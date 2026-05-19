@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bubble Sort</title>
+    <style>
+        body {
+            background-color: #f1e9d2; /* Cream background from image */
+            color: #726253; /* Muted brown-gray for text */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 500;
+            margin-bottom: 25px;
+            letter-spacing: 0.5px;
+            color: #4a3f35;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .sim-box {
+            background-color: #f6efe0; /* Slightly lighter cream for contrast */
+            border: 1px solid #e2d6b5;
+            border-radius: 6px;
+            padding: 15px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .sim-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8c7b70;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        canvas {
+            display: block;
+            background-color: #f1e9d2; /* Match parent background */
+            width: 100%;
+            height: 620px; /* Tall container to fit stacked row tracking */
+        }
+
+        .controls {
+            display: flex;
+            gap: 25px;
+            margin-top: 30px;
+            align-items: center;
+            justify-content: center;
+            background-color: #e8ddbe;
+            padding: 12px 25px;
+            border-radius: 6px;
+            border: 1px solid #dcd0b0;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #faf6eb;
+            color: #4a3f35;
+            border: 1px solid #bcaf92;
+            padding: 8px 18px;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #ffffff;
+            border-color: #9a8c6f;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: #5c4f43;
+        }
+
+        input[type="range"] {
+            accent-color: #e60000; /* Red slider selector */
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Bubble Sort Comparison</h1>
+
+    <div class="grid-container">
+        <div class="sim-box">
+            <div class="sim-title">Random</div>
+            <canvas id="canvas-random"></canvas>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Nearly Sorted</div>
+            <canvas id="canvas-nearly"></canvas>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Reversed</div>
+            <canvas id="canvas-reversed"></canvas>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Few Unique</div>
+            <canvas id="canvas-unique"></canvas>
+        </div>
+    </div>
+        
+    <div class="controls">
+        <div class="btn-group">
+            <button id="startBtn" onclick="startSyncSorting()">Sort</button>
+            <button id="resetBtn" onclick="resetAll()">Reset</button>
+        </div>
+        
+        <div class="slider-group">
+            <label for="sizeSlider">Elements:</label>
+            <input type="range" id="sizeSlider" min="5" max="50" value="10" oninput="updateSize(this.value)">
+            <span id="sizeVal">30</span>
+        </div>
+
+        <div class="slider-group">
+            <label for="speedSlider">Delay:</label>
+            <input type="range" id="speedSlider" min="5" max="1000" value="200" oninput="updateSpeed(this.value)">
+            <span id="speedVal">200ms</span>
+        </div>
+    </div>
+
+    <script>
+        // Color palettes sampled directly from the provided source image
+        const COLOR_BG = '#f1e9d2';       // Main cream backdrop
+        const COLOR_TEXT = '#9a8f81';     // Row index number color
+        
+        // Dynamic horizontal bar tones
+        const COLOR_BAR_SMALL = '#0013cd'; // Deep dark blue (Now maps to physically shorter, numerically LARGER elements)
+        const COLOR_BAR_MID = '#7c7dec';   // Medium slate blue
+        const COLOR_BAR_LARGE = '#9a9bf4'; // Light lavender/blue (Now maps to physically longer, numerically SMALLER elements)
+        
+        const COLOR_DOT = '#e1e3fd';       // Off-white/lavender tracking dots
+        const COLOR_HIGHLIGHT = '#ff0000'; // Pure crimson red for selections
+
+        let numBars = 10; // Matches the 0-29 breakdown in the reference picture
+        let isSorting = false;
+        let speed = 200;
+        let timeoutId = null;
+
+        const simulations = [
+            { id: 'canvas-random', type: 'random', data: [], gen: null, ctx: null, logicalWidth: 0, logicalHeight: 0, state: {} },
+            { id: 'canvas-nearly', type: 'nearly', data: [], gen: null, ctx: null, logicalWidth: 0, logicalHeight: 0, state: {} },
+            { id: 'canvas-reversed', type: 'reversed', data: [], gen: null, ctx: null, logicalWidth: 0, logicalHeight: 0, state: {} },
+            { id: 'canvas-unique', type: 'unique', data: [], gen: null, ctx: null, logicalWidth: 0, logicalHeight: 0, state: {} }
+        ];
+
+        function generateData(type) {
+            let arr = [];
+            if (type === 'random') {
+                for (let i = 0; i < numBars; i++) arr.push(Math.random() * 0.85 + 0.15);
+            } 
+            else if (type === 'nearly') {
+                for (let i = 0; i < numBars; i++) arr.push(0.15 + (i / numBars) * 0.85);
+                const numSwaps = Math.max(2, Math.floor(numBars * 0.12));
+                for (let i = 0; i < numSwaps; i++) {
+                    let idx = Math.floor(Math.random() * (numBars - 1));
+                    let temp = arr[idx];
+                    arr[idx] = arr[idx + 1];
+                    arr[idx + 1] = temp;
+                }
+            } 
+            else if (type === 'reversed') {
+                for (let i = numBars - 1; i >= 0; i--) arr.push(0.15 + (i / numBars) * 0.85);
+            } 
+            else if (type === 'unique') {
+                const pools = [0.22, 0.45, 0.68, 0.95];
+                for (let i = 0; i < numBars; i++) {
+                    arr.push(pools[Math.floor(Math.random() * pools.length)]);
+                }
+            }
+            return arr;
+        }
+
+        function* bubbleSortImprovedGenerator(arr) {
+            const n = arr.length; 
+            let t = 0;
+
+            while (t !== n) {
+                let i = t; 
+                t = n;
+
+                for (let j = n - 1; j >= i + 1; --j) {
+                    yield { activeJ: j, activeJPrev: j - 1, done: false };
+
+                    if (arr[j] < arr[j - 1]) {
+                        let temp = arr[j];
+                        arr[j] = arr[j - 1];
+                        arr[j - 1] = temp;
+                        t = j;
+                        yield { activeJ: j, activeJPrev: j - 1, done: false };
+                    }
+                }
+            }
+            while (true) {
+                yield { activeJ: null, activeJPrev: null, done: true };
+            }
+        }
+
+        // --- NEW DESIGN RENDERING ENGINE WITH ADJUSTED VALUE DIRECTION ---
+        function draw(sim) {
+            const ctx = sim.ctx;
+            const w = sim.logicalWidth;
+            const h = sim.logicalHeight;
+            
+            // Clear Background
+            ctx.fillStyle = COLOR_BG;
+            ctx.fillRect(0, 0, w, h);
+
+            const { activeJ, activeJPrev } = sim.state;
+            const rowHeight = h / numBars;
+            const maxBarWidth = w * 0.75; 
+            const centerOffsetX = w * 0.58; 
+
+            for (let idx = 0; idx < sim.data.length; idx++) {
+                const rawValue = sim.data[idx];
+                
+                // ADJUSTMENT: Invert the visual scaling. 
+                // A small numeric element value (near 0) now outputs a high visual scale weight (near 1.0).
+                const visualWeight = 1.1 - rawValue; 
+
+                // Calculate position parameters
+                const rowCenterY = (idx * rowHeight) + (rowHeight / 2);
+                const barThickness = Math.max(6, rowHeight * 0.45);
+                const barWidth = visualWeight * maxBarWidth;
+                const barStartX = centerOffsetX - (barWidth / 2);
+
+                // 1. Draw Row Index Label Text
+                ctx.fillStyle = COLOR_TEXT;
+                ctx.font = `500 ${Math.clamp(rowHeight * 0.6, 10, 15)}px sans-serif`;
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(idx.toString(), centerOffsetX - (maxBarWidth / 2) - 20, rowCenterY);
+
+                // 2. Map colors relative to the inverted size profile
+                let barColor = COLOR_BAR_MID;
+                if (visualWeight < 0.35) {
+                    barColor = COLOR_BAR_SMALL; // Numerically large elements are short and dark
+                } else if (visualWeight > 0.70) {
+                    barColor = COLOR_BAR_LARGE; // Numerically small elements are long and light
+                }
+
+                // 3. Render Highlighting bounding indicator states (Red outlines & structural boxes)
+                const isHighlighted = (idx === activeJ || idx === activeJPrev);
+                if (isHighlighted) {
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = COLOR_HIGHLIGHT;
+                    
+                    if (idx === activeJ) {
+                        const padding = 4;
+                        ctx.strokeRect(
+                            centerOffsetX - (maxBarWidth / 2) - 5, 
+                            rowCenterY - (rowHeight / 2) + padding / 2, 
+                            maxBarWidth + 10, 
+                            rowHeight - padding
+                        );
+                    } else if (idx === activeJPrev) {
+                        ctx.strokeRect(barStartX - 2, rowCenterY - (barThickness / 2) - 2, barWidth + 4, barThickness + 4);
+                    }
+                }
+
+                // 4. Render Horizontal Base Bar
+                ctx.fillStyle = barColor;
+                ctx.fillRect(barStartX, rowCenterY - (barThickness / 2), barWidth, barThickness);
+
+                // 5. Draw decorative overlay structural circle groups inside/over the bars
+                const dotSpacing = 16; 
+                const maxDots = Math.floor(barWidth / dotSpacing);
+                
+                ctx.fillStyle = COLOR_DOT;
+                for (let d = 0; d <= maxDots; d++) {
+                    let dotX = barStartX + (d * dotSpacing);
+                    if (maxDots > 0) {
+                        dotX = barStartX + (barWidth * 0.08) + (d * (barWidth * 0.84 / maxDots));
+                    } else {
+                        dotX = barStartX + (barWidth / 2);
+                    }
+
+                    // Dynamically calculate rhythmic varying dot sizes mimicking the asset source
+                    let dotRadius = 4.5;
+                    if (d % 3 === 0) dotRadius = 9.5;
+                    else if (d % 2 === 0) dotRadius = 6;
+                    
+                    // Constrain circle radius thresholds gracefully if layout scaling shrinks down
+                    dotRadius *= 0.025*rowHeight; // Math.min(dotRadius, barThickness * 0.65);
+
+                    ctx.beginPath();
+                    ctx.arc(dotX, rowCenterY-rowHeight/5, dotRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // Math clamp utility function
+        Math.clamp = function(number, min, max) {
+            return Math.max(min, Math.min(number, max));
+        };
+
+        function stepAll() {
+            if (!isSorting) return;
+            let allDone = true;
+
+            simulations.forEach(sim => {
+                const nextStep = sim.gen.next();
+                if (!nextStep.done) {
+                    sim.state = nextStep.value;
+                    if (!sim.state.done) allDone = false;
+                }
+                draw(sim);
+            });
+
+            if (allDone) {
+                isSorting = false;
+                document.getElementById('startBtn').disabled = true;
+            } else {
+                timeoutId = setTimeout(stepAll, speed);
+            }
+        }
+
+        function startSyncSorting() {
+            if (isSorting) return;
+            isSorting = true;
+            document.getElementById('startBtn').disabled = true;
+            stepAll();
+        }
+
+        function updateSpeed(val) {
+            speed = parseInt(val);
+            document.getElementById('speedVal').innerText = val + 'ms';
+        }
+
+        function updateSize(val) {
+            numBars = parseInt(val);
+            document.getElementById('sizeVal').innerText = val;
+            resetAll(); 
+        }
+
+        function resetAll() {
+            isSorting = false;
+            clearTimeout(timeoutId);
+            document.getElementById('startBtn').disabled = false;
+
+            const dpr = window.devicePixelRatio || 1;
+
+            simulations.forEach(sim => {
+                const canvas = document.getElementById(sim.id);
+                sim.ctx = canvas.getContext('2d');
+                
+                const rect = canvas.getBoundingClientRect();
+                sim.logicalWidth = rect.width;
+                sim.logicalHeight = rect.height;
+
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+
+                sim.ctx.scale(dpr, dpr);
+                
+                sim.data = generateData(sim.type);
+                sim.gen = bubbleSortImprovedGenerator(sim.data);
+                sim.state = { activeJ: null, activeJPrev: null, done: false };
+                
+                draw(sim);
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            const dpr = window.devicePixelRatio || 1;
+            simulations.forEach(sim => {
+                const canvas = document.getElementById(sim.id);
+                const rect = canvas.getBoundingClientRect();
+                sim.logicalWidth = rect.width;
+                sim.logicalHeight = rect.height;
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                sim.ctx.scale(dpr, dpr);
+                draw(sim);
+            });
+        });
+
+        resetAll();
+    </script>
+</body>
+</html>

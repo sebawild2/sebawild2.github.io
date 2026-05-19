@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top-Down Merge Sort</title>
+    <style>
+        body {
+            background-color: #f1e9d2; /* Cream background from image */
+            color: #726253; /* Muted brown-gray for text */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 500;
+            margin-bottom: 25px;
+            letter-spacing: 0.5px;
+            color: #4a3f35;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .sim-box {
+            background-color: #f6efe0; /* Slightly lighter cream for contrast */
+            border: 1px solid #e2d6b5;
+            border-radius: 6px;
+            padding: 15px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .sim-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8c7b70;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        canvas {
+            display: block;
+            background-color: #f1e9d2; /* Match parent background */
+            width: 100%;
+            height: 250px; 
+        }
+
+        .controls {
+            display: flex;
+            gap: 25px;
+            margin-top: 30px;
+            align-items: center;
+            justify-content: center;
+            background-color: #e8ddbe;
+            padding: 12px 25px;
+            border-radius: 6px;
+            border: 1px solid #dcd0b0;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #faf6eb;
+            color: #4a3f35;
+            border: 1px solid #bcaf92;
+            padding: 8px 18px;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background-color: #ffffff;
+            border-color: #9a8c6f;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: #5c4f43;
+        }
+
+        input[type="range"] {
+            accent-color: #e60000; /* Red slider selector */
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Top-Down Merge Sort Comparison</h1>
+
+    <div class="grid-container">
+        <div class="sim-box">
+            <div class="sim-title">Random</div>
+            <canvas id="canvas-random"></canvas>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Nearly Sorted</div>
+            <canvas id="canvas-nearly"></canvas>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Reversed</div>
+            <canvas id="canvas-reversed"></canvas>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Few Unique</div>
+            <canvas id="canvas-unique"></canvas>
+        </div>
+    </div>
+        
+    <div class="controls">
+        <div class="btn-group">
+            <button id="startBtn" onclick="startSyncSorting()">Sort</button>
+            <button id="resetBtn" onclick="resetAll()">Reset</button>
+        </div>
+        
+        <div class="slider-group">
+            <label for="sizeSlider">Elements:</label>
+            <input type="range" id="sizeSlider" min="10" max="100" value="40" oninput="updateSize(this.value)">
+            <span id="sizeVal">40</span>
+        </div>
+
+        <div class="slider-group">
+            <label for="speedSlider">Delay:</label>
+            <input type="range" id="speedSlider" min="1" max="150" value="25" oninput="updateSpeed(this.value)">
+            <span id="speedVal">25ms</span>
+        </div>
+    </div>
+
+    <script>
+        // Color Palette based on your image
+        const COLOR_BG = '#f1e9d2';
+        const COLOR_START_BAR = '#e2b3a3'; // Light pink/brown start of gradient
+        const COLOR_END_BAR = '#670c07';   // Deep rich red/burgundy end of gradient
+        const COLOR_ACTIVE_BORDER = '#ff0000'; // Vibrant red border for active key
+
+        let numBars = 40; 
+        let isSorting = false;
+        let speed = 25;
+        let timeoutId = null;
+
+        const simulations = [
+            { id: 'canvas-random', type: 'random', data: [], gen: null, ctx: null, logicalWidth: 0, logicalHeight: 0, state: {} },
+            { id: 'canvas-nearly', type: 'nearly', data: [], gen: null, ctx: null, logicalWidth: 0, logicalHeight: 0, state: {} },
+            { id: 'canvas-reversed', type: 'reversed', data: [], gen: null, ctx: null, logicalWidth: 0, logicalHeight: 0, state: {} },
+            { id: 'canvas-unique', type: 'unique', data: [], gen: null, ctx: null, logicalWidth: 0, logicalHeight: 0, state: {} }
+        ];
+
+        function lerpColor(color1, color2, factor) {
+            const r1 = parseInt(color1.substring(1, 3), 16);
+            const g1 = parseInt(color1.substring(3, 5), 16);
+            const b1 = parseInt(color1.substring(5, 7), 16);
+
+            const r2 = parseInt(color2.substring(1, 3), 16);
+            const g2 = parseInt(color2.substring(3, 5), 16);
+            const b2 = parseInt(color2.substring(5, 7), 16);
+
+            const r = Math.round(r1 + factor * (r2 - r1));
+            const g = Math.round(g1 + factor * (g2 - g1));
+            const b = Math.round(b1 + factor * (b2 - b1));
+
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function generateData(type) {
+            let arr = [];
+            if (type === 'random') {
+                for (let i = 0; i < numBars; i++) arr.push(Math.random() * 0.90 + 0.10);
+            } 
+            else if (type === 'nearly') {
+                for (let i = 0; i < numBars; i++) arr.push(0.10 + (i / numBars) * 0.90);
+                const numSwaps = Math.max(2, Math.floor(numBars * 0.12));
+                for (let i = 0; i < numSwaps; i++) {
+                    let idx = Math.floor(Math.random() * (numBars - 1));
+                    let temp = arr[idx];
+                    arr[idx] = arr[idx + 1];
+                    arr[idx + 1] = temp;
+                }
+            } 
+            else if (type === 'reversed') {
+                for (let i = numBars - 1; i >= 0; i--) arr.push(0.10 + (i / numBars) * 0.90);
+            } 
+            else if (type === 'unique') {
+                const pools = [0.2, 0.42, 0.65, 0.88];
+                for (let i = 0; i < numBars; i++) {
+                    arr.push(pools[Math.floor(Math.random() * pools.length)]);
+                }
+            }
+            return arr;
+        }
+
+        // --- TOP-DOWN MERGESORT GENERATOR ---
+        function* mergeSortGenerator(arr) {
+            yield* sort(0, arr.length - 1);
+
+            function* sort(l, r) {
+                if (l < r) {
+                    const m = Math.floor((l + r) / 2);
+                    yield* sort(l, m);
+                    yield* sort(m + 1, r);
+                    yield* merge(l, m, r);
+                }
+            }
+
+            function* merge(l, m, r) {
+                let leftArr = arr.slice(l, m + 1);
+                let rightArr = arr.slice(m + 1, r + 1);
+                
+                let i = 0, j = 0, k = l;
+                
+                while (i < leftArr.length && j < rightArr.length) {
+                    if (leftArr[i] <= rightArr[j]) {
+                        arr[k] = leftArr[i];
+                        i++;
+                    } else {
+                        arr[k] = rightArr[j];
+                        j++;
+                    }
+                    yield { activeIdx: k, done: false };
+                    k++;
+                }
+                
+                while (i < leftArr.length) {
+                    arr[k] = leftArr[i];
+                    i++;
+                    yield { activeIdx: k, done: false };
+                    k++;
+                }
+                
+                while (j < rightArr.length) {
+                    arr[k] = rightArr[j];
+                    j++;
+                    yield { activeIdx: k, done: false };
+                    k++;
+                }
+            }
+
+            while (true) {
+                yield { activeIdx: null, done: true };
+            }
+        }
+
+        function draw(sim) {
+            const ctx = sim.ctx;
+            const totalWidth = sim.logicalWidth;
+            const barSpacing = 3; 
+            const barWidth = (totalWidth - (barSpacing * (numBars - 1))) / numBars;
+            
+            ctx.fillStyle = COLOR_BG;
+            ctx.fillRect(0, 0, sim.logicalWidth, sim.logicalHeight);
+
+            const { activeIdx } = sim.state;
+
+            for (let idx = 0; idx < sim.data.length; idx++) {
+                const value = sim.data[idx];
+                const barHeight = Math.floor(value * (sim.logicalHeight - 30));
+                const x = idx * (barWidth + barSpacing);
+                const y = sim.logicalHeight - barHeight;
+
+                ctx.fillStyle = lerpColor(COLOR_START_BAR, COLOR_END_BAR, value);
+                ctx.fillRect(x, y, barWidth, barHeight);
+
+                // Replicate the prominent red outline box on active/mutated items
+                if (activeIdx !== undefined && activeIdx !== null && idx === activeIdx) {
+                    ctx.strokeStyle = COLOR_ACTIVE_BORDER;
+                    ctx.lineWidth = 3; 
+                    ctx.strokeRect(x + 1, y + 1, barWidth - 2, barHeight - 2);
+                }
+            }
+        }
+
+        function stepAll() {
+            if (!isSorting) return;
+            let allDone = true;
+
+            simulations.forEach(sim => {
+                const nextStep = sim.gen.next();
+                if (!nextStep.done) {
+                    sim.state = nextStep.value;
+                    if (!sim.state.done) allDone = false;
+                }
+                draw(sim);
+            });
+
+            if (allDone) {
+                isSorting = false;
+                document.getElementById('startBtn').disabled = true;
+            } else {
+                timeoutId = setTimeout(stepAll, speed);
+            }
+        }
+
+        function startSyncSorting() {
+            if (isSorting) return;
+            isSorting = true;
+            document.getElementById('startBtn').disabled = true;
+            stepAll();
+        }
+
+        function updateSpeed(val) {
+            speed = parseInt(val);
+            document.getElementById('speedVal').innerText = val + 'ms';
+        }
+
+        function updateSize(val) {
+            numBars = parseInt(val);
+            document.getElementById('sizeVal').innerText = val;
+            resetAll(); 
+        }
+
+        function resetAll() {
+            isSorting = false;
+            clearTimeout(timeoutId);
+            document.getElementById('startBtn').disabled = false;
+
+            const dpr = window.devicePixelRatio || 1;
+
+            simulations.forEach(sim => {
+                const canvas = document.getElementById(sim.id);
+                sim.ctx = canvas.getContext('2d');
+                
+                const rect = canvas.getBoundingClientRect();
+                sim.logicalWidth = rect.width;
+                sim.logicalHeight = rect.height;
+
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+
+                sim.ctx.scale(dpr, dpr);
+                
+                sim.data = generateData(sim.type);
+                sim.gen = mergeSortGenerator(sim.data);
+                sim.state = { activeIdx: null, done: false };
+                
+                draw(sim);
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            const dpr = window.devicePixelRatio || 1;
+            simulations.forEach(sim => {
+                const canvas = document.getElementById(sim.id);
+                const rect = canvas.getBoundingClientRect();
+                sim.logicalWidth = rect.width;
+                sim.logicalHeight = rect.height;
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                sim.ctx.scale(dpr, dpr);
+                draw(sim);
+            });
+        });
+
+        resetAll();
+    </script>
+</body>
+</html>
