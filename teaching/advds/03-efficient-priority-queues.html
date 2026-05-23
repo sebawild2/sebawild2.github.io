@@ -6,7 +6,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>Partition-based Simple Heaps</title>
+  <title>Unit 3: Efficient Priority Queues</title>
   <meta name="description" content="">
 
   <link rel="stylesheet" href="/fonts/pagella/stylesheet.css" type="text/css" charset="utf-8" />
@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/fonts/fontawesome/fontawesome-all.min.css" type="text/css" charset="utf-8" />
   <link rel="stylesheet" href="/fonts/academicons/academicons.min.css" type="text/css" charset="utf-8" />
   <link rel="stylesheet" href="/css/main.css">
-  <link rel="canonical" href="https://www.wild-inter.net/publications/brodal-iacono-rysgaard-wild-2026">
+  <link rel="canonical" href="https://www.wild-inter.net/teaching/advds/03-efficient-priority-queues">
   <link rel="alternate" type="application/rss+xml" title="Sebastian Wild's Site" href="https://www.wild-inter.net/feed.xml">
 </head>
 
@@ -88,105 +88,75 @@
 
     <div class="page-content">
       <div class="wrapper">
-        <article class="post">
+        <link rel="stylesheet" href="lessons.css">
+<script src="lightweight-embed.js"></script>
+
+<article class="post">
 	<div class="post-back">
 		<small>
-			<a href="/publications/"><i class="fas fa-arrow-left"></i> All Publications</a>
+			<p><a href="./"><i class="fas fa-arrow-left"></i> main page</a>
+			&nbsp;&mdash;&nbsp; CS&thinsp;650 Advanced Data Structures</p>
 		</small>
 	</div>
 
-	<header class="publication-header">
-		<h1 class="publication-title"><p>Partition-based Simple Heaps</p>
+	<h1 class="post-title"><p>Unit 3: Efficient Priority Queues</p>
 </h1>
 
-		<div class="publication-meta">
-			<p style="text-align:left">
-				<small>
-				Apr 2026
-				<span style="padding-left:1em;">
-					<small>(Written: Oct 2026)</small>
-				</span>
-				</small>
-			</p>
-			<p>
-				
-				
-<p><a href="https://www.cs.au.dk/~gerth/">Gerth Stølting Brodal</a>, <a href="https://john.iacono.web.ulb.be/">John Iacono</a>, <a href="https://pure.au.dk/portal/en/persons/rysgaard@cs.au.dk">Casper Moldrup Rysgaard</a>, and Sebastian Wild:</p>
+	<div class="page-content">
+		<!-- <center>
+<p class="red-box" markdown="1">
+	<strong>
+		This is an archived version of this module from Winter 2024-25.<br/>
+	</strong>
+		Click [here](../) for the current iteration.
+</p>
+</center> -->
 
-			</p>
-			<p>
-				<p><a href="https://latin2026.ufsc.br/">Latin American Theoretical Informatics Symposium (LATIN) 2026</a></p>
+<p>This unit covers:</p>
 
-			</p>
-			<p>
-				
-				| <a href="/publications/html/brodal-iacono-rysgaard-wild-2026.pdf.html"><em>read here</em></a>
-				
-				
-				
-				
-					|&nbsp;<a href="brodal-iacono-rysgaard-wild-2026.pdf" title="brodal-iacono-rysgaard-wild-2026.pdf (preprint)">PDF</a>
-				
-				
-				
-				
-				
-				
-					|&nbsp;<a href="https://arxiv.org/abs/2603.01206" title="2603.01206">arXiv</a>
-				
-				
-					|&nbsp;<a href="https://speakerdeck.com/sebawild/partition-based-simple-heaps">slides</a>
-				
-				
-				
-				
-				
-				|
-			</p>
+<ul>
+  <li>Tournament trees</li>
+  <li>LP heaps</li>
+  <li>Quake heaps</li>
+</ul>
 
-		</div>
+<h2 id="material">Material</h2>
 
-	</header>
+<ul>
+  <li><a href="03-efficient-priority-queues.pdf"><i class="fas fa-file"></i> preliminary slides</a>
+<!-- * [<i class="fas fa-file-contract"></i> lecture notes](notes-03-efficient-priority-queues.pdf) --></li>
+</ul>
 
-	<div class="publication-content">
-		
-<script type="text/x-mathjax-config">
-	var font = "Neo-Euler";
-	MathJax.Hub.Config({
-		tex2jax: {
-			inlineMath: [['$','$']],
-			displayMath: [['\\[','\\]']],
-			processEscapes: true,
-		},
-		"SVG":{ 
-			font:font
-		},
-		"HTML-CSS": {
-			webFont: font,
-			imageFont: font,
-			preferredFont: font,
-			availableFonts: [],
-			scale: 85,
-			mtextFontInherit: true
-		}
-	});
-</script>
+<!-- * [<i class="fab fa-youtube"></i> Video 3-1](https://youtu.be/XpI77k-C0zw) (2026-04-27):
+  Efficient Priority Queues
+  <p><div class="youtube"><div class="youtube-player" data-id="XpI77k-C0zw"></div></div></p> -->
 
-<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<h2 id="further-sources">Further sources</h2>
 
-<p>We introduce a new family of simple priority-queue data structures: partition-based heaps.</p>
+<p>LP Heaps are from our paper</p>
 
-<p>The structures consist of $O(\log n)$ doubly-linked lists; order is enforced among data in different lists, but the individual lists are unordered. Our structures have $O(\log n)$ amortized time extract-min and $O(\log \log n)$ amortized time insert and decrease-key.</p>
+<ul>
+  <li><a href="/publications/brodal-iacono-rysgaard-wild-2026">Brodal, Iacono, Rysgaard, Wild, <em>Partition-based Simple Heaps</em> (2026)</a></li>
+</ul>
 
-<p>The structures require nothing beyond binary search over $O(\log n)$ elements, as well as binary partitions and concatenations of linked lists in natural ways as the linked lists get too big or small. We present three different ways that these lists can be maintained in order to obtain the stated amortized running times.</p>
+<p>Quake heaps follow the original paper by Chan (with a mistake in the potential function fixed).</p>
 
-<h3 id="history">History</h3>
+<ul>
+  <li><a href="https://tmc.web.engr.illinois.edu/heap_ianfest.pdf">Chan, <em>Quake Heaps: A Simple Alternative to Fibonacci Heaps</em> (2013)</a></li>
+</ul>
 
-<p>The paper resulted from a <em>triple merge</em> of three similar data structures, developed independently.
-Casper Rysgaard and I contributed the LP Heaps as given in detail; 
-they are a special case of lazy search trees with some simplifications when solely used as a priority queue.</p>
+<hr />
+
+<p align="center">
+<a href="02-adaptive-trees"><i class="fas fa-arrow-left"></i> Unit 2</a>
+ ⋅ 
+<a href="./#units"><i class="fas fa-arrow-up"></i> Syllabus</a>
+ ⋅ 
+<a href="04-persistence">Unit 4 <i class="fas fa-arrow-right"></i></a>
+</p>
 
 	</div>
+
 </article>
 
       </div>
