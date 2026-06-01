@@ -197,7 +197,7 @@ and the <a href="https://github.com/python/cpython/issues/78742">issue</a> on Py
 unless you explicitly install something else, <code class="language-plaintext highlighter-rouge">python</code> on your machine will be CPython.
 Powersort is used in Tim Peters’s new C-code for sorting lists, see <a href="https://github.com/python/cpython/blob/main/Objects/listobject.c"><code class="language-plaintext highlighter-rouge">listobjects.c</code></a>.
 The list sorting algorithm is described in Tim Peters’s words in 
-<a href="https://github.com/python/cpython/blob/main/Objects/listsort.txt#L343"><code class="language-plaintext highlighter-rouge">listsort.txt</code></a>,
+<a href="https://github.com/python/cpython/blob/main/Objects/listsort.txt#L434"><code class="language-plaintext highlighter-rouge">listsort.txt</code></a>,
 including lots of discussion of the taken design decisions and some benchmark
 results.</p>
 
@@ -206,7 +206,7 @@ results.</p>
 <p>Powersort has also been adapted by Carl Friedrich Bolz-Tereick for <a href="https://www.pypy.org/">PyPy</a>.
 See the Python source for powersort on PyPy heptapod: <a href="https://foss.heptapod.net/pypy/pypy/-/blob/branch/default/rpython/rlib/listsort.py"><code class="language-plaintext highlighter-rouge">listsort.py</code></a>.</p>
 
-<p>###</p>
+<h3 id="numpy">NumPy</h3>
 
 <p>Since June 2025, powersort is also used in <a href="https://github.com/numpy/numpy/pull/29208">numpy</a>, replacing the former Timsort implementation in the development branch.</p>
 
