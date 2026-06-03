@@ -147,6 +147,14 @@ Fibonacci Heaps – Informal Overview
 Quake Heaps Overview
     <p><div class="youtube"><div class="youtube-player" data-id="UFoEuho1Tjs"></div></div></p>
   </li>
+  <li><a href="https://youtu.be/IaUmAD5KKJQ"><i class="fab fa-youtube"></i> Video 3-6</a> (2026-06-02):
+Quake Heaps Operations
+    <p><div class="youtube"><div class="youtube-player" data-id="IaUmAD5KKJQ"></div></div></p>
+  </li>
+  <li><a href="https://youtu.be/xoeHBIT-rvw"><i class="fab fa-youtube"></i> Video 3-7</a> (2026-06-02):
+Quake Heaps Analysis
+    <p><div class="youtube"><div class="youtube-player" data-id="xoeHBIT-rvw"></div></div></p>
+  </li>
 </ul>
 
 <h2 id="further-sources">Further sources</h2>
@@ -164,7 +172,7 @@ is described in</p>
   <li><a href="/publications/brodal-iacono-rysgaard-wild-2026">Brodal, Iacono, Rysgaard, Wild, <em>Partition-based Simple Heaps</em> (2026)</a></li>
 </ul>
 
-<p>Quake heaps follow the original paper by Chan (with a mistake in the potential function fixed).</p>
+<p>Quake heaps follow the original paper by Chan (with constants in the potential function fixed, and the gap of how to do meld in O(1) time plugged by <a href="https://tamionv.ro/">Tamio-Vesa Nakajima</a>).</p>
 
 <ul>
   <li><a href="https://tmc.web.engr.illinois.edu/heap_ianfest.pdf">Chan, <em>Quake Heaps: A Simple Alternative to Fibonacci Heaps</em> (2013)</a></li>
@@ -174,7 +182,7 @@ is described in</p>
 
 <ul>
   <li><a href="https://github.com/elen-niedermeyer/Quake-Heap/blob/master/src/de/niedermeyer/quake_heap/QuakeHeap.java">Elen Niedermeyer, <em>Quake-Heaps</em></a><br />
-(the use of <code class="language-plaintext highlighter-rouge">LinkedList.remove</code> is slow, though)</li>
+(the use of <code class="language-plaintext highlighter-rouge">LinkedList.remove</code> is slow, though; the implementation does not support fast meld.)</li>
 </ul>
 
 <p>The short summary of Fibonacci heaps is based on the following slides</p>
