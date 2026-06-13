@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Red‑Black Tree Visualizer</title>
+    <style>
+        body {
+            background-color: #f1e9d2;
+            color: #726253;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;          /* horizontally center the container */
+            justify-content: flex-start; /* top‑align the whole page */
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+            color: #4a3f35;
+            text-transform: uppercase;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .card {
+            background-color: #f6efe0;
+            border: 1px solid #e2d6b5;
+            border-radius: 8px;
+            padding: 18px 20px;
+            margin-bottom: 16px;
+            width: 100%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .preset-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .preset-row span {
+            font-size: 0.8rem;
+            color: #8c7b70;
+            font-weight: 500;
+        }
+
+        .preset-row button,
+        .preset-row input {
+            font-size: 0.8rem;
+            height: 32px;
+            padding: 0 12px;
+            border-radius: 5px;
+            border: 1px solid #bcaf92;
+            background-color: #faf6eb;
+            color: #4a3f35;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            font-weight: 500;
+        }
+
+        .preset-row button:hover {
+            background-color: #ffffff;
+            border-color: #9a8c6f;
+        }
+
+        .preset-row input[type="number"] {
+            width: 60px;
+            text-align: center;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .toolbar input[type="text"] {
+            height: 34px;
+            padding: 0 12px;
+            border: 1px solid #bcaf92;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            background-color: #faf6eb;
+            color: #4a3f35;
+            width: 100px;
+        }
+
+        .toolbar input:focus {
+            outline: none;
+            border-color: #9a8c6f;
+        }
+
+        button {
+            background-color: #faf6eb;
+            color: #4a3f35;
+            border: 1px solid #bcaf92;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background-color: #ffffff;
+            border-color: #9a8c6f;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        button.primary {
+            background-color: #4a3f35;
+            color: #faf6eb;
+            border-color: #4a3f35;
+        }
+
+        button.primary:hover {
+            background-color: #5c5043;
+            border-color: #5c5043;
+        }
+
+        .sep {
+            width: 1px;
+            height: 22px;
+            background-color: #dcd0b0;
+            margin: 0 4px;
+        }
+
+        .step-nav {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .step-nav span {
+            font-size: 0.8rem;
+            color: #8c7b70;
+        }
+
+        .canvas-wrap {
+            background-color: #f6efe0;
+            border: 1px solid #e2d6b5;
+            border-radius: 8px;
+            overflow: auto;
+            min-height: 320px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        svg#tree {
+            display: block;
+            width: 100%;
+            background-color: transparent;
+        }
+
+        .log {
+            background-color: #f6efe0;
+            border: 1px solid #e2d6b5;
+            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 0.85rem;
+            color: #5c4f43;
+            min-height: 44px;
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        /* Slider-style range for speed (if needed) – not present in tree, but kept for future) */
+        input[type="range"] {
+            accent-color: #c43333;
+        }
+
+        .mode-indicator {
+            font-size: 0.8rem;
+            color: #8c7b70;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Left‑Leaning Red‑Black Tree <span id="mode-indicator" class="mode-indicator">(2-3 tree mode)</span></h1>
+
+        <div class="card preset-row">
+            <span>Presets:</span>
+            <button onclick="loadPreset('SEARCHEX')">S E A R C H E X</button>
+            <button onclick="loadPreset('ABCDEFG')">A B C D E F G</button>
+            <button onclick="loadPreset('balanced')">Balanced</button>
+            <button onclick="resetTree()">Clear</button>
+            <span style="margin-left:6px;">Random size:</span>
+            <input id="random-size" type="number" min="1" max="100" value="7">
+            <button onclick="loadRandomPreset()">Random</button>
+        </div>
+
+        <div class="card toolbar">
+            <input id="key-input" type="text" maxlength="10" placeholder="Key" />
+            <button class="primary" onclick="startInsert()">Insert</button>
+            <button onclick="startDelete()">Delete</button>
+            <div class="sep"></div>
+            <button onclick="opDeleteMin()">Delete min</button>
+            <button onclick="opDeleteMax()">Delete max</button>
+            <div class="sep"></div>
+            <button id="btn-toggle-mode" onclick="toggleBlobMode()">Mode: Blob</button>
+        </div>
+
+        <div class="card step-nav">
+            <button id="btn-prev" onclick="stepPrev()" disabled>← Prev</button>
+            <button id="btn-next" onclick="stepNext()" disabled>Next →</button>
+            <button id="btn-play" onclick="togglePlay()">▶ Auto‑play</button>
+            <span id="step-label"></span>
+        </div>
+
+        <div class="canvas-wrap">
+            <svg id="tree" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+
+        <div class="log" id="log">Ready. Insert a key or choose a preset.</div>
+    </div>
+
+    <script>
+        // ── Faithful port of Sedgewick's RedBlackBST ──────────────────────────
+        const RED = true, BLACK = false;
+        let _uid = 0;
+        function newNode(key) {
+            return { key, color: RED, left: null, right: null, size: 1, id: ++_uid };
+        }
+        function isRed(x) { return x != null && x.color === RED; }
+        function nodeSize(x) { return x ? x.size : 0; }
+        function cloneTree(n) {
+            if (!n) return null;
+            return {
+                key: n.key, color: n.color, left: cloneTree(n.left),
+                right: cloneTree(n.right), size: n.size, id: n.id
+            };
+        }
+
+        function rotateLeft(h) {
+            let x = h.right;
+            h.right = x.left; x.left = h;
+            x.color = h.color; h.color = RED;
+            x.size = h.size; h.size = nodeSize(h.left) + nodeSize(h.right) + 1;
+            return x;
+        }
+        function rotateRight(h) {
+            let x = h.left;
+            h.left = x.right; x.right = h;
+            x.color = h.color; h.color = RED;
+            x.size = h.size; h.size = nodeSize(h.left) + nodeSize(h.right) + 1;
+            return x;
+        }
+        function flipColors(h) {
+            h.color = !h.color;
+            h.left.color = !h.left.color;
+            h.right.color = !h.right.color;
+        }
+        function balance(h) {
+            if (isRed(h.right) && !isRed(h.left)) h = rotateLeft(h);
+            if (isRed(h.left) && isRed(h.left && h.left.left)) h = rotateRight(h);
+            if (isRed(h.left) && isRed(h.right)) flipColors(h);
+            h.size = nodeSize(h.left) + nodeSize(h.right) + 1;
+            return h;
+        }
+
+        function moveRedLeft(h) {
+            flipColors(h);
+            if (isRed(h.right.left)) { h.right = rotateRight(h.right); h = rotateLeft(h); flipColors(h); }
+            return h;
+        }
+        function moveRedRight(h) {
+            flipColors(h);
+            if (isRed(h.left.left)) { h = rotateRight(h); flipColors(h); }
+            return h;
+        }
+        function treeMin(x) { return x.left ? treeMin(x.left) : x; }
+
+        // ── Numeric‑aware comparisons ──────────────────────────────────────
+        let allKeysNumeric = true;
+        function isNumericKey(k) { return /^\d+$/.test(k); }
+        function recalcNumericFlag(node) {
+            let allNum = true;
+            (function walk(n) {
+                if (!n || !allNum) return;
+                if (!isNumericKey(n.key)) { allNum = false; return; }
+                walk(n.left);
+                walk(n.right);
+            })(node);
+            allKeysNumeric = allNum;
+        }
+
+        function lessThan(a, b) {
+            if (allKeysNumeric) return Number(a) < Number(b);
+            return a < b;
+        }
+        function greaterThan(a, b) {
+            if (allKeysNumeric) return Number(a) > Number(b);
+            return a > b;
+        }
+        function equals(a, b) { return a === b; }
+
+        function contains(h, k) {
+            while (h) {
+                if (lessThan(k, h.key)) h = h.left;
+                else if (greaterThan(k, h.key)) h = h.right;
+                else return true;
+            }
+            return false;
+        }
+
+        // ── Step recording ────────────────────────────────────────────────────
+        let steps = [];
+        let stepIdx = 0;
+        let liveRoot = null;
+
+        function snap(desc, hl) {
+            steps.push({ root: cloneTree(liveRoot), desc, hl: (hl || []).filter(Boolean) });
+        }
+
+        // ── Recorded insert ───────────────────────────────────────────────────
+        function opInsert(key) {
+            if (contains(liveRoot, key)) { setLog(`"${key}" already in tree.`); return; }
+            steps = [];
+            snap(`Inserting "${key}" — searching for position`, []);
+
+            function putR(h, setChild) {
+                if (!h) {
+                    let n = newNode(key);
+                    setChild(n);
+                    snap(`New RED node "${key}" inserted`, [n.id]);
+                    return n;
+                }
+
+                if (lessThan(key, h.key)) {
+                    h.left = putR(h.left, v => { h.left = v; setChild(h); });
+                } else if (greaterThan(key, h.key)) {
+                    h.right = putR(h.right, v => { h.right = v; setChild(h); });
+                }
+
+                if (isRed(h.right) && !isRed(h.left)) {
+                    let hl = [h.id, h.right && h.right.id];
+                    h = rotateLeft(h);
+                    setChild(h); snap(`Rotate LEFT at "${h.key}" — right-leaning red link`, hl.filter(Boolean));
+                }
+                if (isRed(h.left) && isRed(h.left && h.left.left)) {
+                    let hl = [h.id, h.left && h.left.id];
+                    h = rotateRight(h);
+                    setChild(h); snap(`Rotate RIGHT at "${h.key}" — two consecutive left reds`, hl.filter(Boolean));
+                }
+                if (isRed(h.left) && isRed(h.right)) {
+                    let hl = [h.id, h.left && h.left.id, h.right && h.right.id];
+                    flipColors(h);
+                    setChild(h); snap(`Flip colors at "${h.key}" — red pushed up`, hl.filter(Boolean));
+                }
+                h.size = nodeSize(h.left) + nodeSize(h.right) + 1;
+                return h;
+            }
+
+            liveRoot = putR(liveRoot, v => { liveRoot = v; });
+            if (liveRoot) liveRoot.color = BLACK;
+            if (!isNumericKey(key)) allKeysNumeric = false;
+            snap(`Insert complete — root set BLACK`, liveRoot ? [liveRoot.id] : []);
+            showSteps();
+        }
+
+        // ── Recorded delete operations ────────────────────────────────────────
+        function balanceR(h, setChild, prefix) {
+            if (isRed(h.right) && !isRed(h.left)) {
+                let hl = [h.id, h.right && h.right.id];
+                h = rotateLeft(h);
+                setChild(h); snap(`${prefix}: Rotate LEFT at "${h.key}"`, hl.filter(Boolean));
+            }
+            if (isRed(h.left) && isRed(h.left && h.left.left)) {
+                let hl = [h.id, h.left && h.left.id];
+                h = rotateRight(h);
+                setChild(h); snap(`${prefix}: Rotate RIGHT at "${h.key}"`, hl.filter(Boolean));
+            }
+            if (isRed(h.left) && isRed(h.right)) {
+                let hl = [h.id, h.left && h.left.id, h.right && h.right.id];
+                flipColors(h);
+                setChild(h); snap(`${prefix}: Flip colors at "${h.key}"`, hl.filter(Boolean));
+            }
+            h.size = nodeSize(h.left) + nodeSize(h.right) + 1;
+            return h;
+        }
+
+        function moveRedLeftR(h, setChild) {
+            let hl = [h.id, h.left && h.left.id, h.right && h.right.id];
+            flipColors(h);
+            setChild(h); snap(`Move red left: flip at "${h.key}"`, hl.filter(Boolean));
+            if (isRed(h.right && h.right.left)) {
+                let hrl = [h.right.id, h.right.left.id];
+                h.right = rotateRight(h.right);
+                setChild(h); snap(`Move red left: rotate right on right child "${h.right.key}"`, hrl.filter(Boolean));
+                hl = [h.id, h.right && h.right.id];
+                h = rotateLeft(h);
+                setChild(h); snap(`Move red left: rotate left at "${h.key}"`, hl.filter(Boolean));
+                hl = [h.id, h.left && h.left.id, h.right && h.right.id];
+                flipColors(h);
+                setChild(h); snap(`Move red left: flip colors at "${h.key}"`, hl.filter(Boolean));
+            }
+            return h;
+        }
+
+        function moveRedRightR(h, setChild) {
+            let hl = [h.id, h.left && h.left.id, h.right && h.right.id];
+            flipColors(h);
+            setChild(h); snap(`Move red right: flip at "${h.key}"`, hl.filter(Boolean));
+            if (isRed(h.left && h.left.left)) {
+                hl = [h.id, h.left && h.left.id];
+                h = rotateRight(h);
+                setChild(h); snap(`Move red right: rotate right at "${h.key}"`, hl.filter(Boolean));
+                hl = [h.id, h.left && h.left.id, h.right && h.right.id];
+                flipColors(h);
+                setChild(h); snap(`Move red right: flip colors at "${h.key}"`, hl.filter(Boolean));
+            }
+            return h;
+        }
+
+        function deleteMinNodeR(h, setChild) {
+            if (!h.left) {
+                setChild(null);
+                snap(`Delete min: removed leaf "${h.key}"`, [h.id]);
+                return null;
+            }
+            if (!isRed(h.left) && !isRed(h.left.left)) {
+                h = moveRedLeftR(h, setChild);
+            }
+            h.left = deleteMinNodeR(h.left, v => { h.left = v; setChild(h); });
+            return balanceR(h, setChild, "deleteMin fixup");
+        }
+
+        function deleteMaxNodeR(h, setChild) {
+            if (isRed(h.left)) {
+                let hl = [h.id, h.left && h.left.id];
+                h = rotateRight(h);
+                setChild(h); snap(`Delete max: rotate right at "${h.key}" (red left link)`, hl.filter(Boolean));
+            }
+            if (!h.right) {
+                setChild(null);
+                snap(`Delete max: removed leaf "${h.key}"`, [h.id]);
+                return null;
+            }
+            if (!isRed(h.right) && !isRed(h.right.left)) {
+                h = moveRedRightR(h, setChild);
+            }
+            h.right = deleteMaxNodeR(h.right, v => { h.right = v; setChild(h); });
+            return balanceR(h, setChild, "deleteMax fixup");
+        }
+
+        function deleteNodeR(h, key, setChild) {
+            if (lessThan(key, h.key)) {
+                if (!h.left) {
+                    setChild(h);
+                    snap(`Key "${key}" not found (should not happen)`, []);
+                    return balanceR(h, setChild, "delete fixup (key not found)");
+                }
+                if (!isRed(h.left) && !isRed(h.left.left)) {
+                    h = moveRedLeftR(h, setChild);
+                }
+                h.left = deleteNodeR(h.left, key, v => { h.left = v; setChild(h); });
+            } else {
+                if (isRed(h.left)) {
+                    let hl = [h.id, h.left && h.left.id];
+                    h = rotateRight(h);
+                    setChild(h); snap(`Delete: rotate right at "${h.key}" (red left link)`, hl.filter(Boolean));
+                }
+                if (equals(key, h.key) && !h.right) {
+                    setChild(null);
+                    snap(`Delete: removed leaf "${h.key}"`, [h.id]);
+                    return null;
+                }
+                if (h.right && !isRed(h.right) && !isRed(h.right.left)) {
+                    h = moveRedRightR(h, setChild);
+                }
+                if (equals(key, h.key)) {
+                    let m = treeMin(h.right);
+                    h.key = m.key;
+                    setChild(h);
+                    snap(`Delete: replaced key with successor "${m.key}"`, [h.id]);
+                    h.right = deleteMinNodeR(h.right, v => { h.right = v; setChild(h); });
+                } else if (h.right) {
+                    h.right = deleteNodeR(h.right, key, v => { h.right = v; setChild(h); });
+                }
+            }
+            return balanceR(h, setChild, "delete fixup");
+        }
+
+        function opDelete(key) {
+            if (!contains(liveRoot, key)) { setLog(`"${key}" not found.`); return; }
+            steps = [];
+            snap(`Deleting "${key}"`, findIds(liveRoot, key));
+            if (!isRed(liveRoot.left) && !isRed(liveRoot.right)) {
+                liveRoot.color = RED;
+                snap(`Temporary RED root for delete`, [liveRoot.id]);
+            }
+            liveRoot = deleteNodeR(liveRoot, key, v => { liveRoot = v; });
+            if (liveRoot) liveRoot.color = BLACK;
+            recalcNumericFlag(liveRoot);
+            snap(`Delete complete — root set BLACK`, liveRoot ? [liveRoot.id] : []);
+            showSteps();
+        }
+
+        function opDeleteMin() {
+            if (!liveRoot) { setLog("Tree is empty."); return; }
+            steps = [];
+            let m = treeMin(liveRoot);
+            snap(`Deleting minimum "${m.key}"`, [m.id]);
+            if (!isRed(liveRoot.left) && !isRed(liveRoot.right)) {
+                liveRoot.color = RED;
+                snap(`Temporary RED root for delete min`, [liveRoot.id]);
+            }
+            liveRoot = deleteMinNodeR(liveRoot, v => { liveRoot = v; });
+            if (liveRoot) liveRoot.color = BLACK;
+            recalcNumericFlag(liveRoot);
+            snap(`Delete min complete — root set BLACK`, liveRoot ? [liveRoot.id] : []);
+            showSteps();
+        }
+
+        function opDeleteMax() {
+            if (!liveRoot) { setLog("Tree is empty."); return; }
+            steps = [];
+            let m = liveRoot; while (m.right) m = m.right;
+            snap(`Deleting maximum "${m.key}"`, [m.id]);
+            if (!isRed(liveRoot.left) && !isRed(liveRoot.right)) {
+                liveRoot.color = RED;
+                snap(`Temporary RED root for delete max`, [liveRoot.id]);
+            }
+            liveRoot = deleteMaxNodeR(liveRoot, v => { liveRoot = v; });
+            if (liveRoot) liveRoot.color = BLACK;
+            recalcNumericFlag(liveRoot);
+            snap(`Delete max complete — root set BLACK`, liveRoot ? [liveRoot.id] : []);
+            showSteps();
+        }
+
+        function findIds(h, key) {
+            let r = [];
+            (function w(n) { if (!n) return; if (n.key === key) r.push(n.id); w(n.left); w(n.right); })(h);
+            return r;
+        }
+        function showSteps() { stepIdx = 0; worldPos = {}; render(); updateNav(); }
+
+        // ── Layout toggle & mode ────────────────────────────────────────────
+        let blobMode = true;
+        const NR = 20, HGAP = 10, VGAP = 66;
+
+        function computeLayout(node, depth, leftOffset, useBlobMode) {
+            if (!node) return { w: 0, pos: {} };
+            let leftDepth, rightDepth;
+            if (useBlobMode) {
+                leftDepth = (node.left && node.left.color === RED) ? depth : depth + 1;
+                rightDepth = (node.right && node.right.color === RED) ? depth : depth + 1;
+            } else {
+                leftDepth = depth + 1;
+                rightDepth = depth + 1;
+            }
+
+            let L = computeLayout(node.left, leftDepth, leftOffset, useBlobMode);
+            let myX = leftOffset + L.w + (L.w > 0 ? HGAP : 0);
+            let R = computeLayout(node.right, rightDepth, myX + NR * 2 + HGAP, useBlobMode);
+            let w = L.w + (L.w > 0 ? HGAP : 0) + NR * 2 + (R.w > 0 ? HGAP : 0) + R.w;
+            return {
+                w,
+                pos: {
+                    ...L.pos,
+                    [node.id]: { x: myX + NR, y: depth * VGAP + NR + 28,
+                        key: node.key, color: node.color, id: node.id },
+                    ...R.pos
+                }
+            };
+        }
+
+        // ── Rendering (colors adapted to cream theme) ───────────────────────
+        const svgEl = document.getElementById('tree');
+        let worldPos = {};
+        let animId = null;
+
+        function render() {
+            if (!steps.length) return;
+            const s = steps[stepIdx];
+            setLog(s.desc);
+
+            if (!s.root) {
+                svgEl.setAttribute('viewBox', '0 0 700 80');
+                svgEl.innerHTML = '<text x="350" y="44" text-anchor="middle" font-size="13" fill="#8c7b70" font-family="inherit">Empty tree</text>';
+                worldPos = {}; return;
+            }
+
+            const { w, pos } = computeLayout(s.root, 0, 0, blobMode);
+            const maxY = Object.values(pos).reduce((m, p) => Math.max(m, p.y), 0);
+            const svgW = Math.max(w + 60, 300);
+            const svgH = maxY + NR + 40;
+            const OX = 20;
+            svgEl.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
+            svgEl.style.height = svgH + 'px';
+
+            const from = {};
+            for (let id in pos) {
+                from[id] = worldPos[id]
+                    ? { x: worldPos[id].x, y: worldPos[id].y }
+                    : { x: pos[id].x, y: pos[id].y };
+            }
+
+            if (animId) cancelAnimationFrame(animId);
+            const t0 = performance.now(), DUR = 420;
+
+            (function frame(now) {
+                const t = Math.min(1, (now - t0) / DUR);
+                const e = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+                const cur = {};
+                for (let id in pos)
+                    cur[id] = {
+                        ...pos[id],
+                        x: from[id].x + (pos[id].x - from[id].x) * e,
+                        y: from[id].y + (pos[id].y - from[id].y) * e
+                    };
+                paint(s.root, cur, s.hl, OX, svgW, svgH, blobMode);
+                if (t < 1) animId = requestAnimationFrame(frame);
+                else { worldPos = {}; for (let id in pos) worldPos[id] = { ...pos[id] }; }
+            })(t0);
+        }
+
+        function paint(root, cur, hl, OX, svgW, svgH, useBlobMode) {
+            svgEl.innerHTML = '';
+
+            // Blobs (only in blob mode) – colored with a warm muted tone
+            const blobsGroup = g();
+            if (useBlobMode) {
+                const clusters = [];
+                (function collectClusters(n) {
+                    if (!n) return;
+                    if (n.color === BLACK) {
+                        const clusterNodes = [n];
+                        if (n.left && n.left.color === RED) clusterNodes.push(n.left);
+                        if (n.right && n.right.color === RED) clusterNodes.push(n.right);
+                        if (clusterNodes.length > 1) clusters.push(clusterNodes);
+                    }
+                    collectClusters(n.left);
+                    collectClusters(n.right);
+                })(root);
+
+                for (const cl of clusters) {
+                    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                    for (const node of cl) {
+                        const p = cur[node.id];
+                        if (!p) continue;
+                        minX = Math.min(minX, p.x - NR);
+                        maxX = Math.max(maxX, p.x + NR);
+                        minY = Math.min(minY, p.y - NR);
+                        maxY = Math.max(maxY, p.y + NR);
+                    }
+                    const pad = 8;
+                    const rect = el('rect');
+                    rect.setAttribute('x', minX + OX - pad);
+                    rect.setAttribute('y', minY - pad);
+                    rect.setAttribute('width', maxX - minX + 2 * pad);
+                    rect.setAttribute('height', maxY - minY + 2 * pad);
+                    rect.setAttribute('rx', 12);
+                    rect.setAttribute('ry', 12);
+                    rect.setAttribute('fill', '#e8ddbe');
+                    rect.setAttribute('fill-opacity', '0.6');
+                    rect.setAttribute('stroke', '#bcaf92');
+                    rect.setAttribute('stroke-width', '1.4');
+                    rect.setAttribute('stroke-dasharray', '4 3');
+                    blobsGroup.appendChild(rect);
+                }
+            }
+            svgEl.appendChild(blobsGroup);
+
+            // Edges
+            const eg = g();
+            function drawEdges(n) {
+                if (!n) return;
+                const p = cur[n.id]; if (!p) return;
+                for (let child of [n.left, n.right]) {
+                    if (!child) continue;
+                    const cp = cur[child.id]; if (!cp) continue;
+                    const ln = el('line');
+                    ln.setAttribute('x1', p.x + OX); ln.setAttribute('y1', p.y);
+                    ln.setAttribute('x2', cp.x + OX); ln.setAttribute('y2', cp.y);
+                    const red = child.color === RED;
+                    ln.setAttribute('stroke', red ? '#c43333' : '#9a8c6f');
+                    ln.setAttribute('stroke-width', red ? '3.5' : '1.5');
+                    if (red) ln.setAttribute('stroke-linecap', 'round');
+                    eg.appendChild(ln);
+                }
+                drawEdges(n.left); drawEdges(n.right);
+            }
+            drawEdges(root);
+            svgEl.appendChild(eg);
+
+            // Nodes
+            const ng = g();
+            for (let id in cur) {
+                const p = cur[id];
+                const isHL = hl && hl.includes(p.id);
+                const grp = g();
+                if (isHL) {
+                    const ring = el('circle');
+                    ring.setAttribute('cx', p.x + OX); ring.setAttribute('cy', p.y);
+                    ring.setAttribute('r', NR + 6);
+                    ring.setAttribute('fill', 'none');
+                    ring.setAttribute('stroke', '#c43333');
+                    ring.setAttribute('stroke-width', '2.5');
+                    grp.appendChild(ring);
+                }
+                const c = el('circle');
+                c.setAttribute('cx', p.x + OX); c.setAttribute('cy', p.y); c.setAttribute('r', NR);
+                c.setAttribute('fill', p.color === RED ? '#c43333' : '#4a3f35');
+                grp.appendChild(c);
+                const t = el('text');
+                t.setAttribute('x', p.x + OX); t.setAttribute('y', p.y);
+                t.setAttribute('text-anchor', 'middle'); t.setAttribute('dominant-baseline', 'central');
+                t.setAttribute('font-size', '12'); t.setAttribute('font-weight', '600');
+                t.setAttribute('fill', '#faf6eb');
+                t.setAttribute('font-family', 'inherit');
+                t.textContent = p.key;
+                grp.appendChild(t);
+                ng.appendChild(grp);
+            }
+            svgEl.appendChild(ng);
+
+            // Legend
+            const lg = g();
+            lg.setAttribute('transform', `translate(${svgW - 175},${svgH - 12})`);
+            lcirc(lg, '#c43333', 8);
+            lgtxt(lg, '= red link', 20);
+            lcirc(lg, 'none', 95, '#c43333');
+            lgtxt(lg, '= active', 108);
+            svgEl.appendChild(lg);
+        }
+
+        function lcirc(parent, fill, cx, stroke) {
+            const c = el('circle');
+            c.setAttribute('cx', cx); c.setAttribute('cy', 0); c.setAttribute('r', 7);
+            c.setAttribute('fill', fill);
+            if (stroke) { c.setAttribute('stroke', stroke); c.setAttribute('stroke-width', '2'); }
+            parent.appendChild(c);
+        }
+        function lgtxt(parent, s, x) {
+            const t = el('text');
+            t.setAttribute('x', x); t.setAttribute('y', 4);
+            t.setAttribute('font-size', '10'); t.setAttribute('fill', '#8c7b70');
+            t.setAttribute('font-family', 'inherit');
+            t.textContent = s; parent.appendChild(t);
+        }
+        function g() { return document.createElementNS('http://www.w3.org/2000/svg', 'g'); }
+        function el(t) { return document.createElementNS('http://www.w3.org/2000/svg', t); }
+
+        // ── Toggle mode ──────────────────────────────────────────────────────
+        function toggleBlobMode() {
+            blobMode = !blobMode;
+            const btn = document.getElementById('btn-toggle-mode');
+            const ind = document.getElementById('mode-indicator');
+            if (blobMode) {
+                btn.textContent = 'Mode: Blob';
+                ind.textContent = '(2-3 tree mode)';
+            } else {
+                btn.textContent = 'Mode: Standard';
+                ind.textContent = '(red-black mode)';
+            }
+            worldPos = {};
+            render();
+        }
+
+        // ── Navigation ────────────────────────────────────────────────────────
+        function updateNav() {
+            document.getElementById('btn-prev').disabled = stepIdx <= 0;
+            document.getElementById('btn-next').disabled = stepIdx >= steps.length - 1;
+            document.getElementById('step-label').textContent =
+                steps.length ? `Step ${stepIdx + 1} / ${steps.length}` : '';
+        }
+        function stepNext() { if (stepIdx < steps.length - 1) { stepIdx++; render(); updateNav(); } }
+        function stepPrev() { if (stepIdx > 0) { stepIdx--; render(); updateNav(); } }
+        let playTimer = null;
+        function togglePlay() {
+            if (playTimer) {
+                clearInterval(playTimer); playTimer = null;
+                document.getElementById('btn-play').textContent = '▶ Auto‑play';
+            } else {
+                document.getElementById('btn-play').textContent = '⏸ Pause';
+                playTimer = setInterval(() => {
+                    if (stepIdx >= steps.length - 1) {
+                        clearInterval(playTimer); playTimer = null;
+                        document.getElementById('btn-play').textContent = '▶ Auto‑play'; return;
+                    }
+                    stepNext();
+                }, 850);
+            }
+        }
+
+        // ── User actions ──────────────────────────────────────────────────────
+        function startInsert() { const k = getKey(); if (k) opInsert(k); }
+        function startDelete() { const k = getKey(); if (k) opDelete(k); }
+        function getKey() {
+            const k = document.getElementById('key-input').value.trim().toUpperCase();
+            document.getElementById('key-input').value = ''; return k;
+        }
+        document.getElementById('key-input').addEventListener('keydown', e => { if (e.key === 'Enter') startInsert(); });
+        function setLog(m) { document.getElementById('log').textContent = m; }
+
+        // ── Silent build helper ──────────────────────────────────────────────
+        function buildTreeFromKeys(keys) {
+            liveRoot = null;
+            _uid = 0;
+            allKeysNumeric = keys.every(isNumericKey);
+            function putSilent(h, key) {
+                if (!h) return newNode(key);
+                if (lessThan(key, h.key)) h.left = putSilent(h.left, key);
+                else if (greaterThan(key, h.key)) h.right = putSilent(h.right, key);
+                if (isRed(h.right) && !isRed(h.left)) h = rotateLeft(h);
+                if (isRed(h.left) && isRed(h.left && h.left.left)) h = rotateRight(h);
+                if (isRed(h.left) && isRed(h.right)) flipColors(h);
+                h.size = nodeSize(h.left) + nodeSize(h.right) + 1;
+                return h;
+            }
+            for (let k of keys) {
+                if (contains(liveRoot, k)) continue;
+                liveRoot = putSilent(liveRoot, k);
+                if (liveRoot) liveRoot.color = BLACK;
+            }
+            steps = [{ root: cloneTree(liveRoot), desc: `Tree built (${nodeSize(liveRoot)} nodes).`, hl: [] }];
+            stepIdx = 0; worldPos = {}; render(); updateNav();
+        }
+
+        // ── Presets ───────────────────────────────────────────────────────────
+        function loadPreset(name) {
+            const keys = {
+                SEARCHEX: ['S', 'E', 'A', 'R', 'C', 'H', 'E', 'X'],
+                ABCDEFG: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+                balanced: ['M', 'F', 'T', 'C', 'J', 'P', 'X', 'A', 'E', 'H', 'K', 'N', 'R', 'W', 'Z']
+            }[name] || [];
+            buildTreeFromKeys(keys);
+        }
+
+        function loadRandomPreset() {
+            let size = parseInt(document.getElementById('random-size').value, 10);
+            if (isNaN(size) || size < 1) size = 7;
+            if (size > 100) size = 100;
+            const nums = [];
+            for (let i = 0; i < size; i++) nums.push(i);
+            for (let i = nums.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [nums[i], nums[j]] = [nums[j], nums[i]];
+            }
+            const keys = nums.map(n => n.toString());
+            buildTreeFromKeys(keys);
+        }
+
+        function resetTree() {
+            liveRoot = null; worldPos = {};
+            allKeysNumeric = true;
+            steps = [{ root: null, desc: 'Tree cleared.', hl: [] }];
+            stepIdx = 0; render(); updateNav();
+        }
+
+        // ── Init ──────────────────────────────────────────────────────────────
+        steps = [{ root: null, desc: 'Ready. Insert a key or choose a preset.', hl: [] }];
+        render();
+        updateNav();
+    </script>
+</body>
+</html>
