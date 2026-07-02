@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PageRank &mdash; Random Surfer &amp; Power Iteration</title>
+<style>
+    :root {
+        --bg:        #f1e9d2; /* cream */
+        --panel:     #f6efe0; /* lighter cream */
+        --panel-2:   #faf6eb;
+        --line:      #e2d6b5;
+        --line-2:    #dcd0b0;
+        --controls:  #e8ddbe;
+        --text:      #726253;
+        --text-dim:  #8c7b70;
+        --ink:       #4a3f35;
+        --bar-start: #e2b3a3; /* light pink */
+        --bar-end:   #670c07; /* burgundy */
+        --active:    #ff0000;
+        --btn:       #faf6eb;
+        --btn-line:  #bcaf92;
+        --btn-line-2:#9a8c6f;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        background-color: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 22px 20px 40px;
+    }
+
+    h1 {
+        font-size: 1.55rem;
+        font-weight: 500;
+        margin: 4px 0 4px;
+        letter-spacing: 0.5px;
+        color: var(--ink);
+        text-align: center;
+    }
+
+    .subtitle {
+        font-size: 0.86rem;
+        color: var(--text-dim);
+        margin-bottom: 22px;
+        text-align: center;
+        max-width: 720px;
+        line-height: 1.45;
+    }
+
+    .stage {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        gap: 20px;
+        width: 100%;
+        max-width: 1120px;
+    }
+
+    .sim-box {
+        background-color: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .box-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 12px;
+    }
+
+    .sim-title {
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-dim);
+        font-weight: 600;
+    }
+
+    .box-stat {
+        font-size: 0.78rem;
+        color: var(--text-dim);
+        font-variant-numeric: tabular-nums;
+    }
+    .box-stat b { color: var(--ink); font-weight: 600; }
+
+    #graph {
+        display: block;
+        background-color: var(--bg);
+        width: 100%;
+        height: 460px;
+        border-radius: 4px;
+    }
+
+    /* ---- ranking panel ---- */
+    .rank-list { display: flex; flex-direction: column; gap: 9px; margin-top: 2px; }
+
+    .rank-row { display: grid; grid-template-columns: 22px 1fr 52px; align-items: center; gap: 8px; }
+
+    .rank-id {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-dim);
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .rank-track {
+        position: relative;
+        height: 16px;
+        background-color: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .rank-fill {
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 0%;
+        border-radius: 2px 0 0 2px;
+        transition: none;
+    }
+    /* steady-state marker */
+    .rank-marker {
+        position: absolute;
+        top: -2px; bottom: -2px;
+        width: 2px;
+        background: var(--ink);
+        opacity: 0.55;
+    }
+    .rank-marker::after {
+        content: "";
+        position: absolute;
+        top: -3px; left: -2px;
+        border-left: 3px solid transparent;
+        border-right: 3px solid transparent;
+        border-top: 4px solid var(--ink);
+        opacity: 0.7;
+    }
+
+    .rank-val {
+        font-size: 0.76rem;
+        text-align: right;
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .legend {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        font-size: 0.74rem;
+        color: var(--text-dim);
+        line-height: 1.5;
+    }
+    .legend .swatch {
+        display: inline-block;
+        width: 42px; height: 9px;
+        border-radius: 2px;
+        vertical-align: middle;
+        margin: 0 5px;
+        background: linear-gradient(90deg, var(--bar-start), var(--bar-end));
+    }
+    .legend .tick {
+        display:inline-block; width:2px; height:9px; background:var(--ink);
+        opacity:.55; vertical-align:middle; margin:0 5px;
+    }
+
+    /* ---- controls ---- */
+    .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 22px;
+        margin-top: 24px;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--controls);
+        padding: 14px 24px;
+        border-radius: 6px;
+        border: 1px solid var(--line-2);
+        max-width: 1120px;
+    }
+
+    .seg {
+        display: inline-flex;
+        border: 1px solid var(--btn-line);
+        border-radius: 5px;
+        overflow: hidden;
+        background: var(--bg);
+    }
+    .seg button {
+        border: none;
+        border-radius: 0;
+        background: transparent;
+        padding: 8px 16px;
+        font-size: 0.86rem;
+        font-weight: 500;
+        color: var(--text);
+        cursor: pointer;
+        transition: background .18s, color .18s;
+    }
+    .seg button + button { border-left: 1px solid var(--btn-line); }
+    .seg button.active {
+        background: var(--bar-end);
+        color: #f6e9d8;
+    }
+
+    .btn-group { display: flex; gap: 10px; }
+
+    button {
+        background-color: var(--btn);
+        color: var(--ink);
+        border: 1px solid var(--btn-line);
+        padding: 8px 16px;
+        font-size: 0.88rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.2s, border-color 0.2s, opacity .2s;
+        font-weight: 500;
+    }
+    button:hover:not(:disabled) { background-color: #ffffff; border-color: var(--btn-line-2); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .primary { background-color: var(--bar-end); color: #f6e9d8; border-color: #4d0905; }
+    .primary:hover:not(:disabled) { background-color: #7d130c; border-color: #4d0905; }
+
+    .slider-group { display: flex; align-items: center; gap: 9px; font-size: 0.84rem; color: #5c4f43; }
+    .slider-group span { font-variant-numeric: tabular-nums; min-width: 30px; }
+    input[type="range"] { accent-color: #e60000; cursor: pointer; width: 110px; }
+
+    .hint { font-size: 0.78rem; color: var(--text-dim); text-align:center; margin-top:14px; max-width: 760px; line-height:1.45;}
+
+    @media (max-width: 820px) {
+        .stage { grid-template-columns: 1fr; }
+        #graph { height: 380px; }
+    }
+</style>
+</head>
+<body>
+
+    <h1>PageRank</h1>
+    <p class="subtitle">
+        A random surfer wanders a small web of links. The long-run fraction of time spent at each page <em>is</em> its
+        PageRank &mdash; and power iteration computes that same steady state directly. Watch both arrive at the
+        same answer: bigger, darker nodes are more important.
+    </p>
+
+    <div class="stage">
+        <div class="sim-box">
+            <div class="box-head">
+                <div class="sim-title">The Web</div>
+                <div class="box-stat" id="graphStat">&nbsp;</div>
+            </div>
+            <canvas id="graph"></canvas>
+        </div>
+
+        <div class="sim-box">
+            <div class="box-head">
+                <div class="sim-title">PageRank</div>
+                <div class="box-stat" id="rankStat">&nbsp;</div>
+            </div>
+            <div class="rank-list" id="rankList"></div>
+            <div class="legend">
+                <div><span class="swatch"></span> light &rarr; dark = low &rarr; high rank</div>
+                <div style="margin-top:6px"><span class="tick"></span> marks the true steady-state value</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="seg" id="modeSeg">
+            <button data-mode="surfer" class="active">Random Surfer</button>
+            <button data-mode="power">Power Iteration</button>
+        </div>
+
+        <div class="btn-group">
+            <button id="playBtn" class="primary" onclick="togglePlay()">Play</button>
+            <button id="stepBtn" onclick="stepOnce()">Step</button>
+            <button id="resetBtn" onclick="resetStats()">Reset</button>
+            <button id="newBtn" onclick="newGraph()">New web</button>
+        </div>
+
+        <div class="slider-group">
+            <label for="sizeSlider">Pages:</label>
+            <input type="range" id="sizeSlider" min="5" max="16" value="9" oninput="updateSize(this.value)">
+            <span id="sizeVal">9</span>
+        </div>
+
+        <div class="slider-group">
+            <label for="dampSlider">Damping:</label>
+            <input type="range" id="dampSlider" min="50" max="95" value="85" oninput="updateDamp(this.value)">
+            <span id="dampVal">0.85</span>
+        </div>
+
+        <div class="slider-group">
+            <label for="speedSlider">Speed:</label>
+            <input type="range" id="speedSlider" min="5" max="200" value="26" oninput="updateSpeed(this.value)">
+            <span id="speedVal">26</span>
+        </div>
+    </div>
+
+    <p class="hint" id="hint"></p>
+
+<script>
+/* ============================================================
+   Palette (shared with the merge-sort visual)
+   ============================================================ */
+const COLORS = {
+    bg:        '#f1e9d2',
+    barStart:  '#e2b3a3',
+    barEnd:    '#670c07',
+    active:    '#ff0000',
+    edge:      'rgba(140,123,112,0.45)',
+    edgeActive:'#e60000',
+    textDark:  '#4a3f35',
+    textLight: '#f4ecd6'
+};
+
+/* ============================================================
+   State
+   ============================================================ */
+let N        = 9;
+let damping  = 0.85;
+let speed    = 26;          // surfer hops / second (also drives iteration cadence)
+let mode     = 'surfer';    // 'surfer' | 'power'
+let playing  = false;
+
+let graph    = null;        // { out:[[..]], inn:[[..]], outdeg:[], nx:[], ny:[] }
+let visits, totalHops;      // surfer accounting
+let pr;                     // power-iteration vector (current)
+let truePr, maxTrue;        // converged ground-truth + its max (scaling)
+let displayPr;              // smoothed values actually drawn
+let iteration, lastDelta, converged;
+
+let surfer   = { from:0, to:0, t:0 };
+let trail    = [];
+
+let iterTimer = 0;
+let lastTs    = 0;
+
+/* canvas */
+const canvas = document.getElementById('graph');
+const ctx    = canvas.getContext('2d');
+let   W = 0, H = 0;
+
+let MIN_R = 9, MAX_R = 30;  // recomputed per N
+
+/* ============================================================
+   Color helpers
+   ============================================================ */
+function lerpColor(c1, c2, f) {
+    const r1=parseInt(c1.substr(1,2),16), g1=parseInt(c1.substr(3,2),16), b1=parseInt(c1.substr(5,2),16);
+    const r2=parseInt(c2.substr(1,2),16), g2=parseInt(c2.substr(3,2),16), b2=parseInt(c2.substr(5,2),16);
+    const r=Math.round(r1+f*(r2-r1)), g=Math.round(g1+f*(g2-g1)), b=Math.round(b1+f*(b2-b1));
+    return `rgb(${r},${g},${b})`;
+}
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const randInt = n => Math.floor(Math.random()*n);
+
+/* ============================================================
+   Graph generation + force-directed layout
+   ============================================================ */
+function generateGraph(n) {
+    const out = Array.from({length:n}, ()=>new Set());
+
+    for (let i=0;i<n;i++){
+        const deg = 1 + randInt(Math.min(3, n-1));
+        let guard = 0;
+        while (out[i].size < deg && guard++ < 50){
+            const t = randInt(n);
+            if (t!==i) out[i].add(t);
+        }
+    }
+    // light preferential attachment: give a couple of pages extra inlinks
+    const favourites = [randInt(n), randInt(n)];
+    for (let i=0;i<n;i++){
+        if (Math.random() < 0.35){
+            const f = favourites[randInt(favourites.length)];
+            if (f!==i) out[i].add(f);
+        }
+    }
+
+    const outArr = out.map(s=>[...s]);
+    const outdeg = outArr.map(a=>a.length);
+    const inn = Array.from({length:n}, ()=>[]);
+    outArr.forEach((targets,i)=>targets.forEach(t=>inn[t].push(i)));
+
+    const pos = layout(n, outArr);
+
+    graph = { out:outArr, inn, outdeg, nx:pos.nx, ny:pos.ny };
+}
+
+function layout(n, out){
+    const VW=1000, VH=600;
+    const px = new Float64Array(n), py = new Float64Array(n);
+    for (let i=0;i<n;i++){ px[i]=Math.random()*VW; py[i]=Math.random()*VH; }
+
+    // unique undirected edges for attraction
+    const und = new Set();
+    out.forEach((ts,i)=>ts.forEach(t=>{
+        const a=Math.min(i,t), b=Math.max(i,t);
+        und.add(a+'-'+b);
+    }));
+    const edges = [...und].map(s=>s.split('-').map(Number));
+
+    const k = Math.sqrt((VW*VH)/n) * 0.62;
+    const ITER = 320;
+
+    for (let it=0; it<ITER; it++){
+        const dx=new Float64Array(n), dy=new Float64Array(n);
+        // repulsion
+        for (let i=0;i<n;i++){
+            for (let j=i+1;j<n;j++){
+                let ddx=px[i]-px[j], ddy=py[i]-py[j];
+                let d=Math.hypot(ddx,ddy)||0.01;
+                const f=(k*k)/d;
+                const ux=ddx/d, uy=ddy/d;
+                dx[i]+=ux*f; dy[i]+=uy*f;
+                dx[j]-=ux*f; dy[j]-=uy*f;
+            }
+        }
+        // attraction
+        for (const [a,b] of edges){
+            let ddx=px[a]-px[b], ddy=py[a]-py[b];
+            let d=Math.hypot(ddx,ddy)||0.01;
+            const f=(d*d)/k;
+            const ux=ddx/d, uy=ddy/d;
+            dx[a]-=ux*f; dy[a]-=uy*f;
+            dx[b]+=ux*f; dy[b]+=uy*f;
+        }
+        // mild gravity toward centre
+        for (let i=0;i<n;i++){
+            dx[i]+=(VW/2-px[i])*0.012;
+            dy[i]+=(VH/2-py[i])*0.012;
+        }
+        const temp = (VW*0.10)*(1 - it/ITER);
+        for (let i=0;i<n;i++){
+            const dl=Math.hypot(dx[i],dy[i])||0.01;
+            px[i]+=dx[i]/dl*Math.min(dl,temp);
+            py[i]+=dy[i]/dl*Math.min(dl,temp);
+            px[i]=clamp(px[i],0,VW);
+            py[i]=clamp(py[i],0,VH);
+        }
+    }
+
+    // normalise to [0.07, 0.93]
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    for (let i=0;i<n;i++){ minX=Math.min(minX,px[i]);maxX=Math.max(maxX,px[i]);minY=Math.min(minY,py[i]);maxY=Math.max(maxY,py[i]); }
+    const sx=(maxX-minX)||1, sy=(maxY-minY)||1;
+    const nx=new Float64Array(n), ny=new Float64Array(n);
+    for (let i=0;i<n;i++){
+        nx[i]=0.07+((px[i]-minX)/sx)*0.86;
+        ny[i]=0.07+((py[i]-minY)/sy)*0.86;
+    }
+    return {nx,ny};
+}
+
+/* ============================================================
+   PageRank ground truth (power iteration to convergence)
+   ============================================================ */
+function computeTruePR(){
+    let p = new Float64Array(N).fill(1/N);
+    for (let it=0; it<300; it++){
+        const np = new Float64Array(N).fill((1-damping)/N);
+        let dangling = 0;
+        for (let i=0;i<N;i++) if (graph.outdeg[i]===0) dangling += p[i];
+        const danShare = damping*dangling/N;
+        for (let i=0;i<N;i++) np[i]+=danShare;
+        for (let i=0;i<N;i++){
+            if (graph.outdeg[i]>0){
+                const share = damping*p[i]/graph.outdeg[i];
+                for (const t of graph.out[i]) np[t]+=share;
+            }
+        }
+        let delta=0; for (let i=0;i<N;i++) delta+=Math.abs(np[i]-p[i]);
+        p=np;
+        if (delta<1e-12) break;
+    }
+    truePr = p;
+    maxTrue = Math.max(...p);
+}
+
+/* one power-iteration step (drives the "Power Iteration" mode) */
+function powerStep(){
+    if (converged) return;
+    const np = new Float64Array(N).fill((1-damping)/N);
+    let dangling = 0;
+    for (let i=0;i<N;i++) if (graph.outdeg[i]===0) dangling += pr[i];
+    const danShare = damping*dangling/N;
+    for (let i=0;i<N;i++) np[i]+=danShare;
+    for (let i=0;i<N;i++){
+        if (graph.outdeg[i]>0){
+            const share = damping*pr[i]/graph.outdeg[i];
+            for (const t of graph.out[i]) np[t]+=share;
+        }
+    }
+    let delta=0; for (let i=0;i<N;i++) delta+=Math.abs(np[i]-pr[i]);
+    pr = np;
+    iteration++;
+    lastDelta = delta;
+    if (delta < 1e-6){ converged = true; }
+}
+
+/* one surfer hop */
+function surferHop(){
+    const cur = surfer.to;
+    let next;
+    if (Math.random() > damping || graph.outdeg[cur]===0){
+        next = randInt(N);                                   // teleport
+    } else {
+        next = graph.out[cur][randInt(graph.outdeg[cur])];   // follow a link
+    }
+    visits[next]++;
+    totalHops++;
+    surfer.from = cur;
+    surfer.to   = next;
+}
+
+/* ============================================================
+   Canvas sizing
+   ============================================================ */
+function sizeCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    canvas.width  = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+function nodeRadii(){
+    const r = new Float64Array(N);
+    for (let i=0;i<N;i++){
+        const t = clamp(displayPr[i]/maxTrue, 0, 1.15);
+        r[i] = MIN_R + Math.sqrt(clamp(t,0,1))*(MAX_R-MIN_R);
+    }
+    return r;
+}
+
+function px_(i){ return (MAX_R+12) + graph.nx[i]*(W-2*(MAX_R+12)); }
+function py_(i){ return (MAX_R+12) + graph.ny[i]*(H-2*(MAX_R+12)); }
+
+/* ============================================================
+   Drawing
+   ============================================================ */
+function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0,0,W,H);
+
+    const R = nodeRadii();
+    const activeFrom = surfer.from, activeTo = surfer.to;
+    const showSurfer = (mode==='surfer');
+
+    // ---- edges ----
+    for (let i=0;i<N;i++){
+        for (const j of graph.out[i]){
+            const isActive = showSurfer && playing && i===activeFrom && j===activeTo;
+            drawEdge(i, j, R[i], R[j], isActive);
+        }
+    }
+
+    // ---- nodes ----
+    for (let i=0;i<N;i++){
+        const x=px_(i), y=py_(i), r=R[i];
+        const t = clamp(displayPr[i]/maxTrue, 0, 1);
+        ctx.beginPath();
+        ctx.arc(x,y,r,0,Math.PI*2);
+        ctx.fillStyle = lerpColor(COLORS.barStart, COLORS.barEnd, t);
+        ctx.fill();
+
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(74,63,53,0.25)';
+        ctx.stroke();
+
+        // active surfer node
+        if (showSurfer && i===activeTo){
+            ctx.beginPath();
+            ctx.arc(x,y,r+3.5,0,Math.PI*2);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = COLORS.active;
+            ctx.stroke();
+        }
+
+        // label
+        ctx.fillStyle = t>0.55 ? COLORS.textLight : COLORS.textDark;
+        const fs = clamp(r*0.95, 9, 15);
+        ctx.font = `600 ${fs}px -apple-system, sans-serif`;
+        ctx.textAlign='center';
+        ctx.textBaseline='middle';
+        ctx.fillText(i, x, y+0.5);
+    }
+
+    // ---- surfer dot + trail ----
+    if (showSurfer){
+        const x = px_(activeFrom) + (px_(activeTo)-px_(activeFrom))*ease(surfer.t);
+        const y = py_(activeFrom) + (py_(activeTo)-py_(activeFrom))*ease(surfer.t);
+
+        // trail
+        for (let k=0;k<trail.length;k++){
+            const a = (k+1)/trail.length * 0.5;
+            ctx.beginPath();
+            ctx.arc(trail[k].x, trail[k].y, 3.5, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(255,0,0,${a*0.6})`;
+            ctx.fill();
+        }
+        // glow
+        ctx.beginPath();
+        ctx.arc(x,y,9,0,Math.PI*2);
+        ctx.fillStyle = 'rgba(255,0,0,0.22)';
+        ctx.fill();
+        // core
+        ctx.beginPath();
+        ctx.arc(x,y,5,0,Math.PI*2);
+        ctx.fillStyle = '#ff2b1c';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x,y,2,0,Math.PI*2);
+        ctx.fillStyle = '#fff4ec';
+        ctx.fill();
+    }
+}
+
+function ease(t){ return t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+
+function drawEdge(i, j, ri, rj, active){
+    const ax=px_(i), ay=py_(i), bx=px_(j), by=py_(j);
+    let dx=bx-ax, dy=by-ay;
+    const len=Math.hypot(dx,dy)||1;
+    const ux=dx/len, uy=dy/len;
+    const perp = { x:-uy, y:ux };
+    const off = clamp(len*0.16, 14, 70);
+    const cx = (ax+bx)/2 + perp.x*off;
+    const cy = (ay+by)/2 + perp.y*off;
+
+    // start/end clipped to node boundaries (aimed at control point)
+    let sdx=cx-ax, sdy=cy-ay; const sl=Math.hypot(sdx,sdy)||1;
+    const sx=ax+sdx/sl*ri, sy=ay+sdy/sl*ri;
+    let edx=cx-bx, edy=cy-by; const el=Math.hypot(edx,edy)||1;
+    const ex=bx+edx/el*(rj+3), ey=by+edy/el*(rj+3);
+
+    ctx.beginPath();
+    ctx.moveTo(sx,sy);
+    ctx.quadraticCurveTo(cx,cy,ex,ey);
+    ctx.strokeStyle = active ? COLORS.edgeActive : COLORS.edge;
+    ctx.lineWidth   = active ? 2.6 : 1.3;
+    ctx.stroke();
+
+    // arrowhead at (ex,ey), pointing away from control
+    let adx=ex-cx, ady=ey-cy; const al=Math.hypot(adx,ady)||1;
+    adx/=al; ady/=al;
+    const size = active ? 9 : 6.5;
+    const px1 = ex - adx*size - ady*size*0.55;
+    const py1 = ey - ady*size + adx*size*0.55;
+    const px2 = ex - adx*size + ady*size*0.55;
+    const py2 = ey - ady*size - adx*size*0.55;
+    ctx.beginPath();
+    ctx.moveTo(ex,ey);
+    ctx.lineTo(px1,py1);
+    ctx.lineTo(px2,py2);
+    ctx.closePath();
+    ctx.fillStyle = active ? COLORS.edgeActive : COLORS.edge;
+    ctx.fill();
+}
+
+/* ============================================================
+   Ranking panel (DOM)
+   ============================================================ */
+let rowEls = [];
+function buildRankList(){
+    const list = document.getElementById('rankList');
+    list.innerHTML = '';
+    rowEls = [];
+    for (let i=0;i<N;i++){
+        const row = document.createElement('div');
+        row.className = 'rank-row';
+
+        const id = document.createElement('div');
+        id.className='rank-id'; id.textContent = i;
+
+        const track = document.createElement('div');
+        track.className='rank-track';
+        const fill = document.createElement('div');
+        fill.className='rank-fill';
+        const marker = document.createElement('div');
+        marker.className='rank-marker';
+        marker.style.left = (truePr[i]/maxTrue*100) + '%';
+        track.appendChild(fill);
+        track.appendChild(marker);
+
+        const val = document.createElement('div');
+        val.className='rank-val'; val.textContent = '.000';
+
+        row.appendChild(id); row.appendChild(track); row.appendChild(val);
+        list.appendChild(row);
+        rowEls.push({fill, val});
+    }
+}
+
+function updateRankList(){
+    for (let i=0;i<N;i++){
+        const t = clamp(displayPr[i]/maxTrue, 0, 1);
+        rowEls[i].fill.style.width = (t*100)+'%';
+        rowEls[i].fill.style.backgroundColor = lerpColor(COLORS.barStart, COLORS.barEnd, t);
+        rowEls[i].val.textContent = displayPr[i].toFixed(3).replace(/^0/,'');
+    }
+}
+
+/* ============================================================
+   Main loop
+   ============================================================ */
+function loop(ts){
+    const dt = Math.min(0.05, (ts - lastTs)/1000 || 0);
+    lastTs = ts;
+
+    let target;
+
+    if (mode==='surfer'){
+        if (playing){
+            surfer.t += dt * speed;
+            let guard=0;
+            while (surfer.t >= 1 && guard++ < 40){
+                surfer.t -= 1;
+                surferHop();
+            }
+            // record trail position
+            const x = px_(surfer.from) + (px_(surfer.to)-px_(surfer.from))*ease(surfer.t);
+            const y = py_(surfer.from) + (py_(surfer.to)-py_(surfer.from))*ease(surfer.t);
+            trail.push({x,y});
+            if (trail.length>14) trail.shift();
+        }
+        target = i => totalHops>0 ? visits[i]/totalHops : 0;
+    } else {
+        if (playing && !converged){
+            iterTimer += dt;
+            const interval = clamp(1.4 - (speed-5)/195*1.25, 0.12, 1.4);
+            if (iterTimer >= interval){ iterTimer = 0; powerStep(); }
+        }
+        target = i => pr[i];
+    }
+
+    // smooth displayed values toward the target
+    const a = Math.min(1, dt*9);
+    for (let i=0;i<N;i++){
+        const tgt = target(i);
+        displayPr[i] += (tgt - displayPr[i]) * a;
+    }
+
+    draw();
+    updateRankList();
+    updateStats();
+    requestAnimationFrame(loop);
+}
+
+/* ============================================================
+   Stats / hints
+   ============================================================ */
+function updateStats(){
+    const gs = document.getElementById('graphStat');
+    const rs = document.getElementById('rankStat');
+    if (mode==='surfer'){
+        gs.innerHTML = `at page <b>${surfer.to}</b>`;
+        rs.innerHTML = `<b>${totalHops.toLocaleString()}</b> hops`;
+    } else {
+        gs.innerHTML = `&nbsp;`;
+        rs.innerHTML = converged
+            ? `converged &middot; iter <b>${iteration}</b>`
+            : `iter <b>${iteration}</b> &middot; &Delta; ${lastDelta.toExponential(1)}`;
+    }
+}
+
+function updateHint(){
+    const h = document.getElementById('hint');
+    if (mode==='surfer'){
+        h.textContent = 'Random Surfer: one walker follows links, occasionally teleporting (chance = 1 − damping). Each bar fills toward its steady-state tick as the visit fractions settle. Crank Speed to accumulate millions of hops fast.';
+    } else {
+        h.textContent = 'Power Iteration: every page redistributes its rank along its outgoing links each step. The delta (Δ) shrinks as the vector converges to the same steady state the surfer approaches.';
+    }
+}
+
+/* ============================================================
+   Reset / regenerate
+   ============================================================ */
+function resetStats(){
+    visits = new Float64Array(N);
+    totalHops = 0;
+    const start = randInt(N);
+    surfer = { from:start, to:start, t:0 };
+    visits[start] = 1; totalHops = 1;
+    trail = [];
+
+    pr = new Float64Array(N).fill(1/N);
+    iteration = 0; lastDelta = 0; converged = false;
+    iterTimer = 0;
+
+    displayPr = new Float64Array(N).fill(mode==='surfer' ? 0 : 1/N);
+}
+
+function newGraph(){
+    playing = false;
+    setPlayLabel();
+    MAX_R = clamp(96/Math.sqrt(N), 18, 32);
+    MIN_R = MAX_R*0.30;
+    generateGraph(N);
+    computeTruePR();
+    resetStats();
+    buildRankList();
+}
+
+/* ============================================================
+   Controls
+   ============================================================ */
+function setPlayLabel(){
+    document.getElementById('playBtn').textContent = playing ? 'Pause' : 'Play';
+}
+function togglePlay(){
+    if (mode==='power' && converged && !playing) return; // nothing left to do
+    playing = !playing;
+    setPlayLabel();
+}
+function stepOnce(){
+    playing = false; setPlayLabel();
+    if (mode==='surfer'){
+        surfer.t = 0;
+        surferHop();
+        const x=px_(surfer.to), y=py_(surfer.to);
+        trail.push({x,y}); if (trail.length>14) trail.shift();
+    } else {
+        powerStep();
+    }
+}
+function updateSize(v){
+    N = parseInt(v);
+    document.getElementById('sizeVal').textContent = v;
+    newGraph();
+}
+function updateDamp(v){
+    damping = parseInt(v)/100;
+    document.getElementById('dampVal').textContent = damping.toFixed(2);
+    computeTruePR();
+    // refresh markers against new steady state
+    if (graph){
+        for (let i=0;i<N;i++){
+            const m = document.querySelectorAll('.rank-marker')[i];
+            if (m) m.style.left = (truePr[i]/maxTrue*100)+'%';
+        }
+    }
+    // re-run iteration from scratch so it re-converges visibly
+    if (mode==='power'){ pr=new Float64Array(N).fill(1/N); iteration=0; lastDelta=0; converged=false; iterTimer=0; }
+}
+function updateSpeed(v){
+    speed = parseInt(v);
+    document.getElementById('speedVal').textContent = v;
+}
+function setMode(m){
+    if (m===mode) return;
+    mode = m;
+    playing = false; setPlayLabel();
+    document.querySelectorAll('#modeSeg button').forEach(b=>{
+        b.classList.toggle('active', b.dataset.mode===m);
+    });
+    resetStats();
+    updateHint();
+}
+
+document.querySelectorAll('#modeSeg button').forEach(b=>{
+    b.addEventListener('click', ()=>setMode(b.dataset.mode));
+});
+
+window.addEventListener('resize', sizeCanvas);
+
+/* ============================================================
+   Boot
+   ============================================================ */
+sizeCanvas();
+newGraph();
+updateHint();
+requestAnimationFrame((ts)=>{ lastTs = ts; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>

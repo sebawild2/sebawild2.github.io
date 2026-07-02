@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Depth-First Search — Animated</title>
+<style>
+    :root {
+        --bg: #f1e9d2;
+        --panel: #f6efe0;
+        --panel-border: #e2d6b5;
+        --controls-bg: #e8ddbe;
+        --controls-border: #dcd0b0;
+        --ink: #726253;
+        --ink-strong: #4a3f35;
+        --title-muted: #8c7b70;
+        --btn: #faf6eb;
+        --btn-border: #bcaf92;
+        --btn-border-hover: #9a8c6f;
+
+        --node-cream: #f6efe0;
+        --node-cream-border: #bcaf92;
+        --stack-fill: #e2b3a3;   /* light pink — on the stack / on the thread */
+        --stack-border: #9a3b2f;
+        --done-fill: #670c07;    /* deep burgundy — finished */
+        --done-border: #43271f;
+        --active: #ff0000;       /* current vertex / Ariadne thread */
+        --examine: #c98a1b;      /* iterator currently looking at this edge */
+        --edge: #b3a589;
+        --tree-edge: #670c07;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0;
+        padding: 22px 26px 40px;
+        min-height: 100vh;
+    }
+
+    h1 {
+        font-size: 1.6rem;
+        font-weight: 600;
+        margin: 0 0 4px;
+        letter-spacing: 0.3px;
+        color: var(--ink-strong);
+    }
+    .subtitle {
+        font-size: 0.92rem;
+        color: var(--title-muted);
+        margin: 0 0 20px;
+    }
+    .subtitle code { background: #efe6cd; padding: 1px 6px; border-radius: 3px; }
+
+    /* ---- controls ---- */
+    .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 22px;
+        align-items: center;
+        background-color: var(--controls-bg);
+        padding: 14px 22px;
+        border-radius: 6px;
+        border: 1px solid var(--controls-border);
+        margin-bottom: 22px;
+    }
+    .ctl-group { display: flex; align-items: center; gap: 9px; }
+    .ctl-group label {
+        font-size: 0.82rem; color: var(--ink-strong); font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    .btn-group { display: flex; gap: 8px; }
+
+    button, select {
+        background-color: var(--btn);
+        color: var(--ink-strong);
+        border: 1px solid var(--btn-border);
+        padding: 8px 16px;
+        font-size: 0.9rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        font-weight: 500;
+        font-family: inherit;
+    }
+    button:hover:not(:disabled), select:hover { background-color: #fff; border-color: var(--btn-border-hover); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.primary { background-color: #efd9c8; border-color: #c08b6f; }
+    button.primary:hover:not(:disabled) { background-color: #f3e2d4; }
+    select { cursor: pointer; padding-right: 10px; }
+
+    input[type="range"] { accent-color: #e60000; cursor: pointer; vertical-align: middle; }
+    .slider-group { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #5c4f43; }
+    .slider-group span { min-width: 42px; }
+
+    /* ---- main layout ---- */
+    .stage { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(330px,1fr); gap: 20px; align-items: start; }
+    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+
+    .sim-box {
+        background-color: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        padding: 14px 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .sim-title {
+        font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;
+        color: var(--title-muted); margin: 0 0 12px; font-weight: 700;
+    }
+    canvas#graph { display: block; background-color: var(--bg); width: 100%; height: 460px; border-radius: 4px; }
+
+    .side { display: flex; flex-direction: column; gap: 18px; }
+
+    /* status line */
+    .status {
+        background: #efe6cd; border: 1px solid var(--panel-border); border-radius: 5px;
+        padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px;
+        display: flex; align-items: center;
+    }
+    .status .stepcount { color: var(--title-muted); font-size: 0.8rem; margin-left: auto; padding-left: 12px; white-space: nowrap; }
+
+    /* stack / Ariadne thread */
+    .thread { display: flex; align-items: center; flex-wrap: wrap; gap: 0; min-height: 44px; }
+    .thread .empty { color: var(--title-muted); font-style: italic; font-size: 0.9rem; }
+    .thread-node {
+        width: 38px; height: 38px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 0.95rem;
+        background: var(--stack-fill); border: 2px solid var(--stack-border); color: var(--ink-strong);
+    }
+    .thread-node.top { border-color: var(--active); border-width: 3px; box-shadow: 0 0 0 3px rgba(255,0,0,0.12); }
+    .thread-link { width: 26px; height: 3px; background: var(--active); position: relative; }
+    .thread-tip { font-size: 0.78rem; color: var(--title-muted); margin-top: 8px; }
+    .thread-tip b { color: var(--stack-border); }
+
+    /* adjacency list */
+    .adj { font-size: 0.9rem; }
+    .adj-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #e6dabb; }
+    .adj-row:last-child { border-bottom: none; }
+    .adj-row.onstack { background: #f3e7d2; border-radius: 4px; }
+    .adj-key {
+        width: 34px; min-width: 34px; height: 28px; border-radius: 4px;
+        display: flex; align-items: center; justify-content: center; font-weight: 700;
+        background: var(--node-cream); border: 1px solid var(--node-cream-border); color: var(--ink-strong);
+    }
+    .adj-row.onstack .adj-key { background: var(--stack-fill); border-color: var(--stack-border); }
+    .adj-row.finished .adj-key { background: var(--done-fill); border-color: var(--done-border); color: var(--bg); }
+    .adj-row.current .adj-key { border: 2px solid var(--active); }
+    .adj-arrow { color: var(--title-muted); }
+    .adj-cells { display: flex; gap: 5px; flex-wrap: wrap; }
+    .adj-cell {
+        min-width: 24px; padding: 2px 6px; border-radius: 3px; text-align: center;
+        background: #efe6cd; border: 1px solid #ddd0b1; color: var(--ink); font-variant-numeric: tabular-nums;
+    }
+    .adj-cell.consumed { opacity: 0.38; text-decoration: line-through; }
+    .adj-cell.cursor { background: #fff; border: 2px solid var(--examine); color: var(--ink-strong); font-weight: 700; }
+    .adj-cell.took { background: var(--stack-fill); border-color: var(--stack-border); }
+    .adj-empty { color: var(--title-muted); font-style: italic; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 0.8rem; color: var(--ink); }
+    .legend .item { display: flex; align-items: center; gap: 7px; }
+    .swatch { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; }
+    .sw-cream { background: var(--node-cream); border-color: var(--node-cream-border); }
+    .sw-stack { background: var(--stack-fill); border-color: var(--stack-border); }
+    .sw-done  { background: var(--done-fill); border-color: var(--done-border); }
+    .sw-curr  { background: var(--stack-fill); border-color: var(--active); border-width: 2.5px; }
+    .sw-line  { width: 18px; height: 0; border-radius: 0; border-top: 3px solid var(--active); }
+    .sw-back  { width: 18px; height: 0; border-radius: 0; border-top: 3px dashed #3f7d86; }
+    .sw-cross { width: 16px; height: 16px; border: none; display: inline-flex; align-items: center; justify-content: center; color: #8c3526; font-weight: 800; font-size: 15px; line-height: 1; }
+
+    /* mode toggle switch */
+    .switch { position: relative; display: inline-block; width: 42px; height: 23px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; cursor: pointer; inset: 0; background: #cdbf9d; border: 1px solid #b3a589; border-radius: 23px; transition: .2s; }
+    .switch .track:before { content: ""; position: absolute; height: 17px; width: 17px; left: 3px; top: 2px; background: #faf6eb; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .track { background: #9a3b2f; border-color: #7c2f25; }
+    .switch input:checked + .track:before { transform: translateX(19px); }
+    .sw-agent { position: relative; background: #3b342e !important; border-color: #f1e9d2 !important; }
+    .sw-agent::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: #ff0000; }
+
+    /* editor */
+    details.editor { margin-top: 22px; }
+    details.editor summary { cursor: pointer; font-size: 0.85rem; color: var(--title-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    textarea {
+        font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem;
+        background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border);
+        border-radius: 5px; padding: 10px; width: 230px; height: 230px; resize: vertical;
+    }
+    .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 420px; line-height: 1.5; }
+    .editor-help code { background: #efe6cd; padding: 1px 5px; border-radius: 3px; }
+    .err { color: #9a3b2f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
+</style>
+</head>
+<body>
+
+<h1>Depth-First Search</h1>
+<p class="subtitle">Recursive DFS on an undirected graph from a start vertex. Reads the <code>Algs4 Graph</code> format (V, then E, then the edges). Watch the <b>stack</b> grow as Theseus's thread, and the <b>adjacency-list iterators</b> advance.</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="presetSel">Graph</label>
+        <select id="presetSel"></select>
+    </div>
+    <div class="ctl-group">
+        <label for="startSel">Start</label>
+        <select id="startSel"></select>
+    </div>
+    <div class="btn-group">
+        <button id="backBtn"  onclick="stepBack()">‹ Back</button>
+        <button id="stepBtn" class="primary" onclick="stepFwd()">Step ›</button>
+        <button id="playBtn" onclick="togglePlay()">Play</button>
+        <button id="resetBtn" onclick="resetRun()">Reset</button>
+    </div>
+    <div class="ctl-group">
+        <label for="agentToggle">Explorer</label>
+        <label class="switch"><input type="checkbox" id="agentToggle" onchange="toggleAgentMode(this.checked)"><span class="track"></span></label>
+    </div>
+    <div class="slider-group">
+        <label style="font-size:.82rem;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:var(--ink-strong)">Delay</label>
+        <input type="range" id="speedSlider" min="40" max="1400" value="650" oninput="updateSpeed(this.value)">
+        <span id="speedVal">650ms</span>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="sim-box">
+        <div class="sim-title">Graph G</div>
+        <canvas id="graph"></canvas>
+        <div class="legend" style="margin-top:12px">
+            <div class="item"><span class="swatch sw-cream"></span>unmarked</div>
+            <div class="item"><span class="swatch sw-stack"></span>on stack</div>
+            <div class="item"><span class="swatch sw-curr"></span>current vertex</div>
+            <div class="item"><span class="swatch sw-done"></span>finished</div>
+            <div class="item"><span class="swatch sw-line"></span>Ariadne thread</div>
+            <div class="item"><span class="swatch sw-back"></span>back edge (cycle)</div>
+            <div class="item"><span class="sw-cross">✕</span>passage examined (both mouths ⇒ explored)</div>
+            <div class="item"><span class="swatch sw-agent"></span>explorer</div>
+        </div>
+    </div>
+
+    <div class="side">
+        <div class="sim-box">
+            <div class="sim-title">Status</div>
+            <div class="status"><span id="statusText">Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.</span><span class="stepcount" id="stepCount"></span></div>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title">Stack &nbsp;·&nbsp; Ariadne thread</div>
+            <div class="thread" id="threadView"><span class="empty">empty</span></div>
+            <div class="thread-tip">Bottom = start &nbsp;·&nbsp; <b>top</b> = vertex being explored. Pop = backtrack along the thread.</div>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title">Adjacency lists &nbsp;·&nbsp; iterators</div>
+            <div class="adj" id="adjView"></div>
+        </div>
+    </div>
+</div>
+
+<details class="editor">
+    <summary>Edit / paste a graph</summary>
+    <div class="editor-body">
+        <textarea id="graphText" spellcheck="false"></textarea>
+        <div>
+            <button class="primary" onclick="loadFromText()">Load this graph</button>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--ink-strong);margin-left:10px;cursor:pointer">
+                <input type="checkbox" id="sedgewickToggle" onchange="refreshTextarea()">
+                original Sedgewick format (no coordinates)
+            </label>
+            <div class="err" id="parseErr"></div>
+            <div class="editor-help" style="margin-top:10px">
+                Format (Sedgewick &amp; Wayne <code>Graph</code>): first line is the number of vertices <code>V</code>,
+                second line is the number of edges <code>E</code>, then <code>E</code> lines each holding an
+                undirected edge <code>v w</code>. Vertices are <code>0 … V−1</code>. Parallel edges and self-loops
+                are allowed. Adjacency lists are built by prepending (a Sedgewick <code>Bag</code>), so a vertex's
+                neighbours appear in reverse order of how the edges were read — matching the booksite traversal order.
+                <br><br>
+                <b>Optional fixed layout:</b> after the edges, add exactly <code>V</code> more lines of
+                <code>x y</code> — one pair per vertex, in order — to pin down your own layout instead of the
+                automatic one. Any numeric scale works; it's auto-centred and scaled to fit, preserving relative
+                position and aspect ratio. Loading a graph always fills the box back in with its current layout's
+                coordinates so you can nudge them; tick the box above to see the plain format instead.
+                <br><br>
+                <b>Mixed-format tolerant:</b> each edge occupies exactly one line. Pasting a <i>weighted</i>
+                graph here (an extra third number per edge line) just ignores that weight, since this page is
+                unweighted — no need to strip it out by hand.
+            </div>
+        </div>
+    </div>
+</details>
+
+<script>
+/* ============================ preset graphs ============================ */
+const PRESETS = {
+    "tinyG.txt  (13 V, 13 E — the slide)":
+`13
+13
+0 5
+4 3
+0 1
+9 12
+6 4
+5 4
+0 2
+11 12
+9 10
+0 6
+7 8
+9 11
+5 3`,
+    "tinyCG.txt  (6 V, 8 E — connected)":
+`6
+8
+0 5
+2 4
+2 3
+1 2
+0 1
+3 4
+3 5
+0 2`,
+    "Path  (8 V — single chain)":
+`8
+7
+0 1
+1 2
+2 3
+3 4
+4 5
+5 6
+6 7`,
+    "Two triangles + bridge  (6 V)":
+`6
+7
+0 1
+1 2
+2 0
+3 4
+4 5
+5 3
+2 3`,
+    "Grid maze  (16 V — planar, with loops)":
+`16
+17
+0 1
+1 2
+2 3
+0 4
+2 6
+3 7
+5 6
+5 9
+4 8
+8 9
+7 11
+10 14
+11 15
+12 13
+13 14
+14 15
+9 13`
+};
+
+/* ============================ state ============================ */
+let V = 0;
+let adj = [];            // adjacency lists (Algs4 bag / prepend order)
+let pos = [];            // node positions in [0,1]^2
+let steps = [];          // precomputed snapshots
+let ptr = -1;            // current step index (-1 = before start)
+let lastV = 0, lastEdges = [];
+let playing = false;
+let timer = null;
+let delay = 650;
+let startVertex = 0;
+
+/* explorer (agent) mode state */
+const MOVE_S = 2.4, EXAM_S = 0.16, SKIP_S = 0.18, APPEAR_S = 0.35, FIN_S = 0.30, DONE_S = 0.5, PAUSE_S = 0.15;
+let agentMode = false, agentPlaying = false, tAnim = 0, rafId = null, lastTs = null;
+let TL = { T: [], total: 0 };
+let agentHeading = 0;   // radians, direction Theseus is facing (for lantern + nose)
+
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+
+/* ============================ optional fixed-layout coordinates ============================ */
+function normalizePositions(raw) {
+    let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+    for (const p of raw) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+    const w = Math.max(maxx-minx, 1e-6), h = Math.max(maxy-miny, 1e-6);
+    const pad = 0.08, avail = 1 - 2*pad;
+    const s = avail / Math.max(w, h);
+    const usedW = w*s, usedH = h*s;
+    const offX = pad + (avail-usedW)/2, offY = pad + (avail-usedH)/2;
+    return raw.map(p => ({ x: offX + (p.x-minx)*s, y: offY + (p.y-miny)*s }));
+}
+function fmtCoord(x) { return (Math.round(x*1000)/1000).toString(); }
+
+/* ============================ parsing ============================ */
+/* Line-based: each edge (and, later, each coordinate pair) occupies exactly one line. This makes the
+   format tolerant of pasting a weighted graph where an unweighted one is expected (the extra weight
+   token per line is simply ignored) or vice versa (a missing weight defaults to 1) — a stray/missing
+   token only ever affects the one line it's on, not the rest of the parse. */
+function tokenizeLines(text) {
+    return text.split('\n').map(line => line.trim().split(/\s+/).filter(s => s.length)).filter(toks => toks.length > 0);
+}
+function readVE(lines) {
+    if (lines.length === 0) throw new Error("Empty input.");
+    if (lines[0].length >= 2) return { v: parseInt(lines[0][0], 10), e: parseInt(lines[0][1], 10), li: 1 };
+    if (lines.length < 2) throw new Error("Need E on the second line.");
+    return { v: parseInt(lines[0][0], 10), e: parseInt(lines[1][0], 10), li: 2 };
+}
+function readTrailingPositions(lines, li, v) {
+    const remaining = lines.length - li;
+    if (remaining === 0) return null;
+    if (remaining !== v) throw new Error(`After the edges, expected either nothing or exactly ${v} coordinate line(s) ("x y" each), but found ${remaining}.`);
+    const raw = [];
+    for (let i = 0; i < v; i++) {
+        const toks = lines[li++];
+        const x = parseFloat(toks[0]), y = parseFloat(toks[1]);
+        if (toks.length < 2 || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Vertex ${i}: expected two coordinate numbers "x y".`);
+        raw.push({ x, y });
+    }
+    return normalizePositions(raw);
+}
+function parseGraph(text) {
+    const lines = tokenizeLines(text);
+    const { v, e, li: li0 } = readVE(lines);
+    let li = li0;
+    if (!Number.isFinite(v) || v <= 0) throw new Error("V (number of vertices) must be a positive integer.");
+    if (!Number.isFinite(e) || e < 0) throw new Error("E (number of edges) must be a non-negative integer.");
+    const a = Array.from({length: v}, () => []);
+    const edgeList = [];
+    for (let k = 0; k < e; k++) {
+        if (li >= lines.length) throw new Error(`Expected ${e} edge line(s), only found ${k}.`);
+        const toks = lines[li++];
+        if (toks.length < 2) throw new Error(`Edge ${k+1}: expected two integers.`);
+        const x = parseInt(toks[0], 10);
+        const y = parseInt(toks[1], 10);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Edge ${k+1}: expected two integers.`);
+        if (x < 0 || x >= v || y < 0 || y >= v) throw new Error(`Edge ${k+1}: vertex out of range 0…${v-1}.`);
+        // Algs4 Graph.addEdge prepends to each bag → unshift
+        a[x].unshift(y);
+        a[y].unshift(x);
+        edgeList.push([x, y]);
+    }
+    const customPos = readTrailingPositions(lines, li, v);
+    return { v, adj: a, edges: edgeList, pos: customPos };
+}
+
+/* ============================ layout (force-directed, per component) ============================ */
+function components(n, a) {
+    const comp = new Array(n).fill(-1);
+    let c = 0;
+    for (let s = 0; s < n; s++) {
+        if (comp[s] !== -1) continue;
+        const q = [s]; comp[s] = c;
+        while (q.length) {
+            const u = q.pop();
+            for (const w of a[u]) if (comp[w] === -1) { comp[w] = c; q.push(w); }
+        }
+        c++;
+    }
+    return { comp, count: c };
+}
+
+function forceLayout(localEdges, N) {
+    if (N === 1) return [{ x: 0.5, y: 0.5 }];
+    const p = [];
+    for (let i = 0; i < N; i++) {
+        const ang = (i / N) * Math.PI * 2;
+        p.push({ x: 0.5 + 0.35 * Math.cos(ang) + (Math.random()-0.5)*0.02,
+                 y: 0.5 + 0.35 * Math.sin(ang) + (Math.random()-0.5)*0.02 });
+    }
+    const k = Math.sqrt(1 / N) * 0.9;
+    let temp = 0.12;
+    const ITER = 500;
+    for (let it = 0; it < ITER; it++) {
+        const disp = p.map(() => ({ x: 0, y: 0 }));
+        for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+            let dx = p[i].x - p[j].x, dy = p[i].y - p[j].y;
+            let d = Math.hypot(dx, dy) || 1e-4;
+            const f = (k * k) / d;
+            disp[i].x += (dx/d)*f; disp[i].y += (dy/d)*f;
+            disp[j].x -= (dx/d)*f; disp[j].y -= (dy/d)*f;
+        }
+        for (const [a2, b2] of localEdges) {
+            if (a2 === b2) continue;
+            let dx = p[a2].x - p[b2].x, dy = p[a2].y - p[b2].y;
+            let d = Math.hypot(dx, dy) || 1e-4;
+            const f = (d * d) / k;
+            disp[a2].x -= (dx/d)*f; disp[a2].y -= (dy/d)*f;
+            disp[b2].x += (dx/d)*f; disp[b2].y += (dy/d)*f;
+        }
+        for (let i = 0; i < N; i++) {
+            let d = Math.hypot(disp[i].x, disp[i].y) || 1e-4;
+            const lim = Math.min(d, temp);
+            p[i].x += (disp[i].x/d)*lim;
+            p[i].y += (disp[i].y/d)*lim;
+        }
+        temp *= 0.985;
+    }
+    return p;
+}
+
+function layoutAll(n, a) {
+    const { comp, count } = components(n, a);
+    let groups = Array.from({ length: count }, () => []);
+    for (let v = 0; v < n; v++) groups[comp[v]].push(v);
+    groups.sort((g1, g2) => g2.length - g1.length);
+
+    const boxes = groups.map(group => {
+        const idxOf = new Map(group.map((v, i) => [v, i]));
+        const elocal = [];
+        for (const v of group) for (const w of a[v]) if (v < w && idxOf.has(w)) elocal.push([idxOf.get(v), idxOf.get(w)]);
+        const p = forceLayout(elocal, group.length);
+        let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+        for (const q of p) { minx = Math.min(minx, q.x); miny = Math.min(miny, q.y); maxx = Math.max(maxx, q.x); maxy = Math.max(maxy, q.y); }
+        return { group, p, minx, miny, w: Math.max(maxx - minx, 1e-3), h: Math.max(maxy - miny, 1e-3) };
+    });
+
+    const positions = new Array(n);
+    const cols = Math.ceil(Math.sqrt(count));
+    const rows = Math.ceil(count / cols);
+    boxes.forEach((box, bi) => {
+        const cx = bi % cols, cy = Math.floor(bi / cols);
+        const cellW = 1 / cols, cellH = 1 / rows;
+        const pad = 0.16;
+        const availW = cellW * (1 - pad * 2), availH = cellH * (1 - pad * 2);
+        const scale = Math.min(availW / box.w, availH / box.h);
+        const usedW = box.w * scale, usedH = box.h * scale;
+        const offX = cx * cellW + (cellW - usedW) / 2;
+        const offY = cy * cellH + (cellH - usedH) / 2;
+        box.group.forEach((v, i) => {
+            positions[v] = {
+                x: offX + (box.p[i].x - box.minx) * scale,
+                y: offY + (box.p[i].y - box.miny) * scale
+            };
+        });
+    });
+    return positions;
+}
+
+/* ============================ DFS step generator ============================ */
+function buildDFS(a, start) {
+    const n = a.length;
+    const marked = new Array(n).fill(false);
+    const finished = new Array(n).fill(false);
+    const edgeTo = new Array(n).fill(-1);
+    const stack = [];               // frames {v, i}
+    const out = [];
+    const backEdges = [];           // explored non-tree edges, canonical [min,max]
+    const backSet = new Set();
+    const examined = [];            // examined directed half-edges [v,w] (a cross at v's mouth of vw)
+    const examinedSet = new Set();
+
+    const snap = (action, extra = {}) => out.push({
+        marked: marked.slice(),
+        finished: finished.slice(),
+        edgeTo: edgeTo.slice(),
+        stack: stack.map(f => ({ v: f.v, i: f.i })),
+        backEdges: backEdges.slice(),
+        examinedDirs: examined.slice(),
+        action, ...extra
+    });
+
+    marked[start] = true;
+    stack.push({ v: start, i: 0 });
+    snap(`Visit ${start}: mark it and push it onto the stack.`, { current: start, flash: start });
+
+    while (stack.length) {
+        const frame = stack[stack.length - 1];
+        const v = frame.v;
+        if (frame.i < a[v].length) {
+            const w = a[v][frame.i];
+            const dk = v + '>' + w;
+            if (!examinedSet.has(dk)) { examinedSet.add(dk); examined.push([v, w]); }
+            snap(`At ${v}: look at neighbour ${w} (iterator position ${frame.i}).`,
+                 { current: v, examV: v, examW: w, examIdx: frame.i });
+            frame.i++;
+            if (!marked[w]) {
+                marked[w] = true;
+                edgeTo[w] = v;
+                stack.push({ v: w, i: 0 });
+                snap(`${w} is unmarked → visit ${w}: mark, push, extend the thread.`,
+                     { current: w, flash: w, treeEdge: [v, w] });
+            } else {
+                // already marked: parent edge (just the way we came) vs a genuine back edge to an ancestor
+                const isParent = edgeTo[v] === w;
+                const isBack = !isParent && v !== w;
+                if (isBack) {
+                    const key = v < w ? v+'_'+w : w+'_'+v;
+                    if (!backSet.has(key)) { backSet.add(key); backEdges.push(v < w ? [v, w] : [w, v]); }
+                }
+                snap(isParent
+                        ? `${w} is already marked (it's the parent) → skip it.`
+                        : `${w} is already marked → skip. Edge ${v}–${w} is a back edge (closes a cycle).`,
+                     { current: v, skipW: w, skipFrom: v, isBack });
+            }
+        } else {
+            stack.pop();
+            finished[v] = true;
+            const back = stack.length ? stack[stack.length - 1].v : null;
+            snap(back !== null
+                    ? `${v} has no unmarked neighbours left → pop, backtrack to ${back}.`
+                    : `${v} done → pop. Stack empty: DFS from ${start} complete.`,
+                 { current: back, finishedV: v });
+        }
+    }
+    const reached = marked.map((m, i) => m ? i : null).filter(x => x !== null);
+    snap(`Done. Reached ${reached.length} vert${reached.length===1?'ex':'ices'} from ${start}: ${reached.join(', ')}.`,
+         { current: null, done: true });
+    return out;
+}
+
+/* ============================ rendering — canvas ============================ */
+let dpr = 1, cw = 0, ch = 0, radius = 16;
+
+function fitCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cw = rect.width; ch = rect.height;
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // node radius from nearest-neighbour spacing
+    const M = 34;
+    const px = pos.map(p => ({ x: M + p.x * (cw - 2*M), y: M + p.y * (ch - 2*M) }));
+    let minD = Infinity;
+    for (let i = 0; i < px.length; i++) for (let j = i+1; j < px.length; j++) {
+        const d = Math.hypot(px[i].x - px[j].x, px[i].y - px[j].y);
+        if (d < minD) minD = d;
+    }
+    if (!Number.isFinite(minD)) minD = 80;
+    radius = Math.max(11, Math.min(24, minD * 0.42));
+    return px;
+}
+
+function nodeColors(state, v) {
+    if (!state) return { fill: 'var', };
+    if (state.finished && state.finished[v]) return { fill: '#670c07', border: '#43271f', text: '#f1e9d2' };
+    if (state.marked && state.marked[v])     return { fill: '#e2b3a3', border: '#9a3b2f', text: '#4a3f35' };
+    return { fill: '#f6efe0', border: '#bcaf92', text: '#726253' };
+}
+
+/* explored non-tree edges (back edges) — dusty teal-slate, short-dashed, clearly
+   different from the tan unvisited edges and the burgundy tree edges */
+const BACK_EDGE_COLOR = '#3f7d86';
+function drawBackEdges(px, backEdges) {
+    ctx.save();
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = BACK_EDGE_COLOR;
+    ctx.setLineDash([6, 5]);
+    for (const [a, b] of backEdges) {
+        if (a === b || !px[a] || !px[b]) continue;
+        ctx.beginPath(); ctx.moveTo(px[a].x, px[a].y); ctx.lineTo(px[b].x, px[b].y); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+}
+
+function render() {
+    if (agentMode) { if (!agentPlaying) drawAgentAt(tAnim); return; }   // explorer mode draws the maze
+    const state = ptr >= 0 ? steps[ptr] : null;
+    const px = fitCanvas();
+    ctx.clearRect(0, 0, cw, ch);
+
+    // --- edges (base) ---
+    const seen = new Set();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = '#b3a589';
+    for (let v = 0; v < V; v++) for (const w of adj[v]) {
+        if (v === w) continue;
+        const key = v < w ? v + '_' + w : w + '_' + v;
+        if (seen.has(key)) continue; seen.add(key);
+        ctx.beginPath(); ctx.moveTo(px[v].x, px[v].y); ctx.lineTo(px[w].x, px[w].y); ctx.stroke();
+    }
+
+    // --- explored non-tree (back) edges: persistent, distinct from unvisited ---
+    if (state && state.backEdges && state.backEdges.length) {
+        drawBackEdges(px, state.backEdges);
+    }
+
+    // --- DFS tree edges ---
+    if (state && state.edgeTo) {
+        ctx.lineWidth = 3; ctx.strokeStyle = '#670c07';
+        for (let w = 0; w < V; w++) {
+            const v = state.edgeTo[w];
+            if (v >= 0) { ctx.beginPath(); ctx.moveTo(px[v].x, px[v].y); ctx.lineTo(px[w].x, px[w].y); ctx.stroke(); }
+        }
+    }
+
+    // --- Ariadne thread (consecutive stack vertices) ---
+    if (state && state.stack && state.stack.length > 1) {
+        ctx.lineWidth = 3.5; ctx.strokeStyle = '#ff0000';
+        ctx.beginPath();
+        for (let i = 0; i < state.stack.length; i++) {
+            const v = state.stack[i].v;
+            if (i === 0) ctx.moveTo(px[v].x, px[v].y); else ctx.lineTo(px[v].x, px[v].y);
+        }
+        ctx.stroke();
+    }
+
+    // --- examined edge highlight ---
+    if (state && state.examV !== undefined) {
+        ctx.lineWidth = 3.5; ctx.strokeStyle = '#c98a1b';
+        ctx.setLineDash([7, 5]);
+        ctx.beginPath(); ctx.moveTo(px[state.examV].x, px[state.examV].y); ctx.lineTo(px[state.examW].x, px[state.examW].y); ctx.stroke();
+        ctx.setLineDash([]);
+    }
+    if (state && state.skipW !== undefined) {
+        ctx.lineWidth = state.isBack ? 3.5 : 2.5; ctx.strokeStyle = state.isBack ? BACK_EDGE_COLOR : '#c98a1b';
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.moveTo(px[state.skipFrom].x, px[state.skipFrom].y); ctx.lineTo(px[state.skipW].x, px[state.skipW].y); ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // --- nodes ---
+    ctx.font = `700 ${Math.round(radius*0.92)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let v = 0; v < V; v++) {
+        const c = nodeColors(state, v);
+        ctx.beginPath(); ctx.arc(px[v].x, px[v].y, radius, 0, Math.PI*2);
+        ctx.fillStyle = c.fill; ctx.fill();
+        const isCurrent = state && state.current === v;
+        const isExam = state && (state.examW === v || state.flash === v);
+        if (isCurrent) { ctx.lineWidth = 4; ctx.strokeStyle = '#ff0000'; }
+        else if (isExam && state.examW === v) { ctx.lineWidth = 3; ctx.strokeStyle = '#c98a1b'; }
+        else { ctx.lineWidth = 2; ctx.strokeStyle = c.border; }
+        ctx.stroke();
+        ctx.fillStyle = c.text;
+        ctx.fillText(String(v), px[v].x, px[v].y + 1);
+    }
+
+    renderSidePanels(state);
+}
+
+/* ============================ rendering — side panels ============================ */
+function renderSidePanels(state) {
+    // status
+    const st = document.getElementById('statusText');
+    const sc = document.getElementById('stepCount');
+    if (state) {
+        st.innerHTML = escapeHtml(state.action);
+        sc.textContent = `step ${ptr+1} / ${steps.length}`;
+    } else {
+        st.innerHTML = 'Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.';
+        sc.textContent = `0 / ${steps.length}`;
+    }
+
+    // thread / stack
+    const tv = document.getElementById('threadView');
+    tv.innerHTML = '';
+    const stk = state ? state.stack : [];
+    if (!stk || stk.length === 0) {
+        tv.innerHTML = '<span class="empty">empty</span>';
+    } else {
+        stk.forEach((f, i) => {
+            if (i > 0) { const link = document.createElement('div'); link.className = 'thread-link'; tv.appendChild(link); }
+            const node = document.createElement('div');
+            node.className = 'thread-node' + (i === stk.length - 1 ? ' top' : '');
+            node.textContent = f.v;
+            tv.appendChild(node);
+        });
+    }
+
+    // adjacency lists + iterators
+    const av = document.getElementById('adjView');
+    av.innerHTML = '';
+    const stackPos = new Map();   // vertex -> iterator index (only for vertices on the stack)
+    if (state) state.stack.forEach(f => stackPos.set(f.v, f.i));
+    for (let v = 0; v < V; v++) {
+        const onStack = stackPos.has(v);
+        const isCurr = state && state.current === v;
+        const fin = state && state.finished && state.finished[v];
+        const row = document.createElement('div');
+        row.className = 'adj-row' + (onStack ? ' onstack' : '') + (isCurr ? ' current' : '') + (fin ? ' finished' : '');
+
+        const key = document.createElement('div'); key.className = 'adj-key'; key.textContent = v; row.appendChild(key);
+        const arrow = document.createElement('span'); arrow.className = 'adj-arrow'; arrow.textContent = '→'; row.appendChild(arrow);
+
+        const cells = document.createElement('div'); cells.className = 'adj-cells';
+        if (adj[v].length === 0) {
+            const e = document.createElement('span'); e.className = 'adj-empty'; e.textContent = '∅'; cells.appendChild(e);
+        } else {
+            const it = onStack ? stackPos.get(v) : -1;
+            adj[v].forEach((w, i) => {
+                const cell = document.createElement('span'); cell.className = 'adj-cell'; cell.textContent = w;
+                if (onStack) {
+                    if (i < it) cell.classList.add('consumed');
+                    else if (i === it) cell.classList.add('cursor');
+                }
+                // highlight the exact edge being examined right now
+                if (state && state.examV === v && state.examIdx === i) { cell.classList.remove('cursor'); cell.classList.add('cursor'); }
+                cells.appendChild(cell);
+            });
+        }
+        row.appendChild(cells);
+        av.appendChild(row);
+    }
+}
+
+function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c])); }
+
+/* ============================ explorer (agent) timeline ============================ */
+function ndist(a, b) { return Math.hypot(pos[a].x - pos[b].x, pos[a].y - pos[b].y); }
+
+function buildTimeline() {
+    const T = []; let tcur = 0;
+    for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        let kind, dur;
+        if (s.treeEdge) { kind = 'fwd'; dur = ndist(s.treeEdge[0], s.treeEdge[1]) * MOVE_S; }
+        else if (s.finishedV !== undefined && s.current !== null && s.current !== undefined) { kind = 'back'; dur = ndist(s.finishedV, s.current) * MOVE_S; }
+        else if (s.finishedV !== undefined) { kind = 'finishroot'; dur = FIN_S; }
+        else if (s.examV !== undefined) { kind = 'exam'; dur = EXAM_S; }
+        else if (s.skipW !== undefined) { kind = 'skip'; dur = SKIP_S; }
+        else if (i === 0) { kind = 'appear'; dur = APPEAR_S; }
+        else if (s.done) { kind = 'done'; dur = DONE_S; }
+        else { kind = 'pause'; dur = PAUSE_S; }
+        s.__kind = kind;
+        dur = Math.max(dur, 0.02);
+        T.push({ i, kind, start: tcur, dur });
+        tcur += dur;
+    }
+    TL = { T, total: tcur };
+}
+
+function stepAtTime(t) {
+    const T = TL.T;
+    if (!T.length || t <= 0) return { idx: 0, frac: 0 };
+    for (let k = 0; k < T.length; k++) if (t < T[k].start + T[k].dur) return { idx: k, frac: (t - T[k].start) / T[k].dur };
+    return { idx: T.length - 1, frac: 1 };
+}
+
+function speedMult() { return 650 / delay; }
+function startMarkedArr() { const a = new Array(V).fill(false); a[startVertex] = true; return a; }
+
+function drawAgentToken(x, y, heading = 0, moving = false) {
+    const r = Math.max(7, radius * 0.62);
+
+    // warm lantern glow cast ahead of the explorer
+    const lx = x + Math.cos(heading) * r * 0.9, ly = y + Math.sin(heading) * r * 0.9;
+    const glowR = r * (moving ? 3.4 : 2.6);
+    const g = ctx.createRadialGradient(lx, ly, 1, lx, ly, glowR);
+    g.addColorStop(0, 'rgba(255,196,92,0.40)');
+    g.addColorStop(0.5, 'rgba(255,170,60,0.16)');
+    g.addColorStop(1, 'rgba(255,170,60,0)');
+    ctx.beginPath(); ctx.arc(lx, ly, glowR, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+
+    // drop shadow
+    ctx.beginPath(); ctx.arc(x, y + 1.5, r + 2, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.fill();
+
+    // heading nose (little prow showing travel direction)
+    if (moving) {
+        const nx = x + Math.cos(heading) * (r + 5), ny = y + Math.sin(heading) * (r + 5);
+        const pa = heading + Math.PI / 2, pb = heading - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(nx, ny);
+        ctx.lineTo(x + Math.cos(pa) * r * 0.7, y + Math.sin(pa) * r * 0.7);
+        ctx.lineTo(x + Math.cos(pb) * r * 0.7, y + Math.sin(pb) * r * 0.7);
+        ctx.closePath(); ctx.fillStyle = '#3b342e'; ctx.fill();
+    }
+
+    // body
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = '#3b342e'; ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = '#f1e9d2'; ctx.stroke();
+
+    // lantern dot on the leading edge
+    ctx.beginPath(); ctx.arc(lx, ly, Math.max(2, r * 0.26), 0, Math.PI * 2);
+    ctx.fillStyle = '#ffce6a'; ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = '#b8862f'; ctx.stroke();
+
+    // red thread-spool core (where Ariadne's thread is tied)
+    ctx.beginPath(); ctx.arc(x, y, Math.max(2.5, r * 0.34), 0, Math.PI * 2); ctx.fillStyle = '#ff0000'; ctx.fill();
+}
+
+/* a chalk ✕ marking that a passage entrance has been examined from this side */
+function drawCross(cx, cy, size, alpha, color) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, size * 0.42); ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - size, cy - size); ctx.lineTo(cx + size, cy + size);
+    ctx.moveTo(cx - size, cy + size); ctx.lineTo(cx + size, cy - size);
+    ctx.stroke();
+    ctx.restore();
+}
+
+/* ===== Explorer mode: the graph drawn as a Trémaux maze (rooms + corridors) ===== */
+function drawAgentAt(t) {
+    const px = fitCanvas();
+    const { idx, frac } = stepAtTime(t);
+    const s = steps[idx];
+    const base = idx > 0 ? steps[idx - 1] : null;
+    const marked = base ? base.marked : startMarkedArr();
+    const finished = base ? base.finished : new Array(V).fill(false);
+    const edgeTo = base ? base.edgeTo : new Array(V).fill(-1);
+    const stack = base ? base.stack : [{ v: startVertex, i: 0 }];
+    const examinedDirs = base ? (base.examinedDirs || []) : [];
+    const kind = s.__kind;
+
+    const P = v => ({ x: px[v].x, y: px[v].y });
+    const ang = (p, q) => Math.atan2(q.y - p.y, q.x - p.x);
+    const stackPts = stack.map(f => P(f.v));
+    let agentPos, threadPts;
+    const moving = (kind === 'fwd' || kind === 'back');
+    if (kind === 'fwd') {
+        const a = s.treeEdge[0], b = s.treeEdge[1];
+        agentPos = { x: px[a].x + (px[b].x - px[a].x) * frac, y: px[a].y + (px[b].y - px[a].y) * frac };
+        threadPts = stackPts.concat([agentPos]);
+        agentHeading = ang(P(a), P(b));
+    } else if (kind === 'back') {
+        const a = s.finishedV, b = s.current;
+        agentPos = { x: px[a].x + (px[b].x - px[a].x) * frac, y: px[a].y + (px[b].y - px[a].y) * frac };
+        threadPts = stackPts.slice(0, stackPts.length - 1).concat([agentPos]);
+        agentHeading = ang(P(a), P(b));
+    } else {
+        const v = (kind === 'finishroot') ? s.finishedV : (stack.length ? stack[stack.length - 1].v : startVertex);
+        agentPos = P(v); threadPts = stackPts;
+        if (kind === 'exam') agentHeading = ang(P(s.examV), P(s.examW));
+        else if (kind === 'skip') agentHeading = ang(P(s.skipFrom), P(s.skipW));
+    }
+
+    // ---- maze geometry ----
+    const corridorW = Math.max(10, Math.min(30, radius * 0.95));
+    const roomR = Math.max(corridorW * 0.92, radius * 0.86);
+    const ROCK = '#2b2017', WALL = '#160d06', FLOOR = '#efe6cd';
+
+    // rock backdrop
+    ctx.fillStyle = ROCK; ctx.fillRect(0, 0, cw, ch);
+
+    // unique corridors
+    const edges = [];
+    const eseen = new Set();
+    for (let v = 0; v < V; v++) for (const w of adj[v]) {
+        if (v === w) continue;
+        const key = v < w ? v + '_' + w : w + '_' + v; if (eseen.has(key)) continue; eseen.add(key);
+        edges.push([v, w]);
+    }
+
+    // carve corridors: wall underlay, then parchment floor
+    ctx.lineCap = 'round';
+    ctx.lineWidth = corridorW + 5; ctx.strokeStyle = WALL;
+    for (const [v, w] of edges) { ctx.beginPath(); ctx.moveTo(px[v].x, px[v].y); ctx.lineTo(px[w].x, px[w].y); ctx.stroke(); }
+    ctx.lineWidth = corridorW; ctx.strokeStyle = FLOOR;
+    for (const [v, w] of edges) { ctx.beginPath(); ctx.moveTo(px[v].x, px[v].y); ctx.lineTo(px[w].x, px[w].y); ctx.stroke(); }
+    // worn trodden tint along the corridors actually walked (the DFS tree)
+    ctx.lineWidth = Math.max(3, corridorW * 0.5); ctx.strokeStyle = '#b58d54';
+    for (let w = 0; w < V; w++) { const v = edgeTo[w]; if (v >= 0) { ctx.beginPath(); ctx.moveTo(px[v].x, px[v].y); ctx.lineTo(px[w].x, px[w].y); ctx.stroke(); } }
+    ctx.lineCap = 'butt';
+
+    // Ariadne thread — laid in the corridors (drawn under the chambers so it pools at junctions)
+    if (threadPts.length >= 2) {
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.lineWidth = 5.5; ctx.strokeStyle = 'rgba(124,0,0,0.18)';
+        ctx.beginPath(); ctx.moveTo(threadPts[0].x, threadPts[0].y);
+        for (let k = 1; k < threadPts.length; k++) ctx.lineTo(threadPts[k].x, threadPts[k].y);
+        ctx.stroke();
+        ctx.lineWidth = 3.4; ctx.strokeStyle = '#ff0000';
+        ctx.beginPath(); ctx.moveTo(threadPts[0].x, threadPts[0].y);
+        for (let k = 1; k < threadPts.length; k++) ctx.lineTo(threadPts[k].x, threadPts[k].y);
+        ctx.stroke();
+        ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    }
+
+    // chambers (rooms) — coloured by vertex state, carved out of the rock
+    const arriving = (kind === 'fwd' && frac > 0.8) ? s.treeEdge[1] : null;
+    for (let v = 0; v < V; v++) {
+        let fill = '#f3ead6';
+        if (finished[v]) fill = '#670c07';
+        else if (marked[v] || v === arriving) fill = '#e2b3a3';
+        ctx.beginPath(); ctx.arc(px[v].x, px[v].y, roomR, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
+    }
+
+    // lantern beam down the passage currently being inspected
+    if (kind === 'exam' || kind === 'skip') {
+        const a = (kind === 'exam') ? s.examV : s.skipFrom;
+        const b = (kind === 'exam') ? s.examW : s.skipW;
+        ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = corridorW * 0.82;
+        ctx.strokeStyle = (kind === 'skip' && s.isBack) ? 'rgba(63,125,134,0.30)' : 'rgba(255,206,106,0.26)';
+        ctx.beginPath(); ctx.moveTo(px[a].x, px[a].y); ctx.lineTo(px[b].x, px[b].y); ctx.stroke(); ctx.restore();
+    }
+
+    // entrance crosses: a ✕ at each mouth examined so far (both ends ⇒ passage fully explored)
+    const crossSize = Math.max(3.5, corridorW * 0.30);
+    const mouth = (v, w) => {
+        const dx = px[w].x - px[v].x, dy = px[w].y - px[v].y, d = Math.hypot(dx, dy) || 1;
+        const off = roomR + corridorW * 0.32;
+        return { x: px[v].x + dx / d * off, y: px[v].y + dy / d * off };
+    };
+    for (const [v, w] of examinedDirs) {
+        const m = mouth(v, w);
+        drawCross(m.x, m.y, crossSize, 1, '#8c3526');
+    }
+    if (kind === 'exam') {   // the fresh mark being chalked in this step
+        const m = mouth(s.examV, s.examW);
+        const a = Math.min(1, frac * 1.6);
+        drawCross(m.x, m.y, crossSize * (0.55 + 0.45 * a), a, '#8c3526');
+    }
+
+    // chamber highlights + labels
+    const examW = (kind === 'exam') ? s.examW : null;
+    ctx.font = `700 ${Math.round(radius * 0.9)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let v = 0; v < V; v++) {
+        if (v === arriving) {
+            const ap = (frac - 0.8) / 0.2;
+            ctx.lineWidth = 3; ctx.strokeStyle = `rgba(255,0,0,${(0.55 * (1 - ap)).toFixed(3)})`;
+            ctx.beginPath(); ctx.arc(px[v].x, px[v].y, roomR + 2 + ap * 6, 0, Math.PI * 2); ctx.stroke();
+        }
+        if (v === examW) { ctx.lineWidth = 3; ctx.strokeStyle = '#c98a1b'; ctx.beginPath(); ctx.arc(px[v].x, px[v].y, roomR, 0, Math.PI * 2); ctx.stroke(); }
+        const text = finished[v] ? '#f1e9d2' : (marked[v] || v === arriving) ? '#4a3f35' : '#726253';
+        ctx.fillStyle = text; ctx.fillText(String(v), px[v].x, px[v].y + 1);
+    }
+
+    drawAgentToken(agentPos.x, agentPos.y, agentHeading, moving);
+    renderSidePanels(steps[idx]);
+}
+
+function updatePlayBtn() { document.getElementById('playBtn').textContent = (agentMode ? agentPlaying : playing) ? 'Pause' : 'Play'; }
+function stopAgentLoop() { agentPlaying = false; if (rafId) cancelAnimationFrame(rafId); rafId = null; lastTs = null; updatePlayBtn(); }
+
+function playAgent() {
+    if (tAnim >= TL.total) tAnim = 0;
+    agentPlaying = true; lastTs = null; updatePlayBtn();
+    rafId = requestAnimationFrame(agentFrame);
+}
+function pauseAgent() { stopAgentLoop(); ptr = stepAtTime(tAnim).idx; syncButtons(); }
+function agentFrame(ts) {
+    if (!agentPlaying) return;
+    if (lastTs === null) lastTs = ts;
+    let dt = (ts - lastTs) / 1000; lastTs = ts;
+    if (dt > 0.1) dt = 0.1;
+    tAnim += dt * speedMult();
+    if (tAnim >= TL.total) { tAnim = TL.total; ptr = steps.length - 1; drawAgentAt(tAnim); stopAgentLoop(); syncButtons(); return; }
+    ptr = stepAtTime(tAnim).idx;
+    drawAgentAt(tAnim); syncButtons();
+    rafId = requestAnimationFrame(agentFrame);
+}
+
+function toggleAgentMode(on) {
+    agentMode = on;
+    stopPlay(); stopAgentLoop();
+    tAnim = (ptr >= 0 && ptr < TL.T.length) ? TL.T[ptr].start + TL.T[ptr].dur : 0;
+    render(); updatePlayBtn();
+}
+
+/* ============================ run control ============================ */
+function rebuildSteps() {
+    steps = buildDFS(adj, startVertex);
+    buildTimeline();
+    ptr = -1; tAnim = 0;
+    stopPlay(); stopAgentLoop();
+    render(); syncButtons(); updatePlayBtn();
+}
+
+function stepFwd() {
+    if (agentMode) {
+        stopAgentLoop();
+        if (ptr < steps.length - 1) ptr++;
+        tAnim = TL.T[ptr] ? TL.T[ptr].start + TL.T[ptr].dur : 0;
+        render(); syncButtons(); return;
+    }
+    if (ptr < steps.length - 1) { ptr++; render(); }
+    if (ptr >= steps.length - 1) { stopPlay(); }
+    syncButtons();
+}
+function stepBack() {
+    if (agentMode) {
+        stopAgentLoop();
+        if (ptr > -1) ptr--;
+        tAnim = (ptr >= 0 && TL.T[ptr]) ? TL.T[ptr].start + TL.T[ptr].dur : 0;
+        render(); syncButtons(); return;
+    }
+    if (ptr > -1) { ptr--; render(); }
+    stopPlay();
+    syncButtons();
+}
+function resetRun() {
+    stopPlay(); stopAgentLoop();
+    ptr = -1; tAnim = 0; render(); syncButtons(); updatePlayBtn();
+}
+
+function togglePlay() {
+    if (agentMode) { agentPlaying ? pauseAgent() : playAgent(); }
+    else { playing ? stopPlay() : startPlay(); }
+}
+function startPlay() {
+    if (ptr >= steps.length - 1) ptr = -1;
+    playing = true;
+    updatePlayBtn();
+    tick();
+}
+function stopPlay() {
+    playing = false;
+    clearTimeout(timer);
+    updatePlayBtn();
+}
+function tick() {
+    if (!playing) return;
+    if (ptr < steps.length - 1) { ptr++; render(); syncButtons(); timer = setTimeout(tick, delay); }
+    else stopPlay();
+}
+
+function syncButtons() {
+    document.getElementById('backBtn').disabled = ptr <= -1;
+    document.getElementById('stepBtn').disabled = ptr >= steps.length - 1;
+}
+
+function updateSpeed(val) { delay = parseInt(val, 10); document.getElementById('speedVal').textContent = val + 'ms'; }
+
+/* ============================ graph loading ============================ */
+function graphToText(v, edgeList, positions, sedgewick) {
+    let s = `${v}\n${edgeList.length}\n` + edgeList.map(([x,y]) => `${x} ${y}`).join('\n');
+    if (!sedgewick && positions) s += '\n' + positions.map(p => `${fmtCoord(p.x)} ${fmtCoord(p.y)}`).join('\n');
+    return s;
+}
+function refreshTextarea() {
+    const sedgewick = document.getElementById('sedgewickToggle').checked;
+    document.getElementById('graphText').value = graphToText(lastV, lastEdges, pos, sedgewick);
+}
+function applyGraph(v, a, edgeList, customPos) {
+    V = v; adj = a;
+    pos = customPos || layoutAll(V, adj);
+    lastV = v; lastEdges = edgeList;
+    // start-vertex selector
+    const sel = document.getElementById('startSel');
+    sel.innerHTML = '';
+    for (let i = 0; i < V; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i; sel.appendChild(o); }
+    if (startVertex >= V) startVertex = 0;
+    sel.value = startVertex;
+    refreshTextarea();
+    rebuildSteps();
+}
+
+function loadPreset(name) {
+    const text = PRESETS[name];
+    try {
+        const { v, adj: a, edges, pos: customPos } = parseGraph(text);
+        startVertex = 0;
+        applyGraph(v, a, edges, customPos);
+        document.getElementById('parseErr').textContent = '';
+    } catch (e) { document.getElementById('parseErr').textContent = e.message; }
+}
+
+function loadFromText() {
+    const text = document.getElementById('graphText').value;
+    try {
+        const { v, adj: a, edges, pos: customPos } = parseGraph(text);
+        if (startVertex >= v) startVertex = 0;
+        applyGraph(v, a, edges, customPos);
+        document.getElementById('parseErr').textContent = '';
+    } catch (e) { document.getElementById('parseErr').textContent = e.message; }
+}
+
+/* ============================ external graphs (graphs/ folder) ============================ */
+function prettyGraphName(filename) {
+    return decodeURIComponent(filename).replace(/\.[^./]+$/, '').replace(/[_-]+/g, ' ');
+}
+async function discoverExternalGraphs() {
+    try {
+        const r = await fetch('graphs/index.json', { cache: 'no-store' });
+        if (r.ok) {
+            const data = await r.json();
+            if (Array.isArray(data)) {
+                return data.map(item => {
+                    const file = typeof item === 'string' ? item : item.file;
+                    const label = (typeof item === 'object' && (item.label || item.name)) || prettyGraphName(file);
+                    return { label, path: 'graphs/' + encodeURIComponent(file) };
+                });
+            }
+        }
+    } catch (e) { /* no manifest — fall through to directory listing */ }
+    try {
+        const r = await fetch('graphs/', { cache: 'no-store' });
+        if (r.ok) {
+            const html = await r.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const hrefs = [...doc.querySelectorAll('a')]
+                .map(a => a.getAttribute('href') || '')
+                .filter(h => h && h !== '../' && h !== './' && !h.startsWith('?') && !h.startsWith('/') && !h.endsWith('/'));
+            const uniq = [...new Set(hrefs)];
+            if (uniq.length) return uniq.map(h => ({ label: prettyGraphName(decodeURIComponent(h)), path: 'graphs/' + h }));
+        }
+    } catch (e) { /* no directory listing either — that's fine, just no external graphs */ }
+    return [];
+}
+function loadExternalGraph(path) {
+    const errEl = document.getElementById('parseErr');
+    errEl.textContent = `Loading ${path}…`;
+    fetch(path, { cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            const { v, adj: a, edges, pos: customPos } = parseGraph(text);
+            startVertex = 0;
+            applyGraph(v, a, edges, customPos);
+            errEl.textContent = '';
+        })
+        .catch(err => { errEl.textContent = `Could not load ${path}: ${err.message}`; });
+}
+function populateExternalGraphs(presetSel) {
+    discoverExternalGraphs().then(list => {
+        if (!list.length) return;
+        const grp = document.createElement('optgroup');
+        grp.label = 'From graphs/ folder';
+        list.forEach(({ label, path }) => {
+            const o = document.createElement('option');
+            o.value = path; o.textContent = label; o.dataset.external = '1';
+            grp.appendChild(o);
+        });
+        presetSel.appendChild(grp);
+    });
+}
+
+/* ============================ init ============================ */
+function init() {
+    const presetSel = document.getElementById('presetSel');
+    Object.keys(PRESETS).forEach(name => {
+        const o = document.createElement('option'); o.value = name; o.textContent = name; presetSel.appendChild(o);
+    });
+    presetSel.addEventListener('change', () => {
+        const opt = presetSel.selectedOptions[0];
+        if (opt && opt.dataset.external) loadExternalGraph(opt.value); else loadPreset(opt.value);
+    });
+    document.getElementById('startSel').addEventListener('change', e => {
+        startVertex = parseInt(e.target.value, 10); rebuildSteps();
+    });
+    window.addEventListener('resize', () => { if (agentMode && agentPlaying) drawAgentAt(tAnim); else render(); });
+    loadPreset(Object.keys(PRESETS)[0]);
+    populateExternalGraphs(presetSel);
+}
+init();
+</script>
+</body>
+</html>

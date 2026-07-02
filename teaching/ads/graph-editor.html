@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graph Editor — drag &amp; drop</title>
+<style>
+    :root {
+        --bg: #f1e9d2;
+        --panel: #f6efe0;
+        --panel-border: #e2d6b5;
+        --controls-bg: #e8ddbe;
+        --controls-border: #dcd0b0;
+        --ink: #726253;
+        --ink-strong: #4a3f35;
+        --title-muted: #8c7b70;
+        --btn: #faf6eb;
+        --btn-border: #bcaf92;
+        --btn-border-hover: #9a8c6f;
+        --node-cream: #f6efe0;
+        --node-cream-border: #bcaf92;
+        --accent: #670c07;
+        --accent2: #1f6f6a;
+        --edge: #948567;
+    }
+    * { box-sizing: border-box; }
+    body {
+        background-color: var(--bg); color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0; padding: 22px 26px 40px; min-height: 100vh;
+    }
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--ink-strong); }
+    .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; max-width: 980px; line-height: 1.5; }
+    .subtitle code { background: #efe6cd; padding: 1px 6px; border-radius: 3px; }
+
+    .controls {
+        display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
+        background-color: var(--controls-bg); padding: 14px 22px; border-radius: 6px;
+        border: 1px solid var(--controls-border); margin-bottom: 18px;
+    }
+    .ctl-group { display: flex; align-items: center; gap: 9px; }
+    .ctl-group label { font-size: 0.82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    button, select {
+        background-color: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+        padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit;
+    }
+    button:hover:not(:disabled), select:hover { background-color: #fff; border-color: var(--btn-border-hover); }
+    select { cursor: pointer; }
+    .switch { position: relative; display: inline-block; width: 42px; height: 23px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; cursor: pointer; inset: 0; background: #cdbf9d; border: 1px solid #b3a589; border-radius: 23px; transition: .2s; }
+    .switch .track:before { content: ""; position: absolute; height: 17px; width: 17px; left: 3px; top: 2px; background: #faf6eb; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .track { background: var(--accent2); border-color: #0f4750; }
+    .switch input:checked + .track:before { transform: translateX(19px); }
+
+    .stage { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(320px,1fr); gap: 20px; align-items: start; }
+    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+
+    .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
+
+    .canvas-wrap { position: relative; width: 100%; height: 520px; border-radius: 4px; overflow: hidden; }
+    canvas#graph { display: block; background-color: var(--bg); width: 100%; height: 100%; cursor: crosshair; }
+    #weightInput {
+        position: absolute; display: none; width: 64px; padding: 3px 6px; font-size: 0.85rem;
+        border: 2px solid var(--accent2); border-radius: 4px; background: #fff; color: var(--ink-strong);
+        font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; text-align: center; z-index: 5;
+        transform: translate(-50%, -50%);
+    }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 12px 18px; font-size: 0.79rem; color: var(--ink); align-items: center; margin-top: 12px; }
+    .legend .item { display: flex; align-items: center; gap: 6px; }
+    .legend kbd { background: #efe6cd; border: 1px solid #ccbb95; border-radius: 3px; padding: 1px 6px; font-family: inherit; font-size: 0.76rem; color: var(--ink-strong); }
+
+    .side { display: flex; flex-direction: column; gap: 14px; }
+    textarea#graphText {
+        font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.82rem;
+        background: #efe6cd; color: var(--ink-strong); border: 1px solid var(--panel-border);
+        border-radius: 5px; padding: 10px; width: 100%; height: 320px; resize: vertical;
+    }
+    .taRow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .err { color: #9a3b2f; font-weight: 600; font-size: 0.82rem; min-height: 18px; margin-top: 6px; }
+    .stat { font-size: 0.8rem; color: var(--title-muted); margin-top: 4px; }
+    .editor-help { font-size: 0.82rem; color: var(--ink); line-height: 1.55; }
+    .editor-help code { background: #efe6cd; padding: 1px 5px; border-radius: 3px; }
+    .editor-help b { color: var(--ink-strong); }
+</style>
+</head>
+<body>
+
+<h1>Graph Editor</h1>
+<p class="subtitle">A small companion tool for preparing example graphs for the BFS / DFS / Dijkstra / Kruskal / Kosaraju
+pages. Drag nodes to lay a graph out exactly how you want it, then copy the text on the right straight into any of
+those pages' "Edit / paste a graph" box — it's the same augmented <code>algs4</code> format (optional
+<code>x y</code> coordinates after the edges). Also reads and writes the
+<a href="https://csacademy.com/app/graph_editor/" target="_blank" rel="noopener">CS Academy</a> graph markup format.</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="weightedToggle">Weighted</label>
+        <label class="switch"><input type="checkbox" id="weightedToggle" onchange="onToggleWeighted(this.checked)"><span class="track"></span></label>
+    </div>
+    <div class="ctl-group">
+        <label for="directedToggle">Directed</label>
+        <label class="switch"><input type="checkbox" id="directedToggle" onchange="onToggleDirected(this.checked)"><span class="track"></span></label>
+    </div>
+    <div class="ctl-group">
+        <label for="formatSel">Output format</label>
+        <select id="formatSel" onchange="refreshTextarea()">
+            <option value="algs4pos">algs4 + coordinates</option>
+            <option value="algs4">algs4 (Sedgewick, no coordinates)</option>
+            <option value="csa">CS Academy markup</option>
+        </select>
+    </div>
+    <button onclick="autoLayout()">Auto-layout</button>
+    <button onclick="clearAll()">Clear</button>
+    <button onclick="copyText()">Copy text</button>
+    <div class="ctl-group">
+        <label for="snapToggle">Snap to grid</label>
+        <label class="switch"><input type="checkbox" id="snapToggle" onchange="onToggleSnap(this.checked)"><span class="track"></span></label>
+        <input id="gridSizeInput" type="number" min="8" max="120" step="1" value="24" style="width:56px;padding:6px 8px;border:1px solid var(--btn-border);border-radius:4px;font-family:inherit;font-size:0.85rem" onchange="onGridSizeChange(this.value)">
+        <span style="font-size:0.8rem;color:var(--title-muted)">px</span>
+    </div>
+    <div class="ctl-group">
+        <label for="springToggle">Spring preview</label>
+        <label class="switch"><input type="checkbox" id="springToggle" onchange="onToggleSpring(this.checked)"><span class="track"></span></label>
+    </div>
+    <div class="ctl-group" id="springSourceGroup" style="display:none">
+        <label for="springSourceSel">Source</label>
+        <select id="springSourceSel" onchange="onSpringSourceChange(this.value)"></select>
+    </div>
+</div>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="fileSel">Load from graphs/</label>
+        <select id="fileSel" onchange="onFileSelChange(this.value)"><option value="">— none found —</option></select>
+    </div>
+    <div class="ctl-group">
+        <label for="filenameInput">Save as</label>
+        <input id="filenameInput" type="text" value="graph.txt" style="padding:7px 10px;border:1px solid var(--btn-border);border-radius:4px;font-family:inherit;font-size:0.9rem;width:150px">
+    </div>
+    <button onclick="downloadGraph()">Download file</button>
+</div>
+
+<div class="stage">
+    <div class="sim-box">
+        <div class="sim-title">Canvas</div>
+        <div class="canvas-wrap" id="canvasWrap">
+            <canvas id="graph"></canvas>
+            <input id="weightInput" type="number" step="any">
+        </div>
+        <div class="legend" id="legendNormal">
+            <div class="item"><kbd>click</kbd> empty space → add vertex</div>
+            <div class="item"><kbd>drag</kbd> a node → move it</div>
+            <div class="item"><kbd>shift</kbd>+<kbd>drag</kbd> node → node → add edge</div>
+            <div class="item"><kbd>click</kbd> node/edge → select</div>
+            <div class="item"><kbd>delete</kbd> → remove selection</div>
+            <div class="item"><kbd>dbl-click</kbd> edge → edit weight</div>
+            <div class="item"><kbd>esc</kbd> → deselect / cancel</div>
+            <div class="item" id="snapLegendItem" style="display:none">grid snap active — drag/add positions round to the nearest cell</div>
+        </div>
+        <div class="legend" id="legendSpring" style="display:none">
+            <div class="item">Radius = shortest-path distance from <b>source</b> (unweighted edges count as 1)</div>
+            <div class="item"><kbd>drag</kbd> a node → spin it around its ring (angle only)</div>
+            <div class="item">dashed outer ring = <b>∞</b>, not yet reachable</div>
+            <div class="item">still edits the real graph — toggle off to see the free layout again</div>
+        </div>
+        <div class="err" id="springWarn"></div>
+    </div>
+
+    <div class="side">
+        <div class="sim-box">
+            <div class="sim-title">Text &nbsp;·&nbsp; live-synced with the canvas</div>
+            <textarea id="graphText" spellcheck="false"></textarea>
+            <div class="taRow">
+                <button class="primary" onclick="applyTextareaContent()">Apply text → canvas</button>
+            </div>
+            <div class="err" id="parseErr"></div>
+            <div class="stat" id="statLine"></div>
+        </div>
+        <div class="sim-box">
+            <div class="editor-help">
+                Dragging, adding, or deleting on the canvas immediately rewrites the text box in whichever
+                <b>output format</b> is selected above. Typing/pasting into the text box only takes effect once you
+                click <b>Apply text → canvas</b> — it auto-detects <code>algs4</code> vs. CS Academy markup
+                (importing CS Academy markup also updates the Weighted/Directed toggles to match what it finds).
+                <br><br>
+                The <b>Weighted</b>/<b>Directed</b> toggles decide how a pasted <code>algs4</code>-format text is
+                read back (2 vs. 3 numbers per edge line) and whether arrowheads are drawn — the underlying
+                <code>v w</code> / <code>v w weight</code> text itself doesn't encode direction, exactly like the
+                other pages: the same edge list works as input for an undirected page or a directed one.
+                <br><br>
+                Any coordinate scale works on import (CS Academy pixels, algs4's own <code>0…1</code> range,
+                anything) — it's auto-centred and scaled to fit, preserving relative position and aspect ratio.
+                Self-loops aren't supported by the canvas editor; parallel edges between the same pair are drawn as
+                separate curved springs. <b>Snap to grid</b> rounds dragged/added positions to the nearest cell
+                (size adjustable, shown as faint gridlines) — handy for tidy rows/columns; it has no effect while
+                Spring preview is on, since dragging there only ever changes angle.
+                <br><br>
+                <b>Mixed-format tolerant:</b> in <code>algs4</code> text, each edge occupies exactly one line.
+                With <b>Weighted</b> on, a line missing its third number just defaults to weight 1; with it off,
+                an extra third number is simply ignored — so pasting a graph doesn't need to match the toggle
+                exactly, and the same edge list works whether you're feeding it to a weighted or unweighted page.
+                Applying text also syncs the toggle to match what's actually there: if any edge line has a real
+                weight, Weighted switches on (so that data isn't silently discarded); if none do, it switches off
+                (so you don't end up with invented weight-1s on a graph that never had any).
+                <br><br>
+                <b>Classroom workflow:</b> build a graph here, name it under "Save as", click <b>Download file</b>,
+                and move the downloaded <code>.txt</code> into a <code>graphs/</code> folder next to these HTML
+                pages on your webserver. Every page (including this editor's <b>Load from graphs/</b> menu) will
+                then offer it as an extra option alongside the built-in examples — either serve
+                <code>graphs/index.json</code> (a JSON array of filenames, or <code>{file, label}</code> objects) as
+                a manifest, or just enable directory listing on your static server (e.g. Python's
+                <code>python3 -m http.server</code> does this by default) and skip the manifest entirely.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ============================ state ============================ */
+let V = 0;
+let E = [];              // [{u, v, weight: number|null}]
+let pos = [];             // [{x,y}] normalized to roughly [0,1]
+let weighted = false;
+let directed = false;
+let selectedNode = -1;
+let selectedEdge = -1;
+let springMode = false;
+let springSource = 0;
+let springDist = [];
+let springMaxDist = 1;
+let R_inf = 1, R_finite = 1, innerFloor = 1, springScale = 1;
+let snapGrid = false;
+let gridSize = 24;   // px, in screen space
+
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvasWrap');
+const weightInput = document.getElementById('weightInput');
+
+/* ============================ coordinate helpers ============================ */
+function normalizePositions(raw) {
+    if (raw.length === 0) return [];
+    let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+    for (const p of raw) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+    const w = Math.max(maxx-minx, 1e-6), h = Math.max(maxy-miny, 1e-6);
+    const pad = 0.08, avail = 1 - 2*pad;
+    const s = avail / Math.max(w, h);
+    const usedW = w*s, usedH = h*s;
+    const offX = pad + (avail-usedW)/2, offY = pad + (avail-usedH)/2;
+    return raw.map(p => ({ x: offX + (p.x-minx)*s, y: offY + (p.y-miny)*s }));
+}
+function fmtCoord(x) { return (Math.round(x*1000)/1000).toString(); }
+function fmtWeight(w) { const r = Math.round((Number.isFinite(w)?w:1)*1000)/1000; return String(r); }
+
+let cw = 0, ch = 0, dpr = 1;
+const M = 40;
+function fitCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cw = rect.width; ch = rect.height;
+    canvas.width = Math.round(cw*dpr); canvas.height = Math.round(ch*dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function toScreen(p) { return { x: M + p.x*(cw-2*M), y: M + p.y*(ch-2*M) }; }
+function toNorm(px, py) { return { x: (px-M)/Math.max(1,(cw-2*M)), y: (py-M)/Math.max(1,(ch-2*M)) }; }
+
+/* ============================ spring (Dijkstra ring) preview ============================ */
+function computeSpringDistances(source) {
+    const n = V;
+    const dist = new Array(n).fill(Infinity);
+    if (source < 0 || source >= n) return dist;
+    dist[source] = 0;
+    const adj = Array.from({ length: n }, () => []);
+    let hasNegative = false;
+    for (const e of E) {
+        if (e.u === e.v || e.u >= n || e.v >= n) continue;
+        let w = weighted ? (Number.isFinite(e.weight) ? e.weight : 1) : 1;
+        if (w < 0) hasNegative = true;
+        adj[e.u].push({ to: e.v, w });
+        if (!directed) adj[e.v].push({ to: e.u, w });
+    }
+    const springWarn = document.getElementById('springWarn');
+    if (springWarn) springWarn.textContent = hasNegative ? 'Note: negative weights aren\'t supported by Dijkstra — ring distances may not be meaningful.' : '';
+    const settled = new Array(n).fill(false);
+    for (let iter = 0; iter < n; iter++) {
+        let u = -1, best = Infinity;
+        for (let i = 0; i < n; i++) if (!settled[i] && dist[i] < best) { best = dist[i]; u = i; }
+        if (u === -1) break;
+        settled[u] = true;
+        for (const { to, w } of adj[u]) if (dist[u] + w < dist[to]) dist[to] = dist[u] + w;
+    }
+    return dist;
+}
+function computeSpringGeometry() {
+    const avail = Math.min(cw, ch)/2 - 30;
+    R_inf = avail * 0.99;
+    R_finite = avail * 0.80;
+    innerFloor = Math.min(52, avail * 0.24);
+    let maxD = 0;
+    for (const d of springDist) if (Number.isFinite(d) && d > maxD) maxD = d;
+    springMaxDist = Math.max(1e-6, maxD);
+    springScale = (R_finite - innerFloor) / springMaxDist;
+}
+function springRof(d) {
+    if (!Number.isFinite(d)) return R_inf;
+    if (d <= 0) return 0;
+    return innerFloor + d*springScale;
+}
+function screenOf(i) {
+    if (!springMode) return toScreen(pos[i]);
+    const centerX = cw/2, centerY = ch/2;
+    if (i === springSource) return { x: centerX, y: centerY };
+    const dx = pos[i].x - pos[springSource].x, dy = pos[i].y - pos[springSource].y;
+    const theta = (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) ? 0 : Math.atan2(dy, dx);
+    const r = springRof(springDist[i]);
+    return { x: centerX + r*Math.cos(theta), y: centerY + r*Math.sin(theta) };
+}
+function syncSpringSourceSelect() {
+    const sel = document.getElementById('springSourceSel');
+    const prev = springSource;
+    sel.innerHTML = '';
+    for (let i = 0; i < V; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i; sel.appendChild(o); }
+    springSource = (prev < V) ? prev : 0;
+    sel.value = springSource;
+}
+function recomputeSpring() {
+    if (V === 0) { springDist = []; return; }
+    springDist = computeSpringDistances(springSource);
+    computeSpringGeometry();
+}
+function onToggleSpring(on) {
+    springMode = on;
+    document.getElementById('springSourceGroup').style.display = on ? 'flex' : 'none';
+    document.getElementById('legendNormal').style.display = on ? 'none' : 'flex';
+    document.getElementById('legendSpring').style.display = on ? 'flex' : 'none';
+    if (on) { syncSpringSourceSelect(); recomputeSpring(); }
+    else { document.getElementById('springWarn').textContent = ''; }
+    render();
+}
+function onSpringSourceChange(val) {
+    springSource = parseInt(val, 10);
+    recomputeSpring();
+    render();
+}
+function snapPx(px, py) {
+    if (!snapGrid) return { x: px, y: py };
+    return { x: Math.round(px / gridSize) * gridSize, y: Math.round(py / gridSize) * gridSize };
+}
+function onToggleSnap(on) {
+    snapGrid = on;
+    document.getElementById('snapLegendItem').style.display = on ? 'flex' : 'none';
+    render();
+}
+function onGridSizeChange(val) {
+    const n = parseInt(val, 10);
+    if (Number.isFinite(n) && n > 0) gridSize = n;
+    render();
+}
+
+/* ============================ layout (force-directed, per component) ============================ */
+function components(n, adj) {
+    const comp = new Array(n).fill(-1); let c = 0;
+    for (let s = 0; s < n; s++) {
+        if (comp[s] !== -1) continue;
+        const q = [s]; comp[s] = c;
+        while (q.length) { const u = q.pop(); for (const w of adj[u]) if (comp[w] === -1) { comp[w] = c; q.push(w); } }
+        c++;
+    }
+    return { comp, count: c };
+}
+function forceLayout(localEdges, N) {
+    if (N === 0) return [];
+    if (N === 1) return [{ x: 0.5, y: 0.5 }];
+    const p = [];
+    for (let i = 0; i < N; i++) {
+        const ang = (i / N) * Math.PI * 2;
+        p.push({ x: 0.5 + 0.35*Math.cos(ang) + (Math.random()-0.5)*0.02, y: 0.5 + 0.35*Math.sin(ang) + (Math.random()-0.5)*0.02 });
+    }
+    const k = Math.sqrt(1 / N) * 0.9; let temp = 0.12;
+    for (let it = 0; it < 500; it++) {
+        const disp = p.map(() => ({ x: 0, y: 0 }));
+        for (let i = 0; i < N; i++) for (let j = i+1; j < N; j++) {
+            let dx = p[i].x-p[j].x, dy = p[i].y-p[j].y, d = Math.hypot(dx,dy)||1e-4;
+            const f = (k*k)/d;
+            disp[i].x += (dx/d)*f; disp[i].y += (dy/d)*f;
+            disp[j].x -= (dx/d)*f; disp[j].y -= (dy/d)*f;
+        }
+        for (const [a2,b2] of localEdges) {
+            if (a2 === b2) continue;
+            let dx = p[a2].x-p[b2].x, dy = p[a2].y-p[b2].y, d = Math.hypot(dx,dy)||1e-4;
+            const f = (d*d)/k;
+            disp[a2].x -= (dx/d)*f; disp[a2].y -= (dy/d)*f;
+            disp[b2].x += (dx/d)*f; disp[b2].y += (dy/d)*f;
+        }
+        for (let i = 0; i < N; i++) {
+            let d = Math.hypot(disp[i].x, disp[i].y)||1e-4;
+            p[i].x += (disp[i].x/d)*Math.min(d, temp);
+            p[i].y += (disp[i].y/d)*Math.min(d, temp);
+        }
+        temp *= 0.985;
+    }
+    return p;
+}
+function layoutAll(n, edges) {
+    if (n === 0) return [];
+    const adj = Array.from({ length: n }, () => []);
+    edges.forEach(e => { if (e.u !== e.v) { adj[e.u].push(e.v); adj[e.v].push(e.u); } });
+    const { comp, count } = components(n, adj);
+    let groups = Array.from({ length: count }, () => []);
+    for (let v = 0; v < n; v++) groups[comp[v]].push(v);
+    groups.sort((g1, g2) => g2.length - g1.length);
+    const boxes = groups.map(group => {
+        const idxOf = new Map(group.map((v, i) => [v, i]));
+        const elocal = [];
+        for (const v of group) for (const w of adj[v]) if (v < w && idxOf.has(w)) elocal.push([idxOf.get(v), idxOf.get(w)]);
+        const p = forceLayout(elocal, group.length);
+        let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+        for (const q of p) { minx=Math.min(minx,q.x); miny=Math.min(miny,q.y); maxx=Math.max(maxx,q.x); maxy=Math.max(maxy,q.y); }
+        return { group, p, minx, miny, w: Math.max(maxx-minx,1e-3), h: Math.max(maxy-miny,1e-3) };
+    });
+    const positions = new Array(n);
+    const cols = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count/cols);
+    boxes.forEach((box, bi) => {
+        const cx = bi % cols, cy = Math.floor(bi/cols);
+        const cellW = 1/cols, cellH = 1/rows, pad = 0.16;
+        const availW = cellW*(1-pad*2), availH = cellH*(1-pad*2);
+        const scale = Math.min(availW/box.w, availH/box.h);
+        const usedW = box.w*scale, usedH = box.h*scale;
+        const offX = cx*cellW + (cellW-usedW)/2, offY = cy*cellH + (cellH-usedH)/2;
+        box.group.forEach((v, i) => { positions[v] = { x: offX + (box.p[i].x-box.minx)*scale, y: offY + (box.p[i].y-box.miny)*scale }; });
+    });
+    return positions;
+}
+
+/* ============================ algs4 format ============================ */
+function dumpAlgs4(includeCoords) {
+    const lines = [String(V), String(E.length)];
+    for (const e of E) lines.push(weighted ? `${e.u} ${e.v} ${fmtWeight(e.weight)}` : `${e.u} ${e.v}`);
+    if (includeCoords) for (let i = 0; i < V; i++) lines.push(`${fmtCoord(pos[i].x)} ${fmtCoord(pos[i].y)}`);
+    return lines.join('\n');
+}
+/* Line-based: each edge (and, later, each coordinate pair) occupies exactly one line. This makes the
+   format tolerant of pasting a weighted graph while Weighted is off (the extra weight token per line is
+   simply ignored) or an unweighted graph while Weighted is on (a missing weight defaults to 1) — a
+   stray/missing token only ever affects the one line it's on, not the rest of the parse. */
+function tokenizeLines(text) {
+    return text.split('\n').map(line => line.trim().split(/\s+/).filter(s => s.length)).filter(toks => toks.length > 0);
+}
+function readVE(lines) {
+    if (lines.length === 0) throw new Error("Empty input.");
+    if (lines[0].length >= 2) return { v: parseInt(lines[0][0], 10), e: parseInt(lines[0][1], 10), li: 1 };
+    if (lines.length < 2) throw new Error("Need E on the second line.");
+    return { v: parseInt(lines[0][0], 10), e: parseInt(lines[1][0], 10), li: 2 };
+}
+// Defensive auto-detect: if any edge line genuinely carries a numeric third token, treat the whole
+// graph as weighted (and the caller flips the toggle on) rather than silently discarding that data
+// just because Weighted happened to be off.
+function detectAlgs4Weighted(text) {
+    try {
+        const lines = tokenizeLines(text);
+        const { e, li: li0 } = readVE(lines);
+        let li = li0;
+        for (let k = 0; k < e; k++) {
+            if (li >= lines.length) return false;
+            const toks = lines[li++];
+            if (toks.length >= 3 && Number.isFinite(parseFloat(toks[2]))) return true;
+        }
+        return false;
+    } catch (err) { return false; }
+}
+function parseAlgs4(text, weightedFlag) {
+    const lines = tokenizeLines(text);
+    const { v, e, li: li0 } = readVE(lines);
+    let li = li0;
+    if (!Number.isFinite(v) || v < 0) throw new Error("V must be a non-negative integer.");
+    if (!Number.isFinite(e) || e < 0) throw new Error("E must be a non-negative integer.");
+    const edges = [];
+    for (let k = 0; k < e; k++) {
+        if (li >= lines.length) throw new Error(`Expected ${e} edge line(s), only found ${k}.`);
+        const toks = lines[li++];
+        if (toks.length < 2) throw new Error(`Edge ${k+1}: expected at least two vertex integers.`);
+        const a = parseInt(toks[0], 10), b = parseInt(toks[1], 10);
+        if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error(`Edge ${k+1}: expected two vertex integers.`);
+        if (a < 0 || a >= v || b < 0 || b >= v) throw new Error(`Edge ${k+1}: vertex out of range 0…${v-1}.`);
+        let w = null;
+        if (weightedFlag) {
+            w = toks.length >= 3 ? parseFloat(toks[2]) : 1;   // missing weight → default 1, don't crash
+            if (!Number.isFinite(w)) throw new Error(`Edge ${k+1}: expected a numeric weight.`);
+        }
+        edges.push({ u: a, v: b, weight: w });
+    }
+    const remaining = lines.length - li;
+    let customPos = null;
+    if (remaining > 0) {
+        if (remaining !== v) throw new Error(`After the edges, expected either nothing or exactly ${v} coordinate line(s) ("x y" each), but found ${remaining}.`);
+        const raw = [];
+        for (let i = 0; i < v; i++) {
+            const toks = lines[li++];
+            const x = parseFloat(toks[0]), y = parseFloat(toks[1]);
+            if (toks.length < 2 || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Vertex ${i}: expected two coordinate numbers "x y".`);
+            raw.push({ x, y });
+        }
+        customPos = normalizePositions(raw);
+    }
+    return { v, edges, pos: customPos };
+}
+
+/* ============================ CS Academy markup format ============================ */
+function extractBalanced(text, key) {
+    const startTag = key + '={';
+    const i = text.indexOf(startTag);
+    if (i < 0) return null;
+    let j = i + startTag.length;
+    while (j < text.length && /\s/.test(text[j])) j++;
+    if (text[j] !== '[') return null;
+    let depth = 0, k = j;
+    for (; k < text.length; k++) {
+        if (text[k] === '[') depth++;
+        else if (text[k] === ']') { depth--; if (depth === 0) { k++; break; } }
+    }
+    if (depth !== 0) throw new Error(`Unbalanced brackets in ${key}={...}.`);
+    return text.slice(j, k);
+}
+function safeEvalArray(src) {
+    if (!/^[\s\[\]{}",':.\-+0-9a-zA-Z_]*$/.test(src)) throw new Error("Unexpected characters in graph markup.");
+    return Function('"use strict"; return (' + src + ');')();
+}
+function looksLikeCSA(text) { return /<\s*Graph\b|nodes\s*=\s*\{/.test(text); }
+function parseCSAcademy(text) {
+    const nodesSrc = extractBalanced(text, 'nodes');
+    const edgesSrc = extractBalanced(text, 'edges');
+    if (!nodesSrc || !edgesSrc) throw new Error("Couldn't find nodes={[...]} and edges={[...]} in the markup.");
+    const nodesArr = safeEvalArray(nodesSrc);
+    const edgesArr = safeEvalArray(edgesSrc);
+    if (!Array.isArray(nodesArr) || !Array.isArray(edgesArr)) throw new Error("nodes/edges did not parse to arrays.");
+    const labelToIndex = new Map();
+    nodesArr.forEach((n, i) => labelToIndex.set(n.label, i));
+    const raw = nodesArr.map(n => {
+        const c = n.center || n;
+        return { x: Number.isFinite(c.x) ? c.x : 0, y: Number.isFinite(c.y) ? c.y : 0 };
+    });
+    const customPos = normalizePositions(raw);
+    let anyWeight = false;
+    const edges = edgesArr.map(e => {
+        const u = labelToIndex.has(e.source) ? labelToIndex.get(e.source) : e.source;
+        const w2 = labelToIndex.has(e.target) ? labelToIndex.get(e.target) : e.target;
+        if (!Number.isFinite(u) || !Number.isFinite(w2) || u < 0 || u >= nodesArr.length || w2 < 0 || w2 >= nodesArr.length) {
+            throw new Error(`Edge references unknown node label: ${JSON.stringify(e)}`);
+        }
+        let weight = null;
+        if (typeof e.weight === 'number') { weight = e.weight; anyWeight = true; }
+        else if (typeof e.label === 'number') { weight = e.label; anyWeight = true; }
+        return { u, v: w2, weight };
+    });
+    const directedFlag = /directed\s*=\s*\{?\s*true\s*\}?|directed\s*=\s*"true"/.test(text);
+    return { v: nodesArr.length, edges, pos: customPos, weighted: anyWeight, directed: directedFlag };
+}
+function dumpCSAcademy() {
+    const w = Math.max(1, Math.round(cw)), h = Math.max(1, Math.round(ch));
+    const nodesTxt = pos.map((p, i) => `{label:${i},center:{x:${fmtCoord(p.x*w)},y:${fmtCoord(p.y*h)}}}`).join(',');
+    const edgesTxt = E.map(e => weighted ? `{source:${e.u},target:${e.v},weight:${fmtWeight(e.weight)}}` : `{source:${e.u},target:${e.v}}`).join(',');
+    const directedAttr = directed ? ' directed={true}' : '';
+    return `<Graph indexType="custom" height="${h}" width="${w}"${directedAttr} nodes={[${nodesTxt}]} edges={[${edgesTxt}]} />`;
+}
+
+/* ============================ textarea sync ============================ */
+function refreshTextarea() {
+    const fmt = document.getElementById('formatSel').value;
+    let text;
+    if (fmt === 'algs4pos') text = dumpAlgs4(true);
+    else if (fmt === 'algs4') text = dumpAlgs4(false);
+    else text = dumpCSAcademy();
+    document.getElementById('graphText').value = text;
+    document.getElementById('statLine').textContent = `${V} vertices, ${E.length} edge${E.length===1?'':'s'}`;
+}
+function applyTextareaContent() {
+    const text = document.getElementById('graphText').value;
+    const errEl = document.getElementById('parseErr');
+    try {
+        let result;
+        if (looksLikeCSA(text)) {
+            result = parseCSAcademy(text);
+            document.getElementById('weightedToggle').checked = result.weighted;
+            document.getElementById('directedToggle').checked = result.directed;
+            weighted = result.weighted; directed = result.directed;
+        } else {
+            const hasWeightData = detectAlgs4Weighted(text);
+            if (hasWeightData !== weighted) {
+                weighted = hasWeightData;
+                document.getElementById('weightedToggle').checked = hasWeightData;
+            }
+            result = parseAlgs4(text, weighted);
+        }
+        V = result.v;
+        E = result.edges.map(e => ({ u: e.u, v: e.v, weight: weighted ? (Number.isFinite(e.weight) ? e.weight : 1) : e.weight }));
+        pos = result.pos || layoutAll(V, E);
+        selectedNode = -1; selectedEdge = -1;
+        if (springSource >= V) springSource = 0;
+        if (springMode) syncSpringSourceSelect();
+        errEl.textContent = '';
+        refreshTextarea();
+        render();
+    } catch (err) { errEl.textContent = err.message; }
+}
+function onToggleWeighted(on) {
+    weighted = on;
+    if (on) for (const e of E) if (!Number.isFinite(e.weight)) e.weight = 1;
+    refreshTextarea(); render();
+}
+function onToggleDirected(on) { directed = on; refreshTextarea(); render(); }
+function autoLayout() { pos = layoutAll(V, E); refreshTextarea(); render(); }
+function clearAll() { V = 0; E = []; pos = []; selectedNode = -1; selectedEdge = -1; springSource = 0; if (springMode) syncSpringSourceSelect(); refreshTextarea(); render(); }
+function copyText() {
+    const ta = document.getElementById('graphText');
+    ta.select();
+    navigator.clipboard && navigator.clipboard.writeText(ta.value).catch(() => document.execCommand('copy'));
+}
+function downloadGraph() {
+    const ta = document.getElementById('graphText');
+    let name = (document.getElementById('filenameInput').value || 'graph.txt').trim() || 'graph.txt';
+    if (!/\.[a-z0-9]+$/i.test(name)) name += '.txt';
+    const blob = new Blob([ta.value], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/* ============================ external graphs (graphs/ folder) ============================ */
+function prettyGraphName(filename) {
+    return decodeURIComponent(filename).replace(/\.[^./]+$/, '').replace(/[_-]+/g, ' ');
+}
+async function discoverExternalGraphs() {
+    try {
+        const r = await fetch('graphs/index.json', { cache: 'no-store' });
+        if (r.ok) {
+            const data = await r.json();
+            if (Array.isArray(data)) {
+                return data.map(item => {
+                    const file = typeof item === 'string' ? item : item.file;
+                    const label = (typeof item === 'object' && (item.label || item.name)) || prettyGraphName(file);
+                    return { label, path: 'graphs/' + encodeURIComponent(file) };
+                });
+            }
+        }
+    } catch (e) { /* no manifest — fall through to directory listing */ }
+    try {
+        const r = await fetch('graphs/', { cache: 'no-store' });
+        if (r.ok) {
+            const html = await r.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const hrefs = [...doc.querySelectorAll('a')]
+                .map(a => a.getAttribute('href') || '')
+                .filter(h => h && h !== '../' && h !== './' && !h.startsWith('?') && !h.startsWith('/') && !h.endsWith('/'));
+            const uniq = [...new Set(hrefs)];
+            if (uniq.length) return uniq.map(h => ({ label: prettyGraphName(decodeURIComponent(h)), path: 'graphs/' + h }));
+        }
+    } catch (e) { /* no directory listing either — that's fine, just no external graphs */ }
+    return [];
+}
+function onFileSelChange(path) {
+    if (!path) return;
+    loadExternalGraph(path);
+}
+function loadExternalGraph(path) {
+    const errEl = document.getElementById('parseErr');
+    errEl.textContent = `Loading ${path}…`;
+    fetch(path, { cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            document.getElementById('graphText').value = text;
+            applyTextareaContent();
+        })
+        .catch(err => { errEl.textContent = `Could not load ${path}: ${err.message}`; });
+}
+function populateExternalGraphs() {
+    discoverExternalGraphs().then(list => {
+        const sel = document.getElementById('fileSel');
+        if (!list.length) { sel.innerHTML = '<option value="">— none found —</option>'; return; }
+        sel.innerHTML = '<option value="">— choose a file —</option>';
+        list.forEach(({ label, path }) => {
+            const o = document.createElement('option'); o.value = path; o.textContent = label;
+            sel.appendChild(o);
+        });
+    });
+}
+
+/* ============================ graph mutation ============================ */
+function addVertex(nx, ny) {
+    pos.push({ x: nx, y: ny });
+    V++;
+    if (springMode) syncSpringSourceSelect();
+    refreshTextarea(); render();
+}
+function deleteVertex(i) {
+    pos.splice(i, 1);
+    E = E.filter(e => e.u !== i && e.v !== i).map(e => ({ u: e.u > i ? e.u-1 : e.u, v: e.v > i ? e.v-1 : e.v, weight: e.weight }));
+    V--;
+    selectedNode = -1;
+    if (springSource === i) springSource = 0;
+    else if (springSource > i) springSource--;
+    if (springMode) syncSpringSourceSelect();
+    refreshTextarea(); render();
+}
+function addEdge(u, v) {
+    if (u === v) return;   // self-loops unsupported in the canvas editor
+    E.push({ u, v, weight: weighted ? 1 : null });
+    refreshTextarea(); render();
+}
+function deleteEdge(i) {
+    E.splice(i, 1);
+    selectedEdge = -1;
+    refreshTextarea(); render();
+}
+function editEdgeWeight(i, w) {
+    if (Number.isFinite(w)) E[i].weight = w;
+    refreshTextarea(); render();
+}
+
+/* ============================ geometry / hit-testing ============================ */
+let radius = 17;
+function computeRadius() {
+    if (V < 2) { radius = 18; return; }
+    let minD = Infinity;
+    for (let i = 0; i < V; i++) for (let j = i+1; j < V; j++) {
+        const a = screenOf(i), b = screenOf(j);
+        const d = Math.hypot(a.x-b.x, a.y-b.y); if (d < minD) minD = d;
+    }
+    if (!Number.isFinite(minD)) minD = 90;
+    radius = Math.max(13, Math.min(24, minD*0.38));
+}
+function hitNode(px, py) {
+    for (let i = V-1; i >= 0; i--) {
+        const s = screenOf(i);
+        if (Math.hypot(s.x-px, s.y-py) <= radius + 3) return i;
+    }
+    return -1;
+}
+function edgeGroups() {
+    const map = new Map();
+    E.forEach((e, i) => {
+        if (e.u === e.v) return;
+        const k = Math.min(e.u,e.v) + '_' + Math.max(e.u,e.v);
+        if (!map.has(k)) map.set(k, []);
+        map.get(k).push(i);
+    });
+    return map;
+}
+function curveOffsetFor(edgeIdx) {
+    // returns perpendicular pixel offset for drawing this edge, spreading out parallel edges between the same pair
+    const groups = edgeGroups();
+    for (const [, idxs] of groups) {
+        const pos2 = idxs.indexOf(edgeIdx);
+        if (pos2 === -1) continue;
+        const n = idxs.length;
+        if (n === 1) return 0;
+        return (pos2 - (n-1)/2) * 22;
+    }
+    return 0;
+}
+function edgeMidpoint(i) {
+    const e = E[i]; const A = screenOf(e.u), B = screenOf(e.v);
+    const off = curveOffsetFor(i);
+    const mx = (A.x+B.x)/2, my = (A.y+B.y)/2;
+    if (off === 0) return { x: mx, y: my };
+    const dx = B.x-A.x, dy = B.y-A.y, len = Math.hypot(dx,dy)||1;
+    const nx = -dy/len, ny = dx/len;
+    return { x: mx+nx*off, y: my+ny*off };
+}
+function hitEdge(px, py) {
+    for (let i = 0; i < E.length; i++) {
+        if (E[i].u === E[i].v) continue;
+        const e = E[i]; const A = screenOf(e.u), B = screenOf(e.v);
+        const off = curveOffsetFor(i);
+        let d;
+        if (off === 0) {
+            d = distToSegment(px, py, A.x, A.y, B.x, B.y);
+        } else {
+            const mid = edgeMidpoint(i);
+            d = Math.min(distToSegment(px, py, A.x, A.y, mid.x, mid.y), distToSegment(px, py, mid.x, mid.y, B.x, B.y));
+        }
+        if (d <= 8) return i;
+    }
+    return -1;
+}
+function distToSegment(px, py, ax, ay, bx, by) {
+    const dx = bx-ax, dy = by-ay;
+    const len2 = dx*dx+dy*dy;
+    let t = len2 === 0 ? 0 : ((px-ax)*dx + (py-ay)*dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const cx = ax + t*dx, cy = ay + t*dy;
+    return Math.hypot(px-cx, py-cy);
+}
+
+/* ============================ rendering ============================ */
+function roundRect(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function drawWeightLabel(x, y, text, hi) {
+    ctx.font = '700 11px -apple-system, "Segoe UI", Roboto, sans-serif';
+    const w = ctx.measureText(text).width, pad = 4;
+    roundRect(x-w/2-pad, y-8, w+2*pad, 16, 4);
+    ctx.fillStyle = hi ? '#fff' : 'rgba(246,239,224,0.95)';
+    ctx.strokeStyle = hi ? '#1f6f6a' : '#bcaf92'; ctx.lineWidth = 1;
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#4a3f35'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y+0.5);
+}
+function drawArrow(x, y, angle, size, color) {
+    ctx.save(); ctx.translate(x,y); ctx.rotate(angle);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-size,size*0.55); ctx.lineTo(-size,-size*0.55); ctx.closePath();
+    ctx.fillStyle = color; ctx.fill(); ctx.restore();
+}
+function drawEdgeLine(i, A, B, color, width) {
+    const off = curveOffsetFor(i);
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round';
+    if (off === 0) {
+        const d = Math.hypot(B.x-A.x, B.y-A.y) || 1, ux = (B.x-A.x)/d, uy = (B.y-A.y)/d;
+        const sx = A.x+ux*radius, sy = A.y+uy*radius, ex = B.x-ux*radius, ey = B.y-uy*radius;
+        ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+        if (directed) drawArrow(ex, ey, Math.atan2(uy,ux), Math.max(7,radius*0.42), color);
+    } else {
+        const mid = edgeMidpoint(i);
+        const d1 = Math.hypot(mid.x-A.x, mid.y-A.y)||1, u1x=(mid.x-A.x)/d1, u1y=(mid.y-A.y)/d1;
+        const sx = A.x+u1x*radius, sy = A.y+u1y*radius;
+        const d2 = Math.hypot(B.x-mid.x, B.y-mid.y)||1, u2x=(B.x-mid.x)/d2, u2y=(B.y-mid.y)/d2;
+        const ex = B.x-u2x*radius, ey = B.y-u2y*radius;
+        ctx.beginPath(); ctx.moveTo(sx,sy); ctx.quadraticCurveTo(mid.x,mid.y,ex,ey); ctx.stroke();
+        if (directed) drawArrow(ex, ey, Math.atan2(B.y-mid.y, B.x-mid.x), Math.max(7,radius*0.42), color);
+    }
+    ctx.lineCap = 'butt';
+}
+function drawTinyRingLabel(x, y, text) {
+    ctx.font = '600 10px -apple-system, "Segoe UI", Roboto, sans-serif';
+    const w = ctx.measureText(text).width, pad = 3;
+    roundRect(x-w/2-pad, y-7, w+2*pad, 14, 3);
+    ctx.fillStyle = 'rgba(241,233,210,0.9)'; ctx.fill();
+    ctx.fillStyle = 'rgba(74,63,53,0.7)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+}
+function render() {
+    fitCanvas();
+    if (springMode) { recomputeSpring(); }
+    computeRadius();
+    ctx.clearRect(0, 0, cw, ch);
+
+    if (snapGrid && !springMode) {
+        ctx.strokeStyle = 'rgba(74,63,53,0.10)'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = gridSize; x < cw; x += gridSize) { ctx.moveTo(x+0.5, 0); ctx.lineTo(x+0.5, ch); }
+        for (let y = gridSize; y < ch; y += gridSize) { ctx.moveTo(0, y+0.5); ctx.lineTo(cw, y+0.5); }
+        ctx.stroke();
+    }
+
+    if (springMode && V > 0) {
+        const centerX = cw/2, centerY = ch/2;
+        const dists = new Set();
+        for (const d of springDist) if (Number.isFinite(d)) dists.add(Math.round(d*100)/100);
+        [...dists].sort((a,b)=>a-b).forEach(d => {
+            const R = springRof(d);
+            if (R < 2) return;
+            ctx.beginPath(); ctx.arc(centerX, centerY, R, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(74,63,53,0.16)'; ctx.lineWidth = 1; ctx.setLineDash([3,4]); ctx.stroke(); ctx.setLineDash([]);
+            drawTinyRingLabel(centerX, centerY-R, fmtWeight(d));
+        });
+        ctx.beginPath(); ctx.arc(centerX, centerY, R_inf, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(140,124,112,0.5)'; ctx.lineWidth = 1.2; ctx.setLineDash([2,5]); ctx.stroke(); ctx.setLineDash([]);
+        drawTinyRingLabel(centerX, centerY-R_inf, '∞');
+    }
+
+    // edges
+    for (let i = 0; i < E.length; i++) {
+        const e = E[i];
+        if (e.u === e.v) continue;
+        const A = screenOf(e.u), B = screenOf(e.v);
+        const isSel = selectedEdge === i;
+        drawEdgeLine(i, A, B, isSel ? '#1f6f6a' : '#948567', isSel ? 3.2 : 1.8);
+        if (weighted) { const mid = edgeMidpoint(i); drawWeightLabel(mid.x, mid.y, fmtWeight(e.weight), isSel); }
+    }
+    // rubber-band while shift-dragging a new edge
+    if (dragMode === 'edge') {
+        const A = screenOf(dragNode);
+        ctx.strokeStyle = '#c98a1b'; ctx.lineWidth = 2; ctx.setLineDash([6,5]);
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(dragCursor.x, dragCursor.y); ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // nodes
+    ctx.font = `700 ${Math.round(radius*0.92)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let i = 0; i < V; i++) {
+        const s = screenOf(i);
+        ctx.beginPath(); ctx.arc(s.x, s.y, radius, 0, Math.PI*2);
+        ctx.fillStyle = '#f6efe0'; ctx.fill();
+        const isSpringSource = springMode && i === springSource;
+        ctx.lineWidth = selectedNode === i ? 4 : (isSpringSource ? 3 : 2);
+        ctx.strokeStyle = selectedNode === i ? '#ff0000' : (isSpringSource ? '#1f6f6a' : '#bcaf92');
+        ctx.stroke();
+        ctx.fillStyle = '#4a3f35';
+        ctx.fillText(String(i), s.x, s.y+1);
+    }
+    document.getElementById('statLine').textContent = `${V} vertices, ${E.length} edge${E.length===1?'':'s'}`;
+}
+
+/* ============================ mouse interaction ============================ */
+let dragMode = null;        // null | 'move' | 'edge'
+let dragNode = -1;
+let dragCursor = { x: 0, y: 0 };
+let mouseDownPos = null;
+let mouseDownHitNode = -1;
+let mouseDownHitEdge = -1;
+let didMove = false;
+
+function canvasPoint(evt) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+}
+canvas.addEventListener('mousedown', evt => {
+    const p = canvasPoint(evt);
+    mouseDownPos = p; didMove = false;
+    mouseDownHitNode = hitNode(p.x, p.y);
+    mouseDownHitEdge = mouseDownHitNode < 0 ? hitEdge(p.x, p.y) : -1;
+    if (mouseDownHitNode >= 0) {
+        dragMode = evt.shiftKey ? 'edge' : 'move';
+        dragNode = mouseDownHitNode;
+        dragCursor = p;
+    } else {
+        dragMode = null; dragNode = -1;
+    }
+});
+canvas.addEventListener('mousemove', evt => {
+    const p = canvasPoint(evt);
+    if (mouseDownPos && Math.hypot(p.x-mouseDownPos.x, p.y-mouseDownPos.y) > 4) didMove = true;
+    if (dragMode === 'move') {
+        if (springMode) {
+            if (dragNode !== springSource) {
+                const centerX = cw/2, centerY = ch/2;
+                const theta = Math.atan2(p.y-centerY, p.x-centerX);
+                const R0 = 0.35;   // nominal radius in true-position space — only the angle round-trips
+                pos[dragNode] = { x: pos[springSource].x + R0*Math.cos(theta), y: pos[springSource].y + R0*Math.sin(theta) };
+                refreshTextarea(); render();
+            }
+        } else {
+            let clampedX = Math.max(radius, Math.min(cw-radius, p.x));
+            let clampedY = Math.max(radius, Math.min(ch-radius, p.y));
+            const snapped = snapPx(clampedX, clampedY);
+            clampedX = Math.max(radius, Math.min(cw-radius, snapped.x));
+            clampedY = Math.max(radius, Math.min(ch-radius, snapped.y));
+            pos[dragNode] = toNorm(clampedX, clampedY);
+            refreshTextarea(); render();
+        }
+    } else if (dragMode === 'edge') {
+        dragCursor = p; render();
+    } else {
+        const overNode = hitNode(p.x, p.y), overEdge = overNode < 0 ? hitEdge(p.x, p.y) : -1;
+        canvas.style.cursor = (overNode >= 0 || overEdge >= 0) ? 'pointer' : 'crosshair';
+    }
+});
+window.addEventListener('mouseup', evt => {
+    if (!mouseDownPos) return;
+    const p = canvasPoint(evt);
+    if (dragMode === 'edge') {
+        const target = hitNode(p.x, p.y);
+        if (target >= 0 && target !== dragNode) addEdge(dragNode, target);
+        render();
+    } else if (dragMode === 'move') {
+        if (!didMove) { selectedNode = mouseDownHitNode; selectedEdge = -1; render(); }
+    } else if (mouseDownHitEdge >= 0) {
+        selectedEdge = mouseDownHitEdge; selectedNode = -1; render();
+    } else if (!didMove) {
+        // empty-space click → add a vertex
+        let nx, ny;
+        if (springMode && V > 0) {
+            const centerX = cw/2, centerY = ch/2;
+            const theta = Math.atan2(p.y-centerY, p.x-centerX);
+            const R0 = 0.35;
+            nx = pos[springSource].x + R0*Math.cos(theta); ny = pos[springSource].y + R0*Math.sin(theta);
+        } else {
+            const clampX = x => Math.max(radius, Math.min(cw-radius, x));
+            const clampY = y => Math.max(radius, Math.min(ch-radius, y));
+            const snapped = snapPx(clampX(p.x), clampY(p.y));
+            const n = toNorm(clampX(snapped.x), clampY(snapped.y));
+            nx = n.x; ny = n.y;
+        }
+        selectedNode = -1; selectedEdge = -1;
+        addVertex(nx, ny);
+    }
+    dragMode = null; dragNode = -1; mouseDownPos = null;
+});
+canvas.addEventListener('dblclick', evt => {
+    const p = canvasPoint(evt);
+    const ei = hitEdge(p.x, p.y);
+    if (ei >= 0 && weighted) {
+        const mid = edgeMidpoint(ei);
+        weightInput.style.left = mid.x + 'px';
+        weightInput.style.top = mid.y + 'px';
+        weightInput.value = fmtWeight(E[ei].weight);
+        weightInput.style.display = 'block';
+        weightInput.dataset.editing = String(ei);
+        weightInput.focus(); weightInput.select();
+    }
+});
+weightInput.addEventListener('keydown', evt => {
+    if (evt.key === 'Enter') { commitWeightInput(); }
+    else if (evt.key === 'Escape') { weightInput.style.display = 'none'; }
+});
+weightInput.addEventListener('blur', commitWeightInput);
+function commitWeightInput() {
+    if (weightInput.style.display === 'none') return;
+    const ei = parseInt(weightInput.dataset.editing, 10);
+    const w = parseFloat(weightInput.value);
+    weightInput.style.display = 'none';
+    if (Number.isInteger(ei) && ei >= 0 && ei < E.length) editEdgeWeight(ei, w);
+}
+document.addEventListener('keydown', evt => {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+    if (evt.key === 'Delete' || evt.key === 'Backspace') {
+        if (selectedNode >= 0) { evt.preventDefault(); deleteVertex(selectedNode); }
+        else if (selectedEdge >= 0) { evt.preventDefault(); deleteEdge(selectedEdge); }
+    } else if (evt.key === 'Escape') {
+        selectedNode = -1; selectedEdge = -1; dragMode = null; render();
+    }
+});
+
+/* ============================ init ============================ */
+function init() {
+    weighted = document.getElementById('weightedToggle').checked;
+    directed = document.getElementById('directedToggle').checked;
+    // small starter example so the canvas isn't empty
+    const starter = parseAlgs4(`4\n4\n0 1\n1 2\n2 3\n3 0`, false);
+    V = starter.v; E = starter.edges; pos = layoutAll(V, E);
+    refreshTextarea();
+    window.addEventListener('resize', render);
+    render();
+    populateExternalGraphs();
+}
+init();
+</script>
+</body>
+</html>

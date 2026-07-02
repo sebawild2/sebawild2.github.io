@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kruskal's Algorithm — Animated (Parallel Fill & Step Mode)</title>
+    <style>
+        :root {
+            --bg: #f1e9d2;
+            --panel: #f6efe0;
+            --panel-border: #e2d6b5;
+            --controls-bg: #e8ddbe;
+            --controls-border: #dcd0b0;
+            --ink: #726253;
+            --ink-strong: #4a3f35;
+            --title-muted: #8c7b70;
+            --btn: #faf6eb;
+            --btn-border: #bcaf92;
+            --btn-border-hover: #9a8c6f;
+            --node-cream: #f6efe0;
+            --node-cream-border: #bcaf92;
+            --active: #ff0000;
+            --examine: #c98a1b;
+            --tree-edge: #1f6f6a;
+            --reject: #e65a4a;
+            --edge-idle: #b3a589;
+            --flash-gold: #ffb300;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background-color: var(--bg); color: var(--ink);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0; padding: 22px 26px 40px; min-height: 100vh;
+        }
+        h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--ink-strong); }
+        .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; }
+        .subtitle code { background: #efe6cd; padding: 1px 6px; border-radius: 3px; }
+        .controls {
+            display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
+            background-color: var(--controls-bg); padding: 14px 22px; border-radius: 6px;
+            border: 1px solid var(--controls-border); margin-bottom: 22px;
+        }
+        .ctl-group { display: flex; align-items: center; gap: 9px; }
+        .ctl-group label { font-size: 0.82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+        .btn-group { display: flex; gap: 8px; }
+        button, select {
+            background-color: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+            padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
+            transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit;
+        }
+        button:hover:not(:disabled), select:hover { background-color: #fff; border-color: var(--btn-border-hover); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        button.primary { background-color: #efd9c8; border-color: #c08b6f; }
+        button.primary:hover:not(:disabled) { background-color: #f3e2d4; }
+        input[type="range"] { accent-color: #e60000; cursor: pointer; vertical-align: middle; }
+        .slider-group span { min-width: 42px; }
+        .stage { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(330px,1fr); gap: 20px; align-items: start; }
+        @media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+        .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
+        canvas#graph { display: block; background-color: var(--bg); width: 100%; height: 460px; border-radius: 4px; }
+        .side { display: flex; flex-direction: column; gap: 18px; }
+        .status { background: #efe6cd; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .status .stepcount { color: var(--title-muted); font-size: 0.8rem; margin-left: auto; padding-left: 12px; white-space: nowrap; }
+        .clock-wrap {
+            background: #efe6cd; border-radius: 6px; padding: 8px 14px; display: flex; align-items: baseline; gap: 8px;
+            font-family: 'SF Mono', 'Consolas', monospace; font-weight: 700; font-size: 1.4rem; color: #1f6f6a;
+            border: 1px solid #b3a589; margin-top: 8px;
+        }
+        .clock-label { font-size: 0.7rem; color: var(--title-muted); letter-spacing: 0.6px; }
+        .list-box { max-height: 180px; overflow-y: auto; }
+        .edge-item {
+            padding: 4px 10px; border-radius: 4px; background: #efe6cd; border: 1px solid #ddd0b1;
+            font-size: 0.78rem; font-weight: 600; font-family: 'SF Mono', 'Consolas', monospace;
+            white-space: nowrap; margin: 2px 0; transition: all 0.2s;
+        }
+        .edge-item.active { background: #fff; border: 2px solid var(--examine); }
+        .edge-item.accepted { background: #d9eee8; border-color: var(--tree-edge); color: #0f4750; }
+        .edge-item.rejected { background: #f7e0dc; border-color: var(--reject); color: #9a3b2f; text-decoration: line-through; }
+        .edge-item.flash { animation: flashHighlight 0.5s ease-out; }
+        @keyframes flashHighlight {
+            0%, 100% { box-shadow: 0 0 0 rgba(255, 179, 0, 0); }
+            50% { box-shadow: 0 0 18px rgba(255, 179, 0, 0.7); }
+        }
+        .layers { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+        .layer-row { display: flex; align-items: center; gap: 8px; transition: all 0.4s; }
+        .layer-row.flash-comp { animation: flashComp 0.6s ease-out; }
+        @keyframes flashComp {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.4) drop-shadow(0 0 8px var(--flash-gold)); }
+        }
+        .layer-label { font-size: 0.78rem; color: var(--ink-strong); font-weight: 700; min-width: 64px; }
+        .layer-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+        .layer-chip { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; border: 1.5px solid rgba(0,0,0,0.15); }
+        .none { color: var(--title-muted); font-style: italic; font-size: 0.88rem; }
+        .adj { font-size: 0.9rem; }
+        .adj-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #e6dabb; }
+        .adj-key { width: 30px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 700; background: var(--node-cream); border: 1px solid var(--node-cream-border); }
+        .adj-arrow { color: var(--title-muted); }
+        .adj-cell { min-width: 24px; padding: 2px 6px; border-radius: 3px; text-align: center; background: #efe6cd; border: 1px solid #ddd0b1; font-size: 0.85rem; }
+        .legend { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 0.8rem; color: var(--ink); align-items: center; margin-top: 12px; }
+        .legend .item { display: flex; align-items: center; gap: 7px; }
+        .swatch { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; }
+        .sw-cream { background: var(--node-cream); border-color: var(--node-cream-border); }
+        .sw-tree { background: #d9eee8; border-color: var(--tree-edge); }
+        .sw-examine { background: #fff; border-color: var(--examine); border-width: 2.5px; }
+        .sw-reject { background: #f7e0dc; border-color: var(--reject); }
+        .switch { position: relative; display: inline-block; width: 42px; height: 23px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .track { position: absolute; cursor: pointer; inset: 0; background: #cdbf9d; border: 1px solid #b3a589; border-radius: 23px; transition: .2s; }
+        .switch .track:before { content: ""; position: absolute; height: 17px; width: 17px; left: 3px; top: 2px; background: #faf6eb; border-radius: 50%; transition: .2s; }
+        .switch input:checked + .track { background: #15616d; border-color: #0f4750; }
+        .switch input:checked + .track:before { transform: translateX(19px); }
+
+        details.editor { margin-top: 22px; }
+        details.editor summary { cursor: pointer; font-size: 0.85rem; color: var(--title-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+        .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+        textarea { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px; padding: 10px; width: 230px; height: 230px; resize: vertical; }
+        .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 420px; line-height: 1.5; }
+        .editor-help code { background: #efe6cd; padding: 1px 5px; border-radius: 3px; }
+        .err { color: #9a3b2f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
+    </style>
+</head>
+<body>
+<h1>Kruskal's Algorithm</h1>
+<p class="subtitle">Minimum spanning tree on an <b>undirected, weighted</b> graph. Toggle between <b>Parallel Fill</b> (edges fill from the middle, sorted by weight) and a basic <b>Step Mode</b>.</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="presetSel">Graph</label>
+        <select id="presetSel"></select>
+    </div>
+    <div class="btn-group">
+        <button id="backBtn" onclick="stepBack()">‹ Back</button>
+        <button id="stepBtn" class="primary" onclick="stepFwd()">Step ›</button>
+        <button id="playBtn" onclick="togglePlay()">Play</button>
+        <button id="resetBtn" onclick="resetRun()">Reset</button>
+    </div>
+    <div class="slider-group" style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#5c4f43">
+        <label style="font-size:.82rem;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:var(--ink-strong)">Speed</label>
+        <input type="range" id="speedSlider" min="100" max="2000" value="500" oninput="updateSpeed(this.value)">
+        <span id="speedVal">500ms</span>
+    </div>
+    <div class="ctl-group">
+        <label for="modeToggle">Parallel Fill</label>
+        <label class="switch"><input type="checkbox" id="modeToggle" onchange="toggleMode(this.checked)"><span class="track"></span></label>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="sim-box">
+        <div class="sim-title">Graph G</div>
+        <canvas id="graph"></canvas>
+        <div class="legend">
+            <div class="item"><span class="swatch sw-cream"></span>vertex</div>
+            <div class="item"><span class="swatch sw-tree"></span>tree edge (MST)</div>
+            <div class="item"><span class="swatch sw-examine"></span>filling / current</div>
+            <div class="item"><span class="swatch sw-reject"></span>rejected (cycle)</div>
+        </div>
+    </div>
+    <div class="side">
+        <div class="sim-box">
+            <div class="sim-title">Status</div>
+            <div class="status">
+                <span id="statusText">Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.</span>
+                <span class="stepcount" id="stepCount"></span>
+            </div>
+            <div class="clock-wrap" id="clockDisplay">
+                <span class="clock-label">⏱ TIME</span>
+                <span id="clockValue">0.00</span>
+            </div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Sorted edges</div>
+            <div class="list-box" id="edgeList"></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Connected components</div>
+            <div class="layers" id="layersView"><span class="none">none yet</span></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">MST edges</div>
+            <div class="adj" id="mstView"></div>
+        </div>
+    </div>
+</div>
+
+<details class="editor">
+    <summary>Edit / paste a graph</summary>
+    <div class="editor-body">
+        <textarea id="graphText" spellcheck="false"></textarea>
+        <div>
+            <button class="primary" onclick="loadFromText()">Load this graph</button>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--ink-strong);margin-left:10px;cursor:pointer">
+                <input type="checkbox" id="sedgewickToggle" onchange="refreshTextarea()">
+                original Sedgewick format (no coordinates)
+            </label>
+            <div class="err" id="parseErr"></div>
+            <div class="editor-help" style="margin-top:10px">
+                Format: first line is the number of vertices <code>V</code> and edges <code>E</code>,
+                then <code>E</code> lines each holding an undirected edge <code>u v weight</code>.
+                Vertices are <code>0 … V−1</code>. Weights are positive numbers (decimals ok).
+                <br><br>
+                <b>Optional fixed layout:</b> after the edges, add exactly <code>V</code> more lines of
+                <code>x y</code> — one pair per vertex, in order — to pin down your own layout instead of the
+                automatic one. Any numeric scale works; it's auto-centred and scaled to fit, preserving relative
+                position and aspect ratio. Loading a graph always fills the box back in with its current layout's
+                coordinates so you can nudge them; tick the box above to see the plain format instead.
+                <br><br>
+                <b>Mixed-format tolerant:</b> each edge occupies exactly one line. Pasting an <i>unweighted</i>
+                graph here (only two numbers per edge line) just defaults each missing weight to 1, instead of
+                failing to parse.
+            </div>
+        </div>
+    </div>
+</details>
+
+<script>
+(function() {
+    const PRESETS = {
+        "Kruskal example (8 V, 16 E)": `8 16
+4 5 0.35
+4 7 0.37
+5 7 0.28
+0 7 0.16
+1 5 0.32
+0 4 0.38
+2 3 0.17
+1 7 0.19
+0 2 0.26
+1 2 0.36
+1 3 0.29
+2 7 0.34
+6 2 0.40
+3 6 0.52
+6 0 0.58
+6 4 0.93`,
+        "Diamond (4 V, 5 E)": `4 5
+0 1 2
+0 2 5
+1 2 1
+1 3 6
+2 3 2`,
+        "Small test (5 V, 7 E)": `5 7
+0 1 2
+0 3 6
+1 2 3
+1 3 8
+1 4 5
+2 4 7
+3 4 9`
+    };
+
+    let V = 0, edges = [], pos = [];
+    let steps = [], ptr = -1;
+    let playing = false, timer = null, delay = 500;
+    let parallelMode = false;
+    let autoState = null;
+    let lastTimestamp = 0;
+
+    const canvas = document.getElementById('graph');
+    const ctx = canvas.getContext('2d');
+    let dpr = 1, cw = 0, ch = 0, radius = 18;
+    const COMPONENT_PALETTE = ['#e2b3a3','#b3cde3','#ccebc5','#decbe4','#fed9a6','#fbb4ae','#b3e2cd','#fdcdac','#cbd5e8','#f4cae4','#e6f5c9','#fff2ae'];
+
+    class DisjointSet {
+        constructor(n) {
+            this.parent = Array.from({ length: n }, (_, i) => i);
+            this.rank = new Array(n).fill(0);
+            this.rootColor = Array.from({ length: n }, (_, i) => COMPONENT_PALETTE[i % COMPONENT_PALETTE.length]);
+        }
+        find(x) {
+            while (this.parent[x] !== x) {
+                this.parent[x] = this.parent[this.parent[x]];
+                x = this.parent[x];
+            }
+            return x;
+        }
+        union(a, b) {
+            let ra = this.find(a), rb = this.find(b);
+            if (ra === rb) return false;
+            if (this.rank[ra] < this.rank[rb]) [ra, rb] = [rb, ra];
+            this.parent[rb] = ra;
+            if (this.rank[ra] === this.rank[rb]) this.rank[ra]++;
+            return true;
+        }
+        getColor(x) {
+            return this.rootColor[this.find(x)];
+        }
+        getComponents() {
+            const comp = new Array(this.parent.length);
+            for (let i = 0; i < this.parent.length; i++) comp[i] = this.find(i);
+            return comp;
+        }
+    }
+
+    function normalizePositions(raw) {
+        let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+        for (const p of raw) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+        const w = Math.max(maxx-minx, 1e-6), h = Math.max(maxy-miny, 1e-6);
+        const pad = 0.08, avail = 1 - 2*pad;
+        const s = avail / Math.max(w, h);
+        const usedW = w*s, usedH = h*s;
+        const offX = pad + (avail-usedW)/2, offY = pad + (avail-usedH)/2;
+        return raw.map(p => ({ x: offX + (p.x-minx)*s, y: offY + (p.y-miny)*s }));
+    }
+    function fmtCoord(x) { return (Math.round(x*1000)/1000).toString(); }
+
+    /* Line-based: each edge (and, later, each coordinate pair) occupies exactly one line. This makes the
+       format tolerant of pasting an unweighted graph here (a missing weight defaults to 1) or a weighted
+       graph into an unweighted page elsewhere (the extra weight token there is simply ignored) — a
+       stray/missing token only ever affects the one line it's on, not the rest of the parse. */
+    function tokenizeLines(text) {
+        return text.split('\n').map(line => line.trim().split(/\s+/).filter(s => s.length)).filter(toks => toks.length > 0);
+    }
+    function readVE(lines) {
+        if (lines.length === 0) throw new Error("Empty input.");
+        if (lines[0].length >= 2) return { v: parseInt(lines[0][0], 10), e: parseInt(lines[0][1], 10), li: 1 };
+        if (lines.length < 2) throw new Error("Need E on the second line.");
+        return { v: parseInt(lines[0][0], 10), e: parseInt(lines[1][0], 10), li: 2 };
+    }
+    function readTrailingPositions(lines, li, v) {
+        const remaining = lines.length - li;
+        if (remaining === 0) return null;
+        if (remaining !== v) throw new Error(`After the edges, expected either nothing or exactly ${v} coordinate line(s) ("x y" each), but found ${remaining}.`);
+        const raw = [];
+        for (let i = 0; i < v; i++) {
+            const toks = lines[li++];
+            const x = parseFloat(toks[0]), y = parseFloat(toks[1]);
+            if (toks.length < 2 || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Vertex ${i}: expected two coordinate numbers "x y".`);
+            raw.push({ x, y });
+        }
+        return normalizePositions(raw);
+    }
+
+    function parseGraph(text) {
+        const lines = tokenizeLines(text);
+        const { v, e, li: li0 } = readVE(lines);
+        let li = li0;
+        if (!Number.isFinite(v) || v <= 0) throw new Error("V must be a positive integer.");
+        if (!Number.isFinite(e) || e < 0) throw new Error("E must be non‑negative.");
+        const edgeList = [];
+        for (let k = 0; k < e; k++) {
+            if (li >= lines.length) throw new Error(`Expected ${e} edge line(s), only found ${k}.`);
+            const toks = lines[li++];
+            if (toks.length < 2) throw new Error(`Edge ${k+1}: expected at least two vertex integers.`);
+            const u = parseInt(toks[0], 10), w = parseInt(toks[1], 10);
+            const wt = toks.length >= 3 ? parseFloat(toks[2]) : 1;   // missing weight → default 1, don't crash
+            if (!Number.isFinite(u) || !Number.isFinite(w) || !Number.isFinite(wt)) throw new Error(`Edge ${k+1}: expected two ints and a weight.`);
+            if (u < 0 || u >= v || w < 0 || w >= v) throw new Error(`Edge ${k+1}: vertex out of range 0…${v-1}.`);
+            if (wt <= 0) throw new Error(`Edge ${k+1}: weight must be positive.`);
+            edgeList.push({ u, v: w, weight: wt });
+        }
+        const customPos = readTrailingPositions(lines, li, v);
+        return { v, edges: edgeList, pos: customPos };
+    }
+
+    function components(n, adj) {
+        const comp = new Array(n).fill(-1); let c = 0;
+        for (let s = 0; s < n; s++) {
+            if (comp[s] !== -1) continue;
+            const q = [s]; comp[s] = c;
+            while (q.length) { const u = q.pop(); for (const w of adj[u]) if (comp[w] === -1) { comp[w] = c; q.push(w); } }
+            c++;
+        }
+        return { comp, count: c };
+    }
+    function forceLayout(localEdges, N) {
+        if (N === 0) return [];
+        if (N === 1) return [{ x: 0.5, y: 0.5 }];
+        const p = [];
+        for (let i = 0; i < N; i++) {
+            const ang = (i / N) * Math.PI * 2;
+            p.push({ x: 0.5 + 0.35*Math.cos(ang) + (Math.random()-0.5)*0.02, y: 0.5 + 0.35*Math.sin(ang) + (Math.random()-0.5)*0.02 });
+        }
+        const k = Math.sqrt(1 / N) * 0.9; let temp = 0.12;
+        for (let it = 0; it < 500; it++) {
+            const disp = p.map(() => ({ x: 0, y: 0 }));
+            for (let i = 0; i < N; i++) for (let j = i+1; j < N; j++) {
+                let dx = p[i].x-p[j].x, dy = p[i].y-p[j].y, d = Math.hypot(dx,dy)||1e-4;
+                const f = (k*k)/d;
+                disp[i].x += (dx/d)*f; disp[i].y += (dy/d)*f;
+                disp[j].x -= (dx/d)*f; disp[j].y -= (dy/d)*f;
+            }
+            for (const [a2,b2] of localEdges) {
+                if (a2 === b2) continue;
+                let dx = p[a2].x-p[b2].x, dy = p[a2].y-p[b2].y, d = Math.hypot(dx,dy)||1e-4;
+                const f = (d*d)/k;
+                disp[a2].x -= (dx/d)*f; disp[a2].y -= (dy/d)*f;
+                disp[b2].x += (dx/d)*f; disp[b2].y += (dy/d)*f;
+            }
+            for (let i = 0; i < N; i++) {
+                let d = Math.hypot(disp[i].x, disp[i].y)||1e-4;
+                p[i].x += (disp[i].x/d)*Math.min(d, temp);
+                p[i].y += (disp[i].y/d)*Math.min(d, temp);
+            }
+            temp *= 0.985;
+        }
+        return p;
+    }
+    function layoutAll(n, edges) {
+        const adj = Array.from({ length: n }, () => []);
+        edges.forEach(e => { adj[e.u].push(e.v); adj[e.v].push(e.u); });
+        const { comp, count } = components(n, adj);
+        let groups = Array.from({ length: count }, () => []);
+        for (let v = 0; v < n; v++) groups[comp[v]].push(v);
+        groups.sort((g1, g2) => g2.length - g1.length);
+        const boxes = groups.map(group => {
+            const idxOf = new Map(group.map((v, i) => [v, i]));
+            const elocal = [];
+            for (const v of group) for (const w of adj[v]) if (v < w && idxOf.has(w)) elocal.push([idxOf.get(v), idxOf.get(w)]);
+            const p = forceLayout(elocal, group.length);
+            let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+            for (const q of p) { minx=Math.min(minx,q.x); miny=Math.min(miny,q.y); maxx=Math.max(maxx,q.x); maxy=Math.max(maxy,q.y); }
+            return { group, p, minx, miny, w: Math.max(maxx-minx,1e-3), h: Math.max(maxy-miny,1e-3) };
+        });
+        const positions = new Array(n);
+        const cols = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count/cols);
+        boxes.forEach((box, bi) => {
+            const cx = bi % cols, cy = Math.floor(bi/cols);
+            const cellW = 1/cols, cellH = 1/rows, pad = 0.16;
+            const availW = cellW*(1-pad*2), availH = cellH*(1-pad*2);
+            const scale = Math.min(availW/box.w, availH/box.h);
+            const usedW = box.w*scale, usedH = box.h*scale;
+            const offX = cx*cellW + (cellW-usedW)/2, offY = cy*cellH + (cellH-usedH)/2;
+            box.group.forEach((v, i) => { positions[v] = { x: offX + (box.p[i].x-box.minx)*scale, y: offY + (box.p[i].y-box.miny)*scale }; });
+        });
+        return positions;
+    }
+
+    function buildKruskalSteps(edges, V) {
+        const sorted = [...edges].sort((a,b) => a.weight - b.weight);
+        const uf = new DisjointSet(V);
+        const mst = [];
+        const steps = [];
+        for (let i = 0; i < sorted.length; i++) {
+            const e = sorted[i];
+            steps.push({ type: 'examine', edge: e, idx: i, mst: mst.slice(), components: uf.getComponents(), rootColors: uf.rootColor.slice() });
+            if (uf.find(e.u) !== uf.find(e.v)) {
+                uf.union(e.u, e.v);
+                mst.push(e);
+                steps.push({ type: 'accept', edge: e, idx: i, mst: mst.slice(), components: uf.getComponents(), rootColors: uf.rootColor.slice() });
+            } else {
+                steps.push({ type: 'reject', edge: e, idx: i, mst: mst.slice(), components: uf.getComponents(), rootColors: uf.rootColor.slice() });
+            }
+        }
+        steps.push({ type: 'done', mst: mst.slice(), components: uf.getComponents(), rootColors: uf.rootColor.slice() });
+        return { steps, sortedEdges: sorted };
+    }
+
+    let currentSortedEdges = [];
+    let currentSteps = [];
+    let currentStepPtr = -1;
+
+    function initAutoState() {
+        const sorted = [...edges].sort((a,b) => a.weight - b.weight);
+        return {
+            t: 0,
+            sortedEdges: sorted,
+            uf: new DisjointSet(V),
+            mst: [],
+            processed: new Array(sorted.length).fill(false),
+            lastProcessedIdx: 0,
+            components: Array.from({ length: V }, (_, i) => i),
+            flashes: {}
+        };
+    }
+
+    function fitCanvas() {
+        dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        cw = rect.width; ch = rect.height;
+        canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const M = 34;
+        const px = pos.map(p => ({ x: M + p.x*(cw-2*M), y: M + p.y*(ch-2*M) }));
+        let minD = Infinity;
+        for (let i = 0; i < px.length; i++) for (let j = i+1; j < px.length; j++) {
+            const d = Math.hypot(px[i].x-px[j].x, px[i].y-px[j].y); if (d < minD) minD = d;
+        }
+        if (!Number.isFinite(minD)) minD = 80;
+        radius = Math.max(13, Math.min(22, minD*0.45));
+        return px;
+    }
+
+    function edgeEndpoints(px, e) {
+        const from = px[e.u], to = px[e.v];
+        const dx = to.x - from.x, dy = to.y - from.y;
+        const len = Math.hypot(dx, dy);
+        if (len < 1e-6) return { sx: from.x, sy: from.y, ex: to.x, ey: to.y, len: 1 };
+        const ux = dx/len, uy = dy/len;
+        return {
+            sx: from.x + ux * radius,
+            sy: from.y + uy * radius,
+            ex: to.x - ux * radius,
+            ey: to.y - uy * radius,
+            len: len - 2*radius
+        };
+    }
+
+    function drawEdgeFill(ctx, sx, sy, ex, ey, progress, color, width=4) {
+        const dx = ex - sx, dy = ey - sy;
+        const len = Math.hypot(dx, dy);
+        if (len === 0) return;
+        const ux = dx/len, uy = dy/len;
+        const midX = (sx+ex)/2, midY = (sy+ey)/2;
+        const halfLen = len/2;
+        const drawLen = halfLen * progress;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(midX - ux*drawLen, midY - uy*drawLen);
+        ctx.lineTo(midX + ux*drawLen, midY + uy*drawLen);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function getVertexColors(components, rootColors) {
+        const colors = new Array(V);
+        for (let v = 0; v < V; v++) colors[v] = rootColors[components[v]];
+        return colors;
+    }
+
+    function drawVertices(px, colors) {
+        ctx.font = `700 ${Math.round(radius*0.85)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        for (let v = 0; v < V; v++) {
+            const x = px[v].x, y = px[v].y;
+            const fill = colors ? colors[v] : '#f6efe0';
+            ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2);
+            ctx.fillStyle = fill; ctx.fill();
+            ctx.strokeStyle = '#bcaf92'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = '#4a3f35'; ctx.fillText(v, x, y+1);
+        }
+    }
+
+    function renderStep(step) {
+        const px = fitCanvas();
+        ctx.clearRect(0, 0, cw, ch);
+        if (!step) {
+            edges.forEach(e => {
+                const { sx, sy, ex, ey } = edgeEndpoints(px, e);
+                ctx.strokeStyle = '#b3a589'; ctx.lineWidth = 1.6;
+                ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+                ctx.fillStyle = '#4a3f35'; ctx.font = '11px -apple-system, sans-serif';
+                ctx.textAlign = 'center'; ctx.fillText(e.weight.toFixed(1), (sx+ex)/2, (sy+ey)/2-8);
+            });
+            drawVertices(px, null);
+            return;
+        }
+        const { mst, type, edge: examEdge, components, rootColors } = step;
+        const vertexColors = getVertexColors(components, rootColors);
+        edges.forEach(e => {
+            const { sx, sy, ex, ey } = edgeEndpoints(px, e);
+            const isMst = mst && mst.some(me => (me.u===e.u&&me.v===e.v) || (me.u===e.v&&me.v===e.u));
+            const isExam = examEdge && ((examEdge.u===e.u&&examEdge.v===e.v) || (examEdge.u===e.v&&examEdge.v===e.u));
+            if (isMst) {
+                ctx.strokeStyle = '#1f6f6a'; ctx.lineWidth = 3.5;
+            } else if (isExam && type==='examine') {
+                ctx.strokeStyle = '#c98a1b'; ctx.lineWidth = 3; ctx.setLineDash([6,4]);
+            } else if (isExam && type==='reject') {
+                ctx.strokeStyle = '#e65a4a'; ctx.lineWidth = 2.5; ctx.setLineDash([5,3]);
+            } else {
+                ctx.strokeStyle = '#b3a589'; ctx.lineWidth = 1.6;
+            }
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = isMst ? '#0f4750' : (isExam && type==='reject' ? '#9a3b2f' : '#4a3f35');
+            ctx.font = '11px -apple-system, sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(e.weight.toFixed(1), (sx+ex)/2, (sy+ey)/2-8);
+        });
+        drawVertices(px, vertexColors);
+    }
+
+    function renderAuto(astate) {
+        const px = fitCanvas();
+        ctx.clearRect(0, 0, cw, ch);
+        const { sortedEdges, mst, processed, t, flashes, uf } = astate;
+        const vertexColors = Array.from({ length: V }, (_, v) => uf.getColor(v));
+        const now = performance.now() / 1000;
+        sortedEdges.forEach((e, i) => {
+            const { sx, sy, ex, ey } = edgeEndpoints(px, e);
+            const progress = Math.min(1, t / e.weight);
+            const isMst = mst.some(me => (me.u===e.u&&me.v===e.v) || (me.u===e.v&&me.v===e.u));
+            const isRejected = processed[i] && !isMst;
+            if (isMst) {
+                const flashTime = flashes['accept_'+i];
+                if (flashTime && now - flashTime < 0.6) {
+                    ctx.strokeStyle = `rgba(255,179,0,${1-(now-flashTime)/0.6})`;
+                    ctx.lineWidth = 6;
+                    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+                }
+                ctx.strokeStyle = '#1f6f6a'; ctx.lineWidth = 3.5;
+            } else if (isRejected) {
+                const flashTime = flashes['reject_'+i];
+                if (flashTime && now - flashTime < 0.7) {
+                    ctx.strokeStyle = `rgba(230,90,74,${0.5+(1-(now-flashTime)/0.7)*0.5})`;
+                    ctx.lineWidth = 4; ctx.setLineDash([]);
+                    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+                }
+                ctx.strokeStyle = '#e65a4a'; ctx.lineWidth = 2.5; ctx.setLineDash([5,3]);
+            } else if (progress < 1) {
+                drawEdgeFill(ctx, sx, sy, ex, ey, progress, '#c98a1b', 4);
+                ctx.fillStyle = '#4a3f35';
+                ctx.font = '11px -apple-system, sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText(e.weight.toFixed(1), (sx+ex)/2, (sy+ey)/2-8);
+                return;
+            } else {
+                ctx.strokeStyle = '#b3a589'; ctx.lineWidth = 1.6;
+            }
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = isMst ? '#0f4750' : (isRejected ? '#9a3b2f' : '#4a3f35');
+            ctx.font = '11px -apple-system, sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(e.weight.toFixed(1), (sx+ex)/2, (sy+ey)/2-8);
+        });
+        drawVertices(px, vertexColors);
+    }
+
+    function updateSidebars(step, astate) {
+        const sortedEdges = astate ? astate.sortedEdges : currentSortedEdges;
+        const mst = astate ? astate.mst : (step ? step.mst : []);
+        const components = astate ? astate.uf.getComponents() : (step ? step.components : null);
+        const rootColors = astate ? astate.uf.rootColor : (step ? step.rootColors : null);
+        const st = document.getElementById('statusText');
+        const sc = document.getElementById('stepCount');
+        if (parallelMode && astate) {
+            st.innerHTML = `Time: <b>${astate.t.toFixed(2)}</b> — edges fill up to their weight.`;
+            sc.textContent = `MST: ${mst.length} / ${V-1}`;
+        } else if (step) {
+            if (step.type === 'done') st.innerHTML = 'Kruskal complete — minimum spanning tree built.';
+            else if (step.type === 'examine') st.innerHTML = `Examining edge ${step.edge.u}–${step.edge.v} (${step.edge.weight.toFixed(1)})`;
+            else if (step.type === 'accept') st.innerHTML = `Accepted edge ${step.edge.u}–${step.edge.v}`;
+            else if (step.type === 'reject') st.innerHTML = `Rejected edge ${step.edge.u}–${step.edge.v} (creates cycle)`;
+            sc.textContent = `step ${currentStepPtr+1} / ${currentSteps.length}`;
+        } else {
+            st.innerHTML = 'Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.';
+            sc.textContent = `0 / ${currentSteps.length}`;
+        }
+        document.getElementById('clockDisplay').style.display = (parallelMode && astate) ? 'flex' : 'none';
+        if (parallelMode && astate) document.getElementById('clockValue').textContent = astate.t.toFixed(2);
+
+        const edgeList = document.getElementById('edgeList');
+        edgeList.innerHTML = '';
+        if (sortedEdges) {
+            sortedEdges.forEach((e, i) => {
+                const item = document.createElement('div');
+                item.className = 'edge-item';
+                item.textContent = `${e.u}-${e.v} (${e.weight.toFixed(1)})`;
+                if (astate) {
+                    const isMst = astate.mst.some(me => (me.u===e.u&&me.v===e.v)||(me.u===e.v&&me.v===e.u));
+                    if (astate.processed[i] && isMst) item.classList.add('accepted');
+                    else if (astate.processed[i]) item.classList.add('rejected');
+                    else if (astate.t >= e.weight) item.classList.add('active');
+                    if (astate.flashes['accept_'+i] && performance.now()/1000 - astate.flashes['accept_'+i] < 0.6) item.classList.add('flash');
+                    if (astate.flashes['reject_'+i] && performance.now()/1000 - astate.flashes['reject_'+i] < 0.7) item.classList.add('flash');
+                } else if (step) {
+                    if (step.mst && step.mst.some(me => (me.u===e.u&&me.v===e.v)||(me.u===e.v&&me.v===e.u))) item.classList.add('accepted');
+                    if (step.type==='reject' && step.edge && step.edge.u===e.u && step.edge.v===e.v) item.classList.add('rejected');
+                    if (step.type==='examine' && step.edge && step.edge.u===e.u && step.edge.v===e.v) item.classList.add('active');
+                }
+                edgeList.appendChild(item);
+            });
+        }
+
+        const lv = document.getElementById('layersView');
+        lv.innerHTML = '';
+        if (components && rootColors) {
+            const byComp = new Map();
+            for (let v = 0; v < V; v++) {
+                const root = components[v];
+                if (!byComp.has(root)) byComp.set(root, []);
+                byComp.get(root).push(v);
+            }
+            if (byComp.size === 0) lv.innerHTML = '<span class="none">none yet</span>';
+            else {
+                byComp.forEach((vertices, root) => {
+                    const row = document.createElement('div');
+                    row.className = 'layer-row';
+                    const label = document.createElement('div');
+                    label.className = 'layer-label';
+                    label.textContent = `comp ${root}`;
+                    row.appendChild(label);
+                    const chips = document.createElement('div');
+                    chips.className = 'layer-chips';
+                    vertices.forEach(v => {
+                        const chip = document.createElement('div');
+                        chip.className = 'layer-chip';
+                        chip.style.background = rootColors[root];
+                        chip.textContent = v;
+                        chips.appendChild(chip);
+                    });
+                    row.appendChild(chips);
+                    lv.appendChild(row);
+                });
+            }
+        } else {
+            lv.innerHTML = '<span class="none">none yet</span>';
+        }
+
+        const mstv = document.getElementById('mstView');
+        mstv.innerHTML = '';
+        if (mst && mst.length > 0) {
+            mst.forEach(e => {
+                const row = document.createElement('div');
+                row.className = 'adj-row';
+                const key = document.createElement('div');
+                key.className = 'adj-key'; key.textContent = e.u; row.appendChild(key);
+                const arrow = document.createElement('span');
+                arrow.className = 'adj-arrow'; arrow.textContent = '—'; row.appendChild(arrow);
+                const cell = document.createElement('div');
+                cell.className = 'adj-cell'; cell.textContent = `${e.v} (${e.weight.toFixed(1)})`; row.appendChild(cell);
+                mstv.appendChild(row);
+            });
+        } else {
+            mstv.innerHTML = '<span class="none">empty</span>';
+        }
+    }
+
+    function rebuildAll() {
+        currentSteps = []; currentStepPtr = -1;
+        if (edges.length > 0) {
+            const { steps: newSteps, sortedEdges } = buildKruskalSteps(edges, V);
+            currentSteps = newSteps; currentSortedEdges = sortedEdges;
+        }
+        autoState = initAutoState();
+        stopPlay();
+        if (parallelMode) { renderAuto(autoState); updateSidebars(null, autoState); }
+        else { renderStep(null); updateSidebars(null, null); }
+        syncButtons();
+    }
+
+    function stepFwd() {
+        if (parallelMode) {
+            if (!autoState) return;
+            autoState.t += 0.8;
+            updateAutoProcess();
+            renderAuto(autoState);
+            updateSidebars(null, autoState);
+        } else {
+            if (currentStepPtr < currentSteps.length-1) {
+                currentStepPtr++;
+                const step = currentSteps[currentStepPtr];
+                renderStep(step);
+                updateSidebars(step, null);
+            }
+        }
+        syncButtons();
+    }
+
+    function stepBack() {
+        if (parallelMode) {
+            if (!autoState) return;
+            autoState.t = Math.max(0, autoState.t - 0.8);
+            autoState = initAutoState();
+            autoState.t = Math.max(0, autoState.t);
+            updateAutoProcess();
+            renderAuto(autoState);
+            updateSidebars(null, autoState);
+        } else {
+            if (currentStepPtr > -1) {
+                currentStepPtr--;
+                const step = currentStepPtr >= 0 ? currentSteps[currentStepPtr] : null;
+                renderStep(step);
+                updateSidebars(step, null);
+            }
+        }
+        syncButtons();
+    }
+
+    function resetRun() {
+        stopPlay();
+        if (parallelMode) { autoState = initAutoState(); renderAuto(autoState); updateSidebars(null, autoState); }
+        else { currentStepPtr = -1; renderStep(null); updateSidebars(null, null); }
+        syncButtons();
+    }
+
+    function togglePlay() { playing ? stopPlay() : startPlay(); }
+
+    function startPlay() {
+        playing = true; lastTimestamp = 0;
+        if (parallelMode) requestAnimationFrame(autoTick);
+        else tick();
+    }
+    function stopPlay() { playing = false; if (timer) clearTimeout(timer); }
+    function tick() {
+        if (!playing || parallelMode) return;
+        if (currentStepPtr < currentSteps.length-1) { stepFwd(); timer = setTimeout(tick, delay); }
+        else stopPlay();
+    }
+
+    function updateAutoProcess() {
+        if (!autoState) return;
+        const now = performance.now() / 1000;
+        for (let i = autoState.lastProcessedIdx; i < autoState.sortedEdges.length; i++) {
+            const e = autoState.sortedEdges[i];
+            if (autoState.t >= e.weight) {
+                if (!autoState.processed[i]) {
+                    autoState.processed[i] = true;
+                    const canUnion = autoState.uf.union(e.u, e.v);
+                    if (canUnion) {
+                        autoState.mst.push(e);
+                        autoState.flashes['accept_'+i] = now;
+                    } else {
+                        autoState.flashes['reject_'+i] = now;
+                    }
+                }
+                autoState.lastProcessedIdx = i+1;
+            } else break;
+        }
+    }
+
+    function autoTick(ts) {
+        if (!playing || !parallelMode) return;
+        if (!lastTimestamp) lastTimestamp = ts;
+        const dt = Math.min(100, ts - lastTimestamp) / 1000;
+        lastTimestamp = ts;
+        const speed = 500 / delay;
+        autoState.t += dt * speed;
+        updateAutoProcess();
+        renderAuto(autoState);
+        updateSidebars(null, autoState);
+        if (autoState.lastProcessedIdx >= autoState.sortedEdges.length) stopPlay();
+        if (playing) requestAnimationFrame(autoTick);
+    }
+
+    function toggleMode(on) {
+        stopPlay();
+        parallelMode = on;
+        if (parallelMode) { autoState = initAutoState(); renderAuto(autoState); updateSidebars(null, autoState); }
+        else { renderStep(currentStepPtr >= 0 ? currentSteps[currentStepPtr] : null); updateSidebars(currentStepPtr >= 0 ? currentSteps[currentStepPtr] : null, null); }
+        syncButtons();
+    }
+
+    function syncButtons() {
+        if (parallelMode) {
+            document.getElementById('backBtn').disabled = autoState.t <= 0;
+            document.getElementById('stepBtn').disabled = autoState.lastProcessedIdx >= autoState.sortedEdges.length;
+        } else {
+            document.getElementById('backBtn').disabled = currentStepPtr <= -1;
+            document.getElementById('stepBtn').disabled = currentStepPtr >= currentSteps.length-1;
+        }
+    }
+
+    function updateSpeed(val) { delay = parseInt(val, 10); document.getElementById('speedVal').textContent = val + 'ms'; }
+
+    function graphToText(v, edgeList, positions, sedgewick) {
+        let s = `${v} ${edgeList.length}\n` + edgeList.map(e => `${e.u} ${e.v} ${e.weight}`).join('\n');
+        if (!sedgewick && positions) s += '\n' + positions.map(p => `${fmtCoord(p.x)} ${fmtCoord(p.y)}`).join('\n');
+        return s;
+    }
+    function refreshTextarea() {
+        const sedgewick = document.getElementById('sedgewickToggle').checked;
+        document.getElementById('graphText').value = graphToText(V, edges, pos, sedgewick);
+    }
+    function applyGraph(v, edgeList, customPos) {
+        V = v; edges = edgeList;
+        pos = customPos || layoutAll(V, edges);
+        refreshTextarea();
+        rebuildAll();
+    }
+
+    function loadPreset(name) {
+        const text = PRESETS[name];
+        try {
+            const { v, edges: e, pos: customPos } = parseGraph(text);
+            applyGraph(v, e, customPos);
+            document.getElementById('parseErr').textContent = '';
+        } catch (err) { document.getElementById('parseErr').textContent = err.message; }
+    }
+
+    function loadFromText() {
+        const text = document.getElementById('graphText').value;
+        try {
+            const { v, edges: e, pos: customPos } = parseGraph(text);
+            applyGraph(v, e, customPos);
+            document.getElementById('parseErr').textContent = '';
+        } catch (err) { document.getElementById('parseErr').textContent = err.message; }
+    }
+
+    /* ============================ external graphs (graphs/ folder) ============================ */
+    function prettyGraphName(filename) {
+        return decodeURIComponent(filename).replace(/\.[^./]+$/, '').replace(/[_-]+/g, ' ');
+    }
+    async function discoverExternalGraphs() {
+        try {
+            const r = await fetch('graphs/index.json', { cache: 'no-store' });
+            if (r.ok) {
+                const data = await r.json();
+                if (Array.isArray(data)) {
+                    return data.map(item => {
+                        const file = typeof item === 'string' ? item : item.file;
+                        const label = (typeof item === 'object' && (item.label || item.name)) || prettyGraphName(file);
+                        return { label, path: 'graphs/' + encodeURIComponent(file) };
+                    });
+                }
+            }
+        } catch (e) { /* no manifest — fall through to directory listing */ }
+        try {
+            const r = await fetch('graphs/', { cache: 'no-store' });
+            if (r.ok) {
+                const html = await r.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const hrefs = [...doc.querySelectorAll('a')]
+                    .map(a => a.getAttribute('href') || '')
+                    .filter(h => h && h !== '../' && h !== './' && !h.startsWith('?') && !h.startsWith('/') && !h.endsWith('/'));
+                const uniq = [...new Set(hrefs)];
+                if (uniq.length) return uniq.map(h => ({ label: prettyGraphName(decodeURIComponent(h)), path: 'graphs/' + h }));
+            }
+        } catch (e) { /* no directory listing either — that's fine, just no external graphs */ }
+        return [];
+    }
+    function loadExternalGraph(path) {
+        const errEl = document.getElementById('parseErr');
+        errEl.textContent = `Loading ${path}…`;
+        fetch(path, { cache: 'no-store' })
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+            .then(text => {
+                const { v, edges: e, pos: customPos } = parseGraph(text);
+                applyGraph(v, e, customPos);
+                errEl.textContent = '';
+            })
+            .catch(err => { errEl.textContent = `Could not load ${path}: ${err.message}`; });
+    }
+    function populateExternalGraphs(presetSel) {
+        discoverExternalGraphs().then(list => {
+            if (!list.length) return;
+            const grp = document.createElement('optgroup');
+            grp.label = 'From graphs/ folder';
+            list.forEach(({ label, path }) => {
+                const o = document.createElement('option');
+                o.value = path; o.textContent = label; o.dataset.external = '1';
+                grp.appendChild(o);
+            });
+            presetSel.appendChild(grp);
+        });
+    }
+
+    function init() {
+        const presetSel = document.getElementById('presetSel');
+        Object.keys(PRESETS).forEach(name => { const o = document.createElement('option'); o.value = name; o.textContent = name; presetSel.appendChild(o); });
+        presetSel.addEventListener('change', () => {
+            const opt = presetSel.selectedOptions[0];
+            if (opt && opt.dataset.external) loadExternalGraph(opt.value); else loadPreset(opt.value);
+        });
+        updateSpeed(500);
+        loadPreset(Object.keys(PRESETS)[0]);
+        populateExternalGraphs(presetSel);
+    }
+    init();
+
+    window.stepFwd = stepFwd;
+    window.stepBack = stepBack;
+    window.togglePlay = togglePlay;
+    window.resetRun = resetRun;
+    window.toggleMode = toggleMode;
+    window.updateSpeed = updateSpeed;
+    window.loadFromText = loadFromText;
+    window.refreshTextarea = refreshTextarea;
+})();
+</script>
+</body>
+</html>

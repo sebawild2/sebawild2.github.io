@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wavelet Tree</title>
+<style>
+  :root{
+    --bg:#f1e9d2;
+    --panel:#f6efe0;
+    --panel-line:#e2d6b5;
+    --controls:#e8ddbe;
+    --controls-line:#dcd0b0;
+    --ink:#4a3f35;
+    --ink-soft:#726253;
+    --label:#8c7b70;
+    --btn:#faf6eb;
+    --btn-line:#bcaf92;
+    --bar-lo:#e2b3a3;
+    --bar-hi:#670c07;
+    --active:#ff0000;
+    --soft:#d8b08c;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg);
+    color:var(--ink-soft);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex;flex-direction:column;align-items:center;
+    min-height:100vh;margin:0;padding:24px 20px 48px;
+  }
+  h1{
+    font-size:1.6rem;font-weight:500;letter-spacing:.5px;
+    color:var(--ink);margin:0 0 4px;
+  }
+  .subtitle{font-size:.9rem;color:var(--label);margin:0 0 22px;letter-spacing:.3px}
+
+  .stage{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:6px;
+    box-shadow:0 2px 8px rgba(0,0,0,.04);
+    width:100%;max-width:1180px;
+    padding:10px;
+    overflow-x:auto;
+  }
+  svg{display:block;width:100%;height:auto;min-width:760px}
+
+  .readout{
+    width:100%;max-width:1180px;
+    display:flex;gap:14px;margin-top:14px;flex-wrap:wrap;
+  }
+  .step-box{
+    flex:3 1 380px;
+    background:var(--panel);border:1px solid var(--panel-line);
+    border-radius:6px;padding:14px 16px;min-height:64px;
+    font-size:.95rem;line-height:1.5;color:var(--ink-soft);
+  }
+  .step-box b{color:var(--ink)}
+  .answer-box{
+    flex:1 1 200px;
+    background:var(--controls);border:1px solid var(--controls-line);
+    border-radius:6px;padding:14px 16px;
+    display:flex;flex-direction:column;justify-content:center;
+  }
+  .answer-label{font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--label);font-weight:600}
+  .answer-val{font-size:1.5rem;color:var(--bar-hi);font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+  .answer-val.pending{color:var(--label);font-weight:500;font-size:1.05rem}
+
+  .controls{
+    display:flex;gap:22px;margin-top:18px;align-items:center;
+    justify-content:center;flex-wrap:wrap;
+    background:var(--controls);padding:14px 22px;border-radius:6px;
+    border:1px solid var(--controls-line);
+  }
+  .group{display:flex;align-items:center;gap:8px;font-size:.85rem;color:#5c4f43}
+  .group label{font-weight:500}
+  select,input[type="number"]{
+    background:var(--btn);color:var(--ink);
+    border:1px solid var(--btn-line);border-radius:4px;
+    padding:7px 9px;font-size:.88rem;font-family:inherit;
+  }
+  input[type="number"]{width:64px}
+  button{
+    background:var(--btn);color:var(--ink);
+    border:1px solid var(--btn-line);padding:8px 18px;
+    font-size:.9rem;border-radius:4px;cursor:pointer;font-weight:500;
+    transition:background .2s,border-color .2s;
+  }
+  button:hover:not(:disabled){background:#fff;border-color:#9a8c6f}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  input[type="range"]{accent-color:#e60000;cursor:pointer}
+  .sep{width:1px;align-self:stretch;background:var(--controls-line)}
+  .playback button{padding:8px 12px}
+  .stepcount{font-size:.82rem;color:var(--label);font-variant-numeric:tabular-nums;min-width:84px;text-align:center}
+  .hint{font-size:.78rem;color:var(--label);max-width:1180px;margin:16px auto 0;text-align:center;line-height:1.5}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:12px;font-size:.78rem;color:var(--label)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:14px;height:14px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+
+  <h1>Wavelet Tree</h1>
+  <p class="subtitle">A sequence over an 8-symbol alphabet, with <i>access</i>, <i>rank</i> and <i>select</i> traced step by step.</p>
+
+  <div class="stage">
+    <svg id="tree" viewBox="0 0 1120 580" preserveAspectRatio="xMidYMin meet" role="img" aria-label="Wavelet tree diagram"></svg>
+  </div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:linear-gradient(90deg,#e2b3a3,#670c07)"></span> colour = symbol value (a → h)</span>
+    <span><span class="swatch" style="border:2px solid #ff0000;background:#f1e9d2"></span> current position</span>
+    <span><span class="swatch" style="background:#d8b08c"></span> bits being counted</span>
+    <span><span class="swatch" style="background:#ff0000"></span> path taken</span>
+  </div>
+
+  <div class="readout">
+    <div class="step-box" id="stepBox">Pick an operation and press <b>Run</b>. The active position is followed down (or up) the tree, one bitvector at a time.</div>
+    <div class="answer-box">
+      <span class="answer-label" id="answerLabel">Result</span>
+      <span class="answer-val pending" id="answerVal">—</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="group">
+      <label for="op">Operation</label>
+      <select id="op" onchange="onOpChange()">
+        <option value="access">access(i)</option>
+        <option value="rank">rank(c, i)</option>
+        <option value="select">select(c, j)</option>
+      </select>
+    </div>
+    <div class="group" id="symGroup">
+      <label for="sym">Symbol c</label>
+      <select id="sym"></select>
+    </div>
+    <div class="group">
+      <label for="param" id="paramLabel">Position i</label>
+      <input type="number" id="param" min="1" value="1">
+    </div>
+    <div class="sep"></div>
+    <div class="group playback">
+      <button id="runBtn" onclick="runFromStart()">Run</button>
+      <button id="prevBtn" onclick="stepPrev()">‹ Prev</button>
+      <button id="playBtn" onclick="togglePlay()">Play</button>
+      <button id="nextBtn" onclick="stepNext()">Next ›</button>
+      <span id="stepCount" class="stepcount">—</span>
+    </div>
+    <div class="group">
+      <button id="newBtn" onclick="newSequence()">New sequence</button>
+    </div>
+    <div class="sep"></div>
+    <div class="group">
+      <label for="len">Length</label>
+      <input type="range" id="len" min="6" max="16" value="12" oninput="onLenChange(this.value)">
+      <span id="lenVal">12</span>
+    </div>
+    <div class="group">
+      <label for="speed">Delay</label>
+      <input type="range" id="speed" min="120" max="1400" value="650" oninput="onSpeedChange(this.value)">
+      <span id="speedVal">650ms</span>
+    </div>
+  </div>
+
+  <p class="hint">
+    Each internal node stores a bitvector: <b>0</b> sends a symbol to the left child, <b>1</b> to the right, splitting the alphabet in half each level until every leaf holds one symbol.
+    <i>access</i> walks down reading bits; <i>rank</i> walks down counting them; <i>select</i> walks back up.
+  </p>
+
+<script>
+/* ------- palette ------- */
+const C = {
+  bg:'#f1e9d2', barLo:'#e2b3a3', barHi:'#670c07',
+  active:'#ff0000', soft:'#d8b08c', ink:'#4a3f35',
+  inkSoft:'#726253', line:'#e2d6b5', label:'#8c7b70'
+};
+const SIGMA = 8;
+const CHARS = ['a','b','c','d','e','f','g','h'];
+
+/* ------- geometry ------- */
+const W = 1120, MX = 34;
+const COLW = (W - 2*MX) / SIGMA;
+const ROWH = 132, MY = 22;
+const CELLW = 19, GAP = 3, CELLH = 22;
+
+function centerX(lo,hi){ return MX + (((lo+hi)/2)+0.5)*COLW; }
+function rowY(level){ return MY + level*ROWH; }
+
+/* ------- colour ------- */
+function lerp(c1,c2,f){
+  const a=[1,3,5].map(i=>parseInt(c1.substr(i,2),16));
+  const b=[1,3,5].map(i=>parseInt(c2.substr(i,2),16));
+  const r=a.map((v,i)=>Math.round(v+f*(b[i]-v)));
+  return `rgb(${r[0]},${r[1]},${r[2]})`;
+}
+function symColor(v){ return lerp(C.barLo,C.barHi, SIGMA<2?0:v/(SIGMA-1)); }
+function textOn(v){ return v/(SIGMA-1) > 0.42 ? C.bg : C.ink; }
+
+/* ------- model ------- */
+let S = [];
+let root = null;
+let nodes = {};           // key -> node
+let anim = { timer:null, steps:[], i:0, playing:false, built:false };
+
+function key(lo,hi){ return lo+'_'+hi; }
+
+function buildTree(seq, lo, hi, level, parent){
+  const node = { lo, hi, seq, level, parent, k:key(lo,hi) };
+  nodes[node.k] = node;
+  if(lo===hi){ node.leaf=true; node.symbol=lo; return node; }
+  const mid = Math.floor((lo+hi)/2);
+  node.mid = mid;
+  node.bits = seq.map(s => s<=mid ? 0 : 1);
+  const left = seq.filter(s=>s<=mid);
+  const right = seq.filter(s=>s>mid);
+  node.left  = buildTree(left,  lo,    mid, level+1, node);
+  node.right = buildTree(right, mid+1, hi,  level+1, node);
+  return node;
+}
+
+function symbolPath(c){           // bit at each level on the way down to symbol c
+  const path=[]; let lo=0,hi=SIGMA-1;
+  while(lo<hi){ const mid=Math.floor((lo+hi)/2);
+    if(c<=mid){ path.push(0); hi=mid; } else { path.push(1); lo=mid+1; } }
+  return path;
+}
+function leafOf(c){ return nodes[key(c,c)]; }
+function countPrefix(bits,len,b){ let n=0; for(let i=0;i<len;i++) if(bits[i]===b) n++; return n; }
+function selectB(bits,j,b){ let n=0; for(let i=0;i<bits.length;i++){ if(bits[i]===b){ n++; if(n===j) return i+1; } } return -1; }
+function countSym(c){ return S.filter(x=>x===c).length; }
+
+/* ------- step generation -------
+   step = { nodeKey, active (0-based col|null), soft:[cols], edgeTo:childKey|null,
+            edgeUp:parentKey|null, text, answerPos|answerCount|answerSym } */
+
+function genAccess(pos){
+  const steps=[];
+  let node=root, p=pos;
+  steps.push({nodeKey:node.k, active:p-1, text:
+    `<b>access(${pos})</b> — start at the root, looking at position ${p}.`});
+  while(!node.leaf){
+    const b=node.bits[p-1];
+    const np=countPrefix(node.bits,p,b);
+    const soft=[]; for(let i=0;i<p;i++) if(node.bits[i]===b) soft.push(i);
+    const dir = b===0?'left':'right';
+    steps.push({nodeKey:node.k, active:p-1, soft, text:
+      `Bit at position ${p} is <b>${b}</b> → go <b>${dir}</b>. Its position there is rank<sub>${b}</sub>(${p}) = <b>${np}</b> (the ${np}${ord(np)} ${b} so far).`});
+    const child = b===0?node.left:node.right;
+    node=child; p=np;
+    steps.push({nodeKey:node.k, active:p-1, edgeTo:node.k, text:
+      `Descend to the ${dir} child (alphabet ${rangeLabel(node)}), now at position ${p}.`});
+  }
+  steps.push({nodeKey:node.k, active:p-1, answerSym:node.symbol, text:
+    `Leaf reached: the symbol is <b>'${CHARS[node.symbol]}'</b>. So <b>S[${pos}] = '${CHARS[node.symbol]}'</b>.`});
+  return steps;
+}
+
+function genRank(c,len){
+  const steps=[];
+  const path=symbolPath(c);
+  let node=root, L=len, lvl=0;
+  steps.push({nodeKey:node.k, active:null, text:
+    `<b>rank('${CHARS[c]}', ${len})</b> — how many '${CHARS[c]}' in S[1..${len}]? Track the prefix length, starting at ${L}.`});
+  while(!node.leaf){
+    const b=path[lvl];
+    const nL=countPrefix(node.bits,L,b);
+    const soft=[]; for(let i=0;i<L;i++) if(node.bits[i]===b) soft.push(i);
+    const dir = b===0?'left':'right';
+    steps.push({nodeKey:node.k, active:L>0?L-1:null, soft, text:
+      `'${CHARS[c]}' goes <b>${dir}</b> here, so count the <b>${b}</b>s in the first ${L} bits: <b>${nL}</b>. That becomes the new prefix length.`});
+    node = b===0?node.left:node.right; L=nL; lvl++;
+    steps.push({nodeKey:node.k, active:L>0?L-1:null, edgeTo:node.k, text:
+      `Move to the ${dir} child (${rangeLabel(node)}); prefix length is now ${L}.`});
+  }
+  steps.push({nodeKey:node.k, active:L>0?L-1:null, answerCount:L, text:
+    `At the leaf for '${CHARS[c]}', the prefix length <b>${L}</b> is the answer: '${CHARS[c]}' occurs <b>${L}</b> time${L===1?'':'s'} in S[1..${len}].`});
+  return steps;
+}
+
+function genSelect(c,occ){
+  const steps=[];
+  let node=leafOf(c), p=occ;
+  steps.push({nodeKey:node.k, active:p-1, text:
+    `<b>select('${CHARS[c]}', ${occ})</b> — find the ${occ}${ord(occ)} '${CHARS[c]}'. Start at its leaf, occurrence ${p}, and climb up.`});
+  while(node.parent){
+    const par=node.parent;
+    const b = (node===par.left)?0:1;
+    const np=selectB(par.bits,p,b);
+    const dir = b===0?'left':'right';
+    const soft=[]; let seen=0;
+    for(let i=0;i<par.bits.length;i++){ if(par.bits[i]===b){ seen++; soft.push(i); if(seen===p) break; } }
+    steps.push({nodeKey:par.k, active:np-1, soft, edgeUp:node.k, text:
+      `This is the ${dir} child. In the parent (${rangeLabel(par)}), the ${p}${ord(p)} <b>${b}</b> sits at position select<sub>${b}</sub>(${p}) = <b>${np}</b>.`});
+    node=par; p=np;
+  }
+  steps.push({nodeKey:node.k, active:p-1, answerPos:p, text:
+    `Back at the root: the ${occ}${ord(occ)} '${CHARS[c]}' is at <b>S[${p}]</b>.`});
+  return steps;
+}
+
+function ord(n){ const s=['th','st','nd','rd'], v=n%100; return s[(v-20)%10]||s[v]||s[0]; }
+function rangeLabel(node){ return node.leaf ? `'${CHARS[node.lo]}'` : `'${CHARS[node.lo]}'..'${CHARS[node.hi]}'`; }
+
+/* ------- rendering ------- */
+const svg = document.getElementById('tree');
+const SVGNS='http://www.w3.org/2000/svg';
+function el(tag,attrs){ const e=document.createElementNS(SVGNS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+
+function boxLeft(node){
+  const m=node.seq.length;
+  const w = m>0 ? m*CELLW + (m-1)*GAP : CELLW;
+  return centerX(node.lo,node.hi) - w/2;
+}
+function nodeTopY(node){ return rowY(node.level); }
+
+function render(state){
+  state = state || {};
+  const activeKey = state.nodeKey;
+  const active = state.active;
+  const soft = state.soft || [];
+  const pathEdges = state.pathEdges || new Set();
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+  // edges first
+  for(const k in nodes){
+    const n=nodes[k];
+    if(n.leaf) continue;
+    [['L',n.left],['R',n.right]].forEach(([_,ch])=>{
+      const x1=centerX(n.lo,n.hi), y1=nodeTopY(n)+CELLH+34;
+      const x2=centerX(ch.lo,ch.hi), y2=nodeTopY(ch)-8;
+      const on = pathEdges.has(ch.k);
+      svg.appendChild(el('path',{
+        d:`M ${x1} ${y1} C ${x1} ${(y1+y2)/2}, ${x2} ${(y1+y2)/2}, ${x2} ${y2}`,
+        fill:'none',
+        stroke: on ? C.active : C.line,
+        'stroke-width': on ? 3 : 1.5,
+        opacity: on ? 0.95 : 0.8
+      }));
+    });
+  }
+
+  // nodes
+  for(const k in nodes){
+    const n=nodes[k];
+    drawNode(n, k===activeKey ? {active,soft} : {active:null,soft:[]});
+  }
+}
+
+function drawNode(node, hl){
+  const top=nodeTopY(node);
+  const left=boxLeft(node);
+  const m=node.seq.length;
+  const isActiveNode = hl.active!==null || (hl.soft&&hl.soft.length);
+
+  // alphabet-range label above the node
+  const lbl=el('text',{x:centerX(node.lo,node.hi), y:top-12,
+    'text-anchor':'middle','font-size':10,'font-weight':600,
+    fill: C.label,'letter-spacing':'.5'});
+  lbl.textContent = node.leaf ? CHARS[node.lo] : `${CHARS[node.lo]}–${CHARS[node.hi]}`;
+  svg.appendChild(lbl);
+
+  if(m===0){
+    svg.appendChild(el('rect',{x:left,y:top,width:CELLW,height:CELLH,rx:3,
+      fill:'none',stroke:C.line,'stroke-dasharray':'3 3'}));
+    return;
+  }
+
+  for(let j=0;j<m;j++){
+    const v=node.seq[j];
+    const x=left + j*(CELLW+GAP);
+    const counted = (hl.soft||[]).includes(j);
+
+    // soft highlight behind counted cells
+    if(counted){
+      svg.appendChild(el('rect',{x:x-1.5,y:top-2,width:CELLW+3,height:CELLH+34,rx:3,
+        fill:C.soft,opacity:0.55}));
+    }
+    // the colour cell
+    svg.appendChild(el('rect',{x,y:top,width:CELLW,height:CELLH,rx:3,
+      fill:symColor(v),stroke:'rgba(74,63,53,.15)','stroke-width':0.5}));
+    // symbol letter inside
+    const t=el('text',{x:x+CELLW/2,y:top+CELLH/2+4,'text-anchor':'middle',
+      'font-size':11,'font-weight':600,fill:textOn(v)});
+    t.textContent=CHARS[v];
+    svg.appendChild(t);
+
+    // bit below (internal nodes only)
+    if(!node.leaf){
+      const bt=el('text',{x:x+CELLW/2,y:top+CELLH+18,'text-anchor':'middle',
+        'font-size':12,'font-weight':700,
+        fill: node.bits[j]===0 ? C.inkSoft : C.barHi});
+      bt.textContent=node.bits[j];
+      svg.appendChild(bt);
+    }
+    // active border
+    if(hl.active===j){
+      svg.appendChild(el('rect',{x:x-1.5,y:top-1.5,width:CELLW+3,height:CELLH+3,rx:3,
+        fill:'none',stroke:C.active,'stroke-width':3}));
+    }
+  }
+
+  // index ruler under the root only
+  if(node===root){
+    for(let j=0;j<m;j++){
+      const x=left + j*(CELLW+GAP);
+      const it=el('text',{x:x+CELLW/2,y:top+CELLH+32,'text-anchor':'middle',
+        'font-size':8.5,fill:C.label});
+      it.textContent=j+1;
+      svg.appendChild(it);
+    }
+  }
+}
+
+/* ------- animation driver ------- */
+function setStep(i){
+  const s=anim.steps[i];
+  const pathEdges=new Set();
+  for(let t=0;t<=i;t++){
+    const st=anim.steps[t];
+    if(st.edgeTo) pathEdges.add(st.edgeTo);
+    if(st.edgeUp) pathEdges.add(st.edgeUp);
+  }
+  render({nodeKey:s.nodeKey, active:s.active, soft:s.soft, pathEdges});
+  document.getElementById('stepBox').innerHTML = s.text;
+  if('answerSym' in s){ showAnswer(`'${CHARS[s.answerSym]}'`,'Symbol'); }
+  else if('answerCount' in s){ showAnswer(String(s.answerCount),'Count'); }
+  else if('answerPos' in s){ showAnswer(String(s.answerPos),'Position'); }
+  else { const a=document.getElementById('answerVal'); a.textContent='—'; a.classList.add('pending'); document.getElementById('answerLabel').textContent='Result'; }
+}
+function showAnswer(val,label){
+  const a=document.getElementById('answerVal');
+  a.textContent=val; a.classList.remove('pending');
+  document.getElementById('answerLabel').textContent=label;
+}
+function showStep(){ setStep(anim.i); }
+
+function updateUI(){
+  const has = anim.built && anim.steps.length>0;
+  const last = anim.steps.length-1;
+  document.getElementById('prevBtn').disabled = !has || anim.i<=0;
+  document.getElementById('nextBtn').disabled = !has || anim.i>=last;
+  document.getElementById('playBtn').disabled = !has || (anim.i>=last && !anim.playing);
+  document.getElementById('playBtn').textContent = anim.playing ? 'Pause' : 'Play';
+  document.getElementById('stepCount').textContent = has ? `Step ${anim.i+1} / ${anim.steps.length}` : '—';
+}
+
+function computeSteps(){
+  const op=document.getElementById('op').value;
+  const c=parseInt(document.getElementById('sym').value);
+  if(op==='select' && countSym(c)===0)
+    return {error:`'${CHARS[c]}' does not appear in this sequence, so <b>select</b> has no answer. Try another symbol or a new sequence.`};
+  clampParam();
+  const p=parseInt(document.getElementById('param').value);
+  if(op==='access') return {steps:genAccess(p)};
+  if(op==='rank')   return {steps:genRank(c,p)};
+  return {steps:genSelect(c,p)};
+}
+
+function buildSteps(){
+  clearTimeout(anim.timer); anim.playing=false;
+  const r=computeSteps();
+  if(r.error){ anim.built=false; anim.steps=[]; document.getElementById('stepBox').innerHTML=r.error; updateUI(); return false; }
+  anim.steps=r.steps; anim.i=0; anim.built=true;
+  showStep(); updateUI(); return true;
+}
+
+function scheduleTick(){
+  clearTimeout(anim.timer);
+  anim.timer=setTimeout(()=>{
+    if(!anim.playing) return;
+    if(anim.i < anim.steps.length-1){ anim.i++; showStep(); updateUI(); scheduleTick(); }
+    else { anim.playing=false; updateUI(); }
+  }, speed);
+}
+
+function runFromStart(){
+  if(!buildSteps()) return;
+  anim.playing=true; updateUI(); scheduleTick();
+}
+function togglePlay(){
+  if(!anim.built){ if(!buildSteps()) return; }
+  if(anim.playing){ anim.playing=false; clearTimeout(anim.timer); updateUI(); return; }
+  if(anim.i>=anim.steps.length-1){ anim.i=0; showStep(); }
+  anim.playing=true; updateUI(); scheduleTick();
+}
+function stepNext(){
+  if(!anim.built){ buildSteps(); return; }
+  anim.playing=false; clearTimeout(anim.timer);
+  if(anim.i<anim.steps.length-1){ anim.i++; showStep(); }
+  updateUI();
+}
+function stepPrev(){
+  if(!anim.built) return;
+  anim.playing=false; clearTimeout(anim.timer);
+  if(anim.i>0){ anim.i--; showStep(); }
+  updateUI();
+}
+function invalidate(){ anim.built=false; anim.playing=false; clearTimeout(anim.timer); updateUI(); }
+
+/* ------- controls ------- */
+let speed=650;
+function onSpeedChange(v){ speed=parseInt(v); document.getElementById('speedVal').textContent=v+'ms'; }
+function onLenChange(v){ document.getElementById('lenVal').textContent=v; newSequence(parseInt(v)); }
+
+function onOpChange(){
+  const op=document.getElementById('op').value;
+  document.getElementById('symGroup').style.display = op==='access' ? 'none':'flex';
+  const lbl=document.getElementById('paramLabel');
+  lbl.textContent = op==='select' ? 'Occurrence j' : 'Position i';
+  clampParam();
+  if(typeof invalidate==='function') invalidate();
+}
+
+function clampParam(){
+  const op=document.getElementById('op').value;
+  const inp=document.getElementById('param');
+  let max;
+  if(op==='select'){ const c=parseInt(document.getElementById('sym').value); max=Math.max(1,countSym(c)); }
+  else max=S.length;
+  inp.max=max;
+  if(parseInt(inp.value)>max) inp.value=max;
+  if(parseInt(inp.value)<1||isNaN(parseInt(inp.value))) inp.value=1;
+}
+
+function populateSymbols(){
+  const sel=document.getElementById('sym');
+  sel.innerHTML='';
+  for(let i=0;i<SIGMA;i++){
+    const o=document.createElement('option');
+    o.value=i; o.textContent=`'${CHARS[i]}'`;
+    sel.appendChild(o);
+  }
+  sel.onchange=()=>{ clampParam(); if(typeof invalidate==='function') invalidate(); };
+}
+
+function resetAnim(){
+  clearTimeout(anim.timer);
+  anim.playing=false; anim.built=false; anim.steps=[]; anim.i=0;
+}
+
+function newSequence(len){
+  resetAnim();
+  const n = len || parseInt(document.getElementById('len').value);
+  S = Array.from({length:n}, ()=>Math.floor(Math.random()*SIGMA));
+  nodes={};
+  root = buildTree(S.slice(), 0, SIGMA-1, 0, null);
+  clampParam();
+  render({});
+  document.getElementById('stepBox').innerHTML =
+    'New sequence built. Pick an operation and press <b>Run</b> to trace it through the tree.';
+  const a=document.getElementById('answerVal');
+  a.textContent='—'; a.classList.add('pending');
+  document.getElementById('answerLabel').textContent='Result';
+  updateUI();
+}
+
+/* ------- init ------- */
+populateSymbols();
+document.getElementById('param').addEventListener('input', ()=>{ if(typeof invalidate==='function') invalidate(); });
+onOpChange();
+newSequence();
+</script>
+</body>
+</html>
