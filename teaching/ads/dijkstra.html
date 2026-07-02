@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dijkstra's Algorithm — Animated</title>
+<style>
+    :root {
+        --bg: #f1e9d2;
+        --panel: #f6efe0;
+        --panel-border: #e2d6b5;
+        --controls-bg: #e8ddbe;
+        --controls-border: #dcd0b0;
+        --ink: #726253;
+        --ink-strong: #4a3f35;
+        --title-muted: #8c7b70;
+        --btn: #faf6eb;
+        --btn-border: #bcaf92;
+        --btn-border-hover: #9a8c6f;
+
+        --node-cream: #f6efe0;
+        --node-cream-border: #bcaf92;
+        --d-start: #e2b3a3;   /* near */
+        --d-end: #670c07;     /* far */
+        --active: #ff0000;    /* current vertex (just extracted) */
+        --examine: #c98a1b;   /* iterator currently looking at this edge */
+        --queue-border: #1f6f6a; /* teal — in the priority queue */
+        --edge: #b3a589;
+        --tree-edge: #670c07;
+        --relax: #3c8a3c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0; padding: 22px 26px 40px; min-height: 100vh;
+    }
+
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--ink-strong); }
+    .nav { display: flex; gap: 6px; margin-bottom: 16px; }
+    .nav a {
+        text-decoration: none; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.4px;
+        padding: 7px 15px; border-radius: 5px 5px 0 0; color: var(--title-muted);
+        background: #e8ddbe; border: 1px solid var(--controls-border); border-bottom: none;
+    }
+    .nav a.active { background: var(--panel); color: var(--ink-strong); }
+    .nav a:hover:not(.active) { background: #efe6cd; color: var(--ink-strong); }
+    .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; max-width: 980px; line-height: 1.5; }
+    .subtitle code { background: #efe6cd; padding: 1px 6px; border-radius: 3px; }
+
+    .controls {
+        display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
+        background-color: var(--controls-bg); padding: 14px 22px; border-radius: 6px;
+        border: 1px solid var(--controls-border); margin-bottom: 22px;
+    }
+    .ctl-group { display: flex; align-items: center; gap: 9px; }
+    .ctl-group label { font-size: 0.82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .btn-group { display: flex; gap: 8px; }
+
+    button, select {
+        background-color: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+        padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit;
+    }
+    button:hover:not(:disabled), select:hover { background-color: #fff; border-color: var(--btn-border-hover); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.primary { background-color: #efd9c8; border-color: #c08b6f; }
+    button.primary:hover:not(:disabled) { background-color: #f3e2d4; }
+    select { cursor: pointer; padding-right: 10px; }
+
+    input[type="range"] { accent-color: #e60000; cursor: pointer; vertical-align: middle; }
+    .slider-group span { min-width: 42px; }
+
+    .stage { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(330px,1fr); gap: 20px; align-items: start; }
+    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+
+    .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
+    canvas#graph { display: block; background-color: var(--bg); width: 100%; height: 460px; border-radius: 4px; }
+
+    .side { display: flex; flex-direction: column; gap: 18px; }
+
+    .status { background: #efe6cd; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px; display: flex; align-items: center; }
+    .status .stepcount { color: var(--title-muted); font-size: 0.8rem; margin-left: auto; padding-left: 12px; white-space: nowrap; }
+
+    /* priority queue */
+    .queue-wrap { display: flex; align-items: center; gap: 10px; min-height: 56px; }
+    .queue-end { font-size: 0.72rem; color: var(--title-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+    .queue { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; flex: 1; }
+    .queue .empty { color: var(--title-muted); font-style: italic; font-size: 0.9rem; }
+    .q-node {
+        width: 42px; height: 42px; border-radius: 8px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+        border: 2px solid var(--queue-border); line-height: 1;
+    }
+    .q-node .qv { font-weight: 800; font-size: 0.95rem; }
+    .q-node .qd { font-size: 0.58rem; font-weight: 700; opacity: 0.85; font-variant-numeric: tabular-nums; }
+    .q-node.front { border-color: var(--active); border-width: 3px; box-shadow: 0 0 0 3px rgba(255,0,0,0.12); }
+    .queue-tip { font-size: 0.78rem; color: var(--title-muted); margin-top: 8px; }
+    .queue-tip b { color: var(--queue-border); }
+
+    /* clock + arrivals */
+    .clock-display {
+        font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+        font-size: 1.9rem; font-weight: 700; color: var(--ink-strong); letter-spacing: 0.5px;
+        text-align: center; background: #efe6cd; border: 1px solid var(--panel-border);
+        border-radius: 5px; padding: 9px 0; margin-bottom: 12px; font-variant-numeric: tabular-nums;
+    }
+    .arrival-log { display: flex; flex-direction: column; gap: 5px; max-height: 190px; overflow-y: auto; }
+    .arrival-row { display: flex; align-items: center; gap: 9px; font-size: 0.84rem; padding: 4px 8px; border-radius: 4px; background: #f6efe0; border: 1px solid #e6dabb; }
+    .arrival-row .av-key { width: 26px; height: 26px; min-width: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.78rem; border: 1.5px solid rgba(0,0,0,0.18); }
+    .arrival-row .av-time { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-strong); font-weight: 700; white-space: nowrap; }
+    .arrival-log .none { color: var(--title-muted); font-style: italic; font-size: 0.88rem; }
+    .hist-row { display: flex; align-items: center; gap: 9px; font-size: 0.84rem; padding: 4px 8px; border-radius: 4px; background: #f6efe0; border: 1px solid #e6dabb; }
+    .hist-values { display: flex; gap: 5px; flex-wrap: wrap; margin-left: auto; }
+    .hist-val { font-variant-numeric: tabular-nums; font-weight: 700; padding: 1px 7px; border-radius: 3px; background: #efe6cd; border: 1px solid #ddd0b1; color: var(--ink-strong); white-space: nowrap; }
+    .hist-val.old { text-decoration: line-through; opacity: 0.5; font-weight: 600; background: transparent; border-color: transparent; }
+    .hist-val.current { background: #dff0d8; border-color: var(--relax); color: #2c5e2c; }
+
+    /* adjacency */
+    .adj { font-size: 0.88rem; }
+    .adj-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #e6dabb; }
+    .adj-row:last-child { border-bottom: none; }
+    .adj-row.processing { background: #f3e7d2; border-radius: 4px; }
+    .adj-key { width: 30px; min-width: 30px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 700; background: var(--node-cream); border: 1px solid var(--node-cream-border); color: var(--ink-strong); font-size: 0.85rem; }
+    .adj-row.queued .adj-key { border: 2px solid var(--queue-border); }
+    .adj-row.processing .adj-key { border: 2px solid var(--active); }
+    .adj-arrow { color: var(--title-muted); }
+    .adj-cells { display: flex; gap: 5px; flex-wrap: wrap; }
+    .adj-cell { min-width: 24px; padding: 2px 6px; border-radius: 3px; text-align: center; background: #efe6cd; border: 1px solid #ddd0b1; color: var(--ink); font-variant-numeric: tabular-nums; font-size: 0.82rem; }
+    .adj-cell.consumed { opacity: 0.4; }
+    .adj-cell.cursor { background: #fff; border: 2px solid var(--examine); color: var(--ink-strong); font-weight: 700; }
+    .adj-cell.relaxed { background: #dff0d8; border: 2px solid var(--relax); color: #2c5e2c; font-weight: 700; }
+    .adj-empty { color: var(--title-muted); font-style: italic; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 0.8rem; color: var(--ink); align-items: center; }
+    .legend .item { display: flex; align-items: center; gap: 7px; }
+    .swatch { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; }
+    .grad { width: 120px; height: 14px; border-radius: 7px; border: 1px solid rgba(0,0,0,.15); background: linear-gradient(90deg, #e2b3a3, #670c07); }
+    .sw-cream { background: var(--node-cream); border-color: var(--node-cream-border); }
+    .sw-queue { background: #f6efe0; border-color: var(--queue-border); border-width: 2.5px; }
+    .sw-curr  { background: #d98a76; border-color: var(--active); border-width: 2.5px; }
+    .sw-water { background: linear-gradient(135deg,#8fd3da,#15616d); border-color: #0f4750; }
+    .sw-buoy  { position: relative; background: #d98a76; border-color: #15616d; border-width: 2.5px; }
+    .sw-buoy::after { content: ""; position: absolute; left: 1px; right: 1px; bottom: -4px; height: 6px; border-radius: 50%; background: #2f9aa6; opacity: .8; }
+    .sw-arrow { width: 22px; height: 2px; background: var(--ink-strong); position: relative; border-radius: 0; }
+    .sw-arrow::after { content: ""; position: absolute; right: -1px; top: -3px; border: 4px solid transparent; border-left-color: var(--ink-strong); }
+
+    /* mode toggle switch */
+    .switch { position: relative; display: inline-block; width: 42px; height: 23px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; cursor: pointer; inset: 0; background: #cdbf9d; border: 1px solid #b3a589; border-radius: 23px; transition: .2s; }
+    .switch .track:before { content: ""; position: absolute; height: 17px; width: 17px; left: 3px; top: 2px; background: #faf6eb; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .track { background: #15616d; border-color: #0f4750; }
+    .switch input:checked + .track:before { transform: translateX(19px); }
+
+    details.editor { margin-top: 22px; }
+    details.editor summary { cursor: pointer; font-size: 0.85rem; color: var(--title-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    textarea { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px; padding: 10px; width: 230px; height: 230px; resize: vertical; }
+    .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 420px; line-height: 1.5; }
+    .editor-help code { background: #efe6cd; padding: 1px 5px; border-radius: 3px; }
+    .err { color: #9a3b2f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+    <a class="active" href="dijkstra.html">Water &amp; Queue</a>
+    <a href="dijkstra-springs.html">Springs &amp; Rings</a>
+</div>
+
+<h1>Dijkstra's Algorithm</h1>
+<p class="subtitle">Dijkstra's shortest paths on a <b>directed, weighted</b> graph from a source vertex. Reads the <code>EdgeWeightedDigraph</code> format (V, then E, then <code>v w weight</code> lines). Watch the <b>min-priority queue</b> extract the closest unsettled vertex and relax its outgoing edges — edge length is drawn roughly to scale with its weight, and the exact weight is always labelled. Flip on <b>Water</b> mode to watch water released from the source flow at <b>one edge-unit of length per one unit of time</b> along every channel — since a longer (heavier) edge takes proportionally longer to fill, the water's visual speed looks uniform, and the moment it reaches a vertex <i>is</i> that vertex's shortest-path distance. A running clock and an arrival log record exactly when (and at what distance) each vertex is reached.</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="presetSel">Graph</label>
+        <select id="presetSel"></select>
+    </div>
+    <div class="ctl-group">
+        <label for="startSel">Source</label>
+        <select id="startSel"></select>
+    </div>
+    <div class="btn-group">
+        <button id="backBtn"  onclick="stepBack()">‹ Back</button>
+        <button id="stepBtn" class="primary" onclick="stepFwd()">Step ›</button>
+        <button id="playBtn" onclick="togglePlay()">Play</button>
+        <button id="resetBtn" onclick="resetRun()">Reset</button>
+    </div>
+    <div class="slider-group" style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#5c4f43">
+        <label style="font-size:.82rem;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:var(--ink-strong)">Delay</label>
+        <input type="range" id="speedSlider" min="40" max="1400" value="650" oninput="updateSpeed(this.value)">
+        <span id="speedVal">650ms</span>
+    </div>
+    <div class="ctl-group">
+        <label for="waterToggle">Water</label>
+        <label class="switch"><input type="checkbox" id="waterToggle" onchange="toggleWaterMode(this.checked)"><span class="track"></span></label>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="sim-box">
+        <div class="sim-title">Digraph G (edge-weighted)</div>
+        <canvas id="graph"></canvas>
+        <div class="legend" style="margin-top:12px">
+            <div class="item"><span class="swatch sw-cream"></span>undiscovered</div>
+            <div class="item"><span class="swatch sw-queue"></span>in priority queue</div>
+            <div class="item"><span class="swatch sw-curr"></span>current (just extracted)</div>
+            <div class="item"><span class="swatch sw-water"></span>water (flowing)</div>
+            <div class="item"><span class="swatch sw-buoy"></span>buoy (reached)</div>
+            <div class="item"><span class="grad"></span>distance: near → far</div>
+            <div class="item"><span class="sw-arrow"></span>edge direction</div>
+        </div>
+    </div>
+
+    <div class="side">
+        <div class="sim-box">
+            <div class="sim-title">Status</div>
+            <div class="status"><span id="statusText">Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.</span><span class="stepcount" id="stepCount"></span></div>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title" id="queueTitle">Priority Queue &nbsp;·&nbsp; min-distance</div>
+            <div class="queue-wrap">
+                <span class="queue-end">min ▸</span>
+                <div class="queue" id="queueView"><span class="empty">empty</span></div>
+                <span class="queue-end">◂ rest</span>
+            </div>
+            <div class="queue-tip" id="queueTip"><b>Min</b> (smallest tentative distance) is extracted next; relaxed neighbours get a key decrease. This greedy order is what makes Dijkstra correct.</div>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title">Clock &nbsp;·&nbsp; time / distance</div>
+            <div class="clock-display" id="clockDisplay">t = 0.00</div>
+            <div class="arrival-log" id="arrivalLog"><span class="none">no arrivals yet</span></div>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title">Adjacency lists &nbsp;·&nbsp; iterators</div>
+            <div class="adj" id="adjView"></div>
+        </div>
+    </div>
+</div>
+
+<details class="editor">
+    <summary>Edit / paste a graph</summary>
+    <div class="editor-body">
+        <textarea id="graphText" spellcheck="false"></textarea>
+        <div>
+            <button class="primary" onclick="loadFromText()">Load this graph</button>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--ink-strong);margin-left:10px;cursor:pointer">
+                <input type="checkbox" id="sedgewickToggle" onchange="refreshTextarea()">
+                original Sedgewick format (no coordinates)
+            </label>
+            <div class="err" id="parseErr"></div>
+            <div class="editor-help" style="margin-top:10px">
+                Format (Sedgewick &amp; Wayne <code>EdgeWeightedDigraph</code>): first line is the number of
+                vertices <code>V</code>, second line is the number of edges <code>E</code>, then <code>E</code>
+                lines each holding a <b>directed</b> edge <code>v w weight</code> (weight ≥ 0, decimals allowed).
+                Vertices are <code>0 … V−1</code>. Edges are one-way, <code>v → w</code>; include the reverse
+                line too if you want a two-way connection. Adjacency lists keep the order edges were read.
+                <br><br>
+                <b>Optional fixed layout:</b> after the edges, add exactly <code>V</code> more lines of
+                <code>x y</code> — one pair per vertex, in order — to pin down your own layout instead of the
+                automatic one. Any numeric scale works; it's auto-centred and scaled to fit, preserving relative
+                position and aspect ratio. Loading a graph always fills the box back in with its current layout's
+                coordinates so you can nudge them; tick the box above to see the plain format instead.
+            </div>
+        </div>
+    </div>
+</details>
+
+<script>
+/* ============================ preset graphs ============================ */
+const PRESETS = {
+    "Small DAG  (6 V, 8 E)":
+`6
+8
+0 1 2
+0 2 4
+1 2 1
+1 3 7
+2 4 3
+3 4 2
+3 5 1
+4 5 5`,
+    "Classic digraph  (8 V, 13 E — two-way pairs)":
+`8
+13
+4 5 3
+5 4 3
+4 7 4
+5 7 2
+7 5 2
+5 1 6
+0 4 5
+0 2 8
+7 3 9
+1 3 3
+2 7 5
+6 2 4
+3 6 7`,
+    "Scale demo  (6 V — wildly different weights)":
+`6
+5
+0 1 1
+1 2 8
+2 3 2
+3 4 10
+4 5 1`,
+    "Two hubs bridged  (8 V)":
+`8
+10
+0 1 2
+1 2 2
+2 0 2
+0 3 9
+3 4 2
+4 5 2
+5 3 2
+4 6 3
+6 7 1
+7 4 4`,
+    "Grid network  (10 V, 14 E)":
+`10
+14
+0 1 3
+1 2 2
+2 3 4
+0 4 5
+2 6 2
+3 7 6
+5 6 1
+5 9 3
+4 8 2
+8 9 4
+7 9 1
+6 9 5
+1 5 2
+4 5 3`
+};
+
+/* ============================ state ============================ */
+let V = 0, adj = [], pos = [], steps = [], ptr = -1;
+let lastV = 0, lastEdges = [];
+let playing = false, timer = null, delay = 650, startVertex = 0;
+let maxDist = 1;
+let settledOrder = [];
+let distHistory = [];
+
+/* ---- water mode ---- */
+let waterMode = false, waterPlaying = false, tau = 0, wRaf = null, wLast = null;
+let wdist = [], waterReachable = [], waterMaxTau = 1;
+const TAU_PER_SEC = 1.0;   // weight-units of water advance per real second at default speed
+
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+
+/* ============================ optional fixed-layout coordinates ============================ */
+function normalizePositions(raw) {
+    let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+    for (const p of raw) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+    const w = Math.max(maxx-minx, 1e-6), h = Math.max(maxy-miny, 1e-6);
+    const pad = 0.08, avail = 1 - 2*pad;
+    const s = avail / Math.max(w, h);
+    const usedW = w*s, usedH = h*s;
+    const offX = pad + (avail-usedW)/2, offY = pad + (avail-usedH)/2;
+    return raw.map(p => ({ x: offX + (p.x-minx)*s, y: offY + (p.y-miny)*s }));
+}
+function fmtCoord(x) { return (Math.round(x*1000)/1000).toString(); }
+
+/* ============================ parsing ============================ */
+/* Line-based: each edge (and, later, each coordinate pair) occupies exactly one line. This makes the
+   format tolerant of pasting an unweighted graph here (a missing weight defaults to 1) or a weighted
+   graph into an unweighted page elsewhere (the extra weight token there is simply ignored) — a
+   stray/missing token only ever affects the one line it's on, not the rest of the parse. */
+function tokenizeLines(text) {
+    return text.split('\n').map(line => line.trim().split(/\s+/).filter(s => s.length)).filter(toks => toks.length > 0);
+}
+function readVE(lines) {
+    if (lines.length === 0) throw new Error("Empty input.");
+    if (lines[0].length >= 2) return { v: parseInt(lines[0][0], 10), e: parseInt(lines[0][1], 10), li: 1 };
+    if (lines.length < 2) throw new Error("Need E on the second line.");
+    return { v: parseInt(lines[0][0], 10), e: parseInt(lines[1][0], 10), li: 2 };
+}
+function readTrailingPositions(lines, li, v) {
+    const remaining = lines.length - li;
+    if (remaining === 0) return null;
+    if (remaining !== v) throw new Error(`After the edges, expected either nothing or exactly ${v} coordinate line(s) ("x y" each), but found ${remaining}.`);
+    const raw = [];
+    for (let i = 0; i < v; i++) {
+        const toks = lines[li++];
+        const x = parseFloat(toks[0]), y = parseFloat(toks[1]);
+        if (toks.length < 2 || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Vertex ${i}: expected two coordinate numbers "x y".`);
+        raw.push({ x, y });
+    }
+    return normalizePositions(raw);
+}
+function parseGraph(text) {
+    const lines = tokenizeLines(text);
+    const { v, e, li: li0 } = readVE(lines);
+    let li = li0;
+    if (!Number.isFinite(v) || v <= 0) throw new Error("V (number of vertices) must be a positive integer.");
+    if (!Number.isFinite(e) || e < 0) throw new Error("E (number of edges) must be a non-negative integer.");
+    const a = Array.from({ length: v }, () => []);
+    const edgeList = [];
+    for (let k = 0; k < e; k++) {
+        if (li >= lines.length) throw new Error(`Expected ${e} edge line(s), only found ${k}.`);
+        const toks = lines[li++];
+        if (toks.length < 2) throw new Error(`Edge ${k+1}: expected at least two vertex integers.`);
+        const x = parseInt(toks[0], 10), y = parseInt(toks[1], 10);
+        const wt = toks.length >= 3 ? parseFloat(toks[2]) : 1;   // missing weight → default 1, don't crash
+        if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Edge ${k+1}: expected two vertex integers.`);
+        if (!Number.isFinite(wt)) throw new Error(`Edge ${k+1}: expected a numeric weight.`);
+        if (wt < 0) throw new Error(`Edge ${k+1}: Dijkstra requires non-negative weights.`);
+        if (x < 0 || x >= v || y < 0 || y >= v) throw new Error(`Edge ${k+1}: vertex out of range 0…${v-1}.`);
+        if (x === y) throw new Error(`Edge ${k+1}: self-loops are not supported in this visualizer.`);
+        a[x].push({ w: y, weight: wt });   // directed: only x's list gets this edge
+        edgeList.push([x, y, wt]);
+    }
+    const customPos = readTrailingPositions(lines, li, v);
+    return { v, adj: a, edges: edgeList, pos: customPos };
+}
+
+/* ============================ layout (force-directed, weight-scaled, per component) ============================ */
+function buildUndirected(n, a) {
+    const und = Array.from({ length: n }, () => new Map());
+    for (let v = 0; v < n; v++) for (const { w, weight } of a[v]) {
+        if (v === w) continue;
+        und[v].set(w, und[v].has(w) ? Math.min(und[v].get(w), weight) : weight);
+        und[w].set(v, und[w].has(v) ? Math.min(und[w].get(v), weight) : weight);
+    }
+    return und;
+}
+function componentsU(n, und) {
+    const comp = new Array(n).fill(-1); let c = 0;
+    for (let s = 0; s < n; s++) {
+        if (comp[s] !== -1) continue;
+        const q = [s]; comp[s] = c;
+        while (q.length) { const u = q.pop(); for (const w of und[u].keys()) if (comp[w] === -1) { comp[w] = c; q.push(w); } }
+        c++;
+    }
+    return { comp, count: c };
+}
+function forceLayout(localEdges, N) {
+    if (N === 1) return [{ x: 0.5, y: 0.5 }];
+    const p = [];
+    for (let i = 0; i < N; i++) {
+        const ang = (i / N) * Math.PI * 2;
+        p.push({ x: 0.5 + 0.35*Math.cos(ang) + (Math.random()-0.5)*0.02, y: 0.5 + 0.35*Math.sin(ang) + (Math.random()-0.5)*0.02 });
+    }
+    let maxW = 0; for (const [,,w] of localEdges) if (w > maxW) maxW = w;
+    if (maxW <= 0) maxW = 1;
+    const restLen = w => 0.16 + 0.5 * (w / maxW);
+    const k = Math.sqrt(1 / N) * 0.9; let temp = 0.12; const ITER = 600;
+    for (let it = 0; it < ITER; it++) {
+        const disp = p.map(() => ({ x: 0, y: 0 }));
+        for (let i = 0; i < N; i++) for (let j = i+1; j < N; j++) {
+            let dx = p[i].x-p[j].x, dy = p[i].y-p[j].y, d = Math.hypot(dx,dy)||1e-4;
+            const f = (k*k)/d;
+            disp[i].x += (dx/d)*f; disp[i].y += (dy/d)*f;
+            disp[j].x -= (dx/d)*f; disp[j].y -= (dy/d)*f;
+        }
+        for (const [a2,b2,w] of localEdges) {
+            if (a2 === b2) continue;
+            let dx = p[a2].x-p[b2].x, dy = p[a2].y-p[b2].y, d = Math.hypot(dx,dy)||1e-4;
+            const L = restLen(w);
+            const f = (d - L) * 1.6;
+            disp[a2].x -= (dx/d)*f; disp[a2].y -= (dy/d)*f;
+            disp[b2].x += (dx/d)*f; disp[b2].y += (dy/d)*f;
+        }
+        for (let i = 0; i < N; i++) {
+            let d = Math.hypot(disp[i].x, disp[i].y)||1e-4;
+            const lim = Math.min(d, temp);
+            p[i].x += (disp[i].x/d)*lim; p[i].y += (disp[i].y/d)*lim;
+        }
+        temp *= 0.985;
+    }
+    return p;
+}
+function layoutAll(n, a) {
+    const und = buildUndirected(n, a);
+    const { comp, count } = componentsU(n, und);
+    let groups = Array.from({ length: count }, () => []);
+    for (let v = 0; v < n; v++) groups[comp[v]].push(v);
+    groups.sort((g1, g2) => g2.length - g1.length);
+    const boxes = groups.map(group => {
+        const idxOf = new Map(group.map((v, i) => [v, i]));
+        const elocal = []; const doneKey = new Set();
+        for (const v of group) for (const [w, weight] of und[v]) {
+            if (!idxOf.has(w)) continue;
+            const key = v < w ? v+'_'+w : w+'_'+v; if (doneKey.has(key)) continue; doneKey.add(key);
+            elocal.push([idxOf.get(v), idxOf.get(w), weight]);
+        }
+        const p = forceLayout(elocal, group.length);
+        let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+        for (const q of p) { minx=Math.min(minx,q.x); miny=Math.min(miny,q.y); maxx=Math.max(maxx,q.x); maxy=Math.max(maxy,q.y); }
+        return { group, p, minx, miny, w: Math.max(maxx-minx,1e-3), h: Math.max(maxy-miny,1e-3) };
+    });
+    const positions = new Array(n);
+    const cols = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count/cols);
+    boxes.forEach((box, bi) => {
+        const cx = bi % cols, cy = Math.floor(bi/cols);
+        const cellW = 1/cols, cellH = 1/rows, pad = 0.16;
+        const availW = cellW*(1-pad*2), availH = cellH*(1-pad*2);
+        const scale = Math.min(availW/box.w, availH/box.h);
+        const usedW = box.w*scale, usedH = box.h*scale;
+        const offX = cx*cellW + (cellW-usedW)/2, offY = cy*cellH + (cellH-usedH)/2;
+        box.group.forEach((v, i) => { positions[v] = { x: offX + (box.p[i].x-box.minx)*scale, y: offY + (box.p[i].y-box.miny)*scale }; });
+    });
+    return positions;
+}
+
+/* ============================ colour ramp by distance ============================ */
+function lerpColor(c1, c2, t) {
+    const r1 = parseInt(c1.slice(1,3),16), g1 = parseInt(c1.slice(3,5),16), b1 = parseInt(c1.slice(5,7),16);
+    const r2 = parseInt(c2.slice(1,3),16), g2 = parseInt(c2.slice(3,5),16), b2 = parseInt(c2.slice(5,7),16);
+    const r = Math.round(r1 + t*(r2-r1)), g = Math.round(g1 + t*(g2-g1)), b = Math.round(b1 + t*(b2-b1));
+    return { r, g, b, css: `rgb(${r},${g},${b})` };
+}
+function distColor(d) {
+    const t = maxDist <= 0 ? 0 : Math.min(1, d / maxDist);
+    return lerpColor('#e2b3a3', '#670c07', t);
+}
+function waterColor(d) {
+    const t = maxDist <= 0 ? 0 : Math.min(1, d / maxDist);
+    return lerpColor('#8fd3da', '#13525c', t);
+}
+function textOn(rgb) {
+    const lum = (0.299*rgb.r + 0.587*rgb.g + 0.114*rgb.b);
+    return lum < 130 ? '#f1e9d2' : '#4a3f35';
+}
+function formatNum(x) {
+    if (!Number.isFinite(x)) return '∞';
+    const r = Math.round(x*100)/100;
+    return Number.isInteger(r) ? String(r) : String(r);
+}
+
+/* ============================ Dijkstra step generator ============================ */
+function buildDijkstra(a, start) {
+    const n = a.length;
+    const distTo = new Array(n).fill(Infinity);
+    const edgeTo = new Array(n).fill(-1);
+    const settled = new Array(n).fill(false);
+    const inPQ = new Array(n).fill(false);
+    let pq = [];
+    const out = [];
+
+    const snap = (action, extra = {}) => out.push({
+        distTo: distTo.slice(), edgeTo: edgeTo.slice(), settled: settled.slice(),
+        pq: pq.slice().sort((x,y) => distTo[x]-distTo[y]),
+        action, ...extra
+    });
+
+    distTo[start] = 0; pq.push(start); inPQ[start] = true;
+    snap(`Insert source ${start} into the priority queue with distance 0.`, { current: start, enqueued: start });
+
+    while (pq.length) {
+        pq.sort((x,y) => distTo[x]-distTo[y]);
+        const v = pq.shift(); inPQ[v] = false;
+        if (settled[v]) continue;
+        settled[v] = true;
+        snap(`Extract-min ${v} (distance ${formatNum(distTo[v])}). Relax its outgoing edges.`, { current: v, dequeued: v });
+
+        for (let idx = 0; idx < a[v].length; idx++) {
+            const { w, weight } = a[v][idx];
+            snap(`At ${v}: examine edge → ${w} (weight ${formatNum(weight)}).`, { current: v, examV: v, examW: w, examIdx: idx, examWeight: weight });
+            if (settled[w]) {
+                snap(`${w} already settled → skip.`, { current: v, skipW: w, skipFrom: v, skipIdx: idx });
+                continue;
+            }
+            const cand = distTo[v] + weight;
+            if (cand < distTo[w]) {
+                const old = distTo[w];
+                distTo[w] = cand; edgeTo[w] = v;
+                if (!inPQ[w]) { pq.push(w); inPQ[w] = true; }
+                snap(`Relax ${w}: ${formatNum(old)} → ${formatNum(cand)} via ${v}.`, { current: v, relaxed: w, relaxIdx: idx, treeEdge: [v, w] });
+            } else {
+                snap(`${w}: candidate ${formatNum(cand)} ≥ current ${formatNum(distTo[w])} → no update.`, { current: v, skipW: w, skipFrom: v, skipIdx: idx });
+            }
+        }
+    }
+    const reached = distTo.map((d,i) => d < Infinity ? i : null).filter(x => x !== null);
+    snap(`Done. Reached ${reached.length} vert${reached.length===1?'ex':'ices'} from ${start}. Distances are shortest-path weights.`, { current: null, done: true });
+
+    let md = 0;
+    for (let i = 0; i < n; i++) if (distTo[i] < Infinity && distTo[i] > md) md = distTo[i];
+    return { out, maxDist: Math.max(1e-6, md) };
+}
+function computeSettledOrder() {
+    settledOrder = [];
+    for (const s of steps) if (s.dequeued !== undefined) settledOrder.push({ v: s.dequeued, dist: s.distTo[s.dequeued] });
+}
+function computeDistHistory() {
+    distHistory = Array.from({ length: V }, () => []);
+    for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        if (s.relaxed !== undefined) distHistory[s.relaxed].push({ step: i, dist: s.distTo[s.relaxed] });
+    }
+}
+function settledCountUpTo(p) {
+    let c = 0;
+    for (let i = 0; i <= p && i < steps.length; i++) if (steps[i].dequeued !== undefined) c++;
+    return c;
+}
+
+/* ============================ geometry helpers (curved/straight edge paths) ============================ */
+function quadPoint(A, C, B, t) {
+    const mt = 1 - t;
+    return { x: mt*mt*A.x + 2*mt*t*C.x + t*t*B.x, y: mt*mt*A.y + 2*mt*t*C.y + t*t*B.y };
+}
+function buildEdgePath(A, B, curved, sign) {
+    const N = 40;
+    let C = null;
+    if (curved) {
+        const mx = (A.x+B.x)/2, my = (A.y+B.y)/2;
+        const dx = B.x-A.x, dy = B.y-A.y, len = Math.hypot(dx,dy)||1;
+        const nx = -dy/len, ny = dx/len;
+        const offset = sign * Math.min(28, len*0.22);
+        C = { x: mx+nx*offset, y: my+ny*offset };
+    }
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+        const t = i/N;
+        pts.push(curved ? quadPoint(A,C,B,t) : { x: A.x+(B.x-A.x)*t, y: A.y+(B.y-A.y)*t });
+    }
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i-1] + Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y));
+    return { pts, cum, total: cum[cum.length-1] };
+}
+function pointAtLen(path, s) {
+    s = Math.max(0, Math.min(path.total, s));
+    const { pts, cum } = path;
+    for (let i = 1; i < cum.length; i++) {
+        if (cum[i] >= s) {
+            const segLen = cum[i]-cum[i-1] || 1e-6;
+            const frac = (s-cum[i-1])/segLen;
+            return { x: pts[i-1].x + (pts[i].x-pts[i-1].x)*frac, y: pts[i-1].y + (pts[i].y-pts[i-1].y)*frac };
+        }
+    }
+    return pts[pts.length-1];
+}
+function tangentAtLen(path, s) {
+    const eps = Math.max(1, path.total*0.02);
+    const p1 = pointAtLen(path, Math.max(0, s-eps));
+    const p2 = pointAtLen(path, Math.min(path.total, s+eps));
+    const dx = p2.x-p1.x, dy = p2.y-p1.y, d = Math.hypot(dx,dy)||1;
+    return { x: dx/d, y: dy/d };
+}
+function strokePathRange(path, s, e, width, color, dash) {
+    s = Math.max(0, Math.min(path.total, s)); e = Math.max(0, Math.min(path.total, e));
+    if (e <= s) return;
+    ctx.lineWidth = width; ctx.strokeStyle = color;
+    if (dash) ctx.setLineDash(dash); else ctx.setLineDash([]);
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < path.cum.length; i++) {
+        const c = path.cum[i];
+        if (c < s) continue;
+        if (!started) { const p0 = pointAtLen(path, s); ctx.moveTo(p0.x, p0.y); started = true; }
+        if (c > e) { const pE = pointAtLen(path, e); ctx.lineTo(pE.x, pE.y); break; }
+        ctx.lineTo(path.pts[i].x, path.pts[i].y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+function drawArrowShape(x, y, angle, size, color) {
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(-size, size*0.55); ctx.lineTo(-size, -size*0.55); ctx.closePath();
+    ctx.fillStyle = color; ctx.fill();
+    ctx.restore();
+}
+function drawArrowAtLen(path, atLen, size, color) {
+    const p = pointAtLen(path, atLen);
+    const tan = tangentAtLen(path, atLen);
+    drawArrowShape(p.x, p.y, Math.atan2(tan.y, tan.x), size, color);
+}
+function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+}
+function drawWeightLabel(x, y, text, opts = {}) {
+    ctx.font = '700 11px -apple-system, "Segoe UI", Roboto, sans-serif';
+    const w = ctx.measureText(text).width;
+    const pad = 4;
+    roundRect(x-w/2-pad, y-8, w+2*pad, 16, 4);
+    ctx.fillStyle = opts.bg || 'rgba(246,239,224,0.94)';
+    ctx.strokeStyle = opts.border || '#bcaf92'; ctx.lineWidth = 1;
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = opts.color || '#4a3f35';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y+0.5);
+}
+
+/* ============================ rendering — canvas setup ============================ */
+let dpr = 1, cw = 0, ch = 0, radius = 16;
+function fitCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cw = rect.width; ch = rect.height;
+    canvas.width = Math.round(rect.width*dpr); canvas.height = Math.round(rect.height*dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const M = 38;
+    const px = pos.map(p => ({ x: M + p.x*(cw-2*M), y: M + p.y*(ch-2*M) }));
+    let minD = Infinity;
+    for (let i = 0; i < px.length; i++) for (let j = i+1; j < px.length; j++) {
+        const d = Math.hypot(px[i].x-px[j].x, px[i].y-px[j].y); if (d < minD) minD = d;
+    }
+    if (!Number.isFinite(minD)) minD = 80;
+    radius = Math.max(11, Math.min(23, minD*0.4));
+    return px;
+}
+function buildAllPaths(px) {
+    const fwdSet = new Set();
+    for (let v = 0; v < V; v++) for (const e of adj[v]) fwdSet.add(v+'_'+e.w);
+    const paths = [];
+    for (let v = 0; v < V; v++) {
+        adj[v].forEach((e, idx) => {
+            const curved = fwdSet.has(e.w+'_'+v);
+            const sign = v < e.w ? 1 : -1;
+            const path = buildEdgePath(px[v], px[e.w], curved, sign);
+            paths.push({ v, idx, w: e.w, weight: e.weight, path });
+        });
+    }
+    return paths;
+}
+function edgeRange(path) { return { lo: radius, hi: Math.max(radius+4, path.total - radius) }; }
+
+/* ============================ rendering — step mode ============================ */
+function render() {
+    if (waterMode && waterPlaying) return;
+    if (waterMode) { drawWaterAt(tau); return; }
+    const state = ptr >= 0 ? steps[ptr] : null;
+    const px = fitCanvas();
+    ctx.clearRect(0, 0, cw, ch);
+    const paths = buildAllPaths(px);
+
+    // dry / base edges + arrows (labels are drawn last, on top of everything)
+    for (const ep of paths) {
+        const { lo, hi } = edgeRange(ep.path);
+        strokePathRange(ep.path, lo, hi, 1.6, '#b3a589');
+        drawArrowAtLen(ep.path, hi, Math.max(6, radius*0.4), '#9c8f72');
+    }
+
+    // shortest-path tree edges (current edgeTo[])
+    if (state && state.edgeTo) {
+        for (let w = 0; w < V; w++) {
+            const v = state.edgeTo[w];
+            if (v < 0) continue;
+            const ep = paths.find(p => p.v === v && p.w === w);
+            if (!ep) continue;
+            const { lo, hi } = edgeRange(ep.path);
+            strokePathRange(ep.path, lo, hi, 3.4, '#670c07');
+            drawArrowAtLen(ep.path, hi, Math.max(7, radius*0.46), '#670c07');
+        }
+    }
+    // currently examined edge
+    if (state && state.examV !== undefined) {
+        const ep = paths.find(p => p.v === state.examV && p.idx === state.examIdx);
+        if (ep) {
+            const { lo, hi } = edgeRange(ep.path);
+            strokePathRange(ep.path, lo, hi, 3.6, '#c98a1b', [7,5]);
+            drawArrowAtLen(ep.path, hi, Math.max(7, radius*0.46), '#c98a1b');
+        }
+    }
+    // skipped edge (already settled, or candidate not better)
+    if (state && state.skipW !== undefined) {
+        const ep = paths.find(p => p.v === state.skipFrom && p.idx === state.skipIdx);
+        if (ep) {
+            const { lo, hi } = edgeRange(ep.path);
+            strokePathRange(ep.path, lo, hi, 2.5, '#c98a1b', [3,4]);
+        }
+    }
+
+    // weight labels — drawn last so they stay legible over tree/examined/water overlays
+    for (const ep of paths) {
+        const { lo, hi } = edgeRange(ep.path);
+        const mid = pointAtLen(ep.path, (lo+hi)/2);
+        drawWeightLabel(mid.x, mid.y, formatNum(ep.weight));
+    }
+
+    // nodes
+    const inQueue = new Set(state ? state.pq : []);
+    ctx.font = `700 ${Math.round(radius*0.92)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let v = 0; v < V; v++) {
+        let fill = '#f6efe0', border = '#bcaf92', text = '#726253';
+        if (state && state.distTo[v] < Infinity) {
+            const rgb = distColor(state.distTo[v]);
+            fill = rgb.css; text = textOn(rgb); border = 'rgba(67,39,31,0.65)';
+        }
+        ctx.beginPath(); ctx.arc(px[v].x, px[v].y, radius, 0, Math.PI*2); ctx.fillStyle = fill; ctx.fill();
+
+        const isCurrent = state && state.current === v;
+        const isQueued = inQueue.has(v);
+        if (isCurrent) { ctx.lineWidth = 4; ctx.strokeStyle = '#ff0000'; }
+        else if (state && state.examW === v) { ctx.lineWidth = 3; ctx.strokeStyle = '#c98a1b'; }
+        else if (isQueued) { ctx.lineWidth = 3; ctx.strokeStyle = '#1f6f6a'; }
+        else { ctx.lineWidth = 2; ctx.strokeStyle = border; }
+        ctx.stroke();
+
+        ctx.fillStyle = text; ctx.fillText(String(v), px[v].x, px[v].y + 1);
+    }
+
+    renderSidePanels(state);
+}
+
+/* ============================ rendering — side panels (step mode) ============================ */
+function renderClockPanel(time, list) {
+    document.getElementById('clockDisplay').textContent = `t = ${time.toFixed(2)}`;
+    const log = document.getElementById('arrivalLog'); log.innerHTML = '';
+    if (!list.length) { log.innerHTML = '<span class="none">no arrivals yet</span>'; return; }
+    list.forEach(({ v, dist }) => {
+        const row = document.createElement('div'); row.className = 'arrival-row';
+        const key = document.createElement('div'); key.className = 'av-key';
+        const rgb = distColor(dist); key.style.background = rgb.css; key.style.color = textOn(rgb);
+        key.style.borderColor = '#15616d'; key.textContent = v; row.appendChild(key);
+        const lbl = document.createElement('span'); lbl.textContent = `reached ${v}`; row.appendChild(lbl);
+        const tval = document.createElement('span'); tval.className = 'av-time'; tval.textContent = `t = ${formatNum(dist)}`; row.appendChild(tval);
+        log.appendChild(row);
+    });
+    log.scrollTop = log.scrollHeight;
+}
+
+function renderHistoryPanel(time, ptrIdx) {
+    document.getElementById('clockDisplay').textContent = `t = ${time.toFixed(2)}`;
+    const log = document.getElementById('arrivalLog'); log.innerHTML = '';
+    const rows = [];
+    for (let v = 0; v < V; v++) {
+        const entries = distHistory[v].filter(e => e.step <= ptrIdx);
+        if (entries.length) rows.push({ v, entries, firstStep: entries[0].step });
+    }
+    if (!rows.length) { log.innerHTML = '<span class="none">no arrivals yet</span>'; return; }
+    rows.sort((a, b) => a.firstStep - b.firstStep);
+    rows.forEach(({ v, entries }) => {
+        const row = document.createElement('div'); row.className = 'hist-row';
+        const key = document.createElement('div'); key.className = 'av-key';
+        const last = entries[entries.length - 1].dist;
+        const rgb = distColor(last); key.style.background = rgb.css; key.style.color = textOn(rgb); key.style.borderColor = '#15616d';
+        key.textContent = v; row.appendChild(key);
+        const vals = document.createElement('div'); vals.className = 'hist-values';
+        entries.forEach((e, i) => {
+            const span = document.createElement('span');
+            span.className = 'hist-val' + (i === entries.length - 1 ? ' current' : ' old');
+            span.textContent = formatNum(e.dist);
+            vals.appendChild(span);
+        });
+        row.appendChild(vals);
+        log.appendChild(row);
+    });
+    log.scrollTop = log.scrollHeight;
+}
+
+function renderSidePanels(state) {
+    const st = document.getElementById('statusText');
+    const sc = document.getElementById('stepCount');
+    if (state) { st.innerHTML = escapeHtml(state.action); sc.textContent = `step ${ptr+1} / ${steps.length}`; }
+    else { st.innerHTML = 'Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.'; sc.textContent = `0 / ${steps.length}`; }
+
+    // priority queue
+    const qv = document.getElementById('queueView'); qv.innerHTML = '';
+    const q = state ? state.pq : [];
+    if (!q || q.length === 0) qv.innerHTML = '<span class="empty">empty</span>';
+    else q.forEach((v, i) => {
+        const node = document.createElement('div');
+        node.className = 'q-node' + (i === 0 ? ' front' : '');
+        const rgb = distColor(state.distTo[v]); node.style.background = rgb.css; node.style.color = textOn(rgb);
+        if (i !== 0) node.style.borderColor = '#1f6f6a';
+        node.innerHTML = `<span class="qv">${v}</span><span class="qd">${formatNum(state.distTo[v])}</span>`;
+        qv.appendChild(node);
+    });
+
+    // clock + distance history
+    const c = state ? settledCountUpTo(ptr) : 0;
+    const time = c > 0 ? settledOrder[c-1].dist : 0;
+    renderHistoryPanel(time, ptr);
+
+    // adjacency lists + iterators
+    const av = document.getElementById('adjView'); av.innerHTML = '';
+    const inQueue = new Set(state ? state.pq : []);
+    for (let v = 0; v < V; v++) {
+        const processing = state && state.current === v && state.settled && state.settled[v];
+        const queued = inQueue.has(v);
+        const row = document.createElement('div');
+        row.className = 'adj-row' + (processing ? ' processing' : (queued ? ' queued' : ''));
+
+        const key = document.createElement('div'); key.className = 'adj-key'; key.textContent = v; row.appendChild(key);
+        const arrow = document.createElement('span'); arrow.className = 'adj-arrow'; arrow.textContent = '→'; row.appendChild(arrow);
+
+        const cells = document.createElement('div'); cells.className = 'adj-cells';
+        if (adj[v].length === 0) { const e = document.createElement('span'); e.className = 'adj-empty'; e.textContent = '∅'; cells.appendChild(e); }
+        else {
+            const showIter = processing && state.examV === v;
+            adj[v].forEach((e, i) => {
+                const cell = document.createElement('span'); cell.className = 'adj-cell'; cell.textContent = `${e.w} (${formatNum(e.weight)})`;
+                if (showIter) {
+                    if (i < state.examIdx) cell.classList.add('consumed');
+                    else if (i === state.examIdx) {
+                        cell.classList.add('cursor');
+                        if (state.relaxed === e.w && state.relaxIdx === i) { cell.classList.remove('cursor'); cell.classList.add('relaxed'); }
+                    }
+                }
+                cells.appendChild(cell);
+            });
+        }
+        row.appendChild(cells); av.appendChild(row);
+    }
+}
+
+function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c])); }
+
+/* ============================ water mode ============================ */
+function computeWaterField() {
+    if (steps.length) {
+        const last = steps[steps.length-1];
+        wdist = last.distTo.slice();
+    } else {
+        wdist = new Array(V).fill(Infinity);
+    }
+    waterReachable = [];
+    let md = 0;
+    for (let v = 0; v < V; v++) if (wdist[v] !== Infinity) { waterReachable.push(v); if (wdist[v] > md) md = wdist[v]; }
+    waterMaxTau = md + 1.0;
+}
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+
+function drawWaterAt(t) {
+    const px = fitCanvas();
+    ctx.clearRect(0, 0, cw, ch);
+    const paths = buildAllPaths(px);
+
+    // dry channels + arrows (labels are drawn last, after the water, so they stay visible)
+    for (const ep of paths) {
+        const { lo, hi } = edgeRange(ep.path);
+        strokePathRange(ep.path, lo, hi, 1.6, '#b3a589');
+        drawArrowAtLen(ep.path, hi, Math.max(6, radius*0.4), '#9c8f72');
+    }
+
+    // water flowing along directed edges — one weight-unit of fill per one unit of time
+    ctx.lineCap = 'round';
+    for (const ep of paths) {
+        if (wdist[ep.v] === Infinity) continue;
+        const { lo, hi } = edgeRange(ep.path);
+        const fa = clamp01((t - wdist[ep.v]) / ep.weight);
+        if (fa <= 0) continue;
+        const fillLen = lo + fa*(hi-lo);
+        const col = waterColor(wdist[ep.v]).css;
+        strokePathRange(ep.path, lo, fillLen, 6, col);
+        drawArrowAtLen(ep.path, fa < 1 ? fillLen : hi, Math.max(7, radius*0.46), col);
+    }
+    ctx.lineCap = 'butt';
+
+    // weight labels — drawn last so they stay legible even where water has covered the edge
+    for (const ep of paths) {
+        const { lo, hi } = edgeRange(ep.path);
+        const mid = pointAtLen(ep.path, (lo+hi)/2);
+        drawWeightLabel(mid.x, mid.y, formatNum(ep.weight));
+    }
+
+    // vertices: cream until the wavefront arrives, then a bobbing buoy in its distance colour
+    ctx.font = `700 ${Math.round(radius*0.92)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let v = 0; v < V; v++) {
+        const x = px[v].x;
+        if (wdist[v] === Infinity || t < wdist[v]) {
+            ctx.beginPath(); ctx.arc(x, px[v].y, radius, 0, Math.PI*2);
+            ctx.fillStyle = '#f6efe0'; ctx.fill();
+            ctx.lineWidth = (v === startVertex) ? 3 : 2;
+            ctx.strokeStyle = (v === startVertex) ? '#1f6f6a' : '#bcaf92'; ctx.stroke();
+            ctx.fillStyle = '#726253'; ctx.fillText(String(v), x, px[v].y + 1);
+            continue;
+        }
+        const phase = t - wdist[v];
+        const bob = phase < 1 ? -(radius*0.5) * Math.sin(Math.PI * Math.min(phase/0.55, 1)) * Math.exp(-2.0*phase) : 0;
+        const y = px[v].y + bob;
+
+        if (phase < 0.6) {
+            const rr = radius * (1 + phase*2.2), a = 0.5 * (1 - phase/0.6);
+            ctx.beginPath(); ctx.arc(x, px[v].y, rr, 0, Math.PI*2);
+            ctx.lineWidth = 3; ctx.strokeStyle = `rgba(31,111,106,${a.toFixed(3)})`; ctx.stroke();
+        }
+
+        const rgb = distColor(wdist[v]);
+        ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2); ctx.fillStyle = rgb.css; ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y - radius*0.32, radius*0.5, Math.PI*1.08, Math.PI*1.92);
+        ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.stroke();
+        ctx.lineWidth = (v === startVertex) ? 3.5 : 2.5;
+        ctx.strokeStyle = (v === startVertex) ? '#ff0000' : '#15616d';
+        ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = textOn(rgb); ctx.fillText(String(v), x, y + 1);
+    }
+
+    renderWaterPanels(t);
+}
+
+function renderWaterPanels(t) {
+    const st = document.getElementById('statusText');
+    const sc = document.getElementById('stepCount');
+    if (t <= 0) st.innerHTML = `Source <b>&nbsp;${startVertex}&nbsp;</b> flooded. Press <b>&nbsp;Play&nbsp;</b> to release the water.`;
+    else if (t >= waterMaxTau) st.innerHTML = `Flood complete — all ${waterReachable.length} reachable vert${waterReachable.length===1?'ex':'ices'} covered, each at exactly its shortest-path distance.`;
+    else st.innerHTML = `Water at <b>&nbsp;t = ${t.toFixed(2)}&nbsp;</b> — flowing along every channel at unit speed.`;
+    sc.textContent = `t ${Math.min(t,waterMaxTau).toFixed(2)} / ${waterMaxTau.toFixed(2)}`;
+
+    document.getElementById('queueTitle').innerHTML = 'Wavefront &nbsp;·&nbsp; bobbing now';
+    document.getElementById('queueTip').innerHTML = 'Every edge fills over a span of time equal to its <b>weight</b> — drawn roughly to scale, so the water\'s visual speed looks uniform.';
+    const qv = document.getElementById('queueView'); qv.innerHTML = '';
+    const active = [];
+    for (const v of waterReachable) { const ph = t - wdist[v]; if (ph >= 0 && ph < 1) active.push(v); }
+    if (active.length === 0) qv.innerHTML = '<span class="empty">—</span>';
+    else active.sort((a,b)=>wdist[a]-wdist[b]).forEach(v => {
+        const node = document.createElement('div'); node.className = 'q-node';
+        const rgb = distColor(wdist[v]); node.style.background = rgb.css; node.style.color = textOn(rgb);
+        node.style.borderColor = '#15616d';
+        node.innerHTML = `<span class="qv">${v}</span><span class="qd">${formatNum(wdist[v])}</span>`;
+        qv.appendChild(node);
+    });
+
+    // clock + arrivals
+    const list = waterReachable.filter(v => t >= wdist[v]).sort((a,b)=>wdist[a]-wdist[b]).map(v => ({ v, dist: wdist[v] }));
+    renderClockPanel(t, list);
+
+    // adjacency — tint reached keys teal
+    const av = document.getElementById('adjView'); av.innerHTML = '';
+    for (let v = 0; v < V; v++) {
+        const reached = wdist[v] !== Infinity && t >= wdist[v];
+        const row = document.createElement('div'); row.className = 'adj-row' + (reached ? ' queued' : '');
+        const key = document.createElement('div'); key.className = 'adj-key'; key.textContent = v;
+        if (reached) { const rgb = distColor(wdist[v]); key.style.background = rgb.css; key.style.color = textOn(rgb); key.style.borderColor = '#15616d'; }
+        row.appendChild(key);
+        const arrow = document.createElement('span'); arrow.className = 'adj-arrow'; arrow.textContent = '→'; row.appendChild(arrow);
+        const cells = document.createElement('div'); cells.className = 'adj-cells';
+        if (adj[v].length === 0) { const e = document.createElement('span'); e.className = 'adj-empty'; e.textContent = '∅'; cells.appendChild(e); }
+        else adj[v].forEach(e => { const cell = document.createElement('span'); cell.className = 'adj-cell'; cell.textContent = `${e.w} (${formatNum(e.weight)})`; cells.appendChild(cell); });
+        row.appendChild(cells); av.appendChild(row);
+    }
+}
+
+function speedMult() { return 650 / delay; }
+function updatePlayBtn() { document.getElementById('playBtn').textContent = (waterMode ? waterPlaying : playing) ? 'Pause' : 'Play'; }
+function stopWaterLoop() { waterPlaying = false; if (wRaf) cancelAnimationFrame(wRaf); wRaf = null; wLast = null; updatePlayBtn(); }
+function playWater() {
+    if (tau >= waterMaxTau) tau = 0;
+    waterPlaying = true; wLast = null; updatePlayBtn();
+    wRaf = requestAnimationFrame(waterFrame);
+}
+function pauseWater() { stopWaterLoop(); syncButtons(); }
+function waterFrame(ts) {
+    if (!waterPlaying) return;
+    if (wLast === null) wLast = ts;
+    let dt = (ts - wLast) / 1000; wLast = ts;
+    if (dt > 0.1) dt = 0.1;
+    tau += dt * TAU_PER_SEC * speedMult();
+    if (tau >= waterMaxTau) { tau = waterMaxTau; drawWaterAt(tau); stopWaterLoop(); syncButtons(); return; }
+    drawWaterAt(tau); syncButtons();
+    wRaf = requestAnimationFrame(waterFrame);
+}
+
+function toggleWaterMode(on) {
+    waterMode = on;
+    stopPlay(); stopWaterLoop();
+    if (waterMode) { if (tau > waterMaxTau) tau = waterMaxTau; }
+    else { restorePanelLabels(); }
+    render(); updatePlayBtn(); syncButtons();
+}
+function restorePanelLabels() {
+    document.getElementById('queueTitle').innerHTML = 'Priority Queue &nbsp;·&nbsp; min-distance';
+    document.getElementById('queueTip').innerHTML = '<b>Min</b> (smallest tentative distance) is extracted next; relaxed neighbours get a key decrease. This greedy order is what makes Dijkstra correct.';
+}
+
+/* ============================ run control ============================ */
+function rebuildSteps() {
+    const r = buildDijkstra(adj, startVertex); steps = r.out; maxDist = r.maxDist;
+    computeSettledOrder();
+    computeDistHistory();
+    computeWaterField();
+    ptr = -1; tau = 0;
+    stopPlay(); stopWaterLoop();
+    render(); syncButtons(); updatePlayBtn();
+}
+function stepFwd() {
+    if (waterMode) {
+        stopWaterLoop();
+        tau = Math.min(waterMaxTau, Math.floor(tau + 1e-9) + 1);
+        render(); syncButtons(); return;
+    }
+    if (ptr < steps.length-1) { ptr++; render(); } if (ptr >= steps.length-1) stopPlay(); syncButtons();
+}
+function stepBack() {
+    if (waterMode) {
+        stopWaterLoop();
+        tau = Math.max(0, Math.ceil(tau - 1e-9) - 1);
+        render(); syncButtons(); return;
+    }
+    if (ptr > -1) { ptr--; render(); } stopPlay(); syncButtons();
+}
+function resetRun() {
+    stopPlay(); stopWaterLoop();
+    ptr = -1; tau = 0; render(); syncButtons(); updatePlayBtn();
+}
+function togglePlay() {
+    if (waterMode) { waterPlaying ? pauseWater() : playWater(); return; }
+    playing ? stopPlay() : startPlay();
+}
+function startPlay() { if (ptr >= steps.length-1) ptr = -1; playing = true; updatePlayBtn(); tick(); }
+function stopPlay() { playing = false; clearTimeout(timer); updatePlayBtn(); }
+function tick() { if (!playing) return; if (ptr < steps.length-1) { ptr++; render(); syncButtons(); timer = setTimeout(tick, delay); } else stopPlay(); }
+function syncButtons() {
+    if (waterMode) {
+        document.getElementById('backBtn').disabled = tau <= 0;
+        document.getElementById('stepBtn').disabled = tau >= waterMaxTau;
+        return;
+    }
+    document.getElementById('backBtn').disabled = ptr <= -1; document.getElementById('stepBtn').disabled = ptr >= steps.length-1;
+}
+function updateSpeed(val) { delay = parseInt(val, 10); document.getElementById('speedVal').textContent = val + 'ms'; }
+
+/* ============================ graph loading ============================ */
+function graphToText(v, edgeList, positions, sedgewick) {
+    let s = `${v}\n${edgeList.length}\n` + edgeList.map(([x,y,wt]) => `${x} ${y} ${formatNum(wt)}`).join('\n');
+    if (!sedgewick && positions) s += '\n' + positions.map(p => `${fmtCoord(p.x)} ${fmtCoord(p.y)}`).join('\n');
+    return s;
+}
+function refreshTextarea() {
+    const sedgewick = document.getElementById('sedgewickToggle').checked;
+    document.getElementById('graphText').value = graphToText(lastV, lastEdges, pos, sedgewick);
+}
+function applyGraph(v, a, edgeList, customPos) {
+    V = v; adj = a; pos = customPos || layoutAll(V, adj);
+    lastV = v; lastEdges = edgeList;
+    const sel = document.getElementById('startSel'); sel.innerHTML = '';
+    for (let i = 0; i < V; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i; sel.appendChild(o); }
+    if (startVertex >= V) startVertex = 0; sel.value = startVertex;
+    refreshTextarea();
+    rebuildSteps();
+}
+function loadPreset(name) {
+    const text = PRESETS[name];
+    try { const { v, adj: a, edges, pos: customPos } = parseGraph(text); startVertex = 0; applyGraph(v, a, edges, customPos); document.getElementById('parseErr').textContent = ''; }
+    catch (e) { document.getElementById('parseErr').textContent = e.message; }
+}
+function loadFromText() {
+    const text = document.getElementById('graphText').value;
+    try { const { v, adj: a, edges, pos: customPos } = parseGraph(text); if (startVertex >= v) startVertex = 0; applyGraph(v, a, edges, customPos); document.getElementById('parseErr').textContent = ''; }
+    catch (e) { document.getElementById('parseErr').textContent = e.message; }
+}
+
+/* ============================ external graphs (graphs/ folder) ============================ */
+function prettyGraphName(filename) {
+    return decodeURIComponent(filename).replace(/\.[^./]+$/, '').replace(/[_-]+/g, ' ');
+}
+async function discoverExternalGraphs() {
+    try {
+        const r = await fetch('graphs/index.json', { cache: 'no-store' });
+        if (r.ok) {
+            const data = await r.json();
+            if (Array.isArray(data)) {
+                return data.map(item => {
+                    const file = typeof item === 'string' ? item : item.file;
+                    const label = (typeof item === 'object' && (item.label || item.name)) || prettyGraphName(file);
+                    return { label, path: 'graphs/' + encodeURIComponent(file) };
+                });
+            }
+        }
+    } catch (e) { /* no manifest — fall through to directory listing */ }
+    try {
+        const r = await fetch('graphs/', { cache: 'no-store' });
+        if (r.ok) {
+            const html = await r.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const hrefs = [...doc.querySelectorAll('a')]
+                .map(a => a.getAttribute('href') || '')
+                .filter(h => h && h !== '../' && h !== './' && !h.startsWith('?') && !h.startsWith('/') && !h.endsWith('/'));
+            const uniq = [...new Set(hrefs)];
+            if (uniq.length) return uniq.map(h => ({ label: prettyGraphName(decodeURIComponent(h)), path: 'graphs/' + h }));
+        }
+    } catch (e) { /* no directory listing either — that's fine, just no external graphs */ }
+    return [];
+}
+function loadExternalGraph(path) {
+    const errEl = document.getElementById('parseErr');
+    errEl.textContent = `Loading ${path}…`;
+    fetch(path, { cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            const { v, adj: a, edges, pos: customPos } = parseGraph(text);
+            startVertex = 0;
+            applyGraph(v, a, edges, customPos);
+            errEl.textContent = '';
+        })
+        .catch(err => { errEl.textContent = `Could not load ${path}: ${err.message}`; });
+}
+function populateExternalGraphs(presetSel) {
+    discoverExternalGraphs().then(list => {
+        if (!list.length) return;
+        const grp = document.createElement('optgroup');
+        grp.label = 'From graphs/ folder';
+        list.forEach(({ label, path }) => {
+            const o = document.createElement('option');
+            o.value = path; o.textContent = label; o.dataset.external = '1';
+            grp.appendChild(o);
+        });
+        presetSel.appendChild(grp);
+    });
+}
+
+/* ============================ init ============================ */
+function init() {
+    const presetSel = document.getElementById('presetSel');
+    Object.keys(PRESETS).forEach(name => { const o = document.createElement('option'); o.value = name; o.textContent = name; presetSel.appendChild(o); });
+    presetSel.addEventListener('change', () => {
+        const opt = presetSel.selectedOptions[0];
+        if (opt && opt.dataset.external) loadExternalGraph(opt.value); else loadPreset(opt.value);
+    });
+    document.getElementById('startSel').addEventListener('change', e => { startVertex = parseInt(e.target.value, 10); rebuildSteps(); });
+    window.addEventListener('resize', () => { if (waterMode && waterPlaying) drawWaterAt(tau); else render(); });
+    loadPreset(Object.keys(PRESETS)[0]);
+    populateExternalGraphs(presetSel);
+}
+init();
+</script>
+</body>
+</html>

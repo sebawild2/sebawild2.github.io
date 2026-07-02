@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Directed Graph as a Wavelet Tree</title>
+<style>
+  :root{
+    --bg:#f1e9d2; --panel:#f6efe0; --panel-line:#e2d6b5;
+    --controls:#e8ddbe; --controls-line:#dcd0b0;
+    --ink:#4a3f35; --ink-soft:#726253; --label:#8c7b70;
+    --btn:#faf6eb; --btn-line:#bcaf92;
+    --bar-lo:#e2b3a3; --bar-hi:#670c07;
+    --active:#ff0000; --soft:#d8b08c; --one:#5c4f43;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg); color:var(--ink-soft);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex;flex-direction:column;align-items:center;
+    min-height:100vh;margin:0;padding:24px 20px 48px;
+  }
+  h1{font-size:1.6rem;font-weight:500;letter-spacing:.5px;color:var(--ink);margin:0 0 4px}
+  .subtitle{font-size:.9rem;color:var(--label);margin:0 0 22px;letter-spacing:.3px;max-width:760px;text-align:center;line-height:1.5}
+  .subtitle code{background:#ece2c6;padding:1px 5px;border-radius:3px;color:var(--ink)}
+
+  .stage{
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:6px;
+    box-shadow:0 2px 8px rgba(0,0,0,.04);width:100%;max-width:1180px;padding:10px;overflow-x:auto;
+  }
+  svg{display:block;width:100%;height:auto;min-width:820px}
+
+  .readout{width:100%;max-width:1180px;display:flex;gap:14px;margin-top:14px;flex-wrap:wrap}
+  .step-box{
+    flex:3 1 380px;background:var(--panel);border:1px solid var(--panel-line);
+    border-radius:6px;padding:14px 16px;min-height:64px;font-size:.95rem;line-height:1.5;
+  }
+  .step-box b{color:var(--ink)}
+  .step-box code{background:#ece2c6;padding:1px 5px;border-radius:3px;color:var(--ink);font-size:.9em}
+  .answer-box{flex:1 1 200px;background:var(--controls);border:1px solid var(--controls-line);
+    border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center}
+  .answer-label{font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--label);font-weight:600}
+  .answer-val{font-size:1.5rem;color:var(--bar-hi);font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+  .answer-val.pending{color:var(--label);font-weight:500;font-size:1.05rem}
+
+  .controls{display:flex;gap:20px;margin-top:18px;align-items:center;justify-content:center;flex-wrap:wrap;
+    background:var(--controls);padding:14px 22px;border-radius:6px;border:1px solid var(--controls-line)}
+  .group{display:flex;align-items:center;gap:8px;font-size:.85rem;color:#5c4f43}
+  .group label{font-weight:500}
+  select,input[type="number"]{background:var(--btn);color:var(--ink);border:1px solid var(--btn-line);
+    border-radius:4px;padding:7px 9px;font-size:.88rem;font-family:inherit}
+  button{background:var(--btn);color:var(--ink);border:1px solid var(--btn-line);padding:8px 18px;
+    font-size:.9rem;border-radius:4px;cursor:pointer;font-weight:500;transition:background .2s,border-color .2s}
+  button:hover:not(:disabled){background:#fff;border-color:#9a8c6f}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  input[type="range"]{accent-color:#e60000;cursor:pointer;width:90px}
+  .sep{width:1px;align-self:stretch;background:var(--controls-line)}
+  .playback button{padding:8px 12px}
+  .stepcount{font-size:.82rem;color:var(--label);font-variant-numeric:tabular-nums;min-width:84px;text-align:center}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:12px;font-size:.78rem;color:var(--label)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:middle}
+  .hint{font-size:.78rem;color:var(--label);max-width:1180px;margin:16px auto 0;text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+
+  <h1>A Directed Graph as a Wavelet Tree</h1>
+  <p class="subtitle">
+    The wavelet tree holds <code>S</code>, all out-neighbourhoods concatenated; the bitvector <code>B</code> holds
+    the out-degrees in unary. Together they answer out- and in-neighbour queries symmetrically.
+  </p>
+
+  <div class="stage">
+    <svg id="viz" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMin meet" role="img" aria-label="Graph and its wavelet-tree representation">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#9a8c6f"/>
+        </marker>
+        <marker id="arrowActive" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#ff0000"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:linear-gradient(90deg,#e2b3a3,#670c07)"></span> colour = a vertex's identity</span>
+    <span><span class="swatch" style="border:2px solid #ff0000;background:#f1e9d2"></span> position under inspection</span>
+    <span><span class="swatch" style="background:#d8b08c"></span> cells being scanned</span>
+    <span><span class="swatch" style="background:#5c4f43"></span> B's <b style="color:#fff">1</b> = list separator</span>
+  </div>
+
+  <div class="readout">
+    <div class="step-box" id="stepBox">Pick an operation and press <b>Run</b>. Watch the query bounce between the graph, the sequence <code>S</code>, and the bitvector <code>B</code>.</div>
+    <div class="answer-box">
+      <span class="answer-label" id="answerLabel">Result</span>
+      <span class="answer-val pending" id="answerVal">—</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="group">
+      <label for="op">Operation</label>
+      <select id="op" onchange="onOp()">
+        <option value="outn">i-th out-neighbour(v)</option>
+        <option value="inn">i-th in-neighbour(v)</option>
+        <option value="outd">out-degree(v)</option>
+        <option value="ind">in-degree(v)</option>
+        <option value="adj">is-adjacent(v, u)</option>
+      </select>
+    </div>
+    <div class="group" id="gA"><label id="labA" for="vA">Vertex v</label><select id="vA"></select></div>
+    <div class="group" id="gB"><label id="labB" for="vB">Vertex u</label><select id="vB"></select></div>
+    <div class="group" id="gI"><label id="labI" for="idx">i</label><input type="number" id="idx" min="1" value="1"></div>
+    <div class="sep"></div>
+    <div class="group playback">
+      <button id="runBtn" onclick="runFromStart()">Run</button>
+      <button id="prevBtn" onclick="stepPrev()">‹ Prev</button>
+      <button id="playBtn" onclick="togglePlay()">Play</button>
+      <button id="nextBtn" onclick="stepNext()">Next ›</button>
+      <span id="stepCount" class="stepcount">—</span>
+    </div>
+    <div class="group">
+      <button id="newBtn" onclick="newGraph()">New graph</button>
+    </div>
+    <div class="sep"></div>
+    <div class="group"><label for="nv">Vertices</label>
+      <input type="range" id="nv" min="4" max="6" value="5" oninput="onN(this.value)"><span id="nvVal">5</span></div>
+    <div class="group"><label for="speed">Delay</label>
+      <input type="range" id="speed" min="150" max="1600" value="750" oninput="onSpeed(this.value)"><span id="speedVal">750ms</span></div>
+  </div>
+
+  <p class="hint">
+    <b>out-neighbour:</b> select<sub>1</sub>(B,v) finds v's block, then read S inside it.&nbsp;&nbsp;
+    <b>in-neighbour:</b> select<sub>u</sub>(S,i) finds an edge into u, then B maps that S-position back to its source vertex.&nbsp;&nbsp;
+    <b>degrees</b> are a gap in B (out) or a symbol count in S (in).
+  </p>
+
+<script>
+/* ---------- palette ---------- */
+const C={bg:'#f1e9d2',barLo:'#e2b3a3',barHi:'#670c07',active:'#ff0000',
+  soft:'#d8b08c',ink:'#4a3f35',inkSoft:'#726253',line:'#e2d6b5',label:'#8c7b70',one:'#5c4f43'};
+
+/* ---------- colour helpers ---------- */
+function lerp(c1,c2,f){
+  const a=[1,3,5].map(i=>parseInt(c1.substr(i,2),16));
+  const b=[1,3,5].map(i=>parseInt(c2.substr(i,2),16));
+  const r=a.map((v,i)=>Math.round(v+f*(b[i]-v)));
+  return `rgb(${r[0]},${r[1]},${r[2]})`;
+}
+let N=5;
+function vColor(v){ return lerp(C.barLo,C.barHi, N<2?0:(v-1)/(N-1)); }
+function textOn(v){ return (v-1)/(N-1) > 0.42 ? C.bg : C.ink; }
+
+/* ---------- model ---------- */
+let adj={}, edges=new Set();
+let S=[], B=[], slots=[], sToB=[], e=0;
+let nodePos=[];           // 1-based vertex -> {x,y}
+let anim={timer:null,steps:[],i:0,playing:false,built:false};
+
+function buildRep(){
+  S=[];B=[];slots=[];sToB=[]; let s=0;
+  for(let v=1;v<=N;v++){
+    B.push(1); slots.push({kind:'one',v});
+    for(const u of adj[v]){ s++; S.push(u); B.push(0); slots.push({kind:'zero',v,s}); sToB[s]=B.length; }
+  }
+  e=S.length;
+}
+/* primitives on B (1-based positions) */
+const select1=k=>{let c=0;for(let i=0;i<B.length;i++){if(B[i]===1){c++;if(c===k)return i+1;}}return -1;};
+const select0=k=>{let c=0;for(let i=0;i<B.length;i++){if(B[i]===0){c++;if(c===k)return i+1;}}return -1;};
+const rank1=pos=>{let c=0;for(let i=0;i<pos;i++)c+=B[i];return c;};
+/* primitives on S (via wavelet tree) */
+const selectSym=(cc,k)=>{let c=0;for(let i=0;i<S.length;i++){if(S[i]===cc){c++;if(c===k)return i+1;}}return -1;};
+const rankSym=(cc,pos)=>{let c=0;for(let i=0;i<pos;i++)if(S[i]===cc)c++;return c;};
+
+function block(v){
+  const p1=select1(v);
+  const nextOne = v<N? select1(v+1) : B.length+1;
+  const a=p1-v+1, b=nextOne-(v+1);
+  return {p1,nextOne,a,b,deg:b-a+1};
+}
+function outDeg(v){ return block(v).deg; }
+function inDeg(u){ return rankSym(u,e); }
+
+/* ---------- geometry ---------- */
+const SLOTW=30, SLOTH=26, ROW_S=300, ROW_B=388;   // y of S row top, B row top
+let VW=1000;
+let startX=120;
+function recomputeWidth(){
+  const tot=slots.length;
+  VW=Math.max(900, tot*SLOTW + 200);
+  startX=Math.max(120,(VW-tot*SLOTW)/2);
+  document.getElementById('viz').setAttribute('viewBox',`0 0 ${VW} 480`);
+}
+function slotX(k){ return startX + k*SLOTW; }          // k = 0-based slot index
+function sCellX(s){ const k=sToB[s]-1; return slotX(k); } // S index -> x (shares B column)
+
+/* graph layout: circle in the left portion */
+function layoutGraph(){
+  nodePos=[];
+  const gcx=VW*0.5, gcy=130, gR=Math.min(110, 30+N*14);
+  for(let v=1;v<=N;v++){
+    const ang=-Math.PI/2 + (v-1)*2*Math.PI/N;
+    nodePos[v]={x:gcx+gR*Math.cos(ang), y:gcy+gR*Math.sin(ang)};
+  }
+}
+
+/* ---------- SVG plumbing ---------- */
+const svg=document.getElementById('viz');
+const NS='http://www.w3.org/2000/svg';
+const defs=svg.querySelector('defs');
+function el(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function clearSvg(){ while(svg.lastChild&&svg.lastChild!==defs) svg.removeChild(svg.lastChild); }
+
+/* ---------- rendering ---------- */
+function render(st){
+  st=st||{};
+  clearSvg();
+  drawGraph(st);
+  drawSequence(st);
+}
+
+function drawGraph(st){
+  const RN=17;
+  const gNodes=st.gNodes||new Set();
+  const ge=st.gEdge||null;
+  // edges
+  for(let v=1;v<=N;v++) for(const u of adj[v]){
+    const active = ge && ge[0]===v && ge[1]===u;
+    drawEdge(v,u,RN,active);
+  }
+  // nodes
+  for(let v=1;v<=N;v++){
+    const p=nodePos[v], on=gNodes.has(v);
+    if(on) svg.appendChild(el('circle',{cx:p.x,cy:p.y,r:RN+5,fill:'none',stroke:C.active,'stroke-width':2.5}));
+    svg.appendChild(el('circle',{cx:p.x,cy:p.y,r:RN,fill:vColor(v),stroke:'rgba(74,63,53,.25)','stroke-width':1}));
+    const t=el('text',{x:p.x,y:p.y+4.5,'text-anchor':'middle','font-size':13,'font-weight':700,fill:textOn(v)});
+    t.textContent=v; svg.appendChild(t);
+  }
+}
+function drawEdge(u,v,RN,active){
+  const a=nodePos[u], b=nodePos[v];
+  let dx=b.x-a.x, dy=b.y-a.y; const L=Math.hypot(dx,dy)||1; dx/=L; dy/=L;
+  const sx=a.x+dx*RN, sy=a.y+dy*RN, ex=b.x-dx*(RN+7), ey=b.y-dy*(RN+7);
+  const mx=(sx+ex)/2, my=(sy+ey)/2;
+  const bend=(u<v?1:-1)*Math.min(34,L*0.22);
+  const cx=mx - dy*bend, cy=my + dx*bend;
+  svg.appendChild(el('path',{d:`M ${sx} ${sy} Q ${cx} ${cy} ${ex} ${ey}`,
+    fill:'none',stroke:active?C.active:'#9a8c6f','stroke-width':active?3:1.4,
+    'marker-end':active?'url(#arrowActive)':'url(#arrow)',opacity:active?1:.65}));
+}
+
+function drawSequence(st){
+  const bActive=st.bActive, bSoft=st.bSoft||new Set();
+  const sActive=st.sActive, sSoft=st.sSoft||new Set();
+
+  // row labels
+  const sl=el('text',{x:startX-58,y:ROW_S+SLOTH/2+5,'font-size':13,'font-weight':700,fill:C.ink});
+  sl.textContent='S'; svg.appendChild(sl);
+  const slc=el('text',{x:startX-58,y:ROW_S-14,'font-size':9.5,fill:C.label});
+  slc.textContent='wavelet tree'; svg.appendChild(slc);
+  const bl=el('text',{x:startX-58,y:ROW_B+SLOTH/2+5,'font-size':13,'font-weight':700,fill:C.ink});
+  bl.textContent='B'; svg.appendChild(bl);
+  const blc=el('text',{x:startX-58,y:ROW_B+SLOTH+15,'font-size':9.5,fill:C.label});
+  blc.textContent='unary out-deg'; svg.appendChild(blc);
+
+  // per-vertex group brackets above S
+  for(let v=1;v<=N;v++){
+    const zeros=slots.filter(sl=>sl.kind==='zero'&&sl.v===v);
+    const oneSlot=slots.findIndex(sl=>sl.kind==='one'&&sl.v===v);
+    if(zeros.length===0){
+      const x=slotX(oneSlot)+SLOTW/2;
+      const t=el('text',{x,y:ROW_S-16,'text-anchor':'middle','font-size':9.5,fill:vColor(v)});
+      t.textContent=`out(${v})=∅`; svg.appendChild(t);
+      continue;
+    }
+    const x0=sCellX(zeros[0].s), x1=sCellX(zeros[zeros.length-1].s)+SLOTW;
+    svg.appendChild(el('path',{d:`M ${x0} ${ROW_S-8} L ${x0} ${ROW_S-14} L ${x1} ${ROW_S-14} L ${x1} ${ROW_S-8}`,
+      fill:'none',stroke:vColor(v),'stroke-width':1.6}));
+    const t=el('text',{x:(x0+x1)/2,y:ROW_S-18,'text-anchor':'middle','font-size':10,'font-weight':600,fill:vColor(v)});
+    t.textContent=`out(${v})`; svg.appendChild(t);
+  }
+
+  // B row (all slots) + S row (zero slots only) + connecting ticks
+  for(let k=0;k<slots.length;k++){
+    const sl=slots[k], x=slotX(k), bpos=k+1;
+    if(sl.kind==='one'){
+      svg.appendChild(el('rect',{x:x+5,y:ROW_B,width:SLOTW-10,height:SLOTH,rx:3,fill:C.one}));
+      const t=el('text',{x:x+SLOTW/2,y:ROW_B+SLOTH/2+4.5,'text-anchor':'middle','font-size':12,'font-weight':700,fill:C.bg});
+      t.textContent='1'; svg.appendChild(t);
+    } else {
+      // soft highlight band spanning both rows
+      if(sSoft.has(sl.s)||bSoft.has(bpos))
+        svg.appendChild(el('rect',{x:x-1,y:ROW_S-2,width:SLOTW+2,height:(ROW_B+SLOTH)-(ROW_S)+4,rx:4,fill:C.soft,opacity:.5}));
+      // connecting tick
+      svg.appendChild(el('line',{x1:x+SLOTW/2,y1:ROW_S+SLOTH,x2:x+SLOTW/2,y2:ROW_B,stroke:C.line,'stroke-width':1,'stroke-dasharray':'2 3'}));
+      // S cell
+      const u=S[sl.s-1];
+      svg.appendChild(el('rect',{x:x+2,y:ROW_S,width:SLOTW-4,height:SLOTH,rx:3,fill:vColor(u),stroke:'rgba(74,63,53,.18)','stroke-width':.5}));
+      const ts=el('text',{x:x+SLOTW/2,y:ROW_S+SLOTH/2+4.5,'text-anchor':'middle','font-size':12,'font-weight':700,fill:textOn(u)});
+      ts.textContent=u; svg.appendChild(ts);
+      // B cell (0)
+      svg.appendChild(el('rect',{x:x+5,y:ROW_B,width:SLOTW-10,height:SLOTH,rx:3,fill:'#faf6eb',stroke:C.line,'stroke-width':1}));
+      const tb=el('text',{x:x+SLOTW/2,y:ROW_B+SLOTH/2+4.5,'text-anchor':'middle','font-size':12,'font-weight':600,fill:C.inkSoft});
+      tb.textContent='0'; svg.appendChild(tb);
+      // S index label
+      const ix=el('text',{x:x+SLOTW/2,y:ROW_S+SLOTH+11,'text-anchor':'middle','font-size':8,fill:C.label});
+      ix.textContent=sl.s; svg.appendChild(ix);
+      // active borders
+      if(sActive===sl.s)
+        svg.appendChild(el('rect',{x:x+0.5,y:ROW_S-1,width:SLOTW-1,height:SLOTH+2,rx:3,fill:'none',stroke:C.active,'stroke-width':3}));
+      if(bActive===bpos)
+        svg.appendChild(el('rect',{x:x+3.5,y:ROW_B-1,width:SLOTW-7,height:SLOTH+2,rx:3,fill:'none',stroke:C.active,'stroke-width':3}));
+    }
+    if(sl.kind==='one' && bActive===bpos)
+      svg.appendChild(el('rect',{x:x+3.5,y:ROW_B-1,width:SLOTW-7,height:SLOTH+2,rx:3,fill:'none',stroke:C.active,'stroke-width':3}));
+  }
+}
+
+/* ---------- step generation ---------- */
+function ord(n){const s=['th','st','nd','rd'],v=n%100;return s[(v-20)%10]||s[v]||s[0];}
+function zeroPosOfBlock(v){ const blk=block(v); const arr=[]; for(let p=blk.p1+1;p<blk.nextOne;p++)arr.push(p); return arr; }
+
+function genOutNeighbor(v,i){
+  const steps=[]; const blk=block(v);
+  if(blk.deg<1) return [{text:`Vertex <b>${v}</b> has out-degree 0 — no out-neighbours.`,gNodes:set(v)}];
+  steps.push({text:`<b>out-neighbour(${v}, ${i})</b> — find vertex ${v}'s block: <code>select₁(B, ${v}) = ${blk.p1}</code>, the ${v}${ord(v)} <b>1</b> in B.`,
+    bActive:blk.p1, gNodes:set(v)});
+  const zb=new Set(zeroPosOfBlock(v));
+  steps.push({text:`Its out-neighbours are the <b>0</b>s in this block, which line up with <code>S[${blk.a}..${blk.b}]</code> above.`,
+    bSoft:zb, sSoft:rangeSet(blk.a,blk.b), gNodes:set(v)});
+  const sIdx=blk.a+i-1;
+  steps.push({text:`The ${i}${ord(i)} of them is <code>S[${sIdx}]</code>.`,
+    sActive:sIdx, bActive:sToB[sIdx], gNodes:set(v)});
+  const u=S[sIdx-1];
+  steps.push({text:`<code>access(S, ${sIdx}) = ${u}</code>. So the ${i}${ord(i)} out-neighbour of <b>${v}</b> is <b>${u}</b>.`,
+    sActive:sIdx, gNodes:set(v,u), gEdge:[v,u], answer:{val:String(u),label:'Out-neighbour'}});
+  return steps;
+}
+
+function genInNeighbor(u,i){
+  const steps=[]; const d=inDeg(u);
+  if(d<1) return [{text:`No edges point to vertex <b>${u}</b> — it has in-degree 0.`,gNodes:set(u)}];
+  steps.push({text:`<b>in-neighbour(${u}, ${i})</b> — find the ${i}${ord(i)} edge into ${u}: <code>select<sub>${u}</sub>(S, ${i})</code>, the ${i}${ord(i)} occurrence of symbol ${u} in S.`,
+    gNodes:set(u)});
+  const j=selectSym(u,i);
+  steps.push({text:`That is <code>S[${j}] = ${u}</code>. But which vertex's list is position ${j} in? Ask B.`,
+    sActive:j, gNodes:set(u)});
+  const pos=select0(j);
+  steps.push({text:`<code>select₀(B, ${j}) = ${pos}</code> maps S-position ${j} to its <b>0</b> in B.`,
+    sActive:j, bActive:pos, gNodes:set(u)});
+  const src=rank1(pos);
+  const onesUp=new Set(); let c=0; for(let p=1;p<=pos;p++){ if(B[p-1]===1){c++; onesUp.add(p);} }
+  steps.push({text:`<code>rank₁(B, ${pos}) = ${src}</code> counts the separators up to here — that's the block we're in. The source vertex is <b>${src}</b>.`,
+    sActive:j, bActive:pos, bSoft:onesUp, gNodes:set(src,u), gEdge:[src,u],
+    answer:{val:String(src),label:'In-neighbour'}});
+  return steps;
+}
+
+function genOutDeg(v){
+  const blk=block(v);
+  const zb=new Set(zeroPosOfBlock(v));
+  const next = v<N? `select₁(B, ${v+1}) = ${blk.nextOne}` : `end of B`;
+  return [
+    {text:`<b>out-degree(${v})</b> — count the <b>0</b>s between vertex ${v}'s separator and the next one: <code>select₁(B,${v})=${blk.p1}</code> … <code>${next}</code>.`,
+      bActive:blk.p1, gNodes:set(v)},
+    {text:`There are <b>${blk.deg}</b> zeros in that gap, so the out-degree is <b>${blk.deg}</b>.`,
+      bSoft:zb, sSoft:rangeSet(blk.a,blk.b), gNodes:set(v),
+      gEdge:null, answer:{val:String(blk.deg),label:'Out-degree'}}
+  ];
+}
+
+function genInDeg(u){
+  const d=inDeg(u);
+  const occ=new Set(); for(let k=1;k<=e;k++) if(S[k-1]===u) occ.add(k);
+  return [
+    {text:`<b>in-degree(${u})</b> — every edge into ${u} appears as a symbol ${u} somewhere in S. Count them: <code>rank<sub>${u}</sub>(S, ${e})</code>.`,
+      sSoft:occ, gNodes:set(u)},
+    {text:`Symbol ${u} occurs <b>${d}</b> time${d===1?'':'s'} in S, so the in-degree is <b>${d}</b>.`,
+      sSoft:occ, gNodes:setWithInedges(u), answer:{val:String(d),label:'In-degree'}}
+  ];
+}
+
+function genAdj(v,u){
+  const blk=block(v);
+  if(blk.deg<1) return [{text:`Vertex <b>${v}</b> has no out-neighbours, so there is no edge ${v}→${u}.`,gNodes:set(v),answer:{val:'no',label:`${v} → ${u}?`}}];
+  const steps=[];
+  const zb=new Set(zeroPosOfBlock(v));
+  steps.push({text:`<b>is-adjacent(${v}, ${u})</b> — locate vertex ${v}'s slice of S: <code>S[${blk.a}..${blk.b}]</code> via B.`,
+    bActive:blk.p1, bSoft:zb, sSoft:rangeSet(blk.a,blk.b), gNodes:set(v)});
+  const cnt=rankSym(u,blk.b)-rankSym(u,blk.a-1);
+  const hits=new Set(); for(let k=blk.a;k<=blk.b;k++) if(S[k-1]===u) hits.add(k);
+  const yes=cnt>0;
+  steps.push({text:`Does symbol ${u} occur in that range? <code>rank<sub>${u}</sub>(S,${blk.b}) − rank<sub>${u}</sub>(S,${blk.a-1}) = ${cnt}</code>. ${yes?`Yes — edge <b>${v}→${u}</b> exists.`:`No — there is no edge ${v}→${u}.`}`,
+    sSoft:rangeSet(blk.a,blk.b),
+    sActive: yes? [...hits][0] : null,
+    gNodes: yes? set(v,u):set(v),
+    gEdge: yes? [v,u]:null,
+    answer:{val: yes?'yes':'no', label:`${v} → ${u}?`}});
+  return steps;
+}
+
+function set(...xs){ return new Set(xs); }
+function rangeSet(a,b){ const s=new Set(); for(let k=a;k<=b;k++) s.add(k); return s; }
+function setWithInedges(u){ const s=new Set([u]); for(let v=1;v<=N;v++) if(adj[v].includes(u)) s.add(v); return s; }
+
+/* ---------- animation driver ---------- */
+function setStep(i){
+  const s=anim.steps[i];
+  render(s);
+  document.getElementById('stepBox').innerHTML=s.text;
+  if(s.answer){ const a=document.getElementById('answerVal'); a.textContent=s.answer.val; a.classList.remove('pending');
+    document.getElementById('answerLabel').textContent=s.answer.label; }
+  else { const a=document.getElementById('answerVal'); a.textContent='—'; a.classList.add('pending');
+    document.getElementById('answerLabel').textContent='Result'; }
+}
+let speed=750;
+function showStep(){ setStep(anim.i); }
+function updateUI(){
+  const has=anim.built && anim.steps.length>0;
+  const last=anim.steps.length-1;
+  document.getElementById('prevBtn').disabled=!has || anim.i<=0;
+  document.getElementById('nextBtn').disabled=!has || anim.i>=last;
+  document.getElementById('playBtn').disabled=!has || (anim.i>=last && !anim.playing);
+  document.getElementById('playBtn').textContent=anim.playing?'Pause':'Play';
+  document.getElementById('stepCount').textContent= has ? `Step ${anim.i+1} / ${anim.steps.length}` : '—';
+}
+function computeSteps(){
+  const op=document.getElementById('op').value;
+  const vA=parseInt(document.getElementById('vA').value);
+  const vB=parseInt(document.getElementById('vB').value);
+  clampIdx();
+  const i=parseInt(document.getElementById('idx').value);
+  if(op==='outn') return genOutNeighbor(vA,i);
+  if(op==='inn')  return genInNeighbor(vA,i);
+  if(op==='outd') return genOutDeg(vA);
+  if(op==='ind')  return genInDeg(vA);
+  return genAdj(vA,vB);
+}
+function buildSteps(){
+  clearTimeout(anim.timer); anim.playing=false;
+  anim.steps=computeSteps(); anim.i=0; anim.built=true;
+  showStep(); updateUI(); return true;
+}
+function scheduleTick(){
+  clearTimeout(anim.timer);
+  anim.timer=setTimeout(()=>{
+    if(!anim.playing) return;
+    if(anim.i < anim.steps.length-1){ anim.i++; showStep(); updateUI(); scheduleTick(); }
+    else { anim.playing=false; updateUI(); }
+  }, speed);
+}
+function runFromStart(){ buildSteps(); anim.playing=true; updateUI(); scheduleTick(); }
+function togglePlay(){
+  if(!anim.built){ buildSteps(); }
+  if(anim.playing){ anim.playing=false; clearTimeout(anim.timer); updateUI(); return; }
+  if(anim.i>=anim.steps.length-1){ anim.i=0; showStep(); }
+  anim.playing=true; updateUI(); scheduleTick();
+}
+function stepNext(){
+  if(!anim.built){ buildSteps(); return; }
+  anim.playing=false; clearTimeout(anim.timer);
+  if(anim.i<anim.steps.length-1){ anim.i++; showStep(); }
+  updateUI();
+}
+function stepPrev(){
+  if(!anim.built) return;
+  anim.playing=false; clearTimeout(anim.timer);
+  if(anim.i>0){ anim.i--; showStep(); }
+  updateUI();
+}
+function invalidate(){ anim.built=false; anim.playing=false; clearTimeout(anim.timer); updateUI(); }
+
+/* ---------- controls ---------- */
+function onSpeed(v){ speed=parseInt(v); document.getElementById('speedVal').textContent=v+'ms'; }
+function onN(v){ document.getElementById('nvVal').textContent=v; N=parseInt(v); newGraph(); }
+function fillVerts(sel){ sel.innerHTML=''; for(let v=1;v<=N;v++){const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);} }
+function onOp(){
+  const op=document.getElementById('op').value;
+  const show=(id,on)=>document.getElementById(id).style.display=on?'flex':'none';
+  show('gA',true);
+  show('gB', op==='adj');
+  show('gI', op==='outn'||op==='inn');
+  const labA=document.getElementById('labA'), labI=document.getElementById('labI');
+  if(op==='outn'){labA.textContent='Vertex v';labI.textContent='i';}
+  else if(op==='inn'){labA.textContent='Vertex v';labI.textContent='i';}
+  else if(op==='outd'){labA.textContent='Vertex v';}
+  else if(op==='ind'){labA.textContent='Vertex v';}
+  else {labA.textContent='From v';document.getElementById('labB').textContent='To u';}
+  clampIdx();
+  if(typeof invalidate==='function') invalidate();
+}
+function clampIdx(){
+  const op=document.getElementById('op').value, inp=document.getElementById('idx');
+  const v=parseInt(document.getElementById('vA').value)||1;
+  let max=1;
+  if(op==='outn') max=Math.max(1,outDeg(v));
+  else if(op==='inn') max=Math.max(1,inDeg(v));
+  inp.max=max; if(parseInt(inp.value)>max)inp.value=max; if(parseInt(inp.value)<1||isNaN(parseInt(inp.value)))inp.value=1;
+}
+
+function resetAnim(){ clearTimeout(anim.timer); anim.playing=false; anim.built=false; anim.steps=[]; anim.i=0; }
+
+function randomGraph(){
+  do{
+    adj={}; edges=new Set();
+    for(let v=1;v<=N;v++){
+      const k=Math.floor(Math.random()*Math.min(4,N));
+      const t=new Set();
+      while(t.size<k){ const u=1+Math.floor(Math.random()*N); if(u!==v)t.add(u); }
+      adj[v]=[...t].sort((a,b)=>a-b);
+      for(const u of adj[v]) edges.add(v+'->'+u);
+    }
+  } while(edges.size<Math.max(3,N)); // avoid sparse/empty
+}
+
+function newGraph(){
+  resetAnim();
+  randomGraph();
+  buildRep();
+  recomputeWidth();
+  layoutGraph();
+  fillVerts(document.getElementById('vA'));
+  fillVerts(document.getElementById('vB'));
+  onOp();
+  render({});
+  document.getElementById('stepBox').innerHTML='New graph built. Pick an operation and press <b>Run</b>.';
+  const a=document.getElementById('answerVal'); a.textContent='—'; a.classList.add('pending');
+  document.getElementById('answerLabel').textContent='Result';
+  updateUI();
+}
+
+document.getElementById('vA').addEventListener('change',()=>{ clampIdx(); invalidate(); });
+document.getElementById('vB').addEventListener('change',invalidate);
+document.getElementById('idx').addEventListener('input',invalidate);
+/* init */
+newGraph();
+</script>
+</body>
+</html>

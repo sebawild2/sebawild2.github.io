@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Road Networks as Graphs — Live OSM + Routing</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body { margin: 0; height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #726253; }
+  #map { position: absolute; inset: 0; background: #f1e9d2; }
+
+  #veil {
+    position: absolute; inset: 0; background: #f1e9d2;
+    opacity: 0; pointer-events: none; z-index: 400;
+    transition: opacity 0.1s linear;
+  }
+  #graph { position: absolute; inset: 0; z-index: 401; pointer-events: none; }
+  #graph line { stroke: #9a8466; stroke-width: 2; stroke-linecap: round; stroke-opacity: 0.8; }
+  #graph line.hi { stroke: #1b6ca8; stroke-width: 5; stroke-linecap: round; stroke-opacity: 0.95; }
+  #graph circle { pointer-events: none; }
+  #graph.interactive circle { pointer-events: all; cursor: pointer; }
+
+  #panel {
+    position: absolute; top: 14px; left: 14px; z-index: 500;
+    background: #f6efe0; padding: 16px;
+    border: 1px solid #e2d6b5; border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    width: 250px;
+  }
+  #panel h1 {
+    font-size: 0.95rem; font-weight: 600; margin: 0 0 12px;
+    text-transform: uppercase; letter-spacing: 1px; color: #8c7b70;
+  }
+  button {
+    display: block; width: 100%; margin: 7px 0;
+    background-color: #faf6eb; color: #4a3f35;
+    border: 1px solid #bcaf92; padding: 8px 14px;
+    font-size: 0.88rem; border-radius: 4px; cursor: pointer;
+    font-weight: 500; transition: background 0.2s, border-color 0.2s;
+  }
+  button:hover:not(:disabled) { background: #ffffff; border-color: #9a8c6f; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #convert { background: #670c07; color: #f6efe0; border-color: #4a0904; }
+  #convert:hover:not(:disabled) { background: #7d160f; border-color: #4a0904; }
+  .row { display: flex; gap: 8px; }
+  .row button { margin: 7px 0; }
+
+  .divider { border: none; border-top: 1px solid #e2d6b5; margin: 14px 0 4px; }
+  .section-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.8px; color: #a99a7a; margin: 8px 0 2px; }
+
+  label { display: block; margin: 12px 0 5px; font-size: 0.82rem; color: #5c4f43; }
+  input[type=range] { width: 100%; accent-color: #e60000; cursor: pointer; }
+  input[type=checkbox] { accent-color: #670c07; cursor: pointer; vertical-align: -1px; }
+
+  .chk { display: flex; align-items: center; gap: 7px; font-size: 0.82rem; color: #5c4f43; margin-top: 10px; }
+  .chk input { width: auto; }
+  #status { margin-top: 12px; font-size: 0.78rem; color: #8c7b70; min-height: 15px; }
+  .stats { font-size: 0.82rem; color: #5c4f43; margin-top: 6px; }
+  .stats b { color: #4a3f35; font-weight: 600; }
+
+  .legend { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: #8c7b70; margin-top: 12px; }
+  .legend .ramp {
+    flex: 1; height: 11px; border-radius: 3px; border: 1px solid #d8caa6;
+    background: linear-gradient(to right, #e2b3a3, #670c07);
+  }
+  .route-hint { font-size: 0.72rem; color: #8c7b70; margin-top: 10px; line-height: 1.4; }
+  .swatch { display:inline-block; width:9px; height:9px; border-radius:50%; vertical-align:-1px; margin-right:2px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="veil"></div>
+<svg id="graph"></svg>
+<input type="file" id="fileInput" accept=".json,application/json" style="display:none" />
+
+<div id="panel">
+  <h1>Roads &rarr; Graph</h1>
+
+  <div class="section-label">Offline (reliable)</div>
+  <button id="loadFile">Load JSON file…</button>
+  <button id="downloadJson" disabled>Download area JSON</button>
+  <button id="copyQuery">Copy Overpass query</button>
+
+  <hr class="divider" />
+  <div class="section-label">Live fetch</div>
+  <button id="select">Draw a selection box</button>
+  <button id="useView">Use current map view</button>
+  <button id="convert" disabled>Convert to graph</button>
+
+  <hr class="divider" />
+  <label for="blend">Map &harr; Graph blend</label>
+  <input type="range" id="blend" min="0" max="100" value="0" />
+  <div class="row">
+    <button id="vMap">Map</button>
+    <button id="vGraph">Graph</button>
+  </div>
+  <label class="chk"><input type="checkbox" id="deg" > Color &amp; size by degree</label>
+  <button id="clearPath">Clear start / target</button>
+  <button id="clear">Clear all</button>
+  <div id="status"></div>
+  <div class="stats" id="stats"></div>
+  <div class="legend"><span>low</span><span class="ramp"></span><span>high</span></div>
+  <div class="route-hint">
+    In Graph view, click a
+    <span class="swatch" style="background:#2e7d32"></span>start and a
+    <span class="swatch" style="background:#c1121f"></span>target vertex to route.
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ---- Map setup (centered on Marburg; pan anywhere you like) ----
+const map = L.map('map').setView([50.8090, 8.7710], 16);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+const veil = document.getElementById('veil');
+const svg = document.getElementById('graph');
+const statusEl = document.getElementById('status');
+const statsEl = document.getElementById('stats');
+const convertBtn = document.getElementById('convert');
+const downloadBtn = document.getElementById('downloadJson');
+const degEl = document.getElementById('deg');
+const fileInput = document.getElementById('fileInput');
+
+const COLOR_VERT_START = '#e2b3a3';
+const COLOR_VERT_END   = '#670c07';
+
+// Overpass endpoints that send permissive CORS headers; tried in order.
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter'
+];
+
+let currentGraph = null;   // { vertices:[{lat,lon,deg}], edges:[{a,b}], adj:[[{to,w}]] }
+let lastRawData = null;    // raw Overpass JSON, for download
+let selectedBounds = null;
+let rect = null;
+
+// routing state
+let startIdx = null, targetIdx = null;
+let pathVerts = new Set(), pathEdgeKeys = new Set();
+
+function lerpColor(c1,c2,f){
+  const r1=parseInt(c1.substr(1,2),16),g1=parseInt(c1.substr(3,2),16),b1=parseInt(c1.substr(5,2),16);
+  const r2=parseInt(c2.substr(1,2),16),g2=parseInt(c2.substr(3,2),16),b2=parseInt(c2.substr(5,2),16);
+  return `rgb(${Math.round(r1+f*(r2-r1))},${Math.round(g1+f*(g2-g1))},${Math.round(b1+f*(b2-b1))})`;
+}
+function haversine(la1,lo1,la2,lo2){
+  const R=6371000, toR=Math.PI/180;
+  const dLa=(la2-la1)*toR, dLo=(lo2-lo1)*toR;
+  const a=Math.sin(dLa/2)**2 + Math.cos(la1*toR)*Math.cos(la2*toR)*Math.sin(dLo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+function buildQuery(b) {
+  const s = b.getSouth(), w = b.getWest(), n = b.getNorth(), e = b.getEast();
+  return `[out:json][timeout:25];\n  (way["highway"](${s},${w},${n},${e}););\n  out body; >; out skel qt;`;
+}
+
+// ---- Rectangle selection (custom, no extra plugin) ----
+let selecting = false, dragStart = null;
+document.getElementById('select').onclick = () => {
+  selecting = true;
+  map.dragging.disable();
+  map.getContainer().style.cursor = 'crosshair';
+  setStatus('Drag on the map to draw a box.');
+};
+map.on('mousedown', e => {
+  if (!selecting) return;
+  dragStart = e.latlng;
+  if (rect) { map.removeLayer(rect); rect = null; }
+});
+map.on('mousemove', e => {
+  if (!selecting || !dragStart) return;
+  const b = L.latLngBounds(dragStart, e.latlng);
+  if (rect) rect.setBounds(b);
+  else rect = L.rectangle(b, { color:'#ff0000', weight:1.6, dashArray:'5 4', fillOpacity:0.05 }).addTo(map);
+});
+map.on('mouseup', e => {
+  if (!selecting || !dragStart) return;
+  selectedBounds = L.latLngBounds(dragStart, e.latlng);
+  dragStart = null; selecting = false;
+  map.dragging.enable();
+  map.getContainer().style.cursor = '';
+  convertBtn.disabled = false;
+  setStatus('Box ready. Convert live, or download its JSON for offline use.');
+});
+
+document.getElementById('useView').onclick = () => {
+  selectedBounds = map.getBounds();
+  if (rect) { map.removeLayer(rect); rect = null; }
+  rect = L.rectangle(selectedBounds, { color:'#ff0000', weight:1.6, dashArray:'5 4', fillOpacity:0.04 }).addTo(map);
+  convertBtn.disabled = false;
+  setStatus('Using current view. Convert live, or download its JSON.');
+};
+
+// ---- Copy the Overpass query for the current selection ----
+document.getElementById('copyQuery').onclick = async () => {
+  const b = selectedBounds || map.getBounds();
+  const q = buildQuery(b);
+  try {
+    await navigator.clipboard.writeText(q);
+    setStatus('Query copied. Run it in overpass-turbo or via curl, save the JSON.');
+  } catch (_) {
+    setStatus('Copy failed; query logged to console.');
+    console.log(q);
+  }
+};
+
+// ---- Fetch from Overpass with per-endpoint timeout + fallback ----
+async function fetchWithTimeout(url, ms) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { method: 'GET', signal: ctrl.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function fetchOverpass(query) {
+  const q = '?data=' + encodeURIComponent(query);
+  let lastErr = null;
+  for (let i = 0; i < OVERPASS_ENDPOINTS.length; i++) {
+    const base = OVERPASS_ENDPOINTS[i];
+    setStatus(`Querying Overpass (server ${i + 1}/${OVERPASS_ENDPOINTS.length})…`);
+    try {
+      const res = await fetchWithTimeout(base + q, 30000);
+      if (!res.ok) { lastErr = new Error('HTTP ' + res.status); continue; }
+      const text = await res.text();
+      try { return JSON.parse(text); }
+      catch (_) { lastErr = new Error('Non-JSON response'); continue; }
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('All Overpass endpoints failed');
+}
+
+// ---- Convert: live fetch then build ----
+convertBtn.onclick = async () => {
+  if (!selectedBounds) return;
+  const b = selectedBounds;
+  if ((b.getNorth()-b.getSouth()) * (b.getEast()-b.getWest()) > 0.0008)
+    setStatus('That area is large and may be slow. Try a few city blocks.');
+  try {
+    const data = await fetchOverpass(buildQuery(b));
+    ingestData(data);
+    setStatus('Slide to Graph, then click a start and target vertex.');
+  } catch (err) {
+    setStatus('Live fetch failed. Tip: use Load JSON file for a reliable offline run.');
+    console.error(err);
+  }
+};
+
+// ---- Load a pre-fetched JSON file (no network, no CORS) ----
+document.getElementById('loadFile').onclick = () => fileInput.click();
+fileInput.onchange = () => {
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      ingestData(data);
+      setStatus(`Loaded ${file.name}. Slide to Graph and pick two vertices.`);
+    } catch (err) {
+      setStatus('Could not parse that file as Overpass JSON.');
+      console.error(err);
+    }
+    fileInput.value = '';
+  };
+  reader.readAsText(file);
+};
+
+// ---- Download the raw JSON of the selected area ----
+downloadBtn.onclick = () => {
+  if (!lastRawData) return;
+  const blob = new Blob([JSON.stringify(lastRawData)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'road-area.json';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+// ---- Shared: take raw Overpass JSON, build graph, render ----
+function ingestData(data) {
+  lastRawData = data;
+  downloadBtn.disabled = false;
+  currentGraph = buildGraph(data);
+  resetRouting();
+  if (!currentGraph.vertices.length) {
+    setStatus('No roads found in that data. Try a different area.');
+    statsEl.innerHTML = '';
+    svg.innerHTML = '';
+    return;
+  }
+  renderGraph();
+  setBlend(70); document.getElementById('blend').value = 70;
+  statsEl.innerHTML =
+    `<b>${currentGraph.vertices.length}</b> vertices &middot; <b>${currentGraph.edges.length}</b> edges`;
+}
+
+function buildGraph(data) {
+  const coords = new Map();   // nodeId -> {lat, lon}
+  const ways = [];
+  for (const el of data.elements) {
+    if (el.type === 'node') coords.set(el.id, { lat: el.lat, lon: el.lon });
+    else if (el.type === 'way' && el.nodes) ways.push(el.nodes);
+  }
+
+  // shared node = intersection
+  const usage = new Map();
+  for (const way of ways)
+    for (const id of way) usage.set(id, (usage.get(id) || 0) + 1);
+
+  // keep intersections + each way's endpoints as vertices
+  const keep = new Set();
+  for (const way of ways) {
+    if (!way.length) continue;
+    keep.add(way[0]);
+    keep.add(way[way.length - 1]);
+    for (const id of way) if ((usage.get(id) || 0) >= 2) keep.add(id);
+  }
+
+  // walk each way; edge weight = real road length summed over shape points
+  const edgeMap = new Map();   // key -> {a, b, w}
+  const degree = new Map();
+  for (const way of ways) {
+    let lastKept = null, acc = 0, prevC = null;
+    for (const id of way) {
+      const c = coords.get(id);
+      if (!c) { prevC = null; continue; }
+      if (prevC) acc += haversine(prevC.lat, prevC.lon, c.lat, c.lon);
+      prevC = c;
+      if (keep.has(id)) {
+        if (lastKept !== null && lastKept !== id) {
+          const key = lastKept < id ? lastKept + '_' + id : id + '_' + lastKept;
+          if (!edgeMap.has(key)) {
+            edgeMap.set(key, { a: lastKept, b: id, w: acc });
+            degree.set(lastKept, (degree.get(lastKept) || 0) + 1);
+            degree.set(id,       (degree.get(id)       || 0) + 1);
+          }
+        }
+        lastKept = id; acc = 0;
+      }
+    }
+  }
+
+  // vertices (kept nodes with at least one edge), indexed
+  const idToIdx = new Map();
+  const vertices = [];
+  for (const id of keep) {
+    if (coords.has(id) && (degree.get(id) || 0) > 0) {
+      idToIdx.set(id, vertices.length);
+      const c = coords.get(id);
+      vertices.push({ lat: c.lat, lon: c.lon, deg: degree.get(id) });
+    }
+  }
+  const edges = [];
+  const adj = vertices.map(() => []);
+  for (const { a, b, w } of edgeMap.values()) {
+    if (idToIdx.has(a) && idToIdx.has(b)) {
+      const ia = idToIdx.get(a), ib = idToIdx.get(b);
+      edges.push({ a: ia, b: ib });
+      adj[ia].push({ to: ib, w });
+      adj[ib].push({ to: ia, w });
+    }
+  }
+  return { vertices, edges, adj };
+}
+
+// ---- Dijkstra (simple O(V^2); fine at neighbourhood scale) ----
+function dijkstra(adj, s, t) {
+  const n = adj.length;
+  const dist = new Array(n).fill(Infinity);
+  const prev = new Array(n).fill(-1);
+  const done = new Array(n).fill(false);
+  dist[s] = 0;
+  for (let it = 0; it < n; it++) {
+    let u = -1, best = Infinity;
+    for (let i = 0; i < n; i++) if (!done[i] && dist[i] < best) { best = dist[i]; u = i; }
+    if (u === -1 || u === t) break;
+    done[u] = true;
+    for (const { to, w } of adj[u])
+      if (!done[to] && dist[u] + w < dist[to]) { dist[to] = dist[u] + w; prev[to] = u; }
+  }
+  if (dist[t] === Infinity) return null;
+  const path = [];
+  for (let v = t; v !== -1; v = prev[v]) path.push(v);
+  path.reverse();
+  return { path, dist: dist[t] };
+}
+
+function computePath() {
+  pathVerts = new Set(); pathEdgeKeys = new Set();
+  if (startIdx == null || targetIdx == null || !currentGraph) return;
+  const res = dijkstra(currentGraph.adj, startIdx, targetIdx);
+  if (!res) { setStatus('No path — those vertices are in disconnected parts.'); return; }
+  res.path.forEach(v => pathVerts.add(v));
+  for (let i = 0; i + 1 < res.path.length; i++) {
+    const a = res.path[i], b = res.path[i + 1];
+    pathEdgeKeys.add(a < b ? a + '_' + b : b + '_' + a);
+  }
+  setStatus(`Shortest path: ${res.path.length - 1} edges · ${(res.dist / 1000).toFixed(2)} km`);
+}
+
+function resetRouting() {
+  startIdx = null; targetIdx = null;
+  pathVerts = new Set(); pathEdgeKeys = new Set();
+}
+
+// ---- Vertex picking ----
+svg.addEventListener('click', ev => {
+  const c = ev.target;
+  if (!c || c.tagName !== 'circle') return;
+  const i = parseInt(c.getAttribute('data-i'), 10);
+  if (Number.isNaN(i)) return;
+  if (startIdx == null) {
+    startIdx = i; targetIdx = null; pathVerts = new Set(); pathEdgeKeys = new Set();
+    setStatus('Start set. Click a target vertex.');
+  } else if (targetIdx == null && i !== startIdx) {
+    targetIdx = i; computePath();
+  } else {
+    startIdx = i; targetIdx = null; pathVerts = new Set(); pathEdgeKeys = new Set();
+    setStatus('Start set. Click a target vertex.');
+  }
+  renderGraph();
+});
+
+// ---- Render the graph as an SVG overlay, re-projected with the map ----
+function renderGraph() {
+  if (!currentGraph) return;
+  const size = map.getSize();
+  svg.setAttribute('width', size.x);
+  svg.setAttribute('height', size.y);
+  const byDeg = degEl.checked;
+  const V = currentGraph.vertices;
+  const P = V.map(v => map.latLngToContainerPoint(L.latLng(v.lat, v.lon)));
+
+  let normal = '', hi = '', dots = '', marks = '';
+
+  for (const e of currentGraph.edges) {
+    const key = e.a < e.b ? e.a + '_' + e.b : e.b + '_' + e.a;
+    const p1 = P[e.a], p2 = P[e.b];
+    if (pathEdgeKeys.has(key))
+      hi += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" class="hi"/>`;
+    else
+      normal += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"/>`;
+  }
+
+  for (let i = 0; i < V.length; i++) {
+    const p = P[i], v = V[i];
+    const f = Math.min((v.deg - 1) / 4, 1);
+    const fill = byDeg ? lerpColor(COLOR_VERT_START, COLOR_VERT_END, f) : '#9a2c1c';
+    const r = byDeg ? (3.5 + f * 5) : 4.5;
+    const onPath = pathVerts.has(i);
+    const stroke = onPath ? '#1b6ca8' : '#43110b';
+    const sw = onPath ? 2 : 1.3;
+    dots += `<circle data-i="${i}" cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  }
+
+  function marker(idx, label, color) {
+    if (idx == null) return '';
+    const p = P[idx];
+    return `<circle cx="${p.x}" cy="${p.y}" r="9" fill="${color}" stroke="#3a2a20" stroke-width="1.5" pointer-events="none"/>` +
+           `<text x="${p.x}" y="${p.y + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" pointer-events="none">${label}</text>`;
+  }
+  marks += marker(startIdx, 'S', '#2e7d32');
+  marks += marker(targetIdx, 'T', '#c1121f');
+
+  svg.innerHTML = normal + hi + dots + marks;
+}
+map.on('move zoom viewreset resize', renderGraph);
+
+// ---- Blend + view controls ----
+const CLICK_THRESHOLD = 12;   // percent at which vertices become clickable
+function setBlend(pct) {
+  veil.style.opacity = pct / 100;
+  // Below the click threshold, fade the whole graph overlay in proportionally
+  // so the underlying map stays visible; at/above threshold it's fully solid.
+  const gOpacity = pct >= CLICK_THRESHOLD ? 1 : pct / CLICK_THRESHOLD;
+  svg.style.opacity = gOpacity;
+  svg.classList.toggle('interactive', pct >= CLICK_THRESHOLD);
+}
+document.getElementById('blend').oninput = e => setBlend(e.target.value);
+document.getElementById('vMap').onclick   = () => { setBlend(0);   document.getElementById('blend').value = 0; };
+document.getElementById('vGraph').onclick = () => { setBlend(100); document.getElementById('blend').value = 100; };
+degEl.onchange = renderGraph;
+
+document.getElementById('clearPath').onclick = () => {
+  resetRouting();
+  renderGraph();
+  setStatus('Cleared. Click a vertex to set the start.');
+};
+
+document.getElementById('clear').onclick = () => {
+  currentGraph = null; lastRawData = null; selectedBounds = null;
+  resetRouting();
+  svg.innerHTML = ''; statsEl.innerHTML = '';
+  if (rect) { map.removeLayer(rect); rect = null; }
+  setBlend(0); document.getElementById('blend').value = 0;
+  convertBtn.disabled = true; downloadBtn.disabled = true;
+  setStatus('Cleared.');
+};
+
+function setStatus(t) { statusEl.textContent = t; }
+setStatus('Load a JSON file, or draw a box and convert live.');
+</script>
+</body>
+</html>

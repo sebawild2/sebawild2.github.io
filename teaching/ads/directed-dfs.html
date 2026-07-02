@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Directed DFS — Edge Types</title>
+<style>
+    :root {
+        --bg: #f1e9d2;
+        --panel: #f6efe0;
+        --panel-border: #e2d6b5;
+        --controls-bg: #e8ddbe;
+        --controls-border: #dcd0b0;
+        --ink: #726253;
+        --ink-strong: #4a3f35;
+        --title-muted: #8c7b70;
+        --title-red: #7c1212;
+        --btn: #faf6eb;
+        --btn-border: #bcaf92;
+        --btn-border-hover: #9a8c6f;
+
+        /* vertex states: unseen / active / done = gray / red / green */
+        --unseen: #c2c2c2;      --unseen-bd: #8f8f8f;   --unseen-tx: #3a3a3a;
+        --active: #e23b3b;      --active-bd: #9d1818;
+        --done:   #3aa64a;      --done-bd:   #1d7a2c;
+
+        /* edge types */
+        --tree:    #1b1b1b;
+        --back:    #d11f1f;
+        --forward: #2f9e2f;
+        --cross:   #9b2d9b;
+        --edge-unseen: #c3b89f;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+        background-color: var(--bg); color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0; padding: 22px 26px 40px; min-height: 100vh;
+    }
+    h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--title-red); }
+    .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; max-width: 70ch; line-height: 1.5; }
+    .subtitle code { background: #efe6cd; padding: 1px 6px; border-radius: 3px; }
+
+    .controls {
+        display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
+        background-color: var(--controls-bg); padding: 14px 22px;
+        border-radius: 6px; border: 1px solid var(--controls-border); margin-bottom: 22px;
+    }
+    .ctl-group { display: flex; align-items: center; gap: 9px; }
+    .ctl-group label { font-size: 0.82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .btn-group { display: flex; gap: 8px; }
+
+    button, select {
+        background-color: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+        padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit;
+    }
+    button:hover:not(:disabled), select:hover { background-color: #fff; border-color: var(--btn-border-hover); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.primary { background-color: #efd9c8; border-color: #c08b6f; }
+    button.primary:hover:not(:disabled) { background-color: #f3e2d4; }
+    select { cursor: pointer; padding-right: 10px; }
+    input[type="range"] { accent-color: #e60000; cursor: pointer; vertical-align: middle; }
+    .slider-group { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #5c4f43; }
+    .slider-group span { min-width: 42px; }
+
+    .stage { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(330px,1fr); gap: 20px; align-items: start; }
+    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+
+    .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .sim-box + .sim-box { margin-top: 18px; }
+    .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
+    canvas#graph { display: block; background-color: var(--bg); width: 100%; height: 430px; border-radius: 4px; }
+    canvas#timeline { display: block; background-color: #efe6cd; width: 100%; height: 206px; border-radius: 4px; }
+    .tl-caption { margin-top: 10px; font-size: 0.84rem; line-height: 1.5; color: var(--ink); display: flex; flex-wrap: wrap; gap: 6px 22px; }
+    .tl-caption .grp { display: flex; align-items: center; gap: 7px; }
+    .tl-caption .ttl { font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .tl-caption .pre .ttl { color: var(--active-bd); }
+    .tl-caption .post .ttl { color: var(--done-bd); }
+    .tl-caption .seqnums { font-family: ui-monospace, Menlo, monospace; font-weight: 600; color: var(--ink-strong); letter-spacing: 1px; }
+    .tl-caption .none { color: var(--title-muted); font-style: italic; }
+
+    .side { display: flex; flex-direction: column; gap: 18px; }
+    .status { background: #efe6cd; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px; display: flex; align-items: center; }
+    .status .stepcount { color: var(--title-muted); font-size: 0.8rem; margin-left: auto; padding-left: 12px; white-space: nowrap; }
+
+    /* active-path stack */
+    .thread { display: flex; align-items: center; flex-wrap: wrap; gap: 0; min-height: 40px; }
+    .thread .empty { color: var(--title-muted); font-style: italic; font-size: 0.9rem; }
+    .thread-node { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; background: var(--active); border: 2px solid var(--active-bd); color: #fff; }
+    .thread-node.top { box-shadow: 0 0 0 3px rgba(226,59,59,0.22); }
+    .thread-link { width: 22px; height: 3px; background: var(--active-bd); }
+    .thread-tip { font-size: 0.78rem; color: var(--title-muted); margin-top: 8px; }
+
+    /* edge classification */
+    .cls-row { display: flex; align-items: flex-start; gap: 9px; padding: 6px 0; border-bottom: 1px dashed #e6dabb; }
+    .cls-row:last-child { border-bottom: none; }
+    .cls-tag { min-width: 86px; display: flex; align-items: center; gap: 7px; font-size: 0.82rem; font-weight: 700; color: var(--ink-strong); }
+    .cls-line { width: 24px; height: 0; border-top-width: 3px; border-top-style: solid; }
+    .cls-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+    .cls-chip { font-size: 0.8rem; font-weight: 600; padding: 2px 7px; border-radius: 999px; color: #fff; font-variant-numeric: tabular-nums; }
+    .cls-none { color: var(--title-muted); font-style: italic; font-size: 0.82rem; }
+    .cls-count { color: var(--title-muted); font-weight: 600; font-size: 0.74rem; margin-left: 2px; }
+
+    /* result */
+    .result { font-size: 0.92rem; line-height: 1.5; color: var(--ink-strong); }
+    .result .verdict { font-weight: 700; }
+    .result.dag .verdict { color: var(--done-bd); }
+    .result.cyclic .verdict { color: var(--back); }
+    .seq { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+    .seq .s-node { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: #fff; background: var(--done); border: 2px solid var(--done-bd); }
+    .seq .s-node.cyc { background: var(--back); border-color: #8c1212; }
+    .seq .s-arrow { color: var(--title-muted); font-size: 0.8rem; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 12px 18px; font-size: 0.8rem; color: var(--ink); margin-top: 12px; }
+    .legend .item { display: flex; align-items: center; gap: 7px; }
+    .swatch { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; }
+    .sw-unseen { background: var(--unseen); border-color: var(--unseen-bd); }
+    .sw-active { background: var(--active); border-color: var(--active-bd); }
+    .sw-done   { background: var(--done);   border-color: var(--done-bd); }
+    .e-line { width: 24px; height: 0; border-top-width: 3px; }
+    .e-tree    { border-top: 3px solid var(--tree); }
+    .e-back    { border-top: 3px dashed var(--back); }
+    .e-forward { border-top: 3px dotted var(--forward); }
+    .e-cross   { border-top: 3px dashed var(--cross); }
+
+    details.editor { margin-top: 22px; }
+    details.editor summary { cursor: pointer; font-size: 0.85rem; color: var(--title-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    textarea { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px; padding: 10px; width: 230px; height: 220px; resize: vertical; }
+    .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 430px; line-height: 1.5; }
+    .editor-help code { background: #efe6cd; padding: 1px 5px; border-radius: 3px; }
+    .err { color: #9a3b2f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
+</style>
+</head>
+<body>
+
+<h1>Directed DFS &amp; Edge Types</h1>
+<p class="subtitle">Depth-first search on a <b>digraph</b>, classifying every edge as <b>tree</b>, <b>back</b>, <b>forward</b>, or <b>cross</b> from the discover/finish times. Reads the <code>Algs4 Digraph</code> format (V, then E, then directed edges <code>v w</code> meaning v→w). A <b>back edge</b> proves a cycle; with none, reverse finish order is a <b>topological sort</b>.</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="presetSel">Digraph</label>
+        <select id="presetSel"></select>
+    </div>
+    <div class="ctl-group">
+        <label for="startSel">Source</label>
+        <select id="startSel"></select>
+    </div>
+    <div class="btn-group">
+        <button id="backBtn" onclick="stepBack()">‹ Back</button>
+        <button id="stepBtn" class="primary" onclick="stepFwd()">Step ›</button>
+        <button id="playBtn" onclick="togglePlay()">Play</button>
+        <button id="resetBtn" onclick="resetRun()">Reset</button>
+    </div>
+    <div class="slider-group">
+        <label style="font-size:.82rem;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:var(--ink-strong)">Delay</label>
+        <input type="range" id="speedSlider" min="40" max="1400" value="650" oninput="updateSpeed(this.value)">
+        <span id="speedVal">650ms</span>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="col-main">
+        <div class="sim-box">
+            <div class="sim-title">Digraph G &nbsp;·&nbsp; DFS forest</div>
+            <canvas id="graph"></canvas>
+            <div class="legend">
+                <div class="item"><span class="swatch sw-unseen"></span>unseen</div>
+                <div class="item"><span class="swatch sw-active"></span>active (on stack)</div>
+                <div class="item"><span class="swatch sw-done"></span>done</div>
+                <div class="item"><span class="e-line e-tree"></span>tree</div>
+                <div class="item"><span class="e-line e-back"></span>back</div>
+                <div class="item"><span class="e-line e-forward"></span>forward*</div>
+                <div class="item"><span class="e-line e-cross"></span>cross*</div>
+                <div class="item" style="color:var(--title-muted)">*digraphs only</div>
+            </div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Stack over time &nbsp;·&nbsp; discover / finish intervals</div>
+            <canvas id="timeline"></canvas>
+            <div class="tl-caption" id="tlCaption"></div>
+        </div>
+    </div>
+
+    <div class="side">
+        <div class="sim-box">
+            <div class="sim-title">Status</div>
+            <div class="status"><span id="statusText">Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.</span><span class="stepcount" id="stepCount"></span></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Active path &nbsp;·&nbsp; the stack</div>
+            <div class="thread" id="threadView"><span class="empty">empty</span></div>
+            <div class="thread-tip">Bottom = root &nbsp;·&nbsp; <b>top</b> = vertex being explored. A <span style="color:var(--back);font-weight:700">back</span> edge points into this path.</div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Edge classification</div>
+            <div id="clsView"></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Result</div>
+            <div class="result" id="resultView">Run the traversal to classify the edges.</div>
+        </div>
+    </div>
+</div>
+
+<details class="editor">
+    <summary>Edit / paste a digraph</summary>
+    <div class="editor-body">
+        <textarea id="graphText" spellcheck="false"></textarea>
+        <div>
+            <button class="primary" onclick="loadFromText()">Load this digraph</button>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--ink-strong);margin-left:10px;cursor:pointer">
+                <input type="checkbox" id="sedgewickToggle" onchange="refreshTextarea()">
+                original Sedgewick format (no coordinates)
+            </label>
+            <div class="err" id="parseErr"></div>
+            <div class="editor-help" style="margin-top:10px">
+                Format (Sedgewick &amp; Wayne <code>Digraph</code>): first line is the vertex count <code>V</code>,
+                second line is the edge count <code>E</code>, then <code>E</code> lines each holding a
+                <b>directed</b> edge <code>v w</code> read as v→w. Vertices are <code>0 … V−1</code>.
+                Adjacency lists keep input order, and DFS runs from the chosen source first, then sweeps the
+                remaining vertices as new roots so the whole <b>DFS forest</b> is built.
+                <br><br>
+                <b>Optional fixed layout:</b> after the edges, add exactly <code>V</code> more lines of
+                <code>x y</code> — one pair per vertex, in order — to pin down your own layout instead of the
+                automatic one. Any numeric scale works; it's auto-centred and scaled to fit, preserving relative
+                position and aspect ratio. Loading a graph always fills the box back in with its current layout's
+                coordinates so you can nudge them; tick the box above to see the plain format instead.
+                <br><br>
+                <b>Mixed-format tolerant:</b> each edge occupies exactly one line. Pasting a <i>weighted</i>
+                graph here (an extra third number per edge line) just ignores that weight, since this page is
+                unweighted — no need to strip it out by hand.
+            </div>
+        </div>
+    </div>
+</details>
+
+<script>
+/* ============================ preset digraphs ============================ */
+const PRESETS = {
+    "Edge types  (5 V — the slide)":
+`5
+7
+0 1
+0 2
+0 3
+2 3
+3 0
+3 1
+4 2`,
+    "Course prerequisites  (DAG, 7 V)":
+`7
+9
+0 1
+0 2
+1 3
+2 3
+2 4
+3 5
+4 5
+1 4
+5 6`,
+    "Has a cycle  (4 V)":
+`4
+4
+0 1
+1 2
+2 3
+3 1`,
+    "Tasks / scheduling  (DAG, 8 V)":
+`8
+11
+0 1
+0 2
+1 3
+2 3
+2 5
+3 4
+3 6
+5 6
+4 7
+6 7
+0 5`
+};
+
+/* ============================ state ============================ */
+let V = 0, adj = [], pos = [], steps = [], ptr = -1;
+let lastV = 0, lastEdges = [];
+let playing = false, timer = null, delay = 650, startVertex = 0;
+
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+const tl = document.getElementById('timeline');
+const tlx = tl.getContext('2d');
+
+const TYPE = {
+    tree:    { c: '#1b1b1b', dash: [],          label: 'tree' },
+    back:    { c: '#d11f1f', dash: [8, 6],       label: 'back' },
+    forward: { c: '#2f9e2f', dash: [1.5, 5],     label: 'forward' },
+    cross:   { c: '#9b2d9b', dash: [7, 4, 2, 4], label: 'cross' }
+};
+
+/* ============================ optional fixed-layout coordinates ============================ */
+function normalizePositions(raw) {
+    let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+    for (const p of raw) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+    const w = Math.max(maxx-minx, 1e-6), h = Math.max(maxy-miny, 1e-6);
+    const pad = 0.08, avail = 1 - 2*pad;
+    const s = avail / Math.max(w, h);
+    const usedW = w*s, usedH = h*s;
+    const offX = pad + (avail-usedW)/2, offY = pad + (avail-usedH)/2;
+    return raw.map(p => ({ x: offX + (p.x-minx)*s, y: offY + (p.y-miny)*s }));
+}
+function fmtCoord(x) { return (Math.round(x*1000)/1000).toString(); }
+
+/* ============================ parsing (directed) ============================ */
+/* Line-based: each edge (and, later, each coordinate pair) occupies exactly one line. This makes the
+   format tolerant of pasting a weighted graph where an unweighted one is expected (the extra weight
+   token per line is simply ignored) or vice versa (a missing weight defaults to 1) — a stray/missing
+   token only ever affects the one line it's on, not the rest of the parse. */
+function tokenizeLines(text) {
+    return text.split('\n').map(line => line.trim().split(/\s+/).filter(s => s.length)).filter(toks => toks.length > 0);
+}
+function readVE(lines) {
+    if (lines.length === 0) throw new Error("Empty input.");
+    if (lines[0].length >= 2) return { v: parseInt(lines[0][0], 10), e: parseInt(lines[0][1], 10), li: 1 };
+    if (lines.length < 2) throw new Error("Need E on the second line.");
+    return { v: parseInt(lines[0][0], 10), e: parseInt(lines[1][0], 10), li: 2 };
+}
+function readTrailingPositions(lines, li, v) {
+    const remaining = lines.length - li;
+    if (remaining === 0) return null;
+    if (remaining !== v) throw new Error(`After the edges, expected either nothing or exactly ${v} coordinate line(s) ("x y" each), but found ${remaining}.`);
+    const raw = [];
+    for (let i = 0; i < v; i++) {
+        const toks = lines[li++];
+        const x = parseFloat(toks[0]), y = parseFloat(toks[1]);
+        if (toks.length < 2 || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Vertex ${i}: expected two coordinate numbers "x y".`);
+        raw.push({ x, y });
+    }
+    return normalizePositions(raw);
+}
+function parseGraph(text) {
+    const lines = tokenizeLines(text);
+    const { v, e, li: li0 } = readVE(lines);
+    let li = li0;
+    if (!Number.isFinite(v) || v <= 0) throw new Error("V must be a positive integer.");
+    if (!Number.isFinite(e) || e < 0) throw new Error("E must be a non-negative integer.");
+    const a = Array.from({ length: v }, () => []);
+    const edgeList = [];
+    for (let k = 0; k < e; k++) {
+        if (li >= lines.length) throw new Error(`Expected ${e} edge line(s), only found ${k}.`);
+        const toks = lines[li++];
+        if (toks.length < 2) throw new Error(`Edge ${k+1}: expected two integers.`);
+        const x = parseInt(toks[0], 10), y = parseInt(toks[1], 10);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Edge ${k+1}: expected two integers.`);
+        if (x < 0 || x >= v || y < 0 || y >= v) throw new Error(`Edge ${k+1}: vertex out of range 0…${v-1}.`);
+        a[x].push(y);            // directed: only v → w, input order preserved
+        edgeList.push([x, y]);
+    }
+    const customPos = readTrailingPositions(lines, li, v);
+    return { v, adj: a, edges: edgeList, pos: customPos };
+}
+
+/* ============================ layout (force-directed, treat edges as undirected) ============================ */
+function components(n, a) {
+    const un = Array.from({ length: n }, () => []);
+    for (let v = 0; v < n; v++) for (const w of a[v]) { un[v].push(w); un[w].push(v); }
+    const comp = new Array(n).fill(-1); let c = 0;
+    for (let s = 0; s < n; s++) {
+        if (comp[s] !== -1) continue;
+        const q = [s]; comp[s] = c;
+        while (q.length) { const u = q.pop(); for (const w of un[u]) if (comp[w] === -1) { comp[w] = c; q.push(w); } }
+        c++;
+    }
+    return { comp, count: c, un };
+}
+function forceLayout(localEdges, N) {
+    if (N === 1) return [{ x: 0.5, y: 0.5 }];
+    const p = [];
+    for (let i = 0; i < N; i++) {
+        const ang = (i / N) * Math.PI * 2;
+        p.push({ x: 0.5 + 0.35 * Math.cos(ang) + (Math.random()-0.5)*0.02, y: 0.5 + 0.35 * Math.sin(ang) + (Math.random()-0.5)*0.02 });
+    }
+    const k = Math.sqrt(1 / N) * 0.9; let temp = 0.12; const ITER = 500;
+    for (let it = 0; it < ITER; it++) {
+        const disp = p.map(() => ({ x: 0, y: 0 }));
+        for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+            let dx = p[i].x - p[j].x, dy = p[i].y - p[j].y, d = Math.hypot(dx, dy) || 1e-4;
+            const f = (k * k) / d;
+            disp[i].x += (dx/d)*f; disp[i].y += (dy/d)*f; disp[j].x -= (dx/d)*f; disp[j].y -= (dy/d)*f;
+        }
+        for (const [a2, b2] of localEdges) {
+            if (a2 === b2) continue;
+            let dx = p[a2].x - p[b2].x, dy = p[a2].y - p[b2].y, d = Math.hypot(dx, dy) || 1e-4;
+            const f = (d * d) / k;
+            disp[a2].x -= (dx/d)*f; disp[a2].y -= (dy/d)*f; disp[b2].x += (dx/d)*f; disp[b2].y += (dy/d)*f;
+        }
+        for (let i = 0; i < N; i++) {
+            let d = Math.hypot(disp[i].x, disp[i].y) || 1e-4; const lim = Math.min(d, temp);
+            p[i].x += (disp[i].x/d)*lim; p[i].y += (disp[i].y/d)*lim;
+        }
+        temp *= 0.985;
+    }
+    return p;
+}
+function layoutAll(n, a) {
+    const { comp, count, un } = components(n, a);
+    let groups = Array.from({ length: count }, () => []);
+    for (let v = 0; v < n; v++) groups[comp[v]].push(v);
+    groups.sort((g1, g2) => g2.length - g1.length);
+    const boxes = groups.map(group => {
+        const idxOf = new Map(group.map((v, i) => [v, i]));
+        const elocal = [];
+        for (const v of group) for (const w of un[v]) if (v < w && idxOf.has(w)) elocal.push([idxOf.get(v), idxOf.get(w)]);
+        const p = forceLayout(elocal, group.length);
+        let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+        for (const q of p) { minx = Math.min(minx, q.x); miny = Math.min(miny, q.y); maxx = Math.max(maxx, q.x); maxy = Math.max(maxy, q.y); }
+        return { group, p, minx, miny, w: Math.max(maxx - minx, 1e-3), h: Math.max(maxy - miny, 1e-3) };
+    });
+    const positions = new Array(n);
+    const cols = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count / cols);
+    boxes.forEach((box, bi) => {
+        const cx = bi % cols, cy = Math.floor(bi / cols);
+        const cellW = 1 / cols, cellH = 1 / rows, pad = 0.16;
+        const availW = cellW * (1 - pad * 2), availH = cellH * (1 - pad * 2);
+        const scale = Math.min(availW / box.w, availH / box.h);
+        const usedW = box.w * scale, usedH = box.h * scale;
+        const offX = cx * cellW + (cellW - usedW) / 2, offY = cy * cellH + (cellH - usedH) / 2;
+        box.group.forEach((v, i) => { positions[v] = { x: offX + (box.p[i].x - box.minx) * scale, y: offY + (box.p[i].y - box.miny) * scale }; });
+    });
+    return positions;
+}
+
+/* ============================ DFS with edge classification + timestamps ============================ */
+function buildDFS(a, start) {
+    const n = a.length;
+    const color = new Array(n).fill(0);     // 0 unseen, 1 active, 2 done
+    const disc = new Array(n).fill(0), fin = new Array(n).fill(0);
+    const depth = new Array(n).fill(-1), parent = new Array(n).fill(-1);
+    let clock = 0;
+    const stack = [], out = [], cls = [], topo = [];
+    let firstBack = null;
+
+    const order = [start];
+    for (let v = 0; v < n; v++) if (v !== start) order.push(v);
+
+    const snap = (action, extra = {}) => out.push({
+        color: color.slice(), disc: disc.slice(), fin: fin.slice(),
+        depth: depth.slice(), parent: parent.slice(),
+        stack: stack.map(f => ({ v: f.v, i: f.i })),
+        cls: cls.map(e => ({ ...e })), topo: topo.slice(), clock,
+        firstBack: firstBack ? { v: firstBack.v, w: firstBack.w, cycle: firstBack.cycle.slice() } : null,
+        action, ...extra
+    });
+
+    function visit(v, asRoot) {
+        color[v] = 1; clock++; disc[v] = clock; depth[v] = stack.length;
+        stack.push({ v, i: 0 });
+        if (asRoot) snap(`New DFS root ${v}: discover it (d=${disc[v]}), mark active.`, { current: v, rootStart: v, flash: v });
+        else snap(`Tree edge → discover ${v} (d=${disc[v]}). Push, mark active.`, { current: v, flash: v, treeChild: v });
+    }
+
+    for (const root of order) {
+        if (color[root] !== 0) continue;
+        visit(root, true);
+        while (stack.length) {
+            const fr = stack[stack.length - 1], v = fr.v;
+            if (fr.i < a[v].length) {
+                const w = a[v][fr.i];
+                let type;
+                if (color[w] === 0) type = 'tree';
+                else if (color[w] === 1) type = 'back';
+                else type = (disc[v] < disc[w]) ? 'forward' : 'cross';
+                cls.push({ v, w, type });
+                if (type === 'back' && !firstBack) {
+                    const cyc = [];
+                    for (let sI = stack.length - 1; sI >= 0; sI--) { cyc.push(stack[sI].v); if (stack[sI].v === w) break; }
+                    cyc.reverse();          // w … v
+                    firstBack = { v, w, cycle: cyc };
+                }
+                fr.i++;
+                snap(`At ${v}: edge ${v}→${w} is a ${type.toUpperCase()} edge.`, { current: v, examV: v, examW: w, examType: type });
+                if (type === 'tree') { parent[w] = v; visit(w, false); }
+            } else {
+                color[v] = 2; clock++; fin[v] = clock; topo.push(v); stack.pop();
+                const back = stack.length ? stack[stack.length - 1].v : null;
+                snap(`${v} has no more out-edges → finish (f=${fin[v]}). Pop.`, { current: back, finishedV: v });
+            }
+        }
+    }
+    const cyclic = !!firstBack;
+    const topoOrder = cyclic ? null : topo.slice().reverse();
+    snap(cyclic
+            ? `Done. A back edge exists ⇒ G has a cycle, so it is not a DAG.`
+            : `Done. No back edges ⇒ G is a DAG. Reverse finish order is a topological sort.`,
+         { current: null, done: true, cyclic, topoOrder });
+    return out;
+}
+
+/* ============================ canvas helpers ============================ */
+let dpr = 1, cw = 0, ch = 0, radius = 16;
+function fitCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cw = rect.width; ch = rect.height;
+    canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const M = 40;
+    const px = pos.map(p => ({ x: M + p.x * (cw - 2*M), y: M + p.y * (ch - 2*M) }));
+    let minD = Infinity;
+    for (let i = 0; i < px.length; i++) for (let j = i+1; j < px.length; j++) { const d = Math.hypot(px[i].x - px[j].x, px[i].y - px[j].y); if (d < minD) minD = d; }
+    if (!Number.isFinite(minD)) minD = 80;
+    radius = Math.max(13, Math.min(24, minD * 0.38));
+    return px;
+}
+
+function hasReverse(v, w) { return adj[w] && adj[w].indexOf(v) !== -1; }
+
+/* canonical bow offset for an edge v→w: if the reverse w→v also exists, both directions
+   must curve to *opposite* sides. We compute the normal from a fixed lo→hi direction
+   (not from v→w itself, which flips per-direction) so the two arcs never coincide. */
+function bowVecFor(px, v, w) {
+    if (!hasReverse(v, w)) return null;
+    const lo = Math.min(v, w), hi = Math.max(v, w);
+    const dx = px[hi].x - px[lo].x, dy = px[hi].y - px[lo].y, len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const mag = 13, sign = (v === lo) ? 1 : -1;
+    return { x: nx * mag * sign, y: ny * mag * sign };
+}
+
+/* draw a directed edge v→w, optionally bowed via an absolute offset vector (so an
+   antiparallel pair, computed from a shared canonical direction, lands on opposite sides) */
+function drawArrow(A, B, opts) {
+    const { color, width, dash, bowVec } = opts;
+    const headLen = Math.max(9, width * 3.2), headW = headLen * 0.62;
+    const startGap = radius + 1, endGap = radius + headLen * 0.55;
+
+    // control point for a quadratic bow
+    const mid = { x: (A.x + B.x) / 2 + (bowVec ? bowVec.x : 0), y: (A.y + B.y) / 2 + (bowVec ? bowVec.y : 0) };
+    // trim endpoints to node borders along the chord tangents
+    const sDir = { x: mid.x - A.x, y: mid.y - A.y }; const sL = Math.hypot(sDir.x, sDir.y) || 1;
+    const eDir = { x: B.x - mid.x, y: B.y - mid.y }; const eL = Math.hypot(eDir.x, eDir.y) || 1;
+    const P0 = { x: A.x + sDir.x / sL * startGap, y: A.y + sDir.y / sL * startGap };
+    const P2 = { x: B.x - eDir.x / eL * endGap,   y: B.y - eDir.y / eL * endGap };
+
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round';
+    ctx.setLineDash(dash || []);
+    ctx.beginPath(); ctx.moveTo(P0.x, P0.y); ctx.quadraticCurveTo(mid.x, mid.y, P2.x, P2.y); ctx.stroke();
+    ctx.setLineDash([]);
+    // arrowhead — orient along the tangent at the end (mid → B)
+    const ax = B.x - mid.x, ay = B.y - mid.y, aL = Math.hypot(ax, ay) || 1;
+    const tx = ax / aL, ty = ay / aL;
+    const tip = { x: B.x - tx * (radius + 1), y: B.y - ty * (radius + 1) };
+    const bx = tip.x - tx * headLen, by = tip.y - ty * headLen;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(tip.x, tip.y);
+    ctx.lineTo(bx + (-ty) * headW, by + (tx) * headW);
+    ctx.lineTo(bx + (ty) * headW, by + (-tx) * headW);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+}
+
+function nodeFill(color, v, state) {
+    if (color === 2) return { fill: '#3aa64a', bd: '#1d7a2c', tx: '#ffffff' };
+    if (color === 1) return { fill: '#e23b3b', bd: '#9d1818', tx: '#ffffff' };
+    return { fill: '#c2c2c2', bd: '#8f8f8f', tx: '#3a3a3a' };
+}
+
+function render() {
+    const state = ptr >= 0 ? steps[ptr] : null;
+    const px = fitCanvas();
+    ctx.clearRect(0, 0, cw, ch);
+
+    const color = state ? state.color : new Array(V).fill(0);
+    const disc = state ? state.disc : new Array(V).fill(0);
+    const fin = state ? state.fin : new Array(V).fill(0);
+    const clsList = state ? state.cls : [];
+    // latest classification per directed edge, for coloring
+    const clsMap = new Map();
+    for (const e of clsList) clsMap.set(e.v + '>' + e.w, e.type);
+    const examKey = state && state.examV !== undefined ? state.examV + '>' + state.examW : null;
+
+    // edges
+    for (let v = 0; v < V; v++) for (const w of adj[v]) {
+        if (v === w) continue;
+        const key = v + '>' + w;
+        const t = clsMap.get(key);
+        const isExam = key === examKey;
+        const bowVec = bowVecFor(px, v, w);   // split antiparallel pairs to opposite sides
+        if (t) {
+            const ty = TYPE[t];
+            drawArrow(px[v], px[w], { color: ty.c, width: isExam ? 4 : 2.4, dash: ty.dash.slice(), bowVec });
+        } else {
+            drawArrow(px[v], px[w], { color: isExam ? '#e8a33a' : '#c3b89f', width: isExam ? 3.4 : 1.6, dash: [], bowVec });
+        }
+    }
+
+    // vertices
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let v = 0; v < V; v++) {
+        const c = nodeFill(color[v], v, state);
+        ctx.beginPath(); ctx.arc(px[v].x, px[v].y, radius, 0, Math.PI*2);
+        ctx.fillStyle = c.fill; ctx.fill();
+        const isCurrent = state && state.current === v;
+        ctx.lineWidth = isCurrent ? 4 : 2; ctx.strokeStyle = isCurrent ? '#1b1b1b' : c.bd; ctx.stroke();
+        ctx.fillStyle = c.tx; ctx.font = `700 ${Math.round(radius*0.95)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+        ctx.fillText(String(v), px[v].x, px[v].y + 1);
+        // discover/finish pill under the node
+        if (disc[v] > 0) {
+            const label = `${disc[v]}/${fin[v] > 0 ? fin[v] : '·'}`;
+            ctx.font = `600 ${Math.max(10, Math.round(radius*0.62))}px ui-monospace, Menlo, monospace`;
+            const tw = ctx.measureText(label).width;
+            const py = px[v].y + radius + 11;
+            ctx.fillStyle = 'rgba(247,239,224,0.92)';
+            ctx.strokeStyle = '#d8c9a8'; ctx.lineWidth = 1;
+            const pad = 4;
+            roundRect(px[v].x - tw/2 - pad, py - 8, tw + pad*2, 16, 4); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#6b5a49'; ctx.textBaseline = 'middle';
+            ctx.fillText(label, px[v].x, py + 1);
+            ctx.textBaseline = 'middle';
+        }
+    }
+
+    renderTimeline(state);
+    renderPanels(state);
+}
+
+function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
+/* ============================ stack-over-time timeline ============================ */
+function renderTimeline(state) {
+    const rect = tl.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    tl.width = Math.round(W * dpr); tl.height = Math.round(H * dpr);
+    tlx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    tlx.clearRect(0, 0, W, H);
+
+    const maxT = 2 * V;
+    const padL = 16, padR = 16, padT = 10;
+    const axisY = H - 70;                 // bars above; tick numbers + pre/post lanes below
+    const yTick = axisY + 11;
+    const yPre  = axisY + 30;
+    const yPost = axisY + 52;
+    const x = c => padL + (c / maxT) * (W - padL - padR);
+
+    // vertical gridlines + tick numbers
+    tlx.font = '600 10px ui-monospace, Menlo, monospace'; tlx.textBaseline = 'middle'; tlx.textAlign = 'center';
+    for (let c = 1; c <= maxT; c++) {
+        const xx = x(c);
+        tlx.strokeStyle = '#e3d5b2'; tlx.lineWidth = 1;
+        tlx.beginPath(); tlx.moveTo(xx, padT); tlx.lineTo(xx, axisY); tlx.stroke();
+        tlx.fillStyle = '#a8977f';
+        tlx.fillText(String(c), xx, yTick);
+    }
+    // axis line
+    tlx.strokeStyle = '#c9ba98'; tlx.lineWidth = 1.2;
+    tlx.beginPath(); tlx.moveTo(padL, axisY + 0.5); tlx.lineTo(W - padR, axisY + 0.5); tlx.stroke();
+
+    // lane labels at the left margin
+    tlx.textAlign = 'left'; tlx.font = '700 9px -apple-system, "Segoe UI", sans-serif';
+    tlx.fillStyle = '#9d1818'; tlx.fillText('ENTER', 2, yPre);
+    tlx.fillStyle = '#1d7a2c'; tlx.fillText('LEAVE', 2, yPost);
+
+    if (!state) { setCaption(null); return; }
+    const disc = state.disc, fin = state.fin, depth = state.depth, clock = state.clock;
+    let maxDepth = 0;
+    for (let v = 0; v < V; v++) if (depth[v] >= 0) maxDepth = Math.max(maxDepth, depth[v]);
+    const lane = axisY - padT;
+    const rowH = Math.min(28, lane / (maxDepth + 1));
+    const barH = Math.max(11, rowH - 6);
+
+    // interval bars
+    for (let v = 0; v < V; v++) {
+        if (disc[v] <= 0) continue;
+        const open = fin[v] <= 0;
+        const x0 = x(disc[v]);
+        const x1 = open ? x(Math.max(clock, disc[v])) : x(fin[v]);
+        const yTop = axisY - (depth[v] + 1) * rowH + (rowH - barH) / 2;
+        const w = Math.max(barH * 0.9, x1 - x0);
+        tlx.fillStyle = open ? '#e23b3b' : '#3aa64a';
+        tlx.strokeStyle = open ? '#9d1818' : '#1d7a2c'; tlx.lineWidth = 1.5;
+        roundRectX(tlx, x0, yTop, w, barH, 3); tlx.fill(); tlx.stroke();
+        tlx.fillStyle = '#fff'; tlx.font = `700 ${Math.round(barH*0.62)}px -apple-system, "Segoe UI", sans-serif`;
+        tlx.textAlign = 'center'; tlx.textBaseline = 'middle';
+        if (w > barH * 0.8) tlx.fillText(String(v), (x0 + x0 + w) / 2, yTop + barH / 2 + 0.5);
+
+        // guide from the bar's left edge (enter) down to the ENTER lane
+        tlx.setLineDash([2, 3]); tlx.lineWidth = 1;
+        tlx.strokeStyle = 'rgba(157,24,24,0.45)';
+        tlx.beginPath(); tlx.moveTo(x0, yTop + barH); tlx.lineTo(x0, yPre - 6); tlx.stroke();
+        // ENTER marker (preorder): red triangle pointing up + vertex id
+        markerTriangle(x(disc[v]), yPre - 5, '#e23b3b', '#9d1818');
+        tlx.setLineDash([]);
+        tlx.fillStyle = '#9d1818'; tlx.font = '700 11px -apple-system, "Segoe UI", sans-serif';
+        tlx.textAlign = 'center'; tlx.textBaseline = 'middle';
+        tlx.fillText(String(v), x(disc[v]), yPre + 7);
+
+        if (!open) {
+            // guide from the bar's right edge (leave) down to the LEAVE lane
+            tlx.setLineDash([2, 3]); tlx.lineWidth = 1;
+            tlx.strokeStyle = 'rgba(29,122,44,0.5)';
+            tlx.beginPath(); tlx.moveTo(x1, yTop + barH); tlx.lineTo(x1, yPost - 6); tlx.stroke();
+            tlx.setLineDash([]);
+            markerTriangle(x(fin[v]), yPost - 5, '#3aa64a', '#1d7a2c');
+            tlx.fillStyle = '#1d7a2c'; tlx.font = '700 11px -apple-system, "Segoe UI", sans-serif';
+            tlx.textAlign = 'center'; tlx.textBaseline = 'middle';
+            tlx.fillText(String(v), x(fin[v]), yPost + 7);
+        }
+    }
+    setCaption(state);
+}
+function markerTriangle(cx, cy, fill, stroke) {
+    tlx.beginPath();
+    tlx.moveTo(cx, cy - 5); tlx.lineTo(cx - 4.5, cy + 3); tlx.lineTo(cx + 4.5, cy + 3); tlx.closePath();
+    tlx.fillStyle = fill; tlx.fill();
+    tlx.lineWidth = 1; tlx.strokeStyle = stroke; tlx.stroke();
+}
+function setCaption(state) {
+    const el = document.getElementById('tlCaption');
+    if (!state) { el.innerHTML = ''; return; }
+    const pre = [], post = [];
+    for (let v = 0; v < V; v++) if (state.disc[v] > 0) pre.push([state.disc[v], v]);
+    for (let v = 0; v < V; v++) if (state.fin[v] > 0) post.push([state.fin[v], v]);
+    pre.sort((a, b) => a[0] - b[0]); post.sort((a, b) => a[0] - b[0]);
+    const preStr = pre.length ? pre.map(p => p[1]).join(' ') : '<span class="none">—</span>';
+    const postStr = post.length ? post.map(p => p[1]).join(' ') : '<span class="none">—</span>';
+    el.innerHTML =
+        `<span class="grp pre"><span class="ttl">▲ enter · preorder</span> <span class="seqnums">${preStr}</span></span>` +
+        `<span class="grp post"><span class="ttl">▲ leave · postorder</span> <span class="seqnums">${postStr}</span></span>`;
+}
+function roundRectX(c, x, y, w, h, r) {
+    r = Math.min(r, h/2, w/2);
+    c.beginPath();
+    c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+/* ============================ side panels ============================ */
+function renderPanels(state) {
+    const st = document.getElementById('statusText');
+    const sc = document.getElementById('stepCount');
+    st.innerHTML = state ? escapeHtml(state.action) : 'Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.';
+    sc.textContent = ptr >= 0 ? `step ${ptr + 1} / ${steps.length}` : '';
+
+    // active path
+    const tv = document.getElementById('threadView'); tv.innerHTML = '';
+    const stack = state ? state.stack : [];
+    if (!stack.length) tv.innerHTML = '<span class="empty">empty</span>';
+    else stack.forEach((f, i) => {
+        if (i) { const l = document.createElement('div'); l.className = 'thread-link'; tv.appendChild(l); }
+        const node = document.createElement('div'); node.className = 'thread-node' + (i === stack.length - 1 ? ' top' : '');
+        node.textContent = f.v; tv.appendChild(node);
+    });
+
+    // edge classification
+    const cv = document.getElementById('clsView'); cv.innerHTML = '';
+    const cls = state ? state.cls : [];
+    const examKey = state && state.examV !== undefined ? state.examV + '>' + state.examW : null;
+    for (const t of ['tree', 'back', 'forward', 'cross']) {
+        const ty = TYPE[t];
+        const row = document.createElement('div'); row.className = 'cls-row';
+        const tag = document.createElement('div'); tag.className = 'cls-tag';
+        const line = document.createElement('span'); line.className = 'cls-line';
+        line.style.borderTopColor = ty.c;
+        line.style.borderTopStyle = (t === 'forward') ? 'dotted' : (t === 'tree' ? 'solid' : 'dashed');
+        tag.appendChild(line);
+        const lbl = document.createElement('span'); lbl.textContent = ty.label; tag.appendChild(lbl);
+        row.appendChild(tag);
+        const chips = document.createElement('div'); chips.className = 'cls-chips';
+        const here = cls.filter(e => e.type === t);
+        if (!here.length) { const n = document.createElement('span'); n.className = 'cls-none'; n.textContent = '—'; chips.appendChild(n); }
+        else here.forEach(e => {
+            const chip = document.createElement('span'); chip.className = 'cls-chip';
+            chip.style.background = ty.c; chip.textContent = `${e.v}→${e.w}`;
+            if (examKey === e.v + '>' + e.w) chip.style.outline = '2px solid #e8a33a';
+            chips.appendChild(chip);
+        });
+        const cnt = document.createElement('span'); cnt.className = 'cls-count'; cnt.textContent = here.length ? `(${here.length})` : '';
+        tag.appendChild(cnt);
+        row.appendChild(chips); cv.appendChild(row);
+    }
+
+    // result
+    const rv = document.getElementById('resultView');
+    rv.className = 'result';
+    const fb = state ? state.firstBack : null;
+    if (state && state.done) {
+        if (state.cyclic) {
+            rv.classList.add('cyclic');
+            rv.innerHTML = `<span class="verdict">Not a DAG.</span> A back edge was found, so G contains a cycle:`;
+            rv.appendChild(seqEl(fb.cycle.concat([fb.cycle[0]]), true));
+        } else {
+            rv.classList.add('dag');
+            rv.innerHTML = `<span class="verdict">G is a DAG.</span> Reverse finish order gives a topological sort:`;
+            rv.appendChild(seqEl(state.topoOrder, false));
+        }
+    } else if (fb) {
+        rv.classList.add('cyclic');
+        rv.innerHTML = `<span class="verdict">Cycle found.</span> Back edge ${fb.v}→${fb.w} closes a loop:`;
+        rv.appendChild(seqEl(fb.cycle.concat([fb.cycle[0]]), true));
+    } else {
+        rv.innerHTML = `No back edge yet. If none appears, reverse finish order will be a valid topological sort.`;
+    }
+}
+function seqEl(list, cyc) {
+    const wrap = document.createElement('div'); wrap.className = 'seq';
+    list.forEach((v, i) => {
+        if (i) { const ar = document.createElement('span'); ar.className = 's-arrow'; ar.textContent = '→'; wrap.appendChild(ar); }
+        const n = document.createElement('span'); n.className = 's-node' + (cyc ? ' cyc' : ''); n.textContent = v; wrap.appendChild(n);
+    });
+    return wrap;
+}
+function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c])); }
+
+/* ============================ run control ============================ */
+function rebuildSteps() {
+    steps = buildDFS(adj, startVertex);
+    ptr = -1; stopPlay(); render(); syncButtons();
+}
+function stepFwd() { if (ptr < steps.length-1) { ptr++; render(); } if (ptr >= steps.length-1) stopPlay(); syncButtons(); }
+function stepBack() { if (ptr > -1) { ptr--; render(); } stopPlay(); syncButtons(); }
+function resetRun() { stopPlay(); ptr = -1; render(); syncButtons(); }
+function togglePlay() { playing ? stopPlay() : startPlay(); }
+function startPlay() { if (ptr >= steps.length-1) ptr = -1; playing = true; document.getElementById('playBtn').textContent = 'Pause'; tick(); }
+function stopPlay() { playing = false; clearTimeout(timer); document.getElementById('playBtn').textContent = 'Play'; }
+function tick() { if (!playing) return; if (ptr < steps.length-1) { ptr++; render(); syncButtons(); timer = setTimeout(tick, delay); } else stopPlay(); }
+function syncButtons() { document.getElementById('backBtn').disabled = ptr <= -1; document.getElementById('stepBtn').disabled = ptr >= steps.length-1; }
+function updateSpeed(val) { delay = parseInt(val, 10); document.getElementById('speedVal').textContent = val + 'ms'; }
+
+/* ============================ graph loading ============================ */
+function graphToText(v, edgeList, positions, sedgewick) {
+    let s = `${v}\n${edgeList.length}\n` + edgeList.map(([x,y]) => `${x} ${y}`).join('\n');
+    if (!sedgewick && positions) s += '\n' + positions.map(p => `${fmtCoord(p.x)} ${fmtCoord(p.y)}`).join('\n');
+    return s;
+}
+function refreshTextarea() {
+    const sedgewick = document.getElementById('sedgewickToggle').checked;
+    document.getElementById('graphText').value = graphToText(lastV, lastEdges, pos, sedgewick);
+}
+function applyGraph(v, a, edgeList, customPos) {
+    V = v; adj = a; pos = customPos || layoutAll(V, a);
+    lastV = v; lastEdges = edgeList;
+    if (startVertex >= V) startVertex = 0;
+    const sel = document.getElementById('startSel');
+    sel.innerHTML = '';
+    for (let i = 0; i < V; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i; sel.appendChild(o); }
+    sel.value = startVertex;
+    refreshTextarea();
+    rebuildSteps();
+}
+function loadPreset(name) {
+    const text = PRESETS[name];
+    document.getElementById('parseErr').textContent = '';
+    try {
+        const { v, adj: a, edges, pos: customPos } = parseGraph(text);
+        startVertex = 0;
+        applyGraph(v, a, edges, customPos);
+    } catch (e) { document.getElementById('parseErr').textContent = e.message; }
+}
+function loadFromText() {
+    const text = document.getElementById('graphText').value;
+    const errEl = document.getElementById('parseErr');
+    try { const { v, adj: a, edges, pos: customPos } = parseGraph(text); startVertex = Math.min(startVertex, v - 1); applyGraph(v, a, edges, customPos); errEl.textContent = ''; }
+    catch (e) { errEl.textContent = e.message; }
+}
+
+/* ============================ external graphs (graphs/ folder) ============================ */
+function prettyGraphName(filename) {
+    return decodeURIComponent(filename).replace(/\.[^./]+$/, '').replace(/[_-]+/g, ' ');
+}
+async function discoverExternalGraphs() {
+    try {
+        const r = await fetch('graphs/index.json', { cache: 'no-store' });
+        if (r.ok) {
+            const data = await r.json();
+            if (Array.isArray(data)) {
+                return data.map(item => {
+                    const file = typeof item === 'string' ? item : item.file;
+                    const label = (typeof item === 'object' && (item.label || item.name)) || prettyGraphName(file);
+                    return { label, path: 'graphs/' + encodeURIComponent(file) };
+                });
+            }
+        }
+    } catch (e) { /* no manifest — fall through to directory listing */ }
+    try {
+        const r = await fetch('graphs/', { cache: 'no-store' });
+        if (r.ok) {
+            const html = await r.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const hrefs = [...doc.querySelectorAll('a')]
+                .map(a => a.getAttribute('href') || '')
+                .filter(h => h && h !== '../' && h !== './' && !h.startsWith('?') && !h.startsWith('/') && !h.endsWith('/'));
+            const uniq = [...new Set(hrefs)];
+            if (uniq.length) return uniq.map(h => ({ label: prettyGraphName(decodeURIComponent(h)), path: 'graphs/' + h }));
+        }
+    } catch (e) { /* no directory listing either — that's fine, just no external graphs */ }
+    return [];
+}
+function loadExternalGraph(path) {
+    const errEl = document.getElementById('parseErr');
+    errEl.textContent = `Loading ${path}…`;
+    fetch(path, { cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            const { v, adj: a, edges, pos: customPos } = parseGraph(text);
+            startVertex = 0;
+            applyGraph(v, a, edges, customPos);
+            errEl.textContent = '';
+        })
+        .catch(err => { errEl.textContent = `Could not load ${path}: ${err.message}`; });
+}
+function populateExternalGraphs(presetSel) {
+    discoverExternalGraphs().then(list => {
+        if (!list.length) return;
+        const grp = document.createElement('optgroup');
+        grp.label = 'From graphs/ folder';
+        list.forEach(({ label, path }) => {
+            const o = document.createElement('option');
+            o.value = path; o.textContent = label; o.dataset.external = '1';
+            grp.appendChild(o);
+        });
+        presetSel.appendChild(grp);
+    });
+}
+
+function init() {
+    const presetSel = document.getElementById('presetSel');
+    Object.keys(PRESETS).forEach(name => { const o = document.createElement('option'); o.value = name; o.textContent = name; presetSel.appendChild(o); });
+    presetSel.addEventListener('change', () => {
+        const opt = presetSel.selectedOptions[0];
+        if (opt && opt.dataset.external) loadExternalGraph(opt.value); else loadPreset(opt.value);
+    });
+    document.getElementById('startSel').addEventListener('change', e => { startVertex = parseInt(e.target.value, 10); rebuildSteps(); });
+    window.addEventListener('resize', () => render());
+    loadPreset(Object.keys(PRESETS)[0]);
+    populateExternalGraphs(presetSel);
+}
+init();
+</script>
+</body>
+</html>

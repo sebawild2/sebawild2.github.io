@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dijkstra's Algorithm — Springs &amp; Rings</title>
+<style>
+    :root {
+        --bg: #f1e9d2;
+        --panel: #f6efe0;
+        --panel-border: #e2d6b5;
+        --controls-bg: #e8ddbe;
+        --controls-border: #dcd0b0;
+        --ink: #726253;
+        --ink-strong: #4a3f35;
+        --title-muted: #8c7b70;
+        --btn: #faf6eb;
+        --btn-border: #bcaf92;
+        --btn-border-hover: #9a8c6f;
+
+        --node-cream: #f6efe0;
+        --node-cream-border: #bcaf92;
+        --active: #ff0000;
+        --examine: #c98a1b;
+        --queue-border: #1f6f6a;
+        --relax: #3c8a3c;
+        --tree-edge: #670c07;
+        --steel: #8c8578;
+    }
+    * { box-sizing: border-box; }
+    body {
+        background-color: var(--bg); color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0; padding: 22px 26px 40px; min-height: 100vh;
+    }
+    .nav { display: flex; gap: 6px; margin-bottom: 16px; }
+    .nav a {
+        text-decoration: none; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.4px;
+        padding: 7px 15px; border-radius: 5px 5px 0 0; color: var(--title-muted);
+        background: #e8ddbe; border: 1px solid var(--controls-border); border-bottom: none;
+    }
+    .nav a.active { background: var(--panel); color: var(--ink-strong); }
+    .nav a:hover:not(.active) { background: #efe6cd; color: var(--ink-strong); }
+
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--ink-strong); }
+    .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; max-width: 1000px; line-height: 1.5; }
+    .subtitle code { background: #efe6cd; padding: 1px 6px; border-radius: 3px; }
+    .subtitle b { color: var(--ink-strong); }
+
+    .controls {
+        display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
+        background-color: var(--controls-bg); padding: 14px 22px; border-radius: 6px;
+        border: 1px solid var(--controls-border); margin-bottom: 22px;
+    }
+    .ctl-group { display: flex; align-items: center; gap: 9px; }
+    .ctl-group label { font-size: 0.82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .btn-group { display: flex; gap: 8px; }
+    button, select {
+        background-color: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+        padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit;
+    }
+    button:hover:not(:disabled), select:hover { background-color: #fff; border-color: var(--btn-border-hover); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.primary { background-color: #efd9c8; border-color: #c08b6f; }
+    button.primary:hover:not(:disabled) { background-color: #f3e2d4; }
+    select { cursor: pointer; padding-right: 10px; }
+    input[type="range"] { accent-color: #e60000; cursor: pointer; vertical-align: middle; }
+    .slider-group span { min-width: 42px; }
+
+    .stage { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(320px,1fr); gap: 20px; align-items: start; }
+    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+
+    .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
+    canvas#graph { display: block; background-color: var(--bg); width: 100%; height: 560px; border-radius: 4px; }
+
+    .side { display: flex; flex-direction: column; gap: 18px; }
+    .status { background: #efe6cd; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px; display: flex; align-items: center; }
+    .status .stepcount { color: var(--title-muted); font-size: 0.8rem; margin-left: auto; padding-left: 12px; white-space: nowrap; }
+
+    .queue-wrap { display: flex; align-items: center; gap: 10px; min-height: 56px; }
+    .queue-end { font-size: 0.72rem; color: var(--title-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+    .queue { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; flex: 1; }
+    .queue .empty { color: var(--title-muted); font-style: italic; font-size: 0.9rem; }
+    .q-node { width: 42px; height: 42px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 2px solid var(--queue-border); line-height: 1; }
+    .q-node .qv { font-weight: 800; font-size: 0.95rem; }
+    .q-node .qd { font-size: 0.58rem; font-weight: 700; opacity: 0.85; font-variant-numeric: tabular-nums; }
+    .q-node.front { border-color: var(--active); border-width: 3px; box-shadow: 0 0 0 3px rgba(255,0,0,0.12); }
+    .queue-tip { font-size: 0.78rem; color: var(--title-muted); margin-top: 8px; }
+    .queue-tip b { color: var(--queue-border); }
+
+    .dist-table { display: flex; flex-direction: column; gap: 5px; max-height: 240px; overflow-y: auto; }
+    .dist-row { display: flex; align-items: center; gap: 9px; font-size: 0.85rem; }
+    .dist-key { width: 26px; height: 26px; min-width: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.78rem; border: 1.5px solid rgba(0,0,0,0.18); }
+    .dist-bar-wrap { flex: 1; height: 12px; background: #efe6cd; border-radius: 6px; overflow: hidden; border: 1px solid #ddd0b1; }
+    .dist-bar { height: 100%; border-radius: 6px 0 0 6px; }
+    .dist-val { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 30px; text-align: right; color: var(--ink-strong); }
+    .dist-val.inf { color: var(--title-muted); }
+    .dist-row.settled .dist-key { border-color: #15616d; border-width: 2px; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 12px 20px; font-size: 0.8rem; color: var(--ink); align-items: center; }
+    .legend .item { display: flex; align-items: center; gap: 7px; }
+    .swatch { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; }
+    .sw-cream { background: var(--node-cream); border-color: var(--node-cream-border); }
+    .sw-settled { background: #d98a76; border-color: #43271f; }
+    .sw-pq { background: #f6efe0; border-color: var(--queue-border); border-width: 2.5px; }
+    .sw-curr  { background: #d98a76; border-color: var(--active); border-width: 2.5px; }
+    .sw-disc { width: 20px; height: 20px; border-radius: 50%; background: rgba(103,12,7,0.10); border: 1px dashed #1f6f6a; }
+    .sw-spring { width: 26px; height: 12px; background: repeating-linear-gradient(90deg,#8c8578 0 2px, transparent 2px 5px); border-radius: 2px; }
+
+    details.editor { margin-top: 22px; }
+    details.editor summary { cursor: pointer; font-size: 0.85rem; color: var(--title-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    textarea { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px; padding: 10px; width: 230px; height: 230px; resize: vertical; }
+    .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 420px; line-height: 1.5; }
+    .editor-help code { background: #efe6cd; padding: 1px 5px; border-radius: 3px; }
+    .err { color: #9a3b2f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+    <a href="dijkstra.html">Water &amp; Queue</a>
+    <a class="active" href="dijkstra-springs.html">Springs &amp; Rings</a>
+</div>
+
+<h1>Dijkstra's Algorithm — Springs &amp; Rings</h1>
+<p class="subtitle">The same shortest-paths algorithm, viewed as <b>iterative edge relaxation</b> on an <b>undirected, weighted</b> graph. The source <b>s</b> sits at the centre and every vertex floats at a <b>radius equal to its current distance</b> <code>distTo[v]</code> — the concentric rings are the distance scale, and the outermost dashed ring is <b>∞</b> (undiscovered, not to scale). Each edge <code>u–v</code> is a <b>metal spring</b> with natural length <code>c(u,v)</code>; while <code>distTo[v] &gt; distTo[u] + c(u,v)</code> the spring is stretched. <b>Relaxing</b> that edge lets the spring snap to its rest length, bouncing <b>v</b> inward to radius <code>distTo[u] + c(u,v)</code>. The <b>delete-min</b> is the growing shaded disc around s: everything inside is settled/popped, the frontier ring is where the next minimum sits, and anything still stranded on the ∞ ring hasn't entered the queue yet.</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="presetSel">Graph</label>
+        <select id="presetSel"></select>
+    </div>
+    <div class="ctl-group">
+        <label for="startSel">Source</label>
+        <select id="startSel"></select>
+    </div>
+    <div class="btn-group">
+        <button id="backBtn"  onclick="stepBack()">‹ Back</button>
+        <button id="stepBtn" class="primary" onclick="stepFwd()">Step ›</button>
+        <button id="playBtn" onclick="togglePlay()">Play</button>
+        <button id="resetBtn" onclick="resetRun()">Reset</button>
+    </div>
+    <div class="slider-group" style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#5c4f43">
+        <label style="font-size:.82rem;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:var(--ink-strong)">Delay</label>
+        <input type="range" id="speedSlider" min="120" max="1800" value="850" oninput="updateSpeed(this.value)">
+        <span id="speedVal">850ms</span>
+    </div>
+    <div class="ctl-group">
+        <label for="coilToggle">Coils</label>
+        <label class="switch" style="position:relative;display:inline-block;width:42px;height:23px">
+            <input type="checkbox" id="coilToggle" checked onchange="toggleCoils(this.checked)" style="opacity:0;width:0;height:0">
+            <span class="track" style="position:absolute;cursor:pointer;inset:0;background:#15616d;border:1px solid #0f4750;border-radius:23px;transition:.2s"></span>
+        </label>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="sim-box">
+        <div class="sim-title">Distance rings &nbsp;·&nbsp; spring relaxation</div>
+        <canvas id="graph"></canvas>
+        <div class="legend" style="margin-top:12px">
+            <div class="item"><span class="swatch sw-cream"></span>undiscovered (∞ ring)</div>
+            <div class="item"><span class="swatch sw-pq"></span>in priority queue</div>
+            <div class="item"><span class="swatch sw-settled"></span>settled (inside disc)</div>
+            <div class="item"><span class="swatch sw-curr"></span>current vertex</div>
+            <div class="item"><span class="sw-disc"></span>delMin frontier</div>
+            <div class="item"><span class="sw-spring"></span>edge = spring c(u,v)</div>
+        </div>
+    </div>
+
+    <div class="side">
+        <div class="sim-box">
+            <div class="sim-title">Status</div>
+            <div class="status"><span id="statusText">Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.</span><span class="stepcount" id="stepCount"></span></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Priority Queue &nbsp;·&nbsp; frontier</div>
+            <div class="queue-wrap">
+                <span class="queue-end">min ▸</span>
+                <div class="queue" id="queueView"><span class="empty">empty</span></div>
+                <span class="queue-end">◂ rest</span>
+            </div>
+            <div class="queue-tip" id="queueTip">The <b>frontier ring</b> expands to the next <b>min</b>; vertices inside are settled, vertices on/outside are still queued (or on the ∞ ring, not yet discovered).</div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Distances &nbsp;·&nbsp; distTo[v]</div>
+            <div class="dist-table" id="distTable"></div>
+        </div>
+    </div>
+</div>
+
+<details class="editor">
+    <summary>Edit / paste a graph</summary>
+    <div class="editor-body">
+        <textarea id="graphText" spellcheck="false"></textarea>
+        <div>
+            <button class="primary" onclick="loadFromText()">Load this graph</button>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--ink-strong);margin-left:10px;cursor:pointer">
+                <input type="checkbox" id="sedgewickToggle" onchange="refreshTextarea()">
+                original Sedgewick format (no coordinates)
+            </label>
+            <div class="err" id="parseErr"></div>
+            <div class="editor-help" style="margin-top:10px">
+                Format (Sedgewick &amp; Wayne style): first line <code>V</code>, second line <code>E</code>,
+                then <code>E</code> lines <code>v w weight</code> (weight ≥ 0). On this page edges are read
+                <b>undirected</b> — direction is ignored and a repeated reverse pair <code>w v</code> is merged
+                (keeping the lighter weight). The radial layout places each reachable vertex along the shortest-path
+                tree, so tree edges look roughly radial and stretched non-tree springs cut across the rings.
+                <br><br>
+                <b>Optional fixed layout:</b> after the edges, add exactly <code>V</code> more lines of
+                <code>x y</code> — one pair per vertex, in order. Since this page's radius is always
+                <code>distTo[v]</code>, only the <b>angle</b> (phase) of each coordinate relative to the source
+                is used — pick positions in the rough direction you want each vertex to sit, any distance from
+                the source works. Without coordinates the angle comes from the shortest-path tree instead, with a
+                random rotation each load. Loading a graph always fills the box back in with coordinates so you
+                can nudge them; tick the box above to see the plain format instead.
+                <br><br>
+                <b>Mixed-format tolerant:</b> each edge occupies exactly one line. Pasting an <i>unweighted</i>
+                graph here (only two numbers per edge line) just defaults each missing weight to 1, instead of
+                failing to parse.
+            </div>
+        </div>
+    </div>
+</details>
+
+<script>
+/* ============================ preset graphs (shared with the other page) ============================ */
+const PRESETS = {
+    "Small graph  (6 V)":
+`6
+8
+0 1 2
+0 2 4
+1 2 1
+1 3 7
+2 4 3
+3 4 2
+3 5 1
+4 5 5`,
+    "Classic network  (8 V)":
+`8
+13
+4 5 3
+5 4 3
+4 7 4
+5 7 2
+7 5 2
+5 1 6
+0 4 5
+0 2 8
+7 3 9
+1 3 3
+2 7 5
+6 2 4
+3 6 7`,
+    "Scale demo  (6 V — wildly different weights)":
+`6
+5
+0 1 1
+1 2 8
+2 3 2
+3 4 10
+4 5 1`,
+    "Two hubs bridged  (8 V)":
+`8
+10
+0 1 2
+1 2 2
+2 0 2
+0 3 9
+3 4 2
+4 5 2
+5 3 2
+4 6 3
+6 7 1
+7 4 4`,
+    "Grid network  (10 V, 14 E)":
+`10
+14
+0 1 3
+1 2 2
+2 3 4
+0 4 5
+2 6 2
+3 7 6
+5 6 1
+5 9 3
+4 8 2
+8 9 4
+7 9 1
+6 9 5
+1 5 2
+4 5 3`
+};
+
+/* ============================ state ============================ */
+let V = 0, adj = [], steps = [], ptr = -1;
+let edges = [], edgeIndex = new Map();   // unique undirected edges {u,v,weight}
+function ekey(a, b) { return Math.min(a,b) + '_' + Math.max(a,b); }
+let playing = false, playTimer = null, delay = 850, startVertex = 0;
+let maxFinalDist = 1, finalDist = [], finalEdgeTo = [];
+let theta = [];                 // fixed angle per vertex (radial-tree layout)
+let customPos = null;           // optional user-given x,y — only the ANGLE is used, radius always = distTo[v]
+let dumpPos = [];               // synthetic x,y (radius=const) reflecting the current theta[], for textarea display
+let springState = [];           // {r, vel} animated radius per vertex
+let ringR = 0, ringTarget = 0;  // settled frontier radius (animated)
+let featured = -1;              // vertex getting the bouncy relax
+let coils = true;
+let animating = false, rafId = null, lastTs = null;
+
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+
+/* ============================ optional fixed-layout coordinates ============================ */
+function normalizePositions(raw) {
+    let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+    for (const p of raw) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+    const w = Math.max(maxx-minx, 1e-6), h = Math.max(maxy-miny, 1e-6);
+    const pad = 0.08, avail = 1 - 2*pad;
+    const s = avail / Math.max(w, h);
+    const usedW = w*s, usedH = h*s;
+    const offX = pad + (avail-usedW)/2, offY = pad + (avail-usedH)/2;
+    return raw.map(p => ({ x: offX + (p.x-minx)*s, y: offY + (p.y-miny)*s }));
+}
+function fmtCoord(x) { return (Math.round(x*1000)/1000).toString(); }
+
+/* ============================ parsing ============================ */
+/* Line-based: each edge (and, later, each coordinate pair) occupies exactly one line. This makes the
+   format tolerant of pasting an unweighted graph here (a missing weight defaults to 1) or a weighted
+   graph into an unweighted page elsewhere (the extra weight token there is simply ignored) — a
+   stray/missing token only ever affects the one line it's on, not the rest of the parse. */
+function tokenizeLines(text) {
+    return text.split('\n').map(line => line.trim().split(/\s+/).filter(s => s.length)).filter(toks => toks.length > 0);
+}
+function readVE(lines) {
+    if (lines.length === 0) throw new Error("Empty input.");
+    if (lines[0].length >= 2) return { v: parseInt(lines[0][0], 10), e: parseInt(lines[0][1], 10), li: 1 };
+    if (lines.length < 2) throw new Error("Need E on the second line.");
+    return { v: parseInt(lines[0][0], 10), e: parseInt(lines[1][0], 10), li: 2 };
+}
+function readTrailingPositions(lines, li, v) {
+    const remaining = lines.length - li;
+    if (remaining === 0) return null;
+    if (remaining !== v) throw new Error(`After the edges, expected either nothing or exactly ${v} coordinate line(s) ("x y" each), but found ${remaining}.`);
+    const raw = [];
+    for (let i = 0; i < v; i++) {
+        const toks = lines[li++];
+        const x = parseFloat(toks[0]), y = parseFloat(toks[1]);
+        if (toks.length < 2 || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Vertex ${i}: expected two coordinate numbers "x y".`);
+        raw.push({ x, y });
+    }
+    return normalizePositions(raw);
+}
+function parseGraph(text) {
+    const lines = tokenizeLines(text);
+    const { v, e, li: li0 } = readVE(lines);
+    let li = li0;
+    if (!Number.isFinite(v) || v <= 0) throw new Error("V must be a positive integer.");
+    if (!Number.isFinite(e) || e < 0) throw new Error("E must be a non-negative integer.");
+    const und = new Map();   // ekey -> {u,v,weight}  (undirected, reverse pairs merged)
+    for (let k = 0; k < e; k++) {
+        if (li >= lines.length) throw new Error(`Expected ${e} edge line(s), only found ${k}.`);
+        const toks = lines[li++];
+        if (toks.length < 2) throw new Error(`Edge ${k+1}: expected at least two vertex integers.`);
+        const x = parseInt(toks[0], 10), y = parseInt(toks[1], 10);
+        const wt = toks.length >= 3 ? parseFloat(toks[2]) : 1;   // missing weight → default 1, don't crash
+        if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Edge ${k+1}: expected two vertex integers.`);
+        if (!Number.isFinite(wt)) throw new Error(`Edge ${k+1}: expected a numeric weight.`);
+        if (wt < 0) throw new Error(`Edge ${k+1}: Dijkstra requires non-negative weights.`);
+        if (x < 0 || x >= v || y < 0 || y >= v) throw new Error(`Edge ${k+1}: vertex out of range 0…${v-1}.`);
+        if (x === y) throw new Error(`Edge ${k+1}: self-loops are not supported.`);
+        const key = ekey(x, y);
+        if (und.has(key)) und.get(key).weight = Math.min(und.get(key).weight, wt);   // keep the lighter of a reverse pair
+        else und.set(key, { u: Math.min(x,y), v: Math.max(x,y), weight: wt });
+    }
+    const elist = [...und.values()];
+    const eidx = new Map();
+    elist.forEach((ed, i) => eidx.set(ekey(ed.u, ed.v), i));
+    const adjL = Array.from({ length: v }, () => []);
+    elist.forEach((ed, i) => { adjL[ed.u].push({ w: ed.v, weight: ed.weight, eid: i }); adjL[ed.v].push({ w: ed.u, weight: ed.weight, eid: i }); });
+    const customPositions = readTrailingPositions(lines, li, v);
+    return { v, adj: adjL, edges: elist, edgeIndex: eidx, pos: customPositions };
+}
+
+/* ============================ Dijkstra step generator (shared logic) ============================ */
+function formatNum(x) {
+    if (!Number.isFinite(x)) return '∞';
+    const r = Math.round(x*100)/100;
+    return String(r);
+}
+function buildDijkstra(a, start) {
+    const n = a.length;
+    const distTo = new Array(n).fill(Infinity);
+    const edgeTo = new Array(n).fill(-1);
+    const settled = new Array(n).fill(false);
+    const inPQ = new Array(n).fill(false);
+    let pq = [];
+    const out = [];
+    const snap = (action, extra = {}) => out.push({
+        distTo: distTo.slice(), edgeTo: edgeTo.slice(), settled: settled.slice(),
+        pq: pq.slice().sort((x,y) => distTo[x]-distTo[y]), action, ...extra
+    });
+    distTo[start] = 0; pq.push(start); inPQ[start] = true;
+    snap(`Insert source ${start} with distance 0.`, { current: start });
+    while (pq.length) {
+        pq.sort((x,y) => distTo[x]-distTo[y]);
+        const v = pq.shift(); inPQ[v] = false;
+        if (settled[v]) continue;
+        settled[v] = true;
+        snap(`Delete-min ${v} (distance ${formatNum(distTo[v])}). It is now settled.`, { current: v, dequeued: v });
+        for (let idx = 0; idx < a[v].length; idx++) {
+            const { w, weight } = a[v][idx];
+            snap(`Examine edge ${v} → ${w}, spring length ${formatNum(weight)}.`, { current: v, examV: v, examW: w, examIdx: idx });
+            if (settled[w]) { snap(`${w} already settled → skip.`, { current: v, skipFrom: v, skipW: w, skipIdx: idx }); continue; }
+            const cand = distTo[v] + weight;
+            if (cand < distTo[w]) {
+                const old = distTo[w];
+                distTo[w] = cand; edgeTo[w] = v;
+                if (!inPQ[w]) { pq.push(w); inPQ[w] = true; }
+                snap(`Relax ${w}: ${formatNum(old)} → ${formatNum(cand)}. Spring snaps ${w} inward.`, { current: v, relaxed: w, relaxIdx: idx });
+            } else {
+                snap(`${w}: ${formatNum(cand)} ≥ ${formatNum(distTo[w])} → spring already at rest, no move.`, { current: v, skipFrom: v, skipW: w, skipIdx: idx });
+            }
+        }
+    }
+    snap(`Done. All reachable vertices settled at their shortest-path distance.`, { current: null, done: true });
+    return { out, distTo: distTo.slice(), edgeTo: edgeTo.slice() };
+}
+
+/* ============================ radial-tree angle layout ============================ */
+function assignAngles() {
+    theta = new Array(V).fill(0);
+    const root = startVertex;
+    if (customPos) {
+        // use only the ANGLE (phase) of the given coordinates, relative to the source — radius still comes from distTo[v]
+        for (let v = 0; v < V; v++) {
+            if (v === root) { theta[v] = 0; continue; }
+            const dx = customPos[v].x - customPos[root].x, dy = customPos[v].y - customPos[root].y;
+            theta[v] = (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) ? 0 : Math.atan2(dy, dx);
+        }
+        deOverlapAngles();
+        syncDumpPos();
+        return;
+    }
+    const kids = Array.from({ length: V }, () => []);
+    for (let v = 0; v < V; v++) if (v !== root && finalEdgeTo[v] >= 0) kids[finalEdgeTo[v]].push(v);
+    const leaves = new Array(V).fill(0);
+    const seen = new Array(V).fill(false);
+    function countLeaves(u) {
+        seen[u] = true;
+        if (kids[u].length === 0) { leaves[u] = 1; return 1; }
+        let s = 0; for (const c of kids[u]) s += countLeaves(c); leaves[u] = s; return s;
+    }
+    countLeaves(root);
+    const START = -Math.PI/2 + Math.random() * 2 * Math.PI;   // random rotation → a reload reshuffles
+    function place(u, a0, a1) {
+        theta[u] = (a0 + a1) / 2;
+        let a = a0; const tot = leaves[u] || 1;
+        for (const c of kids[u]) { const frac = leaves[c] / tot; const b = a + frac * (a1 - a0); place(c, a, b); a = b; }
+    }
+    place(root, START, START + 2 * Math.PI);
+    const unreached = [];
+    for (let v = 0; v < V; v++) if (v !== root && !seen[v]) unreached.push(v);
+    unreached.forEach((v, i) => { theta[v] = START + ((i + 0.5) / Math.max(1, unreached.length)) * 2 * Math.PI; });
+    // small jitter so single-child chains aren't perfectly collinear, then push overlaps apart
+    for (let v = 0; v < V; v++) if (v !== root) theta[v] += (Math.random() - 0.5) * 0.18;
+    deOverlapAngles();
+    syncDumpPos();
+}
+function syncDumpPos() {
+    // synthesize concrete x,y (constant radius) reflecting the CURRENT theta[], purely for textarea display —
+    // radius is meaningless here since the sim always uses distTo[v]; only angle round-trips.
+    dumpPos = new Array(V);
+    for (let v = 0; v < V; v++) dumpPos[v] = (v === startVertex) ? { x: 0.5, y: 0.5 } : { x: 0.5 + 0.4*Math.cos(theta[v]), y: 0.5 + 0.4*Math.sin(theta[v]) };
+}
+function angNorm(a) { while (a > Math.PI) a -= 2*Math.PI; while (a < -Math.PI) a += 2*Math.PI; return a; }
+function deOverlapAngles() {
+    // vertices sharing an angle AND a similar radius overlap on screen — spread them apart angularly
+    const idxs = [];
+    for (let v = 0; v < V; v++) if (v !== startVertex && Number.isFinite(finalDist[v])) idxs.push(v);
+    const Rf = {}; idxs.forEach(v => Rf[v] = Rof(finalDist[v]));
+    const radGap = 2.6 * nr;
+    for (let iter = 0; iter < 90; iter++) {
+        let moved = false;
+        for (let i = 0; i < idxs.length; i++) for (let j = i+1; j < idxs.length; j++) {
+            const a = idxs[i], b = idxs[j];
+            if (Math.abs(Rf[a] - Rf[b]) > radGap) continue;
+            const R = Math.max(Rf[a], Rf[b], 1);
+            const minAng = Math.min(1.1, (2.7 * nr) / R);
+            const d = angNorm(theta[b] - theta[a]);
+            const ad = Math.abs(d);
+            if (ad < minAng) {
+                const push = (minAng - ad) / 2 + 1e-3;
+                const s = d >= 0 ? 1 : -1;
+                theta[a] -= s * push; theta[b] += s * push; moved = true;
+            }
+        }
+        if (!moved) break;
+    }
+}
+
+/* ============================ colour ramp ============================ */
+function lerpColor(c1, c2, t) {
+    const r1 = parseInt(c1.slice(1,3),16), g1 = parseInt(c1.slice(3,5),16), b1 = parseInt(c1.slice(5,7),16);
+    const r2 = parseInt(c2.slice(1,3),16), g2 = parseInt(c2.slice(3,5),16), b2 = parseInt(c2.slice(5,7),16);
+    return { r: Math.round(r1+t*(r2-r1)), g: Math.round(g1+t*(g2-g1)), b: Math.round(b1+t*(b2-b1)) };
+}
+function distColor(d) {
+    const t = maxFinalDist <= 0 ? 0 : Math.min(1, d / maxFinalDist);
+    const c = lerpColor('#e2b3a3', '#670c07', t);
+    return { css: `rgb(${c.r},${c.g},${c.b})`, r: c.r, g: c.g, b: c.b };
+}
+function textOn(rgb) { return (0.299*rgb.r + 0.587*rgb.g + 0.114*rgb.b) < 130 ? '#f1e9d2' : '#4a3f35'; }
+
+/* ============================ geometry / radius mapping ============================ */
+let cx = 0, cy = 0, avail = 1, R_inf = 1, R_finite = 1, innerFloor = 1, scale = 1, nr = 13, dpr = 1;
+function fitCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const cw = rect.width, ch = rect.height;
+    canvas.width = Math.round(cw*dpr); canvas.height = Math.round(ch*dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx = cw / 2; cy = ch / 2;
+    avail = Math.min(cw, ch) / 2 - 30;
+    R_inf = avail * 0.99;
+    R_finite = avail * 0.80;
+    innerFloor = Math.min(52, avail * 0.24);
+    scale = (R_finite - innerFloor) / Math.max(1e-6, maxFinalDist);
+    nr = Math.max(11, Math.min(15, avail * 0.055));
+    return { cw, ch };
+}
+function Rof(d) {
+    if (!Number.isFinite(d)) return R_inf;
+    if (d <= 0) return 0;
+    return innerFloor + d * scale;
+}
+function nodePos(v, r) { // r is animated radius
+    if (v === startVertex) return { x: cx, y: cy };
+    return { x: cx + r * Math.cos(theta[v]), y: cy + r * Math.sin(theta[v]) };
+}
+
+/* ============================ per-step targets ============================ */
+function distAtPtr(p) {
+    if (p < 0) { const d = new Array(V).fill(Infinity); d[startVertex] = 0; return d; }
+    return steps[p].distTo;
+}
+function settledDistUpTo(p) {
+    let s = 0;
+    for (let i = 0; i <= p && i < steps.length; i++) if (steps[i].dequeued !== undefined) s = Math.max(s, steps[i].distTo[steps[i].dequeued]);
+    return s;
+}
+function setTargetsForPtr() {
+    const d = distAtPtr(ptr);
+    for (let v = 0; v < V; v++) springState[v].target = Rof(d[v]);
+    ringTarget = Rof(settledDistUpTo(ptr));
+    featured = (ptr >= 0 && steps[ptr].relaxed !== undefined) ? steps[ptr].relaxed : -1;
+}
+function snapToTargets() {
+    for (let v = 0; v < V; v++) { springState[v].r = springState[v].target; springState[v].vel = 0; }
+    ringR = ringTarget;
+}
+
+/* ============================ animation loop ============================ */
+function advancePhysics(dt) {
+    let moving = false;
+    for (let v = 0; v < V; v++) {
+        const s = springState[v];
+        const bouncy = (v === featured);
+        const k = bouncy ? 130 : 300;
+        const damp = bouncy ? 11 : 34;
+        const a = -k * (s.r - s.target) - damp * s.vel;
+        s.vel += a * dt; s.r += s.vel * dt;
+        if (Math.abs(s.r - s.target) > 0.25 || Math.abs(s.vel) > 0.25) moving = true;
+        else { s.r = s.target; s.vel = 0; }
+    }
+    const rd = ringTarget - ringR;
+    ringR += rd * Math.min(1, dt * 7);
+    if (Math.abs(ringTarget - ringR) > 0.6) moving = true; else ringR = ringTarget;
+    return moving;
+}
+function frame(ts) {
+    if (lastTs === null) lastTs = ts;
+    let dt = (ts - lastTs) / 1000; lastTs = ts;
+    if (dt > 0.05) dt = 0.05;
+    const sub = 2;                       // sub-steps for stable springs
+    let moving = false;
+    for (let i = 0; i < sub; i++) moving = advancePhysics(dt / sub) || moving;
+    draw();
+    if (moving) rafId = requestAnimationFrame(frame);
+    else { animating = false; rafId = null; lastTs = null; }
+}
+function ensureAnim() {
+    if (!animating) { animating = true; lastTs = null; rafId = requestAnimationFrame(frame); }
+}
+
+/* ============================ drawing helpers ============================ */
+function roundRect(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function drawWeightLabel(x, y, text) {
+    ctx.font = '700 11px -apple-system, "Segoe UI", Roboto, sans-serif';
+    const w = ctx.measureText(text).width, pad = 4;
+    roundRect(x-w/2-pad, y-8, w+2*pad, 16, 4);
+    ctx.fillStyle = 'rgba(246,239,224,0.95)'; ctx.strokeStyle = '#bcaf92'; ctx.lineWidth = 1;
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#4a3f35'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y+0.5);
+}
+function drawSpring(ax, ay, bx, by, restPx, color, width, refBodyL) {
+    const dx = bx-ax, dy = by-ay, L = Math.hypot(dx,dy) || 1;
+    const ux = dx/L, uy = dy/L, px = -uy, py = ux;
+    const Ax = ax + ux*nr, Ay = ay + uy*nr, Bx = bx - ux*nr, By = by - uy*nr;
+    const bodyL = Math.hypot(Bx-Ax, By-Ay);
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    if (!coils || bodyL < 6) {
+        ctx.beginPath(); ctx.moveTo(Ax, Ay); ctx.lineTo(Bx, By); ctx.stroke(); return;
+    }
+    const lead = Math.min(11, bodyL * 0.16);
+    const midL = bodyL - 2*lead;
+    const stretch = bodyL / Math.max(restPx, 6);
+    // turn count is keyed off the settled TARGET length, not the live animated length — otherwise it
+    // reflows (and re-samples) every frame as a vertex bounces, which reads as the coil "twitching"
+    const refL = Number.isFinite(refBodyL) ? refBodyL : bodyL;
+    const nc = Math.max(3, Math.min(40, Math.round(refL / 15)));
+    const seg = Math.min(220, Math.max(44, nc * 7));   // segments/turn stays generous regardless of nc, so the curve stays smooth
+    const amp = Math.max(3, Math.min(8, 8 / Math.max(1, Math.pow(stretch, 0.6))));
+    ctx.beginPath(); ctx.moveTo(Ax, Ay);
+    let sx = Ax + ux*lead, sy = Ay + uy*lead; ctx.lineTo(sx, sy);
+    for (let i = 1; i <= seg; i++) {
+        const t = i/seg, along = lead + midL*t;
+        const bx2 = Ax + ux*along, by2 = Ay + uy*along;
+        const off = Math.sin(t * nc * 2 * Math.PI) * amp;
+        ctx.lineTo(bx2 + px*off, by2 + py*off);
+    }
+    ctx.lineTo(Bx, By); ctx.stroke();
+    ctx.lineCap = 'butt';
+}
+
+/* ============================ main draw ============================ */
+function draw() {
+    const { cw, ch } = fitCanvas();
+    ctx.clearRect(0, 0, cw, ch);
+    const state = ptr >= 0 ? steps[ptr] : null;
+    const dcur = distAtPtr(ptr);
+
+    // 1. PQ region (light) then settled disc (warm) then frontier ring
+    ctx.beginPath(); ctx.arc(cx, cy, R_inf, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(31,111,106,0.05)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(0, ringR), 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(103,12,7,0.09)'; ctx.fill();
+
+    // 2. concentric distance guide rings for current distinct finite distances
+    const dists = new Set();
+    for (let v = 0; v < V; v++) if (Number.isFinite(dcur[v])) dists.add(Math.round(dcur[v]*100)/100);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    [...dists].sort((a,b)=>a-b).forEach(d => {
+        const R = Rof(d);
+        if (R < 2) return;
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(74,63,53,0.16)'; ctx.lineWidth = 1; ctx.setLineDash([3,4]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.font = '600 10px -apple-system, "Segoe UI", Roboto, sans-serif';
+        ctx.fillStyle = 'rgba(74,63,53,0.55)';
+        drawTinyLabel(cx, cy - R, String(d));
+    });
+    // ∞ ring
+    ctx.beginPath(); ctx.arc(cx, cy, R_inf, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(140,124,112,0.5)'; ctx.lineWidth = 1.2; ctx.setLineDash([2,5]); ctx.stroke(); ctx.setLineDash([]);
+    drawTinyLabel(cx, cy - R_inf, '∞');
+
+    // 3. frontier ring (delMin)
+    if (ringR > 2) {
+        ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(31,111,106,0.85)'; ctx.lineWidth = 2; ctx.setLineDash([6,5]); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // 4. springs (undirected edges, drawn once each)
+    const posOf = v => nodePos(v, springState[v].r);
+    const targetPosOf = v => nodePos(v, springState[v].target);
+    const examKey  = (state && state.examV  !== undefined) ? ekey(state.examV, state.examW) : null;
+    const relaxKey = (state && state.relaxed !== undefined) ? ekey(state.current, state.relaxed) : null;
+    const skipKey  = (state && state.skipFrom !== undefined) ? ekey(state.skipFrom, state.skipW) : null;
+    for (const e of edges) {
+        const A = posOf(e.u), B = posOf(e.v);
+        const key = ekey(e.u, e.v);
+        let color = 'rgba(140,133,120,0.75)', width = 1.8;
+        const isTree = state && state.edgeTo && (state.edgeTo[e.u] === e.v || state.edgeTo[e.v] === e.u);
+        if (isTree) { color = '#670c07'; width = 3; }
+        if (skipKey === key)  { color = 'rgba(201,138,27,0.5)'; width = 2; }
+        if (examKey === key)  { color = '#c98a1b'; width = 3.2; }
+        if (relaxKey === key) { color = '#3c8a3c'; width = 3.4; }
+        const Tu = targetPosOf(e.u), Tv = targetPosOf(e.v);
+        const refLen = Math.hypot(Tv.x-Tu.x, Tv.y-Tu.y);
+        drawSpring(A.x, A.y, B.x, B.y, e.weight * scale, color, width, refLen);
+    }
+    // weight labels on top
+    for (const e of edges) {
+        const A = posOf(e.u), B = posOf(e.v);
+        drawWeightLabel((A.x+B.x)/2, (A.y+B.y)/2, formatNum(e.weight));
+    }
+
+    // 5. nodes
+    const inQueue = new Set(state ? state.pq : []);
+    ctx.font = `700 ${Math.round(nr*0.95)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    for (let v = 0; v < V; v++) {
+        const p = posOf(v);
+        const d = dcur[v];
+        const settledV = state && state.settled && state.settled[v];
+        let fill = '#f6efe0', border = '#bcaf92', tcol = '#726253';
+        if (Number.isFinite(d)) { const rgb = distColor(d); fill = rgb.css; tcol = textOn(rgb); border = 'rgba(67,39,31,0.6)'; }
+
+
+        ctx.beginPath(); ctx.arc(p.x, p.y, nr, 0, Math.PI*2); ctx.fillStyle = fill; ctx.fill();
+        const isCurrent = state && state.current === v;
+        if (isCurrent) { ctx.lineWidth = 4; ctx.strokeStyle = '#ff0000'; }
+        else if (state && state.examW === v) { ctx.lineWidth = 3; ctx.strokeStyle = '#c98a1b'; }
+        else if (inQueue.has(v) && !settledV) { ctx.lineWidth = 3; ctx.strokeStyle = '#1f6f6a'; }
+        else { ctx.lineWidth = 2; ctx.strokeStyle = border; }
+        ctx.stroke();
+
+        if (v === startVertex) { // anchor ring for the source
+            ctx.beginPath(); ctx.arc(p.x, p.y, nr+4, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(103,12,7,0.5)'; ctx.lineWidth = 1.5; ctx.setLineDash([2,3]); ctx.stroke(); ctx.setLineDash([]);
+        }
+        ctx.fillStyle = tcol; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(v), p.x, p.y + 0.5);
+    }
+
+    renderPanels(state);
+}
+function drawTinyLabel(x, y, text) {
+    ctx.font = '600 10px -apple-system, "Segoe UI", Roboto, sans-serif';
+    const w = ctx.measureText(text).width, pad = 3;
+    roundRect(x-w/2-pad, y-7, w+2*pad, 14, 3);
+    ctx.fillStyle = 'rgba(241,233,210,0.9)'; ctx.fill();
+    ctx.fillStyle = 'rgba(74,63,53,0.7)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+}
+
+/* ============================ side panels ============================ */
+function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c])); }
+function renderPanels(state) {
+    const st = document.getElementById('statusText'), sc = document.getElementById('stepCount');
+    if (state) { st.innerHTML = escapeHtml(state.action); sc.textContent = `step ${ptr+1} / ${steps.length}`; }
+    else { st.innerHTML = 'Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.'; sc.textContent = `0 / ${steps.length}`; }
+
+    const qv = document.getElementById('queueView'); qv.innerHTML = '';
+    const q = state ? state.pq : [];
+    if (!q.length) qv.innerHTML = '<span class="empty">empty</span>';
+    else q.forEach((v, i) => {
+        const node = document.createElement('div'); node.className = 'q-node' + (i===0 ? ' front' : '');
+        const rgb = distColor(state.distTo[v]); node.style.background = rgb.css; node.style.color = textOn(rgb);
+        if (i !== 0) node.style.borderColor = '#1f6f6a';
+        node.innerHTML = `<span class="qv">${v}</span><span class="qd">${formatNum(state.distTo[v])}</span>`;
+        qv.appendChild(node);
+    });
+
+    const dt = document.getElementById('distTable'); dt.innerHTML = '';
+    const dcur = distAtPtr(ptr);
+    for (let v = 0; v < V; v++) {
+        const row = document.createElement('div'); row.className = 'dist-row';
+        const settledV = state && state.settled && state.settled[v];
+        if (settledV) row.classList.add('settled');
+        const key = document.createElement('div'); key.className = 'dist-key';
+        const d = dcur[v];
+        if (Number.isFinite(d)) { const rgb = distColor(d); key.style.background = rgb.css; key.style.color = textOn(rgb); }
+        else { key.style.background = '#f6efe0'; key.style.color = '#a89a86'; }
+        key.textContent = v; row.appendChild(key);
+        const barWrap = document.createElement('div'); barWrap.className = 'dist-bar-wrap';
+        const bar = document.createElement('div'); bar.className = 'dist-bar';
+        if (Number.isFinite(d)) { const rgb = distColor(d); bar.style.background = rgb.css; bar.style.width = `${maxFinalDist>0 ? Math.min(100, (d/maxFinalDist)*100) : 0}%`; }
+        else bar.style.width = '0%';
+        barWrap.appendChild(bar); row.appendChild(barWrap);
+        const val = document.createElement('div'); val.className = 'dist-val' + (Number.isFinite(d) ? '' : ' inf');
+        val.textContent = formatNum(d); row.appendChild(val);
+        dt.appendChild(row);
+    }
+}
+
+/* ============================ run control ============================ */
+function rebuildSteps() {
+    const r = buildDijkstra(adj, startVertex);
+    steps = r.out; finalDist = r.distTo; finalEdgeTo = r.edgeTo;
+    let md = 0; for (let i = 0; i < V; i++) if (Number.isFinite(finalDist[i]) && finalDist[i] > md) md = finalDist[i];
+    maxFinalDist = Math.max(1e-6, md);
+    fitCanvas();
+    assignAngles();
+    springState = Array.from({ length: V }, () => ({ r: 0, vel: 0, target: 0 }));
+    ptr = -1; stopPlay();
+    setTargetsForPtr(); snapToTargets();
+    draw(); syncButtons();
+}
+function stepFwd() { if (ptr < steps.length-1) { ptr++; setTargetsForPtr(); ensureAnim(); } if (ptr >= steps.length-1) stopPlay(); syncButtons(); }
+function stepBack() { if (ptr > -1) { ptr--; setTargetsForPtr(); ensureAnim(); } stopPlay(); syncButtons(); }
+function resetRun() { stopPlay(); ptr = -1; setTargetsForPtr(); snapToTargets(); draw(); syncButtons(); }
+function togglePlay() { playing ? stopPlay() : startPlay(); }
+function startPlay() { if (ptr >= steps.length-1) { ptr = -1; setTargetsForPtr(); snapToTargets(); } playing = true; updatePlayBtn(); tick(); }
+function stopPlay() { playing = false; clearTimeout(playTimer); updatePlayBtn(); }
+function tick() {
+    if (!playing) return;
+    if (ptr < steps.length-1) { ptr++; setTargetsForPtr(); ensureAnim(); syncButtons(); playTimer = setTimeout(tick, delay); }
+    else stopPlay();
+}
+function updatePlayBtn() { document.getElementById('playBtn').textContent = playing ? 'Pause' : 'Play'; }
+function syncButtons() {
+    document.getElementById('backBtn').disabled = ptr <= -1;
+    document.getElementById('stepBtn').disabled = ptr >= steps.length-1;
+}
+function updateSpeed(val) { delay = parseInt(val, 10); document.getElementById('speedVal').textContent = val + 'ms'; }
+function toggleCoils(on) { coils = on; draw(); }
+
+/* ============================ graph loading ============================ */
+function graphToText(v, edgeList, positions, sedgewick) {
+    let s = `${v}\n${edgeList.length}\n` + edgeList.map(e => `${e.u} ${e.v} ${formatNum(e.weight)}`).join('\n');
+    if (!sedgewick && positions) s += '\n' + positions.map(p => `${fmtCoord(p.x)} ${fmtCoord(p.y)}`).join('\n');
+    return s;
+}
+function refreshTextarea() {
+    const sedgewick = document.getElementById('sedgewickToggle').checked;
+    document.getElementById('graphText').value = graphToText(V, edges, dumpPos, sedgewick);
+}
+function applyGraph(parsed) {
+    V = parsed.v; adj = parsed.adj; edges = parsed.edges; edgeIndex = parsed.edgeIndex; customPos = parsed.pos;
+    const sel = document.getElementById('startSel'); sel.innerHTML = '';
+    for (let i = 0; i < V; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i; sel.appendChild(o); }
+    if (startVertex >= V) startVertex = 0; sel.value = startVertex;
+    rebuildSteps();
+    refreshTextarea();
+}
+function loadPreset(name) {
+    const text = PRESETS[name];
+    try { const parsed = parseGraph(text); startVertex = 0; applyGraph(parsed); document.getElementById('parseErr').textContent = ''; }
+    catch (e) { document.getElementById('parseErr').textContent = e.message; }
+}
+function loadFromText() {
+    const text = document.getElementById('graphText').value;
+    try { const parsed = parseGraph(text); if (startVertex >= parsed.v) startVertex = 0; applyGraph(parsed); document.getElementById('parseErr').textContent = ''; }
+    catch (e) { document.getElementById('parseErr').textContent = e.message; }
+}
+
+/* ============================ external graphs (graphs/ folder) ============================ */
+function prettyGraphName(filename) {
+    return decodeURIComponent(filename).replace(/\.[^./]+$/, '').replace(/[_-]+/g, ' ');
+}
+async function discoverExternalGraphs() {
+    try {
+        const r = await fetch('graphs/index.json', { cache: 'no-store' });
+        if (r.ok) {
+            const data = await r.json();
+            if (Array.isArray(data)) {
+                return data.map(item => {
+                    const file = typeof item === 'string' ? item : item.file;
+                    const label = (typeof item === 'object' && (item.label || item.name)) || prettyGraphName(file);
+                    return { label, path: 'graphs/' + encodeURIComponent(file) };
+                });
+            }
+        }
+    } catch (e) { /* no manifest — fall through to directory listing */ }
+    try {
+        const r = await fetch('graphs/', { cache: 'no-store' });
+        if (r.ok) {
+            const html = await r.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const hrefs = [...doc.querySelectorAll('a')]
+                .map(a => a.getAttribute('href') || '')
+                .filter(h => h && h !== '../' && h !== './' && !h.startsWith('?') && !h.startsWith('/') && !h.endsWith('/'));
+            const uniq = [...new Set(hrefs)];
+            if (uniq.length) return uniq.map(h => ({ label: prettyGraphName(decodeURIComponent(h)), path: 'graphs/' + h }));
+        }
+    } catch (e) { /* no directory listing either — that's fine, just no external graphs */ }
+    return [];
+}
+function loadExternalGraph(path) {
+    const errEl = document.getElementById('parseErr');
+    errEl.textContent = `Loading ${path}…`;
+    fetch(path, { cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            const parsed = parseGraph(text);
+            startVertex = 0;
+            applyGraph(parsed);
+            errEl.textContent = '';
+        })
+        .catch(err => { errEl.textContent = `Could not load ${path}: ${err.message}`; });
+}
+function populateExternalGraphs(presetSel) {
+    discoverExternalGraphs().then(list => {
+        if (!list.length) return;
+        const grp = document.createElement('optgroup');
+        grp.label = 'From graphs/ folder';
+        list.forEach(({ label, path }) => {
+            const o = document.createElement('option');
+            o.value = path; o.textContent = label; o.dataset.external = '1';
+            grp.appendChild(o);
+        });
+        presetSel.appendChild(grp);
+    });
+}
+
+/* ============================ init ============================ */
+function init() {
+    const presetSel = document.getElementById('presetSel');
+    Object.keys(PRESETS).forEach(name => { const o = document.createElement('option'); o.value = name; o.textContent = name; presetSel.appendChild(o); });
+    presetSel.addEventListener('change', () => {
+        const opt = presetSel.selectedOptions[0];
+        if (opt && opt.dataset.external) loadExternalGraph(opt.value); else loadPreset(opt.value);
+    });
+    document.getElementById('startSel').addEventListener('change', e => { startVertex = parseInt(e.target.value, 10); rebuildSteps(); refreshTextarea(); });
+    window.addEventListener('resize', () => { fitCanvas(); if (!animating) draw(); });
+    loadPreset(Object.keys(PRESETS)[0]);
+    populateExternalGraphs(presetSel);
+}
+init();
+</script>
+</body>
+</html>

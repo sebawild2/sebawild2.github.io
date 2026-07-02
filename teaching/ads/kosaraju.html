@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strong Components — Kosaraju–Sharir</title>
+<style>
+    :root {
+        --bg: #f1e9d2; --panel: #f6efe0; --panel-border: #e2d6b5;
+        --controls-bg: #e8ddbe; --controls-border: #dcd0b0;
+        --ink: #726253; --ink-strong: #4a3f35; --title-muted: #8c7b70; --title-red: #7c1212;
+        --btn: #faf6eb; --btn-border: #bcaf92; --btn-border-hover: #9a8c6f;
+        --unseen: #c2c2c2; --unseen-bd: #8f8f8f; --unseen-tx: #3a3a3a;
+        --active: #e23b3b; --active-bd: #9d1818;
+        --done: #3aa64a; --done-bd: #1d7a2c;
+        --edge-unseen: #c3b89f; --tree: #1b1b1b; --examine: #e8a33a;
+    }
+    * { box-sizing: border-box; }
+    body { background-color: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 22px 26px 40px; min-height: 100vh; }
+    h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--title-red); }
+    .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; max-width: 72ch; line-height: 1.5; }
+    .subtitle code { background: #efe6cd; padding: 1px 6px; border-radius: 3px; }
+
+    .controls { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; background-color: var(--controls-bg); padding: 14px 22px; border-radius: 6px; border: 1px solid var(--controls-border); margin-bottom: 22px; }
+    .ctl-group { display: flex; align-items: center; gap: 9px; }
+    .ctl-group label { font-size: 0.82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .btn-group { display: flex; gap: 8px; }
+    button, select { background-color: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border); padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer; transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit; }
+    button:hover:not(:disabled), select:hover { background-color: #fff; border-color: var(--btn-border-hover); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.primary { background-color: #efd9c8; border-color: #c08b6f; }
+    button.primary:hover:not(:disabled) { background-color: #f3e2d4; }
+    select { cursor: pointer; padding-right: 10px; }
+    input[type="range"] { accent-color: #e60000; cursor: pointer; vertical-align: middle; }
+    .slider-group { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #5c4f43; }
+    .slider-group span { min-width: 42px; }
+
+    .stage { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(330px,1fr); gap: 20px; align-items: start; }
+    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+    .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .sim-box + .sim-box { margin-top: 18px; }
+    .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
+    canvas#graph { display: block; background-color: var(--bg); width: 100%; height: 450px; border-radius: 4px; }
+    .side { display: flex; flex-direction: column; gap: 18px; }
+
+    /* phase stepper */
+    .phases { display: flex; gap: 10px; }
+    .phase-pill { flex: 1; border: 1px solid var(--panel-border); border-radius: 6px; padding: 9px 11px; background: #efe6cd; opacity: 0.55; transition: 0.2s; }
+    .phase-pill.on { opacity: 1; border-color: #c08b6f; background: #f3e2d4; }
+    .phase-pill .pn { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; color: var(--title-muted); }
+    .phase-pill .pd { font-size: 0.84rem; color: var(--ink-strong); margin-top: 2px; line-height: 1.35; }
+
+    .status { background: #efe6cd; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px; display: flex; align-items: center; }
+    .status .stepcount { color: var(--title-muted); font-size: 0.8rem; margin-left: auto; padding-left: 12px; white-space: nowrap; }
+
+    .chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-height: 34px; }
+    .chip { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: #fff; background: #b9ad92; border: 1.5px solid #9a8c6f; font-variant-numeric: tabular-nums; }
+    .chip.ghost { background: #efe6cd; color: var(--ink); border-color: #d8c9a8; }
+    .chip.cursor { outline: 3px solid var(--examine); outline-offset: 1px; }
+    .chip.skip { opacity: 0.5; }
+    .chips .empty { color: var(--title-muted); font-style: italic; font-size: 0.9rem; }
+    .panel-tip { font-size: 0.78rem; color: var(--title-muted); margin-top: 8px; }
+
+    .thread { display: flex; align-items: center; flex-wrap: wrap; gap: 0; min-height: 38px; }
+    .thread .empty { color: var(--title-muted); font-style: italic; font-size: 0.9rem; }
+    .thread-node { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.92rem; background: var(--active); border: 2px solid var(--active-bd); color: #fff; }
+    .thread-node.top { box-shadow: 0 0 0 3px rgba(226,59,59,0.22); }
+    .thread-link { width: 20px; height: 3px; background: var(--active-bd); }
+
+    .comp-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; border-bottom: 1px dashed #e6dabb; }
+    .comp-row:last-child { border-bottom: none; }
+    .comp-dot { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.25); flex: none; }
+    .comp-label { font-size: 0.8rem; font-weight: 700; color: var(--ink-strong); min-width: 34px; }
+    .comp-members { display: flex; gap: 4px; flex-wrap: wrap; }
+    .comp-members .m { font-size: 0.8rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; color: #fff; }
+    .comp-none { color: var(--title-muted); font-style: italic; font-size: 0.84rem; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 12px 18px; font-size: 0.8rem; color: var(--ink); margin-top: 12px; }
+    .legend .item { display: flex; align-items: center; gap: 7px; }
+    .swatch { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; }
+    .sw-unseen { background: var(--unseen); border-color: var(--unseen-bd); }
+    .sw-active { background: var(--active); border-color: var(--active-bd); }
+    .sw-done { background: var(--done); border-color: var(--done-bd); }
+    .e-line { width: 24px; height: 0; border-top: 3px solid var(--tree); }
+
+    details.editor { margin-top: 22px; }
+    details.editor summary { cursor: pointer; font-size: 0.85rem; color: var(--title-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    textarea { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px; padding: 10px; width: 230px; height: 230px; resize: vertical; }
+    .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 430px; line-height: 1.5; }
+    .editor-help code { background: #efe6cd; padding: 1px 5px; border-radius: 3px; }
+    .err { color: #9a3b2f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
+</style>
+</head>
+<body>
+
+<h1>Strong Components &nbsp;·&nbsp; Kosaraju–Sharir</h1>
+<p class="subtitle">Two depth-first passes find the strongly connected components of a digraph. <b>Phase 1</b> runs DFS on the <b>reverse graph</b> Gᴿ and records the finish order. <b>Phase 2</b> runs DFS on G, taking sources in <b>reverse postorder</b> of that first pass — and every DFS tree it grows is exactly one strong component. Format: <code>Algs4 Digraph</code> (V, then E, then directed edges <code>v w</code>).</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="presetSel">Digraph</label>
+        <select id="presetSel"></select>
+    </div>
+    <div class="btn-group">
+        <button id="backBtn" onclick="stepBack()">‹ Back</button>
+        <button id="stepBtn" class="primary" onclick="stepFwd()">Step ›</button>
+        <button id="playBtn" onclick="togglePlay()">Play</button>
+        <button id="resetBtn" onclick="resetRun()">Reset</button>
+    </div>
+    <div class="slider-group">
+        <label style="font-size:.82rem;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:var(--ink-strong)">Delay</label>
+        <input type="range" id="speedSlider" min="40" max="1400" value="650" oninput="updateSpeed(this.value)">
+        <span id="speedVal">650ms</span>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="col-main">
+        <div class="sim-box">
+            <div class="sim-title" id="canvasTitle">Reverse graph Gᴿ</div>
+            <canvas id="graph"></canvas>
+            <div class="legend" id="legend">
+                <div class="item"><span class="swatch sw-unseen"></span>unseen</div>
+                <div class="item"><span class="swatch sw-active"></span>active (on stack)</div>
+                <div class="item"><span class="swatch sw-done"></span>finished</div>
+                <div class="item"><span class="e-line" style="border-top-color:#1b1b1b"></span>G tree edge</div>
+                <div class="item"><span class="e-line" style="border-top-color:#1d3f63"></span>Gᴿ tree edge</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="side">
+        <div class="sim-box">
+            <div class="sim-title">Algorithm</div>
+            <div class="phases">
+                <div class="phase-pill" id="phase1"><div class="pn">Phase 1</div><div class="pd">DFS on Gᴿ → finish order</div></div>
+                <div class="phase-pill" id="phase2"><div class="pn">Phase 2</div><div class="pd">DFS on G in reverse postorder</div></div>
+            </div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Status</div>
+            <div class="status"><span id="statusText">Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.</span><span class="stepcount" id="stepCount"></span></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title" id="orderTitle">Finish order of Gᴿ</div>
+            <div class="chips" id="orderView"><span class="empty">building…</span></div>
+            <div class="panel-tip" id="orderTip">Vertices appear here as they finish in the reverse-graph DFS.</div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Active path · the stack</div>
+            <div class="thread" id="threadView"><span class="empty">empty</span></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Strong components</div>
+            <div id="compView"><span class="comp-none">found in Phase 2</span></div>
+        </div>
+    </div>
+</div>
+
+<details class="editor">
+    <summary>Edit / paste a digraph</summary>
+    <div class="editor-body">
+        <textarea id="graphText" spellcheck="false"></textarea>
+        <div>
+            <button class="primary" onclick="loadFromText()">Load this digraph</button>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--ink-strong);margin-left:10px;cursor:pointer">
+                <input type="checkbox" id="sedgewickToggle" onchange="refreshTextarea()">
+                original Sedgewick format (no coordinates)
+            </label>
+            <div class="err" id="parseErr"></div>
+            <div class="editor-help" style="margin-top:10px">
+                Format (Sedgewick &amp; Wayne <code>Digraph</code>): vertex count <code>V</code>, then edge count
+                <code>E</code>, then <code>E</code> directed edges <code>v w</code> read as v→w. The reverse graph
+                Gᴿ is built automatically for Phase 1. Phase 1 and Phase 2 each sweep vertices <code>0 … V−1</code>
+                as roots; Phase 2 visits them in the reverse postorder produced by Phase 1.
+                <br><br>
+                <b>Optional fixed layout:</b> after the edges, add exactly <code>V</code> more lines of
+                <code>x y</code> — one pair per vertex, in order — to pin down your own layout instead of the
+                automatic one. Any numeric scale works; it's auto-centred and scaled to fit, preserving relative
+                position and aspect ratio. Loading a graph always fills the box back in with its current layout's
+                coordinates so you can nudge them; tick the box above to see the plain format instead.
+                <br><br>
+                <b>Mixed-format tolerant:</b> each edge occupies exactly one line. Pasting a <i>weighted</i>
+                graph here (an extra third number per edge line) just ignores that weight, since this page is
+                unweighted — no need to strip it out by hand.
+            </div>
+        </div>
+    </div>
+</details>
+
+<script>
+/* ============================ presets ============================ */
+const PRESETS = {
+    "Three components in a chain  (6 V)":
+`6
+7
+0 1
+1 2
+2 0
+2 3
+3 4
+4 3
+4 5`,
+    "tinyDG  (Sedgewick, 13 V — 5 components)":
+`13
+22
+4 2
+2 3
+3 2
+6 0
+0 1
+2 0
+11 12
+12 9
+9 10
+9 11
+7 9
+10 12
+11 4
+4 3
+3 5
+6 8
+8 6
+5 4
+0 5
+6 4
+6 9
+7 6`,
+    "Two components  (4 V)":
+`4
+5
+0 1
+1 0
+1 2
+2 3
+3 2`,
+    "One strong component  (5 V)":
+`5
+6
+0 1
+1 2
+2 3
+3 4
+4 0
+2 0`
+};
+
+/* component palette */
+const COLORS = ['#c0392b','#2e86c1','#27ae60','#8e44ad','#d68910','#16a085','#c2185b','#566573','#2c3e50','#a04000'];
+const compColor = id => COLORS[id % COLORS.length];
+
+/* ============================ state ============================ */
+let V = 0, adj = [], adjRev = [], pos = [], steps = [], ptr = -1;
+let lastV = 0, lastEdges = [];
+let playing = false, timer = null, delay = 650;
+
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+
+/* ============================ optional fixed-layout coordinates ============================ */
+function normalizePositions(raw) {
+    let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+    for (const p of raw) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+    const w = Math.max(maxx-minx, 1e-6), h = Math.max(maxy-miny, 1e-6);
+    const pad = 0.08, avail = 1 - 2*pad;
+    const s = avail / Math.max(w, h);
+    const usedW = w*s, usedH = h*s;
+    const offX = pad + (avail-usedW)/2, offY = pad + (avail-usedH)/2;
+    return raw.map(p => ({ x: offX + (p.x-minx)*s, y: offY + (p.y-miny)*s }));
+}
+function fmtCoord(x) { return (Math.round(x*1000)/1000).toString(); }
+
+/* ============================ parsing (directed) ============================ */
+/* Line-based: each edge (and, later, each coordinate pair) occupies exactly one line. This makes the
+   format tolerant of pasting a weighted graph where an unweighted one is expected (the extra weight
+   token per line is simply ignored) or vice versa (a missing weight defaults to 1) — a stray/missing
+   token only ever affects the one line it's on, not the rest of the parse. */
+function tokenizeLines(text) {
+    return text.split('\n').map(line => line.trim().split(/\s+/).filter(s => s.length)).filter(toks => toks.length > 0);
+}
+function readVE(lines) {
+    if (lines.length === 0) throw new Error("Empty input.");
+    if (lines[0].length >= 2) return { v: parseInt(lines[0][0], 10), e: parseInt(lines[0][1], 10), li: 1 };
+    if (lines.length < 2) throw new Error("Need E on the second line.");
+    return { v: parseInt(lines[0][0], 10), e: parseInt(lines[1][0], 10), li: 2 };
+}
+function readTrailingPositions(lines, li, v) {
+    const remaining = lines.length - li;
+    if (remaining === 0) return null;
+    if (remaining !== v) throw new Error(`After the edges, expected either nothing or exactly ${v} coordinate line(s) ("x y" each), but found ${remaining}.`);
+    const raw = [];
+    for (let i = 0; i < v; i++) {
+        const toks = lines[li++];
+        const x = parseFloat(toks[0]), y = parseFloat(toks[1]);
+        if (toks.length < 2 || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Vertex ${i}: expected two coordinate numbers "x y".`);
+        raw.push({ x, y });
+    }
+    return normalizePositions(raw);
+}
+function parseGraph(text) {
+    const lines = tokenizeLines(text);
+    const { v, e, li: li0 } = readVE(lines);
+    let li = li0;
+    if (!Number.isFinite(v) || v <= 0) throw new Error("V must be a positive integer.");
+    if (!Number.isFinite(e) || e < 0) throw new Error("E must be a non-negative integer.");
+    const a = Array.from({ length: v }, () => []);
+    const edgeList = [];
+    for (let k = 0; k < e; k++) {
+        if (li >= lines.length) throw new Error(`Expected ${e} edge line(s), only found ${k}.`);
+        const toks = lines[li++];
+        if (toks.length < 2) throw new Error(`Edge ${k+1}: expected two integers.`);
+        const x = parseInt(toks[0], 10), y = parseInt(toks[1], 10);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Edge ${k+1}: expected two integers.`);
+        if (x < 0 || x >= v || y < 0 || y >= v) throw new Error(`Edge ${k+1}: vertex out of range 0…${v-1}.`);
+        a[x].push(y);
+        edgeList.push([x, y]);
+    }
+    const customPos = readTrailingPositions(lines, li, v);
+    return { v, adj: a, edges: edgeList, pos: customPos };
+}
+function reverseGraph(a) {
+    const r = Array.from({ length: a.length }, () => []);
+    for (let u = 0; u < a.length; u++) for (const v of a[u]) r[v].push(u);
+    return r;
+}
+
+/* ============================ layout ============================ */
+function components(n, a) {
+    const un = Array.from({ length: n }, () => []);
+    for (let v = 0; v < n; v++) for (const w of a[v]) { un[v].push(w); un[w].push(v); }
+    const comp = new Array(n).fill(-1); let c = 0;
+    for (let s = 0; s < n; s++) {
+        if (comp[s] !== -1) continue;
+        const q = [s]; comp[s] = c;
+        while (q.length) { const u = q.pop(); for (const w of un[u]) if (comp[w] === -1) { comp[w] = c; q.push(w); } }
+        c++;
+    }
+    return { comp, count: c, un };
+}
+function forceLayout(localEdges, N) {
+    if (N === 1) return [{ x: 0.5, y: 0.5 }];
+    const p = [];
+    for (let i = 0; i < N; i++) { const ang = (i / N) * Math.PI * 2; p.push({ x: 0.5 + 0.35*Math.cos(ang) + (Math.random()-0.5)*0.02, y: 0.5 + 0.35*Math.sin(ang) + (Math.random()-0.5)*0.02 }); }
+    const k = Math.sqrt(1 / N) * 0.9; let temp = 0.12; const ITER = 500;
+    for (let it = 0; it < ITER; it++) {
+        const disp = p.map(() => ({ x: 0, y: 0 }));
+        for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+            let dx = p[i].x - p[j].x, dy = p[i].y - p[j].y, d = Math.hypot(dx, dy) || 1e-4; const f = (k*k)/d;
+            disp[i].x += (dx/d)*f; disp[i].y += (dy/d)*f; disp[j].x -= (dx/d)*f; disp[j].y -= (dy/d)*f;
+        }
+        for (const [a2, b2] of localEdges) {
+            if (a2 === b2) continue;
+            let dx = p[a2].x - p[b2].x, dy = p[a2].y - p[b2].y, d = Math.hypot(dx, dy) || 1e-4; const f = (d*d)/k;
+            disp[a2].x -= (dx/d)*f; disp[a2].y -= (dy/d)*f; disp[b2].x += (dx/d)*f; disp[b2].y += (dy/d)*f;
+        }
+        for (let i = 0; i < N; i++) { let d = Math.hypot(disp[i].x, disp[i].y) || 1e-4; const lim = Math.min(d, temp); p[i].x += (disp[i].x/d)*lim; p[i].y += (disp[i].y/d)*lim; }
+        temp *= 0.985;
+    }
+    return p;
+}
+function layoutAll(n, a) {
+    const { comp, count, un } = components(n, a);
+    let groups = Array.from({ length: count }, () => []);
+    for (let v = 0; v < n; v++) groups[comp[v]].push(v);
+    groups.sort((g1, g2) => g2.length - g1.length);
+    const boxes = groups.map(group => {
+        const idxOf = new Map(group.map((v, i) => [v, i]));
+        const elocal = [];
+        for (const v of group) for (const w of un[v]) if (v < w && idxOf.has(w)) elocal.push([idxOf.get(v), idxOf.get(w)]);
+        const p = forceLayout(elocal, group.length);
+        let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+        for (const q of p) { minx = Math.min(minx, q.x); miny = Math.min(miny, q.y); maxx = Math.max(maxx, q.x); maxy = Math.max(maxy, q.y); }
+        return { group, p, minx, miny, w: Math.max(maxx - minx, 1e-3), h: Math.max(maxy - miny, 1e-3) };
+    });
+    const positions = new Array(n);
+    const cols = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count / cols);
+    boxes.forEach((box, bi) => {
+        const cx = bi % cols, cy = Math.floor(bi / cols);
+        const cellW = 1 / cols, cellH = 1 / rows, pad = 0.16;
+        const availW = cellW * (1 - pad*2), availH = cellH * (1 - pad*2);
+        const scale = Math.min(availW / box.w, availH / box.h);
+        const usedW = box.w * scale, usedH = box.h * scale;
+        const offX = cx * cellW + (cellW - usedW) / 2, offY = cy * cellH + (cellH - usedH) / 2;
+        box.group.forEach((v, i) => { positions[v] = { x: offX + (box.p[i].x - box.minx) * scale, y: offY + (box.p[i].y - box.miny) * scale }; });
+    });
+    return positions;
+}
+
+/* ============================ Kosaraju–Sharir step generator ============================ */
+function buildSCC(aG) {
+    const n = aG.length;
+    const aR = reverseGraph(aG);
+    const out = [];
+    let mark = new Array(n).fill(0);     // 0 unseen, 1 active, 2 done (current phase)
+    let comp = new Array(n).fill(-1);
+    let treeEdges = [];
+    let stackIds = [];
+    let order1 = [];
+    let rpo = null, procIdx = 0;
+    let compList = [];
+    let phase = 1;
+
+    const snap = (action, extra = {}) => out.push({
+        phase, graph: phase === 1 ? 'R' : 'G',
+        mark: mark.slice(), comp: comp.slice(),
+        treeEdges: treeEdges.map(e => e.slice()),
+        stack: stackIds.slice(), order1: order1.slice(),
+        rpo: rpo ? rpo.slice() : null, procIdx,
+        comps: compList.map(c => ({ id: c.id, members: c.members.slice() })),
+        action, ...extra
+    });
+
+    /* ---- Phase 1: DFS on the reverse graph, record finish order ---- */
+    snap(`Phase 1 begins. This is the input digraph G.`, { phaseStart: 1, current: null, graph: 'G' });
+    snap(`Reverse every edge — u→v becomes v→u — to build Gᴿ. Phase 1's DFS explores this reversed graph.`, { current: null, graph: 'R', flipStep: true });
+    function dfs1(s) {
+        mark[s] = 1; stackIds.push(s);
+        snap(`Gᴿ: begin a DFS tree at ${s}.`, { current: s, rootStart: s });
+        const fr = [{ v: s, i: 0 }];
+        while (fr.length) {
+            const f = fr[fr.length - 1], v = f.v;
+            if (f.i < aR[v].length) {
+                const w = aR[v][f.i++];
+                if (mark[w] === 0) {
+                    mark[w] = 1; stackIds.push(w); treeEdges.push([v, w]); fr.push({ v: w, i: 0 });
+                    snap(`Gᴿ: tree edge ${v}→${w}, discover ${w}.`, { current: w, treeEdge: [v, w] });
+                }
+            } else {
+                mark[v] = 2; order1.push(v); stackIds.pop(); fr.pop();
+                snap(`Gᴿ: ${v} has no more out-edges → finishes. Append to finish order.`, { current: stackIds.length ? stackIds[stackIds.length-1] : null, finishedV: v });
+            }
+        }
+    }
+    for (let s = 0; s < n; s++) if (mark[s] === 0) dfs1(s);
+
+    rpo = order1.slice().reverse();
+    snap(`Phase 1 done. Reverse postorder of Gᴿ = [ ${rpo.join(', ')} ]. Process G in this order.`, { current: null, rpoReady: true });
+
+    /* ---- Phase 2: DFS on G in reverse postorder; each tree is a component ---- */
+    phase = 2; mark = new Array(n).fill(0); treeEdges = []; stackIds = [];
+    snap(`Phase 2 — DFS on G, taking sources in reverse postorder. Each DFS tree is one strong component.`, { phaseStart: 2, current: null });
+
+    function dfs2(s, cid) {
+        mark[s] = 1; comp[s] = cid; stackIds.push(s); compList[cid].members.push(s);
+        snap(`G: vertex ${s} is unassigned → open component #${cid+1}, start its DFS here.`, { current: s, rootStart: s, newComp: cid });
+        const fr = [{ v: s, i: 0 }];
+        while (fr.length) {
+            const f = fr[fr.length - 1], v = f.v;
+            if (f.i < aG[v].length) {
+                const w = aG[v][f.i++];
+                if (mark[w] === 0) {
+                    mark[w] = 1; comp[w] = cid; stackIds.push(w); treeEdges.push([v, w]); compList[cid].members.push(w); fr.push({ v: w, i: 0 });
+                    snap(`G: ${v}→${w} stays inside the component; add ${w} to #${cid+1}.`, { current: w, treeEdge: [v, w] });
+                }
+            } else {
+                mark[v] = 2; stackIds.pop(); fr.pop();
+                snap(`G: ${v} finishes within component #${cid+1}.`, { current: stackIds.length ? stackIds[stackIds.length-1] : null, finishedV: v });
+            }
+        }
+    }
+
+    let cid = 0;
+    for (let k = 0; k < rpo.length; k++) {
+        const s = rpo[k];
+        procIdx = k + 1;
+        if (comp[s] !== -1) { snap(`G: ${s} already belongs to component #${comp[s]+1} — skip.`, { current: s, skipProc: s }); continue; }
+        compList.push({ id: cid, members: [] });
+        dfs2(s, cid);
+        snap(`Component #${cid+1} complete: { ${compList[cid].members.slice().sort((a,b)=>a-b).join(', ')} }.`, { current: null, compDone: cid });
+        cid++;
+    }
+    snap(`Done. ${cid} strong component${cid===1?'':'s'} found. Phase 2 discovers them in reverse topological order.`, { current: null, done: true, total: cid });
+    return out;
+}
+
+/* ============================ canvas ============================ */
+let dpr = 1, cw = 0, ch = 0, radius = 16;
+function fitCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cw = rect.width; ch = rect.height;
+    canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const M = 40;
+    const px = pos.map(p => ({ x: M + p.x * (cw - 2*M), y: M + p.y * (ch - 2*M) }));
+    let minD = Infinity;
+    for (let i = 0; i < px.length; i++) for (let j = i+1; j < px.length; j++) { const d = Math.hypot(px[i].x - px[j].x, px[i].y - px[j].y); if (d < minD) minD = d; }
+    if (!Number.isFinite(minD)) minD = 80;
+    radius = Math.max(13, Math.min(24, minD * 0.38));
+    return px;
+}
+function drawArrow(A, B, opts) {
+    const { color, width, dash, bowVec } = opts;
+    const mid = { x: (A.x + B.x) / 2 + (bowVec ? bowVec.x : 0), y: (A.y + B.y) / 2 + (bowVec ? bowVec.y : 0) };
+    const headLen = Math.max(9, width * 3.0), startGap = radius + 1, endGap = radius + headLen * 0.55;
+    const sDir = { x: mid.x - A.x, y: mid.y - A.y }, sL = Math.hypot(sDir.x, sDir.y) || 1;
+    const eDir = { x: B.x - mid.x, y: B.y - mid.y }, eL = Math.hypot(eDir.x, eDir.y) || 1;
+    const P0 = { x: A.x + sDir.x/sL*startGap, y: A.y + sDir.y/sL*startGap };
+    const P2 = { x: B.x - eDir.x/eL*endGap, y: B.y - eDir.y/eL*endGap };
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.setLineDash(dash || []);
+    ctx.beginPath(); ctx.moveTo(P0.x, P0.y); ctx.quadraticCurveTo(mid.x, mid.y, P2.x, P2.y); ctx.stroke();
+    ctx.setLineDash([]);
+    const aL = Math.hypot(B.x - mid.x, B.y - mid.y) || 1, tx = (B.x - mid.x)/aL, ty = (B.y - mid.y)/aL;
+    const tip = { x: B.x - tx*(radius+1), y: B.y - ty*(radius+1) };
+    const bx = tip.x - tx*headLen, by = tip.y - ty*headLen, hw = headLen*0.6;
+    ctx.fillStyle = color; ctx.beginPath();
+    ctx.moveTo(tip.x, tip.y); ctx.lineTo(bx + (-ty)*hw, by + tx*hw); ctx.lineTo(bx + ty*hw, by + (-tx)*hw);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function inAdj(A, u, w) { return A[u] && A[u].indexOf(w) !== -1; }
+
+/* canonical bow offset: if both u→w and w→u exist, curve them to opposite sides using
+   a normal derived from a fixed lo→hi direction (not from u→w, which flips per-direction) */
+function bowVecFor(px, A, u, w) {
+    if (!inAdj(A, w, u)) return null;
+    const lo = Math.min(u, w), hi = Math.max(u, w);
+    const dx = px[hi].x - px[lo].x, dy = px[hi].y - px[lo].y, len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const mag = 12, sign = (u === lo) ? 1 : -1;
+    return { x: nx * mag * sign, y: ny * mag * sign };
+}
+
+function render() {
+    const state = ptr >= 0 ? steps[ptr] : null;
+    const px = fitCanvas();
+    ctx.clearRect(0, 0, cw, ch);
+
+    const phase = state ? state.phase : 1;
+    const onReverse = !(state && state.graph === 'G');     // showing Gᴿ (reverse-graph edge palette)
+    const A = onReverse ? adjRev : adj;
+    document.getElementById('canvasTitle').textContent = onReverse ? 'Reverse graph Gᴿ' : 'Graph G';
+
+    const mark = state ? state.mark : new Array(V).fill(0);
+    const comp = state ? state.comp : new Array(V).fill(-1);
+    const treeSet = new Set(state ? state.treeEdges.map(e => e[0] + '>' + e[1]) : []);
+    const curEdge = state && state.treeEdge ? state.treeEdge[0] + '>' + state.treeEdge[1] : null;
+
+    // Gᴿ gets a cool slate-blue palette so it reads as visually distinct from G's warm tan/black
+    const UNSEEN_G = '#c3b89f', UNSEEN_R = '#9ab2d6';
+    const TREE_G   = '#1b1b1b', TREE_R   = '#1d3f63';
+
+    // edges of the currently shown graph
+    for (let u = 0; u < V; u++) for (const w of A[u]) {
+        if (u === w) continue;
+        const key = u + '>' + w;
+        const isTree = treeSet.has(key);
+        const isCur = key === curEdge;
+        const bowVec = bowVecFor(px, A, u, w);
+        let color = onReverse ? UNSEEN_R : UNSEEN_G, width = 1.6;
+        if (isTree) {
+            width = 2.8;
+            color = (phase === 2 && comp[w] >= 0) ? compColor(comp[w]) : (onReverse ? TREE_R : TREE_G);
+        }
+        if (isCur) { width = 4; color = '#e8a33a'; }
+        drawArrow(px[u], px[w], { color, width, dash: [], bowVec });
+    }
+
+    // vertices
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let v = 0; v < V; v++) {
+        let fill, bd, tx = '#fff';
+        if (phase === 2 && comp[v] >= 0) { fill = compColor(comp[v]); bd = 'rgba(0,0,0,0.32)'; }
+        else if (mark[v] === 2) { fill = '#3aa64a'; bd = '#1d7a2c'; }
+        else if (mark[v] === 1) { fill = '#e23b3b'; bd = '#9d1818'; }
+        else { fill = '#c2c2c2'; bd = '#8f8f8f'; tx = '#3a3a3a'; }
+        ctx.beginPath(); ctx.arc(px[v].x, px[v].y, radius, 0, Math.PI*2); ctx.fillStyle = fill; ctx.fill();
+        const isCurrent = state && state.current === v;
+        const isActive = mark[v] === 1;
+        if (isCurrent) { ctx.lineWidth = 4; ctx.strokeStyle = '#1b1b1b'; }
+        else if (isActive) { ctx.lineWidth = 3; ctx.strokeStyle = '#9d1818'; }
+        else { ctx.lineWidth = 2; ctx.strokeStyle = bd; }
+        ctx.stroke();
+        ctx.fillStyle = tx; ctx.font = `700 ${Math.round(radius*0.95)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+        ctx.fillText(String(v), px[v].x, px[v].y + 1);
+    }
+
+    // badges: a strong callout on the explicit flip step, a quiet reminder the rest of phase 1
+    if (state && state.flipStep) {
+        drawBadge('⟲ edges reversed — u→v becomes v→u', '#1d3f63', '#bfd2ec', 14, 12);
+    } else if (onReverse) {
+        drawBadge('working on Gᴿ (reversed)', '#1d3f63', '#bfd2ec', 14, 12, true);
+    }
+
+    renderPanels(state);
+}
+function drawBadge(text, fg, bg, x, y, quiet) {
+    ctx.save();
+    ctx.font = `700 ${quiet ? 11.5 : 13}px -apple-system, "Segoe UI", sans-serif`;
+    const tw = ctx.measureText(text).width, padX = 9, h = quiet ? 22 : 26;
+    ctx.fillStyle = bg; ctx.globalAlpha = quiet ? 0.85 : 0.95;
+    roundRect2(x, y, tw + padX * 2, h, h / 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x + padX, y + h / 2 + 1);
+    ctx.restore();
+}
+function roundRect2(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+/* ============================ panels ============================ */
+function renderPanels(state) {
+    const phase = state ? state.phase : 1;
+    document.getElementById('phase1').classList.toggle('on', phase === 1);
+    document.getElementById('phase2').classList.toggle('on', phase === 2);
+
+    document.getElementById('statusText').innerHTML = state ? escapeHtml(state.action) : 'Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.';
+    document.getElementById('stepCount').textContent = ptr >= 0 ? `step ${ptr+1} / ${steps.length}` : '';
+
+    // order / reverse-postorder panel
+    const oTitle = document.getElementById('orderTitle'), oView = document.getElementById('orderView'), oTip = document.getElementById('orderTip');
+    oView.innerHTML = '';
+    if (state && state.rpo) {
+        oTitle.textContent = 'Reverse postorder → Phase 2 order';
+        oTip.innerHTML = 'Phase 2 takes sources left→right. Colored = already assigned to a component.';
+        const comp = state.comp;
+        state.rpo.forEach((v, i) => {
+            const c = document.createElement('div'); c.className = 'chip';
+            if (comp[v] >= 0) { c.style.background = compColor(comp[v]); c.style.borderColor = 'rgba(0,0,0,0.3)'; }
+            else c.classList.add('ghost');
+            if (state.procIdx === i + 1 && !state.done) c.classList.add('cursor');
+            c.textContent = v; oView.appendChild(c);
+        });
+    } else {
+        oTitle.textContent = 'Finish order of Gᴿ';
+        oTip.textContent = 'Vertices appear here as they finish in the reverse-graph DFS.';
+        const ord = state ? state.order1 : [];
+        if (!ord.length) oView.innerHTML = '<span class="empty">building…</span>';
+        else ord.forEach(v => { const c = document.createElement('div'); c.className = 'chip ghost'; c.textContent = v; oView.appendChild(c); });
+    }
+
+    // active path
+    const tv = document.getElementById('threadView'); tv.innerHTML = '';
+    const stack = state ? state.stack : [];
+    if (!stack.length) tv.innerHTML = '<span class="empty">empty</span>';
+    else stack.forEach((v, i) => {
+        if (i) { const l = document.createElement('div'); l.className = 'thread-link'; tv.appendChild(l); }
+        const node = document.createElement('div'); node.className = 'thread-node' + (i === stack.length-1 ? ' top' : '');
+        const cc = (phase === 2 && state.comp[v] >= 0) ? compColor(state.comp[v]) : null;
+        if (cc) { node.style.background = cc; node.style.borderColor = 'rgba(0,0,0,0.3)'; }
+        node.textContent = v; tv.appendChild(node);
+    });
+
+    // components
+    const cv = document.getElementById('compView'); cv.innerHTML = '';
+    const comps = state ? state.comps : [];
+    if (!comps.length) cv.innerHTML = '<span class="comp-none">found in Phase 2</span>';
+    else comps.forEach(c => {
+        const row = document.createElement('div'); row.className = 'comp-row';
+        const dot = document.createElement('span'); dot.className = 'comp-dot'; dot.style.background = compColor(c.id); row.appendChild(dot);
+        const lab = document.createElement('span'); lab.className = 'comp-label'; lab.textContent = '#' + (c.id + 1); row.appendChild(lab);
+        const mem = document.createElement('div'); mem.className = 'comp-members';
+        c.members.slice().sort((a, b) => a - b).forEach(v => { const m = document.createElement('span'); m.className = 'm'; m.style.background = compColor(c.id); m.textContent = v; mem.appendChild(m); });
+        row.appendChild(mem); cv.appendChild(row);
+    });
+}
+function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c])); }
+
+/* ============================ run control ============================ */
+function rebuildSteps() { steps = buildSCC(adj); ptr = -1; stopPlay(); render(); syncButtons(); }
+function stepFwd() { if (ptr < steps.length-1) { ptr++; render(); } if (ptr >= steps.length-1) stopPlay(); syncButtons(); }
+function stepBack() { if (ptr > -1) { ptr--; render(); } stopPlay(); syncButtons(); }
+function resetRun() { stopPlay(); ptr = -1; render(); syncButtons(); }
+function togglePlay() { playing ? stopPlay() : startPlay(); }
+function startPlay() { if (ptr >= steps.length-1) ptr = -1; playing = true; document.getElementById('playBtn').textContent = 'Pause'; tick(); }
+function stopPlay() { playing = false; clearTimeout(timer); document.getElementById('playBtn').textContent = 'Play'; }
+function tick() { if (!playing) return; if (ptr < steps.length-1) { ptr++; render(); syncButtons(); timer = setTimeout(tick, delay); } else stopPlay(); }
+function syncButtons() { document.getElementById('backBtn').disabled = ptr <= -1; document.getElementById('stepBtn').disabled = ptr >= steps.length-1; }
+function updateSpeed(val) { delay = parseInt(val, 10); document.getElementById('speedVal').textContent = val + 'ms'; }
+
+/* ============================ loading ============================ */
+function graphToText(v, edgeList, positions, sedgewick) {
+    let s = `${v}\n${edgeList.length}\n` + edgeList.map(([x,y]) => `${x} ${y}`).join('\n');
+    if (!sedgewick && positions) s += '\n' + positions.map(p => `${fmtCoord(p.x)} ${fmtCoord(p.y)}`).join('\n');
+    return s;
+}
+function refreshTextarea() {
+    const sedgewick = document.getElementById('sedgewickToggle').checked;
+    document.getElementById('graphText').value = graphToText(lastV, lastEdges, pos, sedgewick);
+}
+function applyGraph(v, a, edgeList, customPos) {
+    V = v; adj = a; adjRev = reverseGraph(a); pos = customPos || layoutAll(V, a);
+    lastV = v; lastEdges = edgeList;
+    refreshTextarea();
+    rebuildSteps();
+}
+function loadPreset(name) {
+    const text = PRESETS[name];
+    document.getElementById('parseErr').textContent = '';
+    try {
+        const { v, adj: a, edges, pos: customPos } = parseGraph(text);
+        applyGraph(v, a, edges, customPos);
+    } catch (e) { document.getElementById('parseErr').textContent = e.message; }
+}
+function loadFromText() {
+    const errEl = document.getElementById('parseErr');
+    try { const { v, adj: a, edges, pos: customPos } = parseGraph(document.getElementById('graphText').value); applyGraph(v, a, edges, customPos); errEl.textContent = ''; }
+    catch (e) { errEl.textContent = e.message; }
+}
+
+/* ============================ external graphs (graphs/ folder) ============================ */
+function prettyGraphName(filename) {
+    return decodeURIComponent(filename).replace(/\.[^./]+$/, '').replace(/[_-]+/g, ' ');
+}
+async function discoverExternalGraphs() {
+    try {
+        const r = await fetch('graphs/index.json', { cache: 'no-store' });
+        if (r.ok) {
+            const data = await r.json();
+            if (Array.isArray(data)) {
+                return data.map(item => {
+                    const file = typeof item === 'string' ? item : item.file;
+                    const label = (typeof item === 'object' && (item.label || item.name)) || prettyGraphName(file);
+                    return { label, path: 'graphs/' + encodeURIComponent(file) };
+                });
+            }
+        }
+    } catch (e) { /* no manifest — fall through to directory listing */ }
+    try {
+        const r = await fetch('graphs/', { cache: 'no-store' });
+        if (r.ok) {
+            const html = await r.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const hrefs = [...doc.querySelectorAll('a')]
+                .map(a => a.getAttribute('href') || '')
+                .filter(h => h && h !== '../' && h !== './' && !h.startsWith('?') && !h.startsWith('/') && !h.endsWith('/'));
+            const uniq = [...new Set(hrefs)];
+            if (uniq.length) return uniq.map(h => ({ label: prettyGraphName(decodeURIComponent(h)), path: 'graphs/' + h }));
+        }
+    } catch (e) { /* no directory listing either — that's fine, just no external graphs */ }
+    return [];
+}
+function loadExternalGraph(path) {
+    const errEl = document.getElementById('parseErr');
+    errEl.textContent = `Loading ${path}…`;
+    fetch(path, { cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            const { v, adj: a, edges, pos: customPos } = parseGraph(text);
+            applyGraph(v, a, edges, customPos);
+            errEl.textContent = '';
+        })
+        .catch(err => { errEl.textContent = `Could not load ${path}: ${err.message}`; });
+}
+function populateExternalGraphs(presetSel) {
+    discoverExternalGraphs().then(list => {
+        if (!list.length) return;
+        const grp = document.createElement('optgroup');
+        grp.label = 'From graphs/ folder';
+        list.forEach(({ label, path }) => {
+            const o = document.createElement('option');
+            o.value = path; o.textContent = label; o.dataset.external = '1';
+            grp.appendChild(o);
+        });
+        presetSel.appendChild(grp);
+    });
+}
+function init() {
+    const presetSel = document.getElementById('presetSel');
+    Object.keys(PRESETS).forEach(name => { const o = document.createElement('option'); o.value = name; o.textContent = name; presetSel.appendChild(o); });
+    presetSel.addEventListener('change', () => {
+        const opt = presetSel.selectedOptions[0];
+        if (opt && opt.dataset.external) loadExternalGraph(opt.value); else loadPreset(opt.value);
+    });
+    window.addEventListener('resize', () => render());
+    loadPreset(Object.keys(PRESETS)[0]);
+    populateExternalGraphs(presetSel);
+}
+init();
+</script>
+</body>
+</html>
