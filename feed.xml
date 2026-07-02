@@ -6,9 +6,71 @@
 </description>
     <link>https://www.wild-inter.net/</link>
     <atom:link href="https://www.wild-inter.net/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Thu, 02 Jul 2026 14:25:27 +0200</pubDate>
-    <lastBuildDate>Thu, 02 Jul 2026 14:25:27 +0200</lastBuildDate>
+    <pubDate>Thu, 02 Jul 2026 21:35:49 +0200</pubDate>
+    <lastBuildDate>Thu, 02 Jul 2026 21:35:49 +0200</lastBuildDate>
     <generator>Jekyll v3.10.0</generator>
+    
+      <item>
+        <title>GitHub Suspension</title>
+        <description>&lt;script type=&quot;text/x-mathjax-config&quot;&gt;
+	var font = &quot;Neo-Euler&quot;;
+	MathJax.Hub.Config({
+		tex2jax: {
+			inlineMath: [[&apos;$&apos;,&apos;$&apos;]],
+			displayMath: [[&apos;\\[&apos;,&apos;\\]&apos;]],
+			processEscapes: true,
+		},
+		&quot;SVG&quot;:{ 
+			font:font
+		},
+		&quot;HTML-CSS&quot;: {
+			webFont: font,
+			imageFont: font,
+			preferredFont: font,
+			availableFonts: [],
+			scale: 85,
+			mtextFontInherit: true
+		}
+	});
+&lt;/script&gt;
+
+&lt;script type=&quot;text/javascript&quot; src=&quot;https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&quot;&gt;&lt;/script&gt;
+
+&lt;p&gt;GitHub blocked my account. I don’t know why or for how long.&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;&lt;strong&gt;tl;dr:&lt;/strong&gt; If you need any old repository, use the cloned versions at &lt;a href=&quot;https://github.com/sebawild2&quot;&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;sebawild2&lt;/code&gt;&lt;/a&gt;.&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;As of now, four weeks on, GitHub still blocked by account &lt;a href=&quot;https://github.com/sebawild&quot;&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;sebawild&lt;/code&gt;&lt;/a&gt;.&lt;br /&gt;
+(It is invisible to others, but let’s me log in and access my repositories.)&lt;/p&gt;
+
+&lt;p&gt;The overall episode is rather annoying: You get blocked and there’s no reason given.
+You can file a ticket, but for weeks nobody replies or acts upon it.
+There are no alternatives to waiting and hoping that, eventually, support gets to the ticket –
+from community posts, this might be anywhere from days to months(!).&lt;/p&gt;
+
+&lt;p&gt;I guess I get the service I pay for in this case …&lt;br /&gt;
+(Academic use is free unless you get very active with AI.)&lt;br /&gt;
+Still, the handling is unprofessional. Clearly, GitHub prioritizes further AI deployments over their core services.&lt;/p&gt;
+
+&lt;p&gt;My takeaway from this ongoing experience is a lesson in digital sovereignty: 
+Relying on a US private company for hosting code referenced in my research paper is questionable, no matter how convenient GitHub is. (I still love their product.)&lt;/p&gt;
+
+&lt;p&gt;Luckily, git makes it easy to have decentralized backups.
+Where I will long term host code is not decided yet.&lt;/p&gt;
+
+</description>
+        <pubDate>Thu, 02 Jul 2026 00:00:00 +0200</pubDate>
+        <link>https://www.wild-inter.net/posts/github</link>
+        <guid isPermaLink="true">https://www.wild-inter.net/posts/github</guid>
+        
+        
+        <category>programming</category>
+        
+        <category>publishing</category>
+        
+        <category>web</category>
+        
+      </item>
     
       <item>
         <title>Powersort&apos;s Pursuit</title>
@@ -851,61 +913,6 @@ i.e., in the above command the current directory.&lt;/p&gt;
         
         
         <category>linux</category>
-        
-      </item>
-    
-      <item>
-        <title>Why DOIs Rule</title>
-        <description>&lt;p&gt;DOIs (digital object identifiers) are much more than a unique id for
-scientific papers.&lt;/p&gt;
-
-&lt;p&gt;Making the style for bibliographies consistent probably ranks among the
-least favorite tasks of researchers who would like to disseminate their
-findings.
-Thanks to LaTeX and BibTeX, the task of citing other research
-is mostly reduced to curating a high-quality &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;bib&lt;/code&gt;-file of references.&lt;/p&gt;
-
-&lt;p&gt;But that shifts the problem to getting high-quality bib entries!
-My experiences with publisher-provided bib-entries and services like Google Scholar
-were very mixed – most required manual tweaking (and double checking!) of the entries.&lt;/p&gt;
-
-&lt;p&gt;This should be much easier. All it needs is a
-well-curated data base of metadata for scientific research
-(maintained by those who care for consistency: the publishers!),
-but with a machine-readable well-defined interface to be used by some
-tool created by someone who
-understands BibTeX well (it seems, this is rather not the publishers strength …).&lt;/p&gt;
-
-&lt;p&gt;Luckily, both exists!
-DOIs (digital object identifiers) are not just an id for papers,
-they also serve as keys in exactly such a data base.
-And with &lt;a href=&quot;https://doi2bib.org&quot;&gt;doi2bib.org&lt;/a&gt;, there is a service that
-produces high-quality bib-entries from a doi.&lt;/p&gt;
-
-&lt;p&gt;This brings us one step closer to a system, in which
-the TeX source would only give the DOI and everything else is taken care of
-automatically
-(retaining the option for manual tweaking as with the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;bbl&lt;/code&gt; files of BibTeX).&lt;/p&gt;
-
-&lt;h2 id=&quot;update-nothing-is-infallible&quot;&gt;Update: Nothing is infallible&lt;/h2&gt;
-
-&lt;p&gt;I found a case where I was not happy with the result of doi2bib:
-For papers in Springer journals that first appear online and later in
-the printed journal, doi2bib mixes the two entries. 
-Month and year of publication are set to the first online version,
-but volume and issue number are also filled in, so that the resulting
-bib entry looks as if the printed issue appeared earlier.
-This is confusing, I would rather use only the final printed information,
-and ended up manually adapting the bib files.&lt;/p&gt;
-</description>
-        <pubDate>Fri, 13 Jul 2018 00:00:00 +0200</pubDate>
-        <link>https://www.wild-inter.net/posts/why-dois-rule</link>
-        <guid isPermaLink="true">https://www.wild-inter.net/posts/why-dois-rule</guid>
-        
-        
-        <category>web</category>
-        
-        <category>publishing</category>
         
       </item>
     
