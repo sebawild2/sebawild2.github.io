@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order / File Maintenance — Relabeling</title>
+<style>
+  :root{
+    --bg:#f1e9d2; --panel:#f6efe0; --panel-line:#e2d6b5;
+    --controls:#e8ddbe; --controls-line:#dcd0b0;
+    --ink:#4a3f35; --ink-soft:#726253; --label:#8c7b70;
+    --btn:#faf6eb; --btn-line:#bcaf92; --active:#ff0000; --barHi:#670c07;
+    --ok:#5f7d43; --over:#a83227;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink-soft);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;margin:0;padding:24px 20px 48px}
+  h1{font-size:1.6rem;font-weight:500;letter-spacing:.5px;color:var(--ink);margin:0 0 4px}
+  .subtitle{font-size:.9rem;color:var(--label);margin:0 0 22px;letter-spacing:.3px;max-width:880px;text-align:center;line-height:1.5}
+  .stage{background:var(--panel);border:1px solid var(--panel-line);border-radius:6px;
+    box-shadow:0 2px 8px rgba(0,0,0,.04);width:100%;max-width:1180px;padding:10px;overflow-x:auto;position:relative}
+  svg{display:block;width:100%;height:auto;min-width:820px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:12px;font-size:.78rem;color:var(--label)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:14px;height:14px;border-radius:3px;display:inline-block}
+  .grad{width:70px;height:12px;border-radius:3px;background:linear-gradient(90deg,hsl(125,58%,52%),hsl(65,58%,52%),hsl(5,58%,52%));display:inline-block}
+  .readout{width:100%;max-width:1180px;display:flex;gap:14px;margin-top:14px;flex-wrap:wrap}
+  .step-box{flex:3 1 380px;background:var(--panel);border:1px solid var(--panel-line);
+    border-radius:6px;padding:14px 16px;min-height:64px;font-size:.95rem;line-height:1.5;color:var(--ink-soft)}
+  .step-box b{color:var(--ink)}
+  .answer-box{flex:1 1 240px;background:var(--controls);border:1px solid var(--controls-line);
+    border-radius:6px;padding:12px 16px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+  .answer-label{font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--label);font-weight:600}
+  .answer-val{font-size:1.5rem;color:var(--barHi);font-weight:600;font-variant-numeric:tabular-nums}
+  .answer-val.pending{color:var(--label);font-weight:500;font-size:1.05rem}
+  .answer-sub{font-size:.78rem;color:var(--label);margin-top:2px}
+  .controls{display:flex;gap:18px;margin-top:18px;align-items:center;justify-content:center;flex-wrap:wrap;
+    background:var(--controls);padding:14px 22px;border-radius:6px;border:1px solid var(--controls-line)}
+  .group{display:flex;align-items:center;gap:8px;font-size:.85rem;color:#5c4f43}
+  .group label{font-weight:500}
+  select{background:var(--btn);color:var(--ink);border:1px solid var(--btn-line);border-radius:4px;padding:7px 9px;font-size:.88rem;font-family:inherit}
+  button{background:var(--btn);color:var(--ink);border:1px solid var(--btn-line);padding:8px 14px;font-size:.88rem;border-radius:4px;cursor:pointer;font-weight:500;transition:background .2s,border-color .2s}
+  button:hover:not(:disabled){background:#fff;border-color:#9a8c6f}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  input[type="range"]{accent-color:#e60000;cursor:pointer;width:120px}
+  .sep{width:1px;align-self:stretch;background:var(--controls-line)}
+  .playback button{padding:8px 12px}
+  .stepcount{font-size:.82rem;color:var(--label);font-variant-numeric:tabular-nums;min-width:92px;text-align:center}
+  .val{min-width:96px;font-variant-numeric:tabular-nums;font-size:.82rem;color:var(--ink-soft)}
+  .hint{font-size:.78rem;color:var(--label);max-width:1000px;margin:16px auto 0;text-align:center;line-height:1.55}
+  .hint b{color:var(--ink-soft)}
+  /* popup */
+  .popup{position:fixed;z-index:60;min-width:214px;background:var(--panel);border:1px solid #b6a173;border-radius:8px;
+    box-shadow:0 6px 22px rgba(0,0,0,.20);padding:12px 14px 11px;font-size:.82rem;color:var(--ink-soft);display:none}
+  .popup h4{margin:0 0 8px;font-size:.88rem;color:var(--ink);font-weight:600}
+  .popup table{border-collapse:collapse;width:100%}
+  .popup td{padding:2.5px 0}
+  .popup td.k{color:var(--label);padding-right:12px;white-space:nowrap}
+  .popup td.v{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
+  .popup .status.ok{color:var(--ok)} .popup .status.over{color:var(--over)}
+  .popup .coins{color:#9a6a2e}
+  .popup .close{position:absolute;top:5px;right:9px;cursor:pointer;color:var(--label);font-size:1.05rem;line-height:1}
+  .popup .coinrow td{border-top:1px solid var(--panel-line);padding-top:6px}
+</style>
+</head>
+<body>
+  <h1>Order&nbsp;/&nbsp;File Maintenance by Relabeling</h1>
+  <p class="subtitle">The universe is fixed at <b>U</b> and calibrated for the <b>linear regime</b> (capacity n = ρ<sub>min</sub>·U, no resizing). Every range has a <b>density threshold</b> — shown on the left and as a heat-map. Each insert banks <b>q = log&#8322;U coins</b> in every range holding it (log²n in all), and one coin buys a constant <b>M = 2/(1−ρ<sub>min</sub>) element-moves</b> — tuned so a range's own banked coins exactly pay for its own spread. <b>Click a range</b> to see the accounting.</p>
+
+  <div class="stage">
+    <svg id="view" viewBox="0 0 1120 360" preserveAspectRatio="xMidYMin meet" role="img" aria-label="File maintenance diagram"></svg>
+    <div class="popup" id="popup"></div>
+  </div>
+
+  <div class="legend">
+    <span>density vs threshold: <span class="grad"></span> low → at threshold</span>
+    <span><span class="swatch" style="background:#a83227;opacity:.65"></span> over threshold (walk-up skips it)</span>
+    <span><span class="swatch" style="background:rgba(95,125,67,.5);border:1px solid #5f7d43"></span> chosen range (rebalanced)</span>
+    <span>click any range for its stats</span>
+  </div>
+
+  <div class="readout">
+    <div class="step-box" id="stepBox">Click a range to inspect it. Then select an element and press <b>Insert after</b>, or hit <b>Worst-case insert</b>. Thresholds are fixed, so you can predict which range will be spread.</div>
+    <div class="answer-box">
+      <span class="answer-label">Relabels this insert</span>
+      <span class="answer-val pending" id="answerVal">—</span>
+      <span class="answer-sub" id="answerSub"></span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="group">
+      <label for="uni">Universe</label>
+      <select id="uni" onchange="reset()">
+        <option value="4">U = 16</option>
+        <option value="5" selected>U = 32</option>
+        <option value="6">U = 64</option>
+      </select>
+    </div>
+    <div class="group">
+      <label for="thr">ρ<sub>min</sub> (root τ)</label>
+      <input type="range" id="thr" min="30" max="70" value="50" step="5" oninput="onThr(this.value)">
+      <span class="val" id="thrVal"></span>
+    </div>
+    <div class="group">
+      <button id="insBtn" onclick="insertSelected()">Insert after selected</button>
+      <button id="worstBtn" onclick="worstInsert()">Worst-case insert</button>
+      <button id="resetBtn" onclick="reset()">Reset</button>
+    </div>
+    <div class="sep"></div>
+    <div class="group playback">
+      <button id="prevBtn" onclick="stepPrev()">‹ Prev</button>
+      <button id="playBtn" onclick="togglePlay()">Play</button>
+      <button id="nextBtn" onclick="stepNext()">Next ›</button>
+      <span id="stepCount" class="stepcount">—</span>
+    </div>
+    <div class="sep"></div>
+    <div class="group">
+      <label for="speed">Delay</label>
+      <input type="range" id="speed" min="200" max="1600" value="850" oninput="onSpeed(this.value)">
+      <span id="speedVal">850ms</span>
+    </div>
+  </div>
+
+  <p class="hint">
+    A range at depth <i>d</i> has threshold τ(<i>d</i>) = ρ<sub>min</sub> + (1−ρ<sub>min</sub>)·<i>d</i>/L, so the root (depth&nbsp;0) is capped at ρ<sub>min</sub> and leaves (depth&nbsp;L) at&nbsp;1.
+    A range at depth <i>d</i> has threshold τ(<i>d</i>) = ρ<sub>min</sub> + (1−ρ<sub>min</sub>)·<i>d</i>/L, so the root (depth&nbsp;0) is capped at ρ<sub>min</sub> and leaves (depth&nbsp;L) at&nbsp;1.
+    <b>Amortization.</b> Each insert banks <b>q = L = log&#8322;U coins</b> in every range containing it (log²n coins total), starting from <b>0</b> — the initial elements sit exactly at the spread baseline, so they owe nothing. A coin is worth a constant <b>M = 2/(1−ρ<sub>min</sub>)</b> moves. An even spread leaves every child a full gap = (1−ρ<sub>min</sub>)/L below its own threshold, so a range must bank ≥ gap·(capacity)/2 inserts before it can be forced to spread — and then q·(banked)·M ≥ capacity ≥ the moves the spread costs. <b>Every range's own coins pay for its own spread</b>; the spread resets its (and its sub-ranges') coins to&nbsp;0, while ancestor ranges keep theirs. When n reaches ρ<sub>min</sub>·U the linear universe is full (a real PMA would double U and rebuild).
+  </p>
+
+<script>
+const SVGNS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('view');
+function el(tag,a){const e=document.createElementNS(SVGNS,tag);for(const k in a)e.setAttribute(k,a[k]);return e;}
+const PAL=['#6d8b9e','#c98a5e','#8a9a5b','#b57b8a','#9b8bbf','#c2a25a','#7fa88f','#b0765f',
+  '#5f8b7e','#a98fb0','#c79a6b','#7d94a8','#a8895f','#93a06d','#bf8b6d','#7e8fa8'];
+const C={line:'#d9cba6',grid:'#e6d9b8',ink:'#4a3f35',inkSoft:'#726253',label:'#8c7b70',
+  active:'#ff0000',barHi:'#670c07',ok:'#5f7d43',over:'#a83227',bg:'#f1e9d2'};
+const VW=1120, MX=66, RMX=24, TOP=58, ROWH=26;
+function pow2(k){return Math.pow(2,k);}
+
+let S={};                 // state
+let curFrame=null;        // frame currently rendered (labels + ins)
+let anim={timer:null,steps:[],i:0,playing:false,built:false}; let speed=850;
+
+function tauAt(depth){ return S.rhoMin + (1-S.rhoMin)*depth/S.L; }
+function colorOf(id){ if(!(id in S.colorOf)) S.colorOf[id]=PAL[Object.keys(S.colorOf).length%PAL.length]; return S.colorOf[id]; }
+
+function reset(){
+  clearTimeout(anim.timer); hidePopup();
+  const L=parseInt(document.getElementById('uni').value);
+  const U=pow2(L), rhoMin=parseInt(document.getElementById('thr').value)/100;
+  S={L,U,rhoMin,cap:Math.floor(rhoMin*U),q:L,M:2/(1-rhoMin),els:[],ins:{},nextId:1,cumRelabels:0,cumInserts:0,selectedId:null,colorOf:{}};
+  const start=Math.min(S.cap-2, Math.round(U/4));  // a comfortable starting load
+  for(let k=0;k<start;k++) S.els.push({id:S.nextId++, label:Math.floor((k+0.5)*U/start)});
+  // no pre-funding: the initial even spread places every element at the baseline density, so every range starts with 0 coins
+  S.selectedId=S.els[Math.floor(start/2)].id;
+  anim.built=false; anim.steps=[]; anim.i=0;
+  document.getElementById('thrVal').textContent=`= ${rhoMin.toFixed(2)} · cap ${S.cap} · ${S.M.toFixed(2)} mv/coin`;
+  document.getElementById('stepBox').innerHTML='Click a range to inspect it, then <b>Insert after selected</b> or <b>Worst-case insert</b>.';
+  const av=document.getElementById('answerVal'); av.textContent='—'; av.classList.add('pending');
+  document.getElementById('answerSub').textContent='';
+  renderCommitted(); updateUI();
+}
+
+/* ---- coins ---- */
+function incPath(o,label){ for(let j=1;j<=S.L;j++){const k=Math.floor(label/pow2(j)); o[j+'_'+k]=(o[j+'_'+k]||0)+1;} }
+function resetSub(o,jv,kv){ for(let j=1;j<=jv;j++){ const span=pow2(jv-j); for(let k=kv*span;k<(kv+1)*span;k++) o[j+'_'+k]=0; } }
+
+/* ---- probe ---- */
+function probesFor(els,label){
+  const probes=[]; let chosen=null;
+  for(let j=1;j<=S.L;j++){
+    const size=pow2(j), k=Math.floor(label/size), lo=k*size;
+    const count=els.filter(e=>e.label>=lo&&e.label<lo+size).length;
+    const dens=(count+1)/size, depth=S.L-j, th=tauAt(depth), ok=dens<=th;
+    probes.push({j,k,lo,hi:lo+size,size,count,dens,th,ok,depth});
+    if(ok){ chosen={j,k,lo,hi:lo+size,size,count,depth}; break; }
+  }
+  return {probes,chosen};
+}
+
+/* ---- node stats (for popup / heat) ---- */
+function nodeStats(j,k,labels,ins){
+  const size=pow2(j), lo=k*size, hi=lo+size;
+  const n=labels.filter(e=>e.label>=lo&&e.label<hi).length;
+  const depth=S.L-j, th=tauAt(depth), dens=n/size, room=Math.floor(th*size)-n;
+  const delta=(ins&&ins[j+'_'+k])||0, coins=S.q*delta, payable=coins*S.M;
+  return {j,k,lo,hi,cap:size,n,depth,th,dens,room,delta,coins,payable,covers:payable>=n-1e-9,over:dens>th+1e-9};
+}
+
+/* ---- build one insertion (frames carry labels + ins snapshots) ---- */
+function buildInsert(xIdx){
+  clearTimeout(anim.timer); anim.playing=false; hidePopup();
+  const els=S.els, x=els[xIdx], succ=els[xIdx+1]||null, succLabel=succ?succ.label:S.U;
+  const preLabels=els.map(e=>({id:e.id,label:e.label})), preIns={...S.ins};
+  const frames=[]; const F=o=>frames.push(o);
+  const full = S.els.length>=S.cap;
+  F({labels:preLabels,ins:preIns,hl:{xId:x.id,succId:succ?succ.id:null,phase:'intro'},
+     text:`Insert after the selected element (label ${x.label}); successor label ${succ?succ.label:'U='+S.U}. `+
+          (full?`But <b>n = ρ<sub>min</sub>·U = ${S.cap}</b> — the universe is full.`:`Gap of <b>${succLabel-x.label-1}</b> free label${succLabel-x.label-1===1?'':'s'} between them.`),
+     relabels:'—'});
+  if(full){
+    F({labels:preLabels,ins:preIns,hl:{fullMark:true,phase:'full'},
+       text:`<b>Full.</b> With n = ρ<sub>min</sub>·U the root is at its threshold, so no range can absorb another element. A real PMA would now double U and rebuild; here U is fixed, so lower ρ<sub>min</sub>, raise U, or reset.`, relabels:'—'});
+    finalize(frames); return frames;
+  }
+  const gap=succLabel-x.label;
+  if(gap>=2){
+    const nl=Math.floor((x.label+succLabel)/2);
+    const postLabels=preLabels.concat([{id:S.nextId,label:nl}]).sort((a,b)=>a.label-b.label);
+    const postIns={...preIns}; incPath(postIns,nl);
+    F({labels:postLabels,ins:postIns,hl:{newId:S.nextId,phase:'gap'},
+       text:`A free label exists — drop the new element at midpoint <b>${nl}</b>. <b>0 relabels</b> (O(1)). It still banks a coin in every range that contains it.`, relabels:0});
+    S.els=postLabels; S.ins=postIns; S.nextId++; S.cumInserts++;
+    finalize(frames,0); return frames;
+  }
+  // adjacent → walk up
+  F({labels:preLabels,ins:preIns,hl:{xId:x.id,succId:succ?succ.id:null,phase:'nogap'},
+     text:`Labels ${x.label} and ${succLabel} are <b>adjacent</b> — no room. Walk up, testing each range's density against its threshold.`, relabels:'…'});
+  const {probes,chosen}=probesFor(preLabels,x.label);
+  const shown=[];
+  probes.forEach(p=>{ shown.push(p);
+    F({labels:preLabels,ins:preIns,hl:{probeTrail:shown.slice(),active:p,xId:x.id,phase:'probe'},
+       text:`Level ${p.j} range [${p.lo}, ${p.hi}) — with the newcomer, ${p.count+1}/${p.size} = <b>${p.dens.toFixed(2)}</b> vs τ = <b>${p.th.toFixed(2)}</b> → `+
+            (p.ok?`<b style="color:#5f7d43">within threshold, stop.</b>`:`<b style="color:#a83227">over, climb.</b>`), relabels:'…'});
+  });
+  if(chosen){
+    const {lo,hi,size,j,k}=chosen;
+    const inside=preLabels.filter(e=>e.label>=lo&&e.label<hi).sort((a,b)=>a.label-b.label);
+    const withY=[]; inside.forEach(e=>{ withY.push({id:e.id}); if(e.id===x.id) withY.push({id:S.nextId,_new:true}); });
+    const m=withY.length; withY.forEach((e,idx)=> e.label=lo+Math.floor((idx+0.5)*size/m));
+    const outside=preLabels.filter(e=>e.label<lo||e.label>=hi);
+    const postLabels=outside.concat(withY.map(e=>({id:e.id,label:e.label}))).sort((a,b)=>a.label-b.label);
+    const newLabel=withY.find(e=>e._new).label;
+    const insWithY={...preIns}; incPath(insWithY,newLabel);          // the new element banks its coins first
+    const delta=insWithY[j+'_'+k]||0, coins=S.q*delta, payable=coins*S.M, cost=chosen.count;
+    const postIns={...insWithY}; resetSub(postIns,j,k);              // the spread then spends this range's (sub)coins
+    F({labels:preLabels,ins:insWithY,hl:{chosen,xId:x.id,phase:'redis-before'},
+       text:`Lowest in-threshold range: <b>[${lo}, ${hi})</b> (level ${j}). It has banked Δ=${delta} inserts → <b>${coins} coins</b> (q·Δ, q=${S.q}). At <b>${S.M.toFixed(2)} moves/coin</b> that is ${coins}·${S.M.toFixed(2)} = <b>${payable.toFixed(0)} ≥ ${cost}</b> moves — the coins pay for the spread.`, relabels:chosen.count});
+    F({labels:postLabels,ins:postIns,hl:{chosen,newId:S.nextId,phase:'redis-after'},
+       text:`Spread — <b>${chosen.count} relabel${chosen.count===1?'':'s'}</b>, paid by the coins. This range and its sub-ranges reset to 0 (their elements are back at the baseline density); the coins banked in <i>ancestor</i> ranges are untouched.`, relabels:chosen.count});
+    S.els=postLabels; S.ins=postIns; S.nextId++; S.cumInserts++; S.cumRelabels+=chosen.count;
+    finalize(frames,chosen.count); return frames;
+  }
+  // shouldn't reach (full handled above), but guard:
+  F({labels:preLabels,ins:preIns,hl:{fullMark:true},text:`<b>Full.</b> No range within threshold.`,relabels:'—'});
+  finalize(frames); return frames;
+}
+function finalize(frames){
+  const avg = S.cumInserts? (S.cumRelabels/S.cumInserts):0;
+  const sub = S.cumInserts? `avg ${avg.toFixed(2)} relabels/insert · n=${S.els.length}/${S.cap}` : `n=${S.els.length}/${S.cap}`;
+  frames.forEach(f=>{ f.avgSub=(typeof f.relabels==='number')?sub:`n=${S.els.length}/${S.cap}`; });
+}
+
+/* ---- geometry ---- */
+function slotW(){ return (VW-MX-RMX)/S.U; }
+function xAt(p){ return MX+p*slotW(); }
+function rowY(j){ return TOP+(S.L-j)*ROWH; }
+function axisY(){ return TOP+S.L*ROWH+30; }
+
+/* ---- rendering ---- */
+function heat(dens,th){
+  if(th<=0) return {fill:'#a83227',op:.62};
+  const r=dens/th;
+  if(r>1.0001) return {fill:'#a83227',op:.62};
+  const h=125-120*r;               // 125 green → 5 red
+  return {fill:`hsl(${h},58%,52%)`,op:0.14+0.42*r};
+}
+function setViewBox(){ svg.setAttribute('viewBox',`0 0 ${VW} ${TOP+S.L*ROWH+108}`); }
+
+function render(fr){
+  curFrame=fr; hidePopup();
+  const labels=fr.labels, ins=fr.ins, hl=fr.hl||{};
+  setViewBox();
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const sw=slotW();
+
+  // title + info
+  const t1=el('text',{x:MX,y:26,'font-size':12,'font-weight':600,fill:C.label,'letter-spacing':'.5'});
+  t1.textContent='RANGE-TREE OVER THE LABEL UNIVERSE  ·  colour = density / threshold'; svg.appendChild(t1);
+  const info=el('text',{x:VW-RMX,y:26,'text-anchor':'end','font-size':11,fill:C.label});
+  info.textContent=`n = ${labels.length} / cap ${S.cap}    U = ${S.U}    ρ_min = ${S.rhoMin.toFixed(2)}`; svg.appendChild(info);
+  // τ column header
+  const th0=el('text',{x:MX-10,y:TOP-8,'text-anchor':'end','font-size':9,'font-weight':600,fill:C.label}); th0.textContent='τ (thr)'; svg.appendChild(th0);
+
+  // selected element's walk-up path ranges (dashed outline) when idle
+  let selLabel=null; const sel=labels.find(e=>e.id===S.selectedId); if(sel) selLabel=sel.label;
+
+  // range rows
+  for(let j=1;j<=S.L;j++){
+    const size=pow2(j), y=rowY(j), depth=S.L-j, th=tauAt(depth);
+    // τ label at left
+    const tl=el('text',{x:MX-10,y:y+ROWH/2+3,'text-anchor':'end','font-size':9.5,'font-weight':600,fill:C.label});
+    tl.textContent=th.toFixed(2); svg.appendChild(tl);
+    for(let k=0;k<S.U/size;k++){
+      const lo=k*size, st=nodeStats(j,k,labels,ins), hc=heat(st.dens,st.th);
+      const rx=xAt(lo)+1, rw=size*sw-2;
+      const rect=el('rect',{x:rx,y:y+1,width:rw,height:ROWH-4,rx:3,fill:hc.fill,'fill-opacity':hc.op,
+        stroke:'#cbbd97','stroke-width':0.7,cursor:'pointer'});
+      rect.addEventListener('click',(ev)=>{ ev.stopPropagation(); showPopup(nodeStats(j,k,curFrame.labels,curFrame.ins),ev); });
+      svg.appendChild(rect);
+      // selected path outline
+      if(selLabel!=null && Math.floor(selLabel/size)===k){
+        svg.appendChild(el('rect',{x:rx,y:y+1,width:rw,height:ROWH-4,rx:3,fill:'none',stroke:C.ink,'stroke-width':1,'stroke-dasharray':'2 3',opacity:.5,'pointer-events':'none'}));
+      }
+    }
+  }
+
+  // probe trail / chosen / full overlays
+  (hl.probeTrail||[]).forEach(p=>{
+    const y=rowY(p.j), active=(hl.active&&hl.active.j===p.j), col=p.ok?C.ok:C.over;
+    svg.appendChild(el('rect',{x:xAt(p.lo)+1,y:y+1,width:p.size*sw-2,height:ROWH-4,rx:3,fill:'none',
+      stroke:col,'stroke-width':active?3:1.6,'stroke-dasharray':active?'':'3 3','pointer-events':'none'}));
+    if(active){ const tg=el('text',{x:xAt(p.lo)+p.size*sw/2,y:y+ROWH/2+3,'text-anchor':'middle','font-size':9.5,'font-weight':700,fill:col,'pointer-events':'none'});
+      tg.textContent=`${p.count+1}/${p.size}=${p.dens.toFixed(2)} vs ${p.th.toFixed(2)}`; svg.appendChild(tg); }
+  });
+  if(hl.chosen){ const ch=hl.chosen, y=rowY(ch.j);
+    svg.appendChild(el('rect',{x:xAt(ch.lo)+1,y:y+1,width:ch.size*sw-2,height:ROWH-4,rx:3,fill:C.ok,'fill-opacity':.3,stroke:C.ok,'stroke-width':3,'pointer-events':'none'}));
+    svg.appendChild(el('rect',{x:xAt(ch.lo),y:y,width:ch.size*sw,height:axisY()-y+4,fill:C.ok,'fill-opacity':.05,'pointer-events':'none'}));
+  }
+  if(hl.fullMark){ svg.appendChild(el('rect',{x:xAt(0),y:rowY(S.L),width:S.U*sw,height:ROWH-4,rx:3,fill:C.over,'fill-opacity':.18,stroke:C.over,'stroke-width':3,'pointer-events':'none'})); }
+
+  // leaf axis
+  const ay=axisY();
+  svg.appendChild(el('line',{x1:MX,y1:ay,x2:MX+S.U*sw,y2:ay,stroke:'#b6a173','stroke-width':1.4}));
+  const tickEvery=S.U>48?4:(S.U>24?2:1);
+  for(let s=0;s<=S.U;s+=tickEvery){ svg.appendChild(el('line',{x1:xAt(s),y1:ay-3,x2:xAt(s),y2:ay+3,stroke:'#c9b98f','stroke-width':1}));
+    if(s<S.U){const tk=el('text',{x:xAt(s),y:ay+13,'text-anchor':'middle','font-size':7.5,fill:C.label});tk.textContent=s;svg.appendChild(tk);} }
+  const ll=el('text',{x:MX-10,y:ay+4,'text-anchor':'end','font-size':9.5,'font-weight':600,fill:C.label}); ll.textContent='1.00'; svg.appendChild(ll);
+
+  // elements
+  const ew=Math.min(sw-2,18), eh=20;
+  labels.forEach(e=>{
+    const cx=xAt(e.label)+sw/2, isNew=(hl.newId===e.id), isSel=(S.selectedId===e.id), isX=(hl.xId===e.id), isSucc=(hl.succId===e.id);
+    const g=el('g',{cursor:'pointer'});
+    g.appendChild(el('rect',{x:cx-ew/2,y:ay-eh-4,width:ew,height:eh,rx:4,fill:colorOf(e.id),'fill-opacity':.85,
+      stroke:isNew?C.active:(isX?C.ink:(isSel?'#3a3129':'rgba(74,63,53,.3)')),'stroke-width':isNew?3:(isSel||isX?2.5:0.8)}));
+    if(ew>=12){const tx=el('text',{x:cx,y:ay-eh/2,'text-anchor':'middle','font-size':9,'font-weight':600,fill:'#fff','pointer-events':'none'});tx.textContent=e.id;g.appendChild(tx);}
+    const lv=el('text',{x:cx,y:ay-eh-8,'text-anchor':'middle','font-size':8,fill:C.label,'pointer-events':'none'});lv.textContent=e.label;g.appendChild(lv);
+    if(isX){const p=el('text',{x:cx,y:ay-eh-19,'text-anchor':'middle','font-size':9,'font-weight':700,fill:C.ink});p.textContent='x';g.appendChild(p);}
+    if(isSucc){const p=el('text',{x:cx,y:ay-eh-19,'text-anchor':'middle','font-size':9,'font-weight':700,fill:C.label});p.textContent='succ';g.appendChild(p);}
+    g.addEventListener('click',(ev)=>{ev.stopPropagation(); selectEl(e.id);});
+    svg.appendChild(g);
+  });
+
+  // caption
+  const cap=el('text',{x:MX,y:ay+30,'font-size':9.5,fill:C.label});
+  cap.textContent='left column = each level\'s threshold τ · dashed outline = the selected element\'s walk-up path · click a range for its coins';
+  svg.appendChild(cap);
+}
+
+function renderCommitted(){ render({labels:S.els.map(e=>({id:e.id,label:e.label})),ins:{...S.ins},hl:{}}); }
+function selectEl(id){ S.selectedId=id; if(anim.built) render(anim.steps[anim.i]); else renderCommitted(); }
+
+/* ---- popup ---- */
+function showPopup(st,ev){
+  const p=document.getElementById('popup');
+  p.innerHTML=`<span class="close" onclick="hidePopup()">×</span>`+
+    `<h4>Range [${st.lo}, ${st.hi})</h4><table>`+
+    `<tr><td class="k">level · depth</td><td class="v">j=${st.j} · d=${st.depth}</td></tr>`+
+    `<tr><td class="k">capacity</td><td class="v">${st.cap}</td></tr>`+
+    `<tr><td class="k">elements</td><td class="v">${st.n}</td></tr>`+
+    `<tr><td class="k">density</td><td class="v">${st.dens.toFixed(2)} <span style="color:var(--label)">(τ ${st.th.toFixed(2)})</span></td></tr>`+
+    `<tr><td class="k">status</td><td class="v status ${st.over?'over':'ok'}">${st.over?'OVER τ':'within τ'}</td></tr>`+
+    `<tr class="coinrow"><td class="k">banked inserts Δ</td><td class="v">${st.delta}</td></tr>`+
+    `<tr><td class="k">coins = q·Δ (q=${S.q})</td><td class="v coins">${st.coins}</td></tr>`+
+    `<tr><td class="k">1 coin pays</td><td class="v">${S.M.toFixed(2)} moves</td></tr>`+
+    `<tr><td class="k">pays spread (${st.n} mv)?</td><td class="v status ${st.covers?'ok':'over'}">${st.payable.toFixed(0)} ${st.covers?'≥':'<'} ${st.n} ${st.covers?'✓':'· banking'}</td></tr>`+
+    `</table>`;
+  p.style.display='block';
+  const pw=p.offsetWidth||220, ph=p.offsetHeight||200;
+  let x=ev.clientX+12, y=ev.clientY+12;
+  if(x+pw>window.innerWidth-8) x=ev.clientX-pw-12;
+  if(y+ph>window.innerHeight-8) y=window.innerHeight-ph-8;
+  p.style.left=Math.max(8,x)+'px'; p.style.top=Math.max(8,y)+'px';
+}
+function hidePopup(){ document.getElementById('popup').style.display='none'; }
+document.addEventListener('click',hidePopup);
+
+/* ---- driver ---- */
+function setStep(i){
+  const f=anim.steps[i]; render(f);
+  document.getElementById('stepBox').innerHTML=f.text;
+  const av=document.getElementById('answerVal');
+  if(f.relabels==='—'||f.relabels==='…'){av.textContent='—';av.classList.add('pending');}
+  else {av.textContent=f.relabels;av.classList.remove('pending');}
+  document.getElementById('answerSub').innerHTML=f.avgSub||'';
+}
+function showStep(){setStep(anim.i);}
+function updateUI(){const has=anim.built&&anim.steps.length>0,last=anim.steps.length-1;
+  document.getElementById('prevBtn').disabled=!has||anim.i<=0;
+  document.getElementById('nextBtn').disabled=!has||anim.i>=last;
+  document.getElementById('playBtn').disabled=!has||(anim.i>=last&&!anim.playing);
+  document.getElementById('playBtn').textContent=anim.playing?'Pause':'Play';
+  document.getElementById('stepCount').textContent=has?`Step ${anim.i+1} / ${anim.steps.length}`:'—';}
+function scheduleTick(){clearTimeout(anim.timer);anim.timer=setTimeout(()=>{if(!anim.playing)return;
+  if(anim.i<anim.steps.length-1){anim.i++;showStep();updateUI();scheduleTick();}else{anim.playing=false;updateUI();}},speed);}
+function playFrom0(frames){anim.steps=frames;anim.i=0;anim.built=true;showStep();anim.playing=true;updateUI();scheduleTick();}
+function togglePlay(){if(!anim.built)return;if(anim.playing){anim.playing=false;clearTimeout(anim.timer);updateUI();return;}
+  if(anim.i>=anim.steps.length-1){anim.i=0;showStep();}anim.playing=true;updateUI();scheduleTick();}
+function stepNext(){if(!anim.built)return;anim.playing=false;clearTimeout(anim.timer);if(anim.i<anim.steps.length-1){anim.i++;showStep();}updateUI();}
+function stepPrev(){if(!anim.built)return;anim.playing=false;clearTimeout(anim.timer);if(anim.i>0){anim.i--;showStep();}updateUI();}
+
+/* ---- operations ---- */
+function insertSelected(){ let idx=S.els.findIndex(e=>e.id===S.selectedId); if(idx<0) idx=Math.floor(Math.random()*S.els.length); playFrom0(buildInsert(idx)); }
+function worstInsert(){
+  let best=-1,bi=0;
+  for(let i=0;i<S.els.length;i++){ const x=S.els[i],sc=S.els[i+1]||null,sl=sc?sc.label:S.U;
+    if(sl-x.label>=2) continue; const {chosen}=probesFor(S.els.map(e=>({id:e.id,label:e.label})),x.label); const j=chosen?chosen.j:(S.L+1);
+    if(j>best){best=j;bi=i;} }
+  if(best<0){ let mn=Infinity; for(let i=0;i<S.els.length;i++){const g=(S.els[i+1]?S.els[i+1].label:S.U)-S.els[i].label; if(g<mn){mn=g;bi=i;}} }
+  S.selectedId=S.els[bi].id; playFrom0(buildInsert(bi));
+}
+
+/* ---- controls ---- */
+function onSpeed(v){speed=parseInt(v);document.getElementById('speedVal').textContent=v+'ms';}
+function onThr(v){ S.rhoMin=parseInt(v)/100; S.cap=Math.floor(S.rhoMin*S.U); S.q=S.L; S.M=2/(1-S.rhoMin);
+  document.getElementById('thrVal').textContent=`= ${S.rhoMin.toFixed(2)} · cap ${S.cap} · ${S.M.toFixed(2)} mv/coin`;
+  if(anim.built) render(anim.steps[anim.i]); else renderCommitted(); }
+
+/* init */
+reset();
+</script>
+</body>
+</html>

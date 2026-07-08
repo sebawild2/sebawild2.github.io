@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>van Emde Boas Layout — Search Analysis</title>
+<style>
+  :root{
+    --bg:#f1e9d2; --panel:#f6efe0; --panel-line:#e2d6b5;
+    --controls:#e8ddbe; --controls-line:#dcd0b0;
+    --ink:#4a3f35; --ink-soft:#726253; --label:#8c7b70;
+    --btn:#faf6eb; --btn-line:#bcaf92; --active:#ff0000; --barHi:#670c07;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink-soft);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;margin:0;padding:24px 20px 48px}
+  h1{font-size:1.6rem;font-weight:500;letter-spacing:.5px;color:var(--ink);margin:0 0 4px}
+  .subtitle{font-size:.9rem;color:var(--label);margin:0 0 22px;letter-spacing:.3px;max-width:920px;text-align:center;line-height:1.5}
+  .stage{background:var(--panel);border:1px solid var(--panel-line);border-radius:6px;
+    box-shadow:0 2px 8px rgba(0,0,0,.04);width:100%;max-width:1180px;padding:10px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto;min-width:820px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:12px;font-size:.78rem;color:var(--label)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:14px;height:14px;border-radius:3px;display:inline-block}
+  .readout{width:100%;max-width:1180px;display:flex;gap:14px;margin-top:14px;flex-wrap:wrap}
+  .step-box{flex:3 1 380px;background:var(--panel);border:1px solid var(--panel-line);
+    border-radius:6px;padding:14px 16px;min-height:70px;font-size:.95rem;line-height:1.5;color:var(--ink-soft)}
+  .step-box b{color:var(--ink)}
+  .answer-box{flex:1.4 1 260px;background:var(--controls);border:1px solid var(--controls-line);
+    border-radius:6px;padding:12px 16px;display:flex;flex-direction:column;justify-content:center;gap:3px}
+  .answer-label{font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--label);font-weight:600}
+  .answer-val{font-size:1.6rem;color:var(--barHi);font-weight:600;font-variant-numeric:tabular-nums}
+  .answer-val.pending{color:var(--label);font-weight:500;font-size:1.05rem}
+  .cmp{display:flex;gap:14px;margin-top:2px;font-size:.8rem;font-variant-numeric:tabular-nums;flex-wrap:wrap}
+  .cmp b{color:var(--ink)} .cmp .naive{color:#a06a4e}
+  .controls{display:flex;gap:20px;margin-top:18px;align-items:center;justify-content:center;flex-wrap:wrap;
+    background:var(--controls);padding:14px 22px;border-radius:6px;border:1px solid var(--controls-line)}
+  .group{display:flex;align-items:center;gap:8px;font-size:.85rem;color:#5c4f43}
+  .group label{font-weight:500}
+  input[type="number"]{background:var(--btn);color:var(--ink);border:1px solid var(--btn-line);
+    border-radius:4px;padding:7px 9px;font-size:.88rem;font-family:inherit;width:78px}
+  button{background:var(--btn);color:var(--ink);border:1px solid var(--btn-line);padding:8px 14px;
+    font-size:.88rem;border-radius:4px;cursor:pointer;font-weight:500;transition:background .2s,border-color .2s}
+  button:hover:not(:disabled){background:#fff;border-color:#9a8c6f}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  input[type="range"]{accent-color:#e60000;cursor:pointer;width:130px}
+  .sep{width:1px;align-self:stretch;background:var(--controls-line)}
+  .playback button{padding:8px 12px}
+  .stepcount{font-size:.82rem;color:var(--label);font-variant-numeric:tabular-nums;min-width:96px;text-align:center}
+  .val{min-width:118px;font-variant-numeric:tabular-nums;font-size:.82rem;color:var(--ink-soft)}
+  .hint{font-size:.78rem;color:var(--label);max-width:1020px;margin:16px auto 0;text-align:center;line-height:1.55}
+  .hint b{color:var(--ink-soft)}
+</style>
+</head>
+<body>
+  <h1>van Emde Boas Layout</h1>
+  <p class="subtitle">Pick a block size <b>B = 2<sup>k</sup>−1</b>. Somewhere in the vEB recursion is the level whose subtrees have height&nbsp;<i>k</i> = lg(B+1): those chunks are <b>contiguous in memory</b> — each is exactly one block — so a search reads only one per chunk. The shading below is <b>that</b> level, and it changes as you change B.</p>
+
+  <div class="stage">
+    <svg id="view" viewBox="0 0 1120 540" preserveAspectRatio="xMidYMin meet" role="img" aria-label="vEB layout diagram"></svg>
+  </div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:#8aa0ae"></span> B-piece: a height-<i>k</i> recursive subtree = one block</span>
+    <span><span class="swatch" style="background:#c98a5e"></span> B-piece on the search path (a block loaded)</span>
+    <span><span class="swatch" style="background:#ff0000"></span> search path / node visited</span>
+  </div>
+
+  <div class="readout">
+    <div class="step-box" id="stepBox">Choose <i>k</i> and the number of recursion levels, pick a key, and press <b>Run</b>. Watch the search cross only one shaded chunk at a time.</div>
+    <div class="answer-box">
+      <span class="answer-label">vEB block loads (I/Os)</span>
+      <span class="answer-val pending" id="answerVal">—</span>
+      <div class="cmp" id="cmp"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="group">
+      <label for="k">Block B=2<sup>k</sup>−1, k</label>
+      <input type="range" id="k" min="2" max="5" value="3" oninput="onParam()">
+      <span class="val" id="kVal"></span>
+    </div>
+    <div class="group">
+      <label for="lvl">Recursion levels</label>
+      <input type="range" id="lvl" min="1" max="3" value="2" oninput="onParam()">
+      <span class="val" id="lvlVal"></span>
+    </div>
+    <div class="group">
+      <label for="query">Key (rank)</label>
+      <input type="number" id="query" min="1" value="2000">
+      <button id="randBtn" onclick="randomQuery()">Random</button>
+    </div>
+    <div class="sep"></div>
+    <div class="group playback">
+      <button id="runBtn" onclick="runFromStart()">Run</button>
+      <button id="prevBtn" onclick="stepPrev()">‹ Prev</button>
+      <button id="playBtn" onclick="togglePlay()">Play</button>
+      <button id="nextBtn" onclick="stepNext()">Next ›</button>
+      <span id="stepCount" class="stepcount">—</span>
+    </div>
+    <div class="sep"></div>
+    <div class="group">
+      <label for="speed">Delay</label>
+      <input type="range" id="speed" min="120" max="1400" value="600" oninput="onSpeed(this.value)">
+      <span id="speedVal">600ms</span>
+    </div>
+  </div>
+
+  <p class="hint">
+    Height is fixed to <b>h = k·2<sup>j</sup></b> so the recursion halves cleanly onto the height-<i>k</i> level and every B-piece is uniform (<b>2<sup>k</sup>−1 = B</b> nodes) and block-aligned — the cleanest case, using B = 2<sup>k</sup>−1 (not a power of two).
+    The path has length h = log&#8322;N but enters a new B-piece only every <i>k</i> levels, so it touches <b>h/k = log<sub>B</sub>N</b> chunks — that is the O(log<sub>B</sub>N) bound. For a general B each chunk still fits in ≤ 2 blocks.
+  </p>
+
+<script>
+const SVGNS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('view');
+function el(tag,a){const e=document.createElementNS(SVGNS,tag);for(const k in a)e.setAttribute(k,a[k]);return e;}
+const C={line:'#d9cba6',grid:'#e6d9b8',ink:'#4a3f35',inkSoft:'#726253',label:'#8c7b70',
+  active:'#ff0000',barHi:'#670c07',piece:'#8aa0ae',pieceB:'#c98a5e',bg:'#f1e9d2'};
+const VW=1120, MX=48, W=VW-2*MX;
+const TA0=74, TA1=252, SY=308, SH=30, ZY=420, ZH=34;
+const TILE_CAP=1200;
+function pow2(k){return Math.pow(2,k);}
+
+let M={};
+function bitsOf(i){const s=i.toString(2).slice(1);const a=new Array(s.length);for(let z=0;z<s.length;z++)a[z]=s.charCodeAt(z)-48;return a;}
+function vebPos(bits,hh,off){const d=bits.length;if(hh===1)return off;
+  const t=Math.ceil(hh/2),b=hh-t,ts=pow2(t)-1;
+  if(d<t)return vebPos(bits,t,off);
+  let idx=0;for(let z=0;z<t;z++)idx=idx*2+bits[z];
+  return vebPos(bits.slice(t),b,off+ts+idx*(pow2(b)-1));}
+function enumPieces(r,h,ds,mo,k,out){
+  if(h<=k){out.push({rootHeap:r,height:h,depthStart:ds,memStart:mo});return;}
+  const t=Math.ceil(h/2),b=h-t,ts=pow2(t)-1;
+  enumPieces(r,t,ds,mo,k,out);
+  for(let i=0;i<pow2(t);i++) enumPieces(r*pow2(t)+i,b,ds+t,mo+ts+i*(pow2(b)-1),k,out);
+}
+function build(){
+  const k=parseInt(document.getElementById('k').value);
+  let j=parseInt(document.getElementById('lvl').value);
+  const maxJ=Math.floor(Math.log2(16/k)); if(j>maxJ)j=maxJ; if(j<1)j=1;
+  document.getElementById('lvl').max=maxJ;
+  const h=k*pow2(j), N=pow2(h)-1, B=pow2(k)-1;
+  const rank=new Int32Array(N+1); const st=[]; let cur=1,c=0;
+  while(st.length||cur<=N){while(cur<=N){st.push(cur);cur=2*cur;}cur=st.pop();rank[cur]=++c;cur=2*cur+1;}
+  const pieces=[]; enumPieces(1,h,0,0,k,pieces); pieces.sort((a,b)=>a.memStart-b.memStart);
+  M={k,j,h,N,B,rank,pieces,tile:pieces.length<=TILE_CAP,fullPath:null};
+  document.getElementById('kVal').textContent=`= ${k}  (B=${B})`;
+  document.getElementById('lvlVal').textContent=`j=${j} · h=${h} · N=${N.toLocaleString()}`;
+  const q=document.getElementById('query'); q.max=N; if(+q.value>N)q.value=Math.ceil(N/2); if(+q.value<1)q.value=1;
+}
+function searchPath(q){let i=1;const p=[];while(i<=M.N){p.push(i);if(M.rank[i]===q)break;i=q<M.rank[i]?2*i:2*i+1;}return p;}
+function ioCounts(path,B){const v=new Set(),o=new Set(),f=new Set();
+  path.forEach(i=>{v.add(Math.floor(vebPos(bitsOf(i),M.h,0)/B));o.add(Math.floor((M.rank[i]-1)/B));f.add(Math.floor((i-1)/B));});
+  return {veb:v.size,ino:o.size,bfs:f.size};}
+
+/* coords */
+function nx(i){return MX+(M.rank[i]-0.5)/M.N*W;}
+function ny(d){return M.h>1?TA0+d/(M.h-1)*(TA1-TA0):(TA0+TA1)/2;}
+function sx(p){return MX+p/M.N*W;}
+function pieceTri(pc){
+  const idx=pc.rootHeap-pow2(pc.depthStart), denom=pow2(pc.depthStart);
+  const xL=MX+idx/denom*W, xR=MX+(idx+1)/denom*W;
+  const apexY=ny(pc.depthStart), baseY=ny(pc.depthStart+pc.height-1);
+  return {xL,xR,apexX:(xL+xR)/2,apexY,baseY};
+}
+
+/* steps */
+function genSteps(q){
+  const path=searchPath(q); const frames=[]; const loaded=new Set(); let io=0;
+  path.forEach((node,ti)=>{
+    const d=Math.floor(Math.log2(node)), pos=vebPos(bitsOf(node),M.h,0), blk=Math.floor(pos/M.B), key=M.rank[node];
+    const newBlk=!loaded.has(blk); if(newBlk){loaded.add(blk);io++;}
+    const last=(ti===path.length-1);
+    let cmp; if(last) cmp=key===q?`key <b>${key}</b> = target → <b>found</b>.`:`leaf reached.`;
+    else { const nxt=path[ti+1]; cmp=q<key?`${q} &lt; <b>${key}</b> → <b>left</b>.`:`${q} &gt; <b>${key}</b> → <b>right</b>.`; }
+    frames.push({node,depth:d,pos,block:blk,newBlk,io,key,edgeTo:last?null:path[ti+1],
+      text:`Depth ${d}: node of rank <b>${key}</b>. ${cmp}<br>`+
+        `It lies in B-piece / block <b>#${blk}</b> — ${newBlk?`<b>a new block → +1 I/O</b>. Reading that one block brings in the whole height-${M.k} subtree.`:`<b>already loaded</b> (the search stayed inside this chunk) → no I/O.`}`});
+  });
+  const cnt=ioCounts(path,M.B); const last=path[path.length-1];
+  frames.push({node:last,depth:Math.floor(Math.log2(last)),pos:vebPos(bitsOf(last),M.h,0),
+    block:Math.floor(vebPos(bitsOf(last),M.h,0)/M.B),newBlk:false,io,key:M.rank[last],edgeTo:null,summary:true,
+    text:`<b>Done.</b> The path had length ${path.length} = log&#8322;N, but it entered a new chunk only every ${M.k} levels, so vEB loaded <b>${io} block${io===1?'':'s'}</b> = h/k = <b>log<sub>${M.B}</sub>N</b>. `+
+      `A sorted layout would take <b>${cnt.ino}</b>, a level-order layout <b>${cnt.bfs}</b> — the vEB win is the factor k = lg(B+1) = ${M.k}.`});
+  return {frames,cnt,pathLen:path.length};
+}
+
+/* render */
+function pt(x,y,txt,anchor){const t=el('text',{x,y,'font-size':11.5,'font-weight':600,fill:C.label,'letter-spacing':'.5'});if(anchor)t.setAttribute('text-anchor',anchor);t.textContent=txt;svg.appendChild(t);}
+function render(state){
+  state=state||{}; const {activeNode=null,pathNodes=new Set(),loadedBlocks=new Set(),curFrame=null}=state;
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const B=M.B, pieces=M.pieces;
+
+  /* Panel A: triangle with B-piece tiling */
+  pt(MX,56,`SEARCH TREE — N=${M.N.toLocaleString()} keys · shaded at the height-${M.k} (lg B) recursion level`);
+  svg.appendChild(el('path',{d:`M ${VW/2} ${TA0} L ${MX} ${TA1} L ${VW-MX} ${TA1} Z`,fill:'#efe6cd',stroke:C.line,'stroke-width':1}));
+  if(M.tile){
+    pieces.forEach((pc,idx)=>{
+      const T=pieceTri(pc);
+      svg.appendChild(el('path',{d:`M ${T.apexX} ${T.apexY} L ${T.xL} ${T.baseY} L ${T.xR} ${T.baseY} Z`,
+        fill:C.piece,'fill-opacity':idx%2?0.30:0.18,stroke:'#fff','stroke-width':0.4}));
+    });
+  } else {
+    const note=el('text',{x:VW/2,y:(TA0+TA1)/2,'text-anchor':'middle','font-size':11,fill:C.label});
+    note.textContent=`${pieces.length.toLocaleString()} B-pieces — too many to tile; showing the ones on the path`; svg.appendChild(note);
+  }
+  // path pieces (blocks) highlighted as bold triangles
+  loadedBlocks.forEach(blk=>{
+    const pc=pieces[blk]; if(!pc)return; const T=pieceTri(pc); const cur=(curFrame&&curFrame.block===blk);
+    svg.appendChild(el('path',{d:`M ${T.apexX} ${T.apexY} L ${T.xL} ${T.baseY} L ${T.xR} ${T.baseY} Z`,
+      fill:C.pieceB,'fill-opacity':cur?0.75:0.5,stroke:cur?C.active:'#a5673f','stroke-width':cur?2:1}));
+  });
+  // path polyline + dots
+  if(M.fullPath){let dp='';M.fullPath.forEach((i,z)=>{dp+=(z?'L':'M')+` ${nx(i)} ${ny(Math.floor(Math.log2(i)))} `;});
+    svg.appendChild(el('path',{d:dp,fill:'none',stroke:C.active,'stroke-width':1.2,opacity:.28}));}
+  if(pathNodes.size){
+    const pn=[...pathNodes].sort((a,b)=>Math.floor(Math.log2(a))-Math.floor(Math.log2(b)));
+    let dp='';pn.forEach((i,z)=>{dp+=(z?'L':'M')+` ${nx(i)} ${ny(Math.floor(Math.log2(i)))} `;});
+    svg.appendChild(el('path',{d:dp,fill:'none',stroke:C.active,'stroke-width':2.6,opacity:.95}));
+    pn.forEach(i=>{const a=(i===activeNode);
+      svg.appendChild(el('circle',{cx:nx(i),cy:ny(Math.floor(Math.log2(i))),r:a?5.5:3,fill:a?C.active:'#fff',stroke:C.active,'stroke-width':a?2.5:1.6}));});
+  }
+  const an=el('text',{x:VW-MX,y:TA1+13,'text-anchor':'end','font-size':9.5,fill:C.label});
+  an.textContent=`${pieces.length.toLocaleString()} B-pieces total · path crosses ${loadedBlocks.size||'…'}`; svg.appendChild(an);
+
+  /* Panel B: memory strip (pieces = blocks) */
+  pt(MX,SY-12,'MEMORY — vEB layout: each B-piece is a contiguous block');
+  if(M.tile){ pieces.forEach((pc,idx)=>{ const x0=sx(pc.memStart), x1=sx(pc.memStart+B);
+    svg.appendChild(el('rect',{x:x0,y:SY,width:Math.max(0.6,x1-x0),height:SH,fill:C.piece,'fill-opacity':idx%2?0.32:0.16,stroke:'none'}));});
+  }
+  svg.appendChild(el('rect',{x:sx(0),y:SY,width:W,height:SH,fill:'none',stroke:C.line,'stroke-width':1}));
+  loadedBlocks.forEach(blk=>{ const x0=sx(blk*B), x1=sx(Math.min((blk+1)*B,M.N)); const cur=(curFrame&&curFrame.block===blk);
+    svg.appendChild(el('rect',{x:x0,y:SY-2,width:Math.max(1.5,x1-x0),height:SH+4,rx:2,
+      fill:C.pieceB,'fill-opacity':cur?0.7:0.42,stroke:cur?C.active:'#a5673f','stroke-width':cur?2:1}));});
+  if(pathNodes.size){[...pathNodes].forEach(i=>{const p=vebPos(bitsOf(i),M.h,0),a=(i===activeNode);
+    svg.appendChild(el('line',{x1:sx(p),y1:SY-6,x2:sx(p),y2:SY+SH+6,stroke:C.active,'stroke-width':a?2.2:1,opacity:a?1:.5}));});}
+  const s0=el('text',{x:sx(0),y:SY+SH+15,'font-size':8.5,fill:C.label});s0.textContent='0';svg.appendChild(s0);
+  const s1=el('text',{x:sx(M.N),y:SY+SH+15,'text-anchor':'end','font-size':8.5,fill:C.label});s1.textContent=(M.N-1).toLocaleString();svg.appendChild(s1);
+
+  /* Panel C: zoom of current B-piece = one block */
+  pt(MX,ZY-12,`ZOOM — the current B-piece: ${B} cells = exactly one block`);
+  if(curFrame){
+    const blk=curFrame.block, start=blk*B, m=B, cw=W/m;
+    for(let z=0;z<m;z++){ const gp=start+z, visited=(gp===curFrame.pos);
+      svg.appendChild(el('rect',{x:MX+z*cw,y:ZY,width:cw-(cw>3?1:0),height:ZH,
+        fill:visited?C.pieceB:'#e7ddc8','fill-opacity':visited?0.9:1,
+        stroke:visited?C.active:'rgba(74,63,53,.18)','stroke-width':visited?2.5:0.5}));}
+    const zl=el('text',{x:MX,y:ZY+ZH+18,'font-size':10,fill:C.label});
+    zl.textContent=`block #${blk}: cells [${start.toLocaleString()}, ${(start+m).toLocaleString()}) — one I/O reads the whole height-${M.k} subtree. (For a general B a chunk straddles ≤ 2 blocks.)`;
+    svg.appendChild(zl);
+    // connector strip->zoom
+    const bx0=sx(start),bx1=sx(start+m);
+    svg.appendChild(el('path',{d:`M ${bx0} ${SY+SH+2} L ${MX} ${ZY-4} M ${bx1} ${SY+SH+2} L ${VW-MX} ${ZY-4}`,stroke:C.pieceB,'stroke-width':1,'stroke-dasharray':'3 3',opacity:.6}));
+    svg.appendChild(el('rect',{x:bx0-1,y:SY-2,width:Math.max(2,bx1-bx0),height:SH+4,fill:'none',stroke:C.pieceB,'stroke-width':1.5}));
+  } else { const zl=el('text',{x:MX,y:ZY+ZH/2,'font-size':11,fill:C.label});zl.textContent='(run a search to inspect a chunk)';svg.appendChild(zl);}
+}
+
+/* driver */
+let anim={timer:null,steps:[],i:0,playing:false,built:false}; let speed=600;
+function setStep(i){
+  const f=anim.steps[i]; const pathNodes=new Set(),loadedBlocks=new Set();
+  for(let z=0;z<=i;z++){pathNodes.add(anim.steps[z].node);loadedBlocks.add(anim.steps[z].block);}
+  render({activeNode:f.node,pathNodes,loadedBlocks,curFrame:f});
+  document.getElementById('stepBox').innerHTML=f.text;
+  const av=document.getElementById('answerVal');av.textContent=f.io;av.classList.remove('pending');
+  document.getElementById('cmp').innerHTML=`<span>path <b>${anim.pathLen}</b></span><span class="naive">in-order <b>${anim.cnt.ino}</b></span><span class="naive">BFS <b>${anim.cnt.bfs}</b></span>`;
+}
+function showStep(){setStep(anim.i);}
+function updateUI(){const has=anim.built&&anim.steps.length>0,last=anim.steps.length-1;
+  document.getElementById('prevBtn').disabled=!has||anim.i<=0;
+  document.getElementById('nextBtn').disabled=!has||anim.i>=last;
+  document.getElementById('playBtn').disabled=!has||(anim.i>=last&&!anim.playing);
+  document.getElementById('playBtn').textContent=anim.playing?'Pause':'Play';
+  document.getElementById('stepCount').textContent=has?`Step ${anim.i+1} / ${anim.steps.length}`:'—';}
+function buildSteps(){clearTimeout(anim.timer);anim.playing=false;build();
+  const q=parseInt(document.getElementById('query').value);M.fullPath=searchPath(q);
+  const r=genSteps(q);anim.steps=r.frames;anim.cnt=r.cnt;anim.pathLen=r.pathLen;anim.i=0;anim.built=true;showStep();updateUI();return true;}
+function scheduleTick(){clearTimeout(anim.timer);anim.timer=setTimeout(()=>{if(!anim.playing)return;
+  if(anim.i<anim.steps.length-1){anim.i++;showStep();updateUI();scheduleTick();}else{anim.playing=false;updateUI();}},speed);}
+function runFromStart(){buildSteps();anim.playing=true;updateUI();scheduleTick();}
+function togglePlay(){if(!anim.built)buildSteps();if(anim.playing){anim.playing=false;clearTimeout(anim.timer);updateUI();return;}
+  if(anim.i>=anim.steps.length-1){anim.i=0;showStep();}anim.playing=true;updateUI();scheduleTick();}
+function stepNext(){if(!anim.built){buildSteps();return;}anim.playing=false;clearTimeout(anim.timer);if(anim.i<anim.steps.length-1){anim.i++;showStep();}updateUI();}
+function stepPrev(){if(!anim.built)return;anim.playing=false;clearTimeout(anim.timer);if(anim.i>0){anim.i--;showStep();}updateUI();}
+function invalidate(){anim.built=false;anim.playing=false;clearTimeout(anim.timer);
+  document.getElementById('answerVal').textContent='—';document.getElementById('answerVal').classList.add('pending');
+  document.getElementById('cmp').innerHTML='';updateUI();}
+
+function onSpeed(v){speed=parseInt(v);document.getElementById('speedVal').textContent=v+'ms';}
+function onParam(){build();M.fullPath=null;render({});invalidate();
+  document.getElementById('stepBox').innerHTML=`Rebuilt: <b>B = ${M.B}</b> (k=${M.k}), <b>N = ${M.N.toLocaleString()}</b>. Shading shows the height-${M.k} recursion level. Pick a key and press <b>Run</b>.`;}
+function randomQuery(){build();document.getElementById('query').value=1+Math.floor(Math.random()*M.N);M.fullPath=null;invalidate();
+  document.getElementById('stepBox').innerHTML='New random key. Press <b>Run</b>.';}
+document.getElementById('query').addEventListener('input',()=>{M.fullPath=null;invalidate();});
+
+build(); render({}); updateUI();
+</script>
+</body>
+</html>
