@@ -14,7 +14,7 @@ dl, dd, ol, ul, figure {
 body {
   font: normal 19px/1.5 texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
   color: #46433A;
-  background-color: #F1EED9;
+  background-color: #F5EBD9;
   -webkit-text-size-adjust: 100%;
   -webkit-font-feature-settings: "kern" 1;
   -moz-font-feature-settings: "kern" 1;
@@ -112,7 +112,7 @@ a {
   top: 0;
   z-index: 100;
   padding: .5em 1em;
-  background: #F1EED9;
+  background: #F5EBD9;
   border: 1px solid #902015;
   border-radius: 0 0 4px 0;
   font-family: epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif; }
@@ -139,7 +139,7 @@ code {
   font-size: 1.8ex;
   border: 1px solid #aeaa9e;
   border-radius: 2px;
-  background-color: #f8f6ec; }
+  background-color: #faf6ed; }
 
 code {
   padding: 1px 5px; }
@@ -239,7 +239,7 @@ hr {
   margin-top: 3ex;
   margin-bottom: 3ex;
   text-align: center;
-  background: #F1EED9; }
+  background: #F5EBD9; }
 
 hr:after {
   content: "*      *      *";
@@ -252,14 +252,14 @@ hr:after {
 
 img,
 iframe {
-  background: #f8f6ec;
+  background: #faf6ed;
   padding: 5px;
   border: 1px solid #aeaa9e;
   border-radius: 4px;
   margin: 0ex 2em 1ex 0; }
 
 .picframe {
-  background: #f8f6ec;
+  background: #faf6ed;
   padding: 5px;
   border: 1px solid #aeaa9e;
   border-radius: 4px;
@@ -293,7 +293,7 @@ img.blend-colors {
   white-space: nowrap; }
 
 .digression {
-  border-left: solid 0.5ex #c18777;
+  border-left: solid 0.5ex #c38677;
   font-size: 16.625px;
   padding-left: .5em;
   padding-top: .35ex;
@@ -368,7 +368,7 @@ img.blend-colors {
       position: absolute;
       top: calc(50% - 19px);
       right: 15px;
-      background-color: #F1EED9;
+      background-color: #F5EBD9;
       border: 1px solid #aeaa9e;
       border-radius: 5px;
       text-align: right; }
@@ -523,7 +523,7 @@ img.blend-colors {
 .post-categories {
   font-size: 16.625px;
   float: right;
-  background-color: #f8f6ec;
+  background-color: #faf6ed;
   border: 1px solid #aeaa9e;
   border-radius: 5px;
   padding: 3px;
@@ -813,7 +813,7 @@ img.blend-colors {
 .highlight {
   background: #fff; }
   .highlighter-rouge .highlight {
-    background: #f8f6ec; }
+    background: #faf6ed; }
   .highlight .c {
     color: #998;
     font-style: italic; }

@@ -9,14 +9,21 @@
    The token values are the *same* numbers as css/main.scss, including the
    ones Sass derives:
 
-       --wi-bg          $background-color                 #F1EED9
+       --wi-bg          $background-color                 #F5EBD9  (was #F1EED9)
        --wi-ink         $text-color                       #46433A
        --wi-ink-strong  darken($text-color, 5%)           #38362e
        --wi-accent      $headings-color / $brand-color    #902015
        --wi-link        mix($headings-color, black, 90%)  #821d13
        --wi-border      lighten($text-color, 40%)         #aeaa9e
-       --wi-panel       lighten($background-color, 5%)    #f8f6ec
-       --wi-accent-soft mix($headings-color, $bg, 50%)    #c08777
+       --wi-panel       lighten($background-color, 5%)    #faf6ed  (was #f8f6ec)
+       --wi-accent-soft mix($headings-color, $bg, 50%)    #c28577  (was #c08777)
+
+   PANEL2, CONTROLS and the two BORDER variants below don't have documented
+   Sass formulas (they were hand-picked to sit right against the background,
+   not strictly derived) -- when --wi-bg moved, they were re-derived by
+   applying the same hue/saturation shift the background itself underwent,
+   keeping each one's own lightness (see retheme-animations.py, which mirrors
+   this file and documents the exact method).
 
    If you ever change a colour in css/main.scss, change it here too. They are
    two separate systems on purpose -- these pages must work when opened
@@ -25,15 +32,15 @@
 
 :root {
   /* --- surfaces ------------------------------------------------------- */
-  --wi-bg:            #F1EED9;
-  --wi-panel:         #f8f6ec;
-  --wi-panel-2:       #fbfaf4;
-  --wi-controls:      #e7e3ca;
+  --wi-bg:            #F5EBD9;  /* was #F1EED9 */
+  --wi-panel:         #faf6ed;  /* was #f8f6ec */
+  --wi-panel-2:       #fcf9f3;  /* was #fbfaf4 */
+  --wi-controls:      #ecddc5;  /* was #e7e3ca */
 
   /* --- lines ---------------------------------------------------------- */
-  --wi-border:        #aeaa9e;
-  --wi-border-soft:   #cdc9bb;
-  --wi-border-strong: #8d897c;
+  --wi-border:        #b9a793;  /* was #aeaa9e */
+  --wi-border-soft:   #d4c5b4;  /* was #cdc9bb */
+  --wi-border-strong: #9c866d;  /* was #8d897c */
 
   /* --- text ----------------------------------------------------------- */
   --wi-ink:           #46433A;
@@ -44,7 +51,7 @@
   /* --- brand ---------------------------------------------------------- */
   --wi-accent:        #902015;
   --wi-accent-dark:   #6d180f;
-  --wi-accent-soft:   #c08777;
+  --wi-accent-soft:   #c28577;  /* was #c08777 */
   --wi-link:          #821d13;
 
   /* --- semantic states -------------------------------------------------
