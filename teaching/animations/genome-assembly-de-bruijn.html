@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>de Bruijn graphs &middot; gluing reads into a graph</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    --wi-radius:4px; --wi-radius-lg:5px;
+    /* the four accents double as the base colours: A C G T */
+    --b-a:#2a6a63; --b-c:#b07d18; --b-g:#4a7c3f; --b-t:#902015;
+    /* the (up to four) solution colours */
+    --sol0:#902015; --sol1:#2a6a63; --sol2:#b07d18; --sol3:#4a7c3f;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code, .status code { background:var(--wi-controls); padding:1px 5px;
+              border-radius:3px; font-size:.85em; font-family:var(--wi-font-mono); }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.str { font-family:var(--wi-font-mono); font-size:.8rem; width:15em; text-transform:uppercase; }
+  input.num { width:3.6em; font-family:var(--wi-font-mono); font-size:.8rem; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* --- transport: slider + phase bar --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  /* half a slider thumb, so the phase bar lines up with the scrubber track;
+     the thumb is chunkier on touch screens */
+  @media (max-width:760px) { .progress { --thumb:11px; } }
+  .phasebar { display:flex; margin:5px var(--thumb) 0;
+              width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden;
+              flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage --- */
+  .stage { display:flex; flex-direction:column; gap:14px; }
+  .panels { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr); gap:14px;
+            align-items:start; }
+  @media (max-width:1100px) { .panels { grid-template-columns:1fr 1fr; } }
+  @media (max-width:760px) { .panels { grid-template-columns:1fr; } }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; margin:0 auto; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:104px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status b { color:var(--wi-accent-dark); }
+
+  /* the little suffix/prefix check */
+  .check { font-family:var(--wi-font-mono); font-size:1rem; line-height:1.35; margin-top:8px;
+           color:var(--wi-ink-strong); }
+  .check .row { white-space:pre; }
+  .check .ov { background:#f0d7cd; border-radius:2px; box-shadow:0 0 0 1px var(--wi-accent-soft); }
+  .check .no { background:#eae1d2; border-radius:2px; box-shadow:0 0 0 1px var(--wi-border); }
+  .check .verdict { font-family:var(--wi-font-body); font-size:.82rem; margin-top:3px; }
+  .check .yes { color:var(--wi-relax); } .check .nope { color:var(--wi-ink-faint); }
+
+  /* composition list */
+  .comp { display:flex; flex-wrap:wrap; gap:5px; }
+  .kchip { font-family:var(--wi-font-mono); font-size:.82rem; padding:2px 6px; border-radius:3px;
+           background:var(--wi-panel-2); border:1px solid var(--wi-border-soft); color:var(--wi-ink-strong); }
+  .kchip .mult { color:var(--wi-ink-faint); font-size:.85em; }
+  .kchip.hot { border-color:var(--wi-active); background:#f6e6df; }
+  .kchip.done { opacity:.45; }
+
+  /* reconstruction tiles */
+  .recon + .recon { margin-top:9px; }
+  .recon .head { font-family:var(--wi-font-head); font-size:.68rem; letter-spacing:.08em;
+                 text-transform:uppercase; color:var(--wi-ink-faint); display:flex; align-items:center;
+                 gap:7px; margin-bottom:4px; }
+  .recon .sw2 { width:.8em; height:.8em; border-radius:2px; display:inline-block; }
+  .tiles { display:flex; gap:2px; flex-wrap:wrap; }
+  .tiles .t { font-family:var(--wi-font-mono); font-size:.8rem; width:1.35em; height:1.6em;
+              display:flex; align-items:center; justify-content:center; border-radius:2px;
+              background:var(--wi-panel-2); border:1px solid var(--wi-border-soft);
+              color:var(--wi-ink-faint); }
+  .tiles .t.on { color:#fcf9f3; border-color:transparent; }
+  .tiles .t.diff { box-shadow:0 0 0 2px var(--wi-ink-strong); }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem;
+            color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+  .swl { width:1.5em; height:0; border-top:3px solid var(--wi-ink); display:inline-block; }
+
+  /* --- pseudocode --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; display:grid; grid-template-columns:1fr 1fr; gap:0 18px; }
+  @media (max-width:900px) { .codebody { grid-template-columns:1fr; } }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent;
+           white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em;
+              text-transform:uppercase; color:var(--wi-ink-faint); padding:10px 12px 3px;
+              border-top:1px solid var(--wi-border-soft); margin-top:6px; }
+  .sublabel.first { border-top:0; margin-top:0; padding-top:2px; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  /* --- editor --- */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,280px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:150px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:280px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+  .tooltip code { font-family:var(--wi-font-mono); font-size:.9em; }
+
+  .mobile-note { display:none; background:var(--wi-controls); border:1px solid var(--wi-accent-soft);
+                 border-radius:var(--wi-radius-lg); padding:11px 15px; font-size:.82rem;
+                 color:var(--wi-ink-strong); margin-bottom:14px; }
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    h1 { font-size:1.3rem; }
+    .controls { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .mobile-note { display:block; }
+    .desk-only { display:none !important; }
+  }
+
+  /* --- SVG classes --- */
+  .nodec { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.4; }
+  .nodec.hot { stroke:var(--wi-active); stroke-width:2.6; fill:#f6e6df; }
+  .nodec.cand { stroke:var(--wi-examine); stroke-width:2.2; fill:#f7edd9; }
+  .nodec.on0 { stroke:var(--sol0); stroke-width:2.6; }
+  .nodec.on1 { stroke:var(--sol1); stroke-width:2.6; }
+  .nodec.on2 { stroke:var(--sol2); stroke-width:2.6; }
+  .nodec.on3 { stroke:var(--sol3); stroke-width:2.6; }
+  .nodec.dim { opacity:.4; }
+  .nch { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-ink-strong);
+         text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .nix { font-family:var(--wi-font-mono); font-size:9.5px; fill:var(--wi-ink-faint);
+         text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .ovbox { fill:#f0d7cd; stroke:var(--wi-accent-soft); stroke-width:.8; pointer-events:none; }
+  .e { fill:none; stroke:#a6947a; stroke-width:1.4; }
+  .e.bb { stroke:var(--wi-ink-soft); stroke-width:2; }
+  .e.hot { stroke:var(--wi-active); stroke-width:2.6; }
+  .e.dim { stroke:var(--wi-inert); stroke-width:1.2; opacity:.5; }
+  .e.p0 { stroke:var(--sol0); stroke-width:2.8; }
+  .e.p1 { stroke:var(--sol1); stroke-width:2.8; }
+  .e.p2 { stroke:var(--sol2); stroke-width:2.8; }
+  .e.p3 { stroke:var(--sol3); stroke-width:2.8; }
+  .tile { fill:var(--wi-panel-2); stroke:var(--wi-border-soft); stroke-width:1; }
+  .tile.win { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2; }
+  .tile.dimmed { opacity:.32; }
+  .tch { font-family:var(--wi-font-mono); font-size:14px; fill:var(--wi-ink-strong);
+         text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .card { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.2; }
+  .card.fresh { stroke:var(--wi-active); stroke-width:2; fill:#f6e6df; }
+  .cix { font-family:var(--wi-font-mono); font-size:9.5px; fill:var(--wi-ink-faint);
+         dominant-baseline:central; }
+  .glab { font-family:var(--wi-font-body); font-size:13px; fill:var(--wi-ink-soft); font-style:italic; }
+  .hit { fill:transparent; cursor:pointer; }
+  @keyframes pop { from { opacity:0; transform:translateY(-7px) scale(.7); } to { opacity:1; transform:none; } }
+  .popin { animation:pop .3s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box; transform-origin:center; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+<style>
+  /* --- page-specific --- */
+  .elab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-soft);
+          text-anchor:middle; paint-order:stroke; stroke:var(--wi-bg); stroke-width:4px; pointer-events:none; }
+  .elab.tr { fill:var(--wi-accent); font-weight:bold; }
+  .e.tr { stroke:var(--wi-accent); stroke-width:3.2; }
+  .e.now { stroke:var(--wi-accent); stroke-width:3.6; }
+  .nodec.live { stroke:var(--wi-active); stroke-width:3.4; fill:#f6e6df; }
+  .nodec.loose { stroke:var(--wi-border-soft); }
+  .dot { fill:var(--wi-accent); stroke:var(--wi-panel-2); stroke-width:2; }
+  .rcard { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.2; }
+  .rcard.fresh { stroke:var(--wi-active); stroke-width:2; fill:#f6e6df; }
+  .rlab { font-family:var(--wi-font-mono); font-size:14px; fill:var(--wi-ink-strong);
+          text-anchor:middle; dominant-baseline:central; }
+  .readlist { display:flex; flex-direction:column; gap:8px; }
+  .readrow { border-left:3px solid transparent; padding-left:7px; }
+  .readrow.sel { border-left-color:var(--wi-accent); }
+  .readrow .rhead { font-size:.72rem; color:var(--wi-ink-faint); display:flex; gap:7px;
+                    align-items:center; margin-bottom:3px; font-family:var(--wi-font-head);
+                    letter-spacing:.04em; }
+  .readrow.sel .rhead { color:var(--wi-accent); }
+  .kread { font-size:.74rem; color:var(--wi-ink-faint); max-width:22ch; line-height:1.35; }
+  .kread b { color:var(--wi-accent); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>de Bruijn graphs &nbsp;&middot;&nbsp; gluing reads into a graph</h1>
+</div>
+
+<p class="subtitle">
+  The overlap graph puts a <i>vertex</i> per read and asks for a Hamiltonian path. Turn it inside out:
+  make each read an <b>edge</b> between its two (<i>k</i>&minus;1)-mers, and <b>glue vertices that carry
+  the same label</b>. An assembly is then a walk using every edge exactly once &mdash; an
+  <b>Eulerian walk</b>, and that one is easy. Nothing here compares reads letter by letter: labels are
+  simply filed by name, and the graph assembles itself.
+</p>
+
+<div class="mobile-note">
+  <b>Small screen:</b> this is the compact demo &mdash; the drawing, the scrubber and the commentary.
+  The definitions panel is on the desktop version.
+</div>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Genome</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <label for="inS">Own</label>
+    <input type="text" id="inS" class="str" spellcheck="false" maxlength="30">
+    <button id="applyBtn" class="pri">Set</button>
+  </div>
+  <div class="ctl">
+    <label for="kSlider">Read length <i>k</i></label>
+    <input type="range" id="kSlider" min="3" max="8" value="4" style="width:110px">
+    <span class="stepno" id="kVal">4</span>
+  </div>
+  <div class="ctl">
+    <span class="kread" id="kNote"></span>
+  </div>
+  <div class="ctl" id="readPick" style="display:none">
+    <label for="readSel">Walk</label>
+    <select id="readSel"></select>
+  </div>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (&larr;)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (&rarr;)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause  (space)" aria-label="Play">&#x25B6;&#xFE0E;</button>
+      <button id="replayBtn" title="Replay this step's motion">&#x21BB; replay</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">&mdash; / &mdash;</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="60" max="1400" value="420" style="width:88px">
+      <span class="stepno" id="speedVal">420ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="sim-box">
+    <div class="sim-title"><span id="stageTitle">The genome</span><span class="rhs" id="stageMeta"></span></div>
+    <div class="svgscroll"><svg id="mainSvg" class="stagesvg"></svg></div>
+    <div class="legend" id="legendBox"></div>
+  </div>
+
+  <div class="panels">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Eulerian walks</span><span class="rhs" id="readMeta"></span></div>
+      <div id="readBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Why more than one?</span><span class="rhs" id="whyMeta"></span></div>
+      <div class="status" id="whyBox" style="min-height:0"></div>
+    </div>
+  </div>
+</div>
+
+<details class="code desk-only" id="codeBox" open style="margin-top:18px">
+  <summary>Definitions</summary>
+  <div class="codebody" id="codeBody"></div>
+  <div class="codenote" id="codeNote"></div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      Lines starting with <code>#</code> are ignored. Of the rest, a line that is a small integer is the
+      read length <i>k</i>; the other one is the genome:
+      <br><br>
+      <code>4</code><br><code>GATTACAGCATGGCTAAC</code>
+      <br><br>
+      Any alphabet of letters and digits works, not just <code>ACGT</code> &mdash; <code>0001110100</code>
+      with <i>k</i>&thinsp;=&thinsp;3 is de Bruijn's own universal-string puzzle. Leave <i>k</i> out and the
+      page picks the smallest one that makes every (<i>k</i>&minus;1)-mer distinct. At most 30 letters: past
+      that the drawing stops being readable, and the point of it is lost.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   de Bruijn graph of the k-mer composition of a string.
+
+     V = { R[0..k-1) : R in R },  and for every read R an edge
+     v -> w labelled R, where v = R[0..k-1) and w = R[1..k).
+
+   An assembly is an Eulerian walk.  Unlike the overlap graph, EVERY walk uses
+   EVERY edge, so different assemblies differ only in the ORDER in which the
+   edges are taken -- which is why the walks are traced one at a time here
+   rather than drawn on top of each other.
+
+   Two sources of several walks, and the page distinguishes them:
+     * a branch: some (k-1)-mer occurs more than once, so a vertex has
+       out-degree >= 2 and the walk may leave it either way;
+     * a balanced graph: no vertex has out-degree - in-degree = +1, so the walk
+       is a closed tour and EVERY vertex is a legal start -- each rotation of
+       the genome is then a perfectly valid reading.
+
+   One step = one meaningful event, and the step animates itself: the window
+   sliding along the string, the reads flying to their sorted places, a read
+   splitting into its two (k-1)-mers, the dot crossing one edge.  The only
+   exception is the gluing, which is deliberately cut into frames so it can be
+   scrubbed and stopped mid-flight -- that one is the point of the whole page.
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/* a preset may pin k; without one the page falls back to the smallest k that
+   makes every (k-1)-mer distinct, which is also the smallest k with a unique
+   reading -- fine for the first example, useless for the interesting ones */
+const PRESETS = {
+  a: { name: "GATTACAGCATGGCTAAC · k = 4", s: "GATTACAGCATGGCTAAC", k: 4 },
+  a3:{ name: "GATTACAGCATGGCTAAC · k = 3", s: "GATTACAGCATGGCTAAC", k: 3 },
+  c: { name: "TAATGCCATGGGATGTT · k = 3",  s: "TAATGCCATGGGATGTT",  k: 3 },
+  d: { name: "AGCAGCAGCAGC · k = 4",       s: "AGCAGCAGCAGC",       k: 4 },
+  b: { name: "AGCTTAGCATGCAGTCAG · k = 3", s: "AGCTTAGCATGCAGTCAG", k: 3 },
+  e: { name: "0001110100 · k = 3",         s: "0001110100",         k: 3 }
+};
+
+const MAXW = 24, BUDGET = 6e5, GLUEF = 22, MAXLEN = 30;
+
+/* ---------- state -------------------------------------------------------- */
+
+let seq = "GATTACAGCATGGCTAAC", k = 4, kAuto = 4, kForced = false;
+let kmers = [], edges = [], adj = {}, outd = {}, ind = {}, nodes = [], nodeOrder = [];
+let rank = [], sortedIdx = [];        /* rank[i] = grid slot of read i;  sortedIdx = its inverse */
+let walks = [], wTrunc = false, sel = 0, why = null;
+let steps = [], phases = [], cur = 0, timer = null, tweenId = null;
+let baseColor = {};
+
+/* ---------- model -------------------------------------------------------- */
+
+/* the smallest k for which all (k-1)-mers of the string are distinct: then the
+   graph is a simple path and the reading is unique */
+function autoK(s) {
+  for (let kk = 3; kk <= s.length; kk++) {
+    const seen = new Set(); let ok = true;
+    for (let i = 0; i + (kk - 1) <= s.length; i++) {
+      const w = s.substr(i, kk - 1);
+      if (seen.has(w)) { ok = false; break; }
+      seen.add(w);
+    }
+    if (ok) return kk;
+  }
+  return s.length;
+}
+
+function enumerateWalks() {
+  walks = []; wTrunc = false;
+  const m = edges.length;
+  if (!m) return;
+  const seen = new Map();
+  seen.set(seq, edges.map(e => e.id));           /* the genome is always a reading -- list it first */
+
+  const semi = nodes.filter(v => (outd[v] || 0) - (ind[v] || 0) === 1);
+  const starts = semi.length ? semi : nodes.filter(v => (outd[v] || 0) > 0);
+  const used = new Array(m).fill(false), path = [];
+  let budget = 0, stop = false;
+  /* parallel edges are interchangeable: only ever take the lowest unused one */
+  const canon = e => {
+    for (const f of (adj[e.from] || [])) if (f.id < e.id && !used[f.id] && f.to === e.to) return false;
+    return true;
+  };
+  const spell = p => { let r = edges[p[0]].from; for (const id of p) r += edges[id].label.slice(-1); return r; };
+  function dfs(v) {
+    if (stop) return;
+    if (++budget > BUDGET) { stop = true; wTrunc = true; return; }
+    if (path.length === m) {
+      const r = spell(path);
+      if (!seen.has(r)) seen.set(r, path.slice());
+      if (seen.size >= MAXW) { stop = true; wTrunc = true; }
+      return;
+    }
+    for (const e of (adj[v] || [])) {
+      if (used[e.id] || !canon(e)) continue;
+      used[e.id] = true; path.push(e.id);
+      dfs(e.to);
+      path.pop(); used[e.id] = false;
+      if (stop) return;
+    }
+  }
+  for (const st of starts) { dfs(st); if (stop) break; }
+
+  const rest = [...seen.entries()].slice(1).sort((x, y) => x[0] < y[0] ? -1 : 1);
+  walks = [[seq, seen.get(seq)]].concat(rest).map(([str, order]) => ({ str: str, order: order }));
+}
+
+function buildModel() {
+  k = clamp(kForced ? k : autoK(seq), 3, Math.max(3, seq.length - 1));
+  kAuto = autoK(seq);
+  kmers = [];
+  for (let i = 0; i + k <= seq.length; i++) kmers.push(seq.substr(i, k));
+  edges = kmers.map((km, i) => ({ id: i, label: km, from: km.slice(0, k - 1), to: km.slice(1) }));
+  adj = {}; outd = {}; ind = {};
+  const nset = new Set();
+  edges.forEach(e => {
+    (adj[e.from] = adj[e.from] || []).push(e);
+    outd[e.from] = (outd[e.from] || 0) + 1;
+    ind[e.to] = (ind[e.to] || 0) + 1;
+    nset.add(e.from); nset.add(e.to);
+  });
+  edges.forEach(e => { e.self = e.from === e.to; });
+  const grp = {};
+  edges.forEach(e => { const key = e.from + ">" + e.to; e.par = (grp[key] = (grp[key] || 0) + 1) - 1; });
+  nodes = [...nset];
+
+  /* the reads sorted: that is the order the input would really arrive in */
+  const ord = kmers.map((_, i) => i).sort((a, b) =>
+    kmers[a] < kmers[b] ? -1 : kmers[a] > kmers[b] ? 1 : a - b);
+  rank = new Array(kmers.length);
+  ord.forEach((i, j) => rank[i] = j);
+  sortedIdx = ord;
+
+  enumerateWalks();
+  sel = clamp(sel, 0, Math.max(0, walks.length - 1));
+
+  /* the drawing order follows the genome walk, so the graph reads left to right */
+  nodeOrder = []; const seenN = new Set();
+  const order = walks.length ? walks[0].order : [];
+  if (order.length) {
+    [edges[order[0]].from].concat(order.map(id => edges[id].to)).forEach(n => {
+      if (!seenN.has(n)) { seenN.add(n); nodeOrder.push(n); }
+    });
+  }
+  nodes.forEach(n => { if (!seenN.has(n)) { seenN.add(n); nodeOrder.push(n); } });
+
+  const branch = nodes.filter(v => (outd[v] || 0) >= 2);
+  const balanced = !nodes.some(v => (outd[v] || 0) - (ind[v] || 0) === 1);
+  why = { branch: branch, balanced: balanced,
+          dup: branch.length ? branch.slice().sort((a, b) => (outd[b] - outd[a]))[0] : null };
+
+  const pal = ["var(--b-a)", "var(--b-c)", "var(--b-g)", "var(--b-t)"];
+  const letters = [...new Set(seq.split(""))].sort();
+  baseColor = {};
+  if (letters.join("") === "ACGT") baseColor = { A: pal[0], C: pal[1], G: pal[2], T: pal[3] };
+  else letters.forEach((c, i) => baseColor[c] = pal[i % 4]);
+}
+
+/* ---------- geometry ----------------------------------------------------- */
+
+/* the stage keeps one size, 1 unit = 1 px, so every font size below is literal
+   and stays in scale with the running text */
+const VW = 1000, VH = 450, R = 24;
+const TW = 26, TH = 30, TG = 3, CARDH = 22, CFONT = 14, CW = CFONT * 0.6;
+
+function nodeFont(len) { return len <= 3 ? 13 : len === 4 ? 12 : len === 5 ? 10 : 9; }
+function cardW() { return Math.max(2 * R, Math.round(k * CW + 18)); }
+
+/* string tiles with the staircase of reads underneath, as on the overlap page */
+function strGeom() {
+  const m = kmers.length, cw = cardW();
+  const strW = seq.length * (TW + TG) - TG;
+  const bodyW = Math.max(strW, (m - 1) * (TW + TG) + cw);
+  const y0 = 26, stairTop = y0 + TH + 26;
+  const pitch = clamp(Math.floor((VH - stairTop - CARDH - 14) / Math.max(1, m - 1)), 11, 20);
+  return { x0: Math.round((VW - bodyW) / 2), y0: y0, stairTop: stairTop, pitch: pitch, cw: cw };
+}
+/* the sorted grid; its cells are wide enough for the triples that appear in them */
+function gridGeom() {
+  const m = kmers.length;
+  const cols = clamp(Math.ceil(Math.sqrt(m * 1.6)), 1, 7), rows = Math.ceil(m / cols);
+  const cellW = Math.min(152, Math.floor((VW - 30) / cols));
+  const cellH = Math.min(102, Math.floor((VH - 40) / rows));
+  return { cols: cols, rows: rows, cellW: cellW, cellH: cellH,
+           gx: (VW - cols * cellW) / 2, gy: (VH - rows * cellH) / 2,
+           sep: clamp((cellW - 2 * R - 14) / 2, 26, 40) };
+}
+function stairPos(i) {
+  const g = strGeom();
+  return { x: g.x0 + i * (TW + TG) + g.cw / 2, y: g.stairTop + i * g.pitch + CARDH / 2 };
+}
+function gridPos(i) {
+  const g = gridGeom(), r = Math.floor(rank[i] / g.cols), c = rank[i] % g.cols;
+  return { x: g.gx + c * g.cellW + g.cellW / 2, y: g.gy + r * g.cellH + g.cellH / 2 };
+}
+function serpentine() {
+  const N = nodeOrder.length;
+  const rows = Math.min(4, Math.max(1, Math.ceil(N / 6)));
+  const cols = Math.max(1, Math.ceil(N / rows));
+  const X0 = 95, X1 = VW - 95;
+  const colW = cols > 1 ? (X1 - X0) / (cols - 1) : 0;
+  const rowH = rows > 1 ? Math.min(110, 310 / (rows - 1)) : 0;
+  const startY = VH / 2 - ((rows - 1) * rowH) / 2 - 4;
+  const pos = {};
+  nodeOrder.forEach((n, i) => {
+    const r = Math.floor(i / cols); let c = i % cols;
+    if (r % 2 === 1) c = cols - 1 - c;
+    pos[n] = { x: X0 + c * colW, y: startY + r * rowH };
+  });
+  return pos;
+}
+function edgeGeom(a, b, opts) {
+  opts = opts || {};
+  const par = opts.par || 0;
+  if (opts.self) {
+    const x = a.x, y = a.y, s = 16 + par * 10;
+    return { d: "M " + (x - 9) + "," + (y - R + 5) + " C " + (x - s - 20) + "," + (y - R - 46) +
+                " " + (x + s + 20) + "," + (y - R - 46) + " " + (x + 9) + "," + (y - R + 5),
+             lx: x, ly: y - R - 38 };
+  }
+  const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+  const ax = a.x + ux * R, ay = a.y + uy * R, bx = b.x - ux * R, by = b.y - uy * R;
+  const mx = (ax + bx) / 2, my = (ay + by) / 2;
+  const side = (par % 2 === 0) ? 1 : -1, mag = Math.min(24, d * 0.10) + Math.floor(par / 2) * 17;
+  const nx = -uy * side, ny = ux * side, cx = mx + nx * mag, cy = my + ny * mag;
+  return { d: "M " + ax + "," + ay + " Q " + cx + "," + cy + " " + bx + "," + by,
+           lx: cx + nx * 9, ly: cy + ny * 9 };
+}
+
+/* ---------- svg pieces ---------------------------------------------------- */
+
+const MARK = { base: "var(--wi-border)", tr: "var(--wi-accent)", dim: "var(--wi-inert)" };
+function defs() {
+  return "<defs>" + Object.keys(MARK).map(m =>
+    '<marker id="ah-' + m + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.6" ' +
+    'markerHeight="5.6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="' +
+    MARK[m] + '"/></marker>').join("") + "</defs>";
+}
+/* one <text> with a <tspan> per letter: the browser does the spacing, so
+   nothing depends on the mono font's advance width */
+function chars(lab, x, y, cls, size, extra) {
+  const sp = [];
+  for (let c = 0; c < lab.length; c++) {
+    const col = baseColor[lab[c]] ? ' fill="' + baseColor[lab[c]] + '"' : "";
+    sp.push("<tspan" + col + ">" + esc(lab[c]) + "</tspan>");
+  }
+  return '<text class="' + cls + '" x="' + x + '" y="' + y + '"' +
+         (size ? ' font-size="' + size + '"' : "") + (extra || "") + ">" + sp.join("") + "</text>";
+}
+function vertexSvg(x, y, label, cls, op) {
+  return '<g' + (op !== undefined && op < 1 ? ' opacity="' + op.toFixed(2) + '"' : "") + '>' +
+         '<circle class="nodec ' + (cls || "") + '" cx="' + x + '" cy="' + y + '" r="' + R + '"/>' +
+         chars(label, x, y, "rlab", nodeFont(label.length)) + "</g>";
+}
+function cardSvg(x, y, text, cls, op) {
+  const w = Math.max(cardW(), text.length * CW + 18), h = CARDH;
+  return '<g' + (op !== undefined && op < 1 ? ' opacity="' + op.toFixed(2) + '"' : "") + '>' +
+         '<rect class="rcard ' + (cls || "") + '" x="' + (x - w / 2) + '" y="' + (y - h / 2) +
+         '" width="' + w + '" height="' + h + '" rx="4"/>' +
+         chars(text, x, y, "rlab", CFONT) + "</g>";
+}
+function sizeStage(svg) {
+  svg.setAttribute("width", VW); svg.setAttribute("height", VH);
+  svg.setAttribute("viewBox", "0 0 " + VW + " " + VH);
+}
+
+/* ---------- the pictures -------------------------------------------------- */
+
+/* the string, with the current window boxed; op fades it out as the reads stop
+   being windows of anything and become an unordered multiset */
+function strSvg(st, op) {
+  if (op <= 0.001) return "";
+  const g = strGeom(), out = ['<g opacity="' + op.toFixed(3) + '">'];
+  out.push('<text class="glab" text-anchor="end" x="' + (g.x0 - 9) + '" y="' + (g.y0 + TH / 2 + 5) +
+           '">T =</text>');
+  for (let i = 0; i < seq.length; i++) {
+    const inWin = st && st.win !== undefined && st.win >= 0 && i >= st.win && i < st.win + k;
+    out.push('<rect class="tile' + (inWin ? " win" : "") + '" x="' + (g.x0 + i * (TW + TG)) +
+             '" y="' + g.y0 + '" width="' + TW + '" height="' + TH + '" rx="3"/>');
+    out.push(chars(seq[i], g.x0 + i * (TW + TG) + TW / 2, g.y0 + TH / 2, "rlab", 16));
+  }
+  out.push("</g>");
+  return out.join("");
+}
+/* phase 1: window sliding, cards dropping into the staircase, then the flight
+   to the sorted grid (t = 0 staircase ... 1 grid) */
+function drawReads(st, t) {
+  const shown = st.cards === undefined ? kmers.length : st.cards;
+  const g = gridGeom();
+  const out = [defs(), strSvg(st, lerp(1, 0.28, t))];
+  if (t > 0.02)
+    out.push('<g opacity="' + t.toFixed(2) + '"><text class="glab" x="' + (g.gx + 4) + '" y="' +
+             (g.gy - 8) + '">&#8475; =</text></g>');
+  for (let i = 0; i < shown; i++) {
+    const a = stairPos(i), b = gridPos(i);
+    const s = 0.3 * (i / Math.max(1, kmers.length - 1));         /* a slight stagger */
+    const lt = t === 0 ? 0 : ease3(clamp((t - s) / (1 - s), 0, 1));
+    const fresh = (i === shown - 1 && st.win !== undefined && st.win >= 0 && t === 0);
+    out.push((fresh ? '<g class="popin">' : "<g>") +
+             cardSvg(lerp(a.x, b.x, lt), lerp(a.y, b.y, lt), kmers[i], fresh ? "fresh" : "") + "</g>");
+  }
+  return out.join("");
+}
+/* phase 2: read n-1 splits into its two (k-1)-mers, which drift apart while the
+   label rises to become the edge label (t = 0 card ... 1 triple) */
+function tripleSvg(i, t) {
+  const g = gridGeom(), c = gridPos(i), e = edges[i], sep = g.sep * t;
+  const a = { x: c.x - sep, y: c.y }, b = { x: c.x + sep, y: c.y };
+  const out = [];
+  if (t < 0.999) out.push(cardSvg(c.x, c.y, e.label, "", 1 - t));
+  if (t > 0.15) {
+    if (!e.self && sep > R + 4) {
+      const geo = edgeGeom(a, b, {});
+      out.push('<path class="e" d="' + geo.d + '" marker-end="url(#ah-base)"/>');
+    } else if (e.self && t > 0.6) {
+      out.push('<path class="e" d="' + edgeGeom(a, a, { self: true }).d + '" marker-end="url(#ah-base)"/>');
+    }
+    out.push(vertexSvg(a.x, a.y, e.from, "loose", clamp((t - 0.15) / 0.35, 0, 1)));
+    if (!e.self) out.push(vertexSvg(b.x, b.y, e.to, "loose", clamp((t - 0.15) / 0.35, 0, 1)));
+    out.push('<text class="elab" x="' + c.x + '" y="' + (c.y - lerp(0, R + 16, t)) + '"' +
+             (t < 0.999 ? ' opacity="' + t.toFixed(2) + '"' : "") + ">" + esc(e.label) + "</text>");
+  }
+  return out.join("");
+}
+function drawTriples(st, t) {
+  const n = st.n === undefined ? kmers.length : st.n;
+  const out = [defs()];
+  const g = gridGeom();
+  out.push('<text class="glab" x="' + (g.gx + 4) + '" y="' + (g.gy - 8) + '">&#8475; =</text>');
+  for (let j = 0; j < kmers.length; j++) {         /* j = grid slot, so this reads left to right */
+    const i = sortedIdx[j];
+    if (j < n - 1) out.push(tripleSvg(i, 1));
+    else if (j === n - 1) out.push(tripleSvg(i, t === null ? 1 : t));
+    else out.push(cardSvg(gridPos(i).x, gridPos(i).y, kmers[i], ""));
+  }
+  return out.join("");
+}
+/* phase 3: every endpoint of every triple travels to its glued position */
+function drawGlue(t) {
+  const g = gridGeom(), pos = serpentine(), out = [defs()];
+  const at = [];
+  edges.forEach((e, i) => {
+    const c = gridPos(i);
+    const s = (rank[i] / Math.max(1, edges.length)) * 0.45;
+    const lt = ease3(clamp((t - s) / (1 - s), 0, 1));
+    at.push([{ x: lerp(c.x - g.sep, pos[e.from].x, lt), y: lerp(c.y, pos[e.from].y, lt) },
+             { x: lerp(c.x + g.sep, pos[e.to].x, lt), y: lerp(c.y, pos[e.to].y, lt) }, lt]);
+  });
+  edges.forEach((e, i) => {
+    const f = at[i][0], h = at[i][1];
+    const self = Math.hypot(f.x - h.x, f.y - h.y) < 4;
+    out.push('<path class="e" d="' + edgeGeom(f, h, { self: self }).d + '" marker-end="url(#ah-base)"/>');
+  });
+  edges.forEach((e, i) => {
+    const f = at[i][0], h = at[i][1], done = at[i][2] > 0.995;
+    out.push(vertexSvg(f.x, f.y, e.from, done ? "" : "loose"));
+    if (!e.self || !done) out.push(vertexSvg(h.x, h.y, e.to, done ? "" : "loose"));
+  });
+  return out.join("");
+}
+/* phases 3-4: the glued graph, with the walk traced over it */
+function drawGraph(st, t) {
+  const pos = serpentine(), out = [defs()];
+  const order = walks.length ? walks[sel].order : [];
+  const tr = st.tr || null, tt = t === null || t === undefined ? 1 : t;
+  const doneSet = {};
+  if (tr) {
+    for (let i = 0; i < tr.i; i++) doneSet[order[i]] = 1;
+    if (tt >= 1 && tr.i < order.length) doneSet[order[tr.i]] = 1;
+  }
+  const nowEid = tr && tt < 1 && tr.i < order.length ? order[tr.i] : null;
+
+  edges.forEach(e => {
+    const g = edgeGeom(pos[e.from], pos[e.to], { par: e.par, self: e.self });
+    const done = doneSet[e.id], now = e.id === nowEid;
+    out.push('<path class="e ' + (done ? "tr" : now ? "now" : "") + '" data-eid="' + e.id +
+             '" d="' + g.d + '"' +
+             (now ? "" : ' marker-end="url(#ah-' + (done ? "tr" : "base") + ')"') + "/>");
+    out.push('<text class="elab' + (done || now ? " tr" : "") + '" x="' + g.lx + '" y="' + g.ly +
+             '">' + esc(e.label) + "</text>");
+  });
+
+  let live = null;
+  if (tr && order.length)
+    live = tr.i === 0 && tt < 1 ? edges[order[0]].from
+         : tt >= 1 && tr.i < order.length ? edges[order[tr.i]].to
+         : tr.i > 0 ? edges[order[tr.i - 1]].to : edges[order[0]].from;
+  nodeOrder.forEach(n => {
+    out.push(vertexSvg(pos[n].x, pos[n].y, n, n === live ? "live" : ""));
+    out.push('<circle class="hit" data-node="' + n + '" cx="' + pos[n].x + '" cy="' + pos[n].y +
+             '" r="' + (R + 3) + '"/>');
+  });
+  out.push('<g id="traceLayer"></g>');
+  return out.join("");
+}
+/* the edge being crossed is measured once it is in the DOM */
+function paintDot(svg, st, t) {
+  const order = walks.length ? walks[sel].order : [];
+  if (!st.tr || t === null || t >= 1 || st.tr.i >= order.length) return;
+  const p = svg.querySelector('path[data-eid="' + order[st.tr.i] + '"]');
+  const layer = svg.querySelector("#traceLayer");
+  if (!p || !p.getTotalLength) return;
+  const L = p.getTotalLength(), at = L * clamp(t, 0, 1);
+  p.style.strokeDasharray = at + " " + (L + 2);
+  const q = p.getPointAtLength(at);
+  if (layer) layer.innerHTML = '<circle class="dot" cx="' + q.x + '" cy="' + q.y + '" r="7"/>';
+}
+
+function ease3(x) { return 1 - Math.pow(1 - x, 3); }
+
+/* ---------- one drawing call, for a step and an optional progress ---------- */
+
+function drawStage(st, t) {
+  const svg = el("mainSvg");
+  sizeStage(svg);
+  svg.innerHTML =
+      st.v === "reads"   ? drawReads(st, st.grid ? (t === null ? 1 : t) : 0)
+    : st.v === "triples" ? drawTriples(st, t)
+    : st.v === "glue"    ? (st.t < 0.999 ? drawGlue(st.t) : drawGraph(st, 1))
+    :                      drawGraph(st, t);
+  if (st.v === "graph") paintDot(svg, st, t);
+}
+
+/* ---------- animation ------------------------------------------------------ */
+
+function stopTween() { if (tweenId) { cancelAnimationFrame(tweenId); tweenId = null; } }
+
+/* every animated step is the same thing: run t from 0 to 1 and redraw */
+function runAnim(st, D, from) {
+  stopTween();
+  const t0 = performance.now(), a = from === undefined ? 0 : from;
+  function frame(now) {
+    const t = clamp(a + (1 - a) * (now - t0) / D, 0, 1);
+    drawStage(st, t);
+    if (t < 1) tweenId = requestAnimationFrame(frame);
+    else { tweenId = null; drawStage(st, null); }
+  }
+  tweenId = requestAnimationFrame(frame);
+}
+const sp = () => Number(el("speed").value);
+/* what, if anything, the step animates when it is stepped into forwards */
+function animOf(st, prev) {
+  if (st.v === "reads" && st.grid && prev && prev.v === "reads" && !prev.grid)
+    return Math.max(700, 2.2 * sp());                    /* the flight to the sorted grid */
+  if (st.v === "triples" && st.n && (!prev || prev.v !== "triples" || prev.n !== st.n))
+    return Math.max(340, 1.0 * sp());                    /* one read splitting */
+  if (st.v === "graph" && st.tr && st.tr.i < edges.length && (!prev || !prev.tr || prev.tr.i !== st.tr.i))
+    return Math.max(260, 0.85 * sp());                   /* the dot crossing one edge */
+  return 0;
+}
+
+/* ---------- steps --------------------------------------------------------- */
+
+function mkPhase(name) { phases.push({ name: name, from: steps.length, to: steps.length }); }
+function add(o) {
+  o.ph = phases.length - 1;
+  if (o.txt === undefined && steps.length) o.txt = steps[steps.length - 1].txt;   /* no flicker */
+  steps.push(o);
+  phases[phases.length - 1].to = steps.length - 1;
+}
+function bigNum(n) {
+  let f = 1;
+  for (let i = 2; i <= n; i++) { f *= i; if (f > 1e15) break; }
+  if (f < 1e6) return f.toLocaleString("en-US");
+  const e = Math.floor(Math.log10(f));
+  return (f / Math.pow(10, e)).toFixed(1) + " &times; 10<sup>" + e + "</sup>";
+}
+
+function build() {
+  buildModel();
+  steps = []; phases = [];
+  const m = edges.length, W = walks.length ? walks[sel] : null;
+
+  mkPhase("Genome & reads");
+  add({ v: "reads", win: -1, cards: 0,
+        txt: "A genome is just a string: <code>" + esc(seq) + "</code>, " + seq.length + " letters. " +
+             "A real one is the same idea at three billion, and no machine reads it end to end.",
+        hl: ["d_head"] });
+  for (let i = 0; i < m; i++)
+    add({ v: "reads", win: i, cards: i + 1, dur: 130, hl: ["d_head"],
+          txt: "Window at " + i + ": <code>" + esc(kmers[i]) + "</code>. Sequencing returns every " +
+               "window of length <i>k</i> = " + k + " &mdash; and nothing about where it came from." });
+  add({ v: "reads", win: -1, cards: m, grid: true, hl: ["d_head"],
+        txt: "<b>" + m + " reads, and no order.</b> What arrives is the multiset &#8475; = " +
+             "Composition<sub>" + k + "</sub>(T), conventionally sorted &mdash; the string is gone. " +
+             "Putting the reads back by trying orders would mean " + m + "! &asymp; <b>" + bigNum(m) +
+             "</b> attempts." });
+
+  mkPhase("Triples");
+  for (let i = 1; i <= m; i++) {
+    const e = edges[sortedIdx[i - 1]];
+    add({ v: "triples", n: i, hl: ["d_v", "d_e"],
+          txt: i === 1
+            ? "The de Bruijn move: a read is not a vertex but an <b>edge</b>. Split <code>" +
+              esc(e.label) + "</code> into its prefix <code>" + esc(e.from) + "</code> and its suffix " +
+              "<code>" + esc(e.to) + "</code> &mdash; two (<i>k</i>&minus;1)-mers &mdash; and hang the " +
+              "read on an arc between them."
+            : i === m
+              ? "All " + m + " reads are arcs now, each between its own two (<i>k</i>&minus;1)-mers, " +
+                "and still completely unconnected" +
+                (why.dup ? " &mdash; though labels are already repeating (<code>" + esc(why.dup) +
+                           "</code> for one)" : "") + "."
+              : "Split <code>" + esc(e.label) + "</code>: prefix <code>" + esc(e.from) +
+                "</code>, suffix <code>" + esc(e.to) + "</code>." });
+  }
+
+  mkPhase("Gluing");
+  for (let f = 0; f <= GLUEF; f++)
+    add({ v: "glue", t: f / GLUEF, dur: 45, hl: ["d_v"],
+          txt: f === 0
+            ? "The only rule: <b>vertices with the same label are the same vertex</b>. No read is ever " +
+              "compared with another &mdash; each label is simply filed by name, and the loose triples " +
+              "zip themselves into a graph. Scrub through this slowly; it is the whole trick."
+            : undefined });
+  add({ v: "graph", hl: ["d_v", "d_e"],
+        txt: "Glued: <b>" + nodeOrder.length + " vertices</b> carrying all <b>" + m + " edges</b>. " +
+             "Nobody ordered the reads &mdash; the structure came out of the labels alone." });
+
+  mkPhase("Eulerian walk");
+  add({ v: "graph", hl: ["e_head", "e_cond"],
+        txt: "An assembly uses every read exactly once: a walk crossing <b>every edge exactly once</b>, " +
+             "an <b>Eulerian walk</b>. It exists iff the graph is connected and every vertex is " +
+             "balanced, except possibly two &mdash; and unlike a Hamiltonian path it can be found in " +
+             "linear time." });
+  if (W) {
+    for (let i = 0; i < m; i++) {
+      const e = edges[W.order[i]];
+      add({ v: "graph", tr: { i: i }, hl: ["e_head", "e_spell"],
+            txt: i === 0
+              ? "Start at <code>" + esc(e.from) + "</code> and cross <code>" + esc(e.label) +
+                "</code>: the first edge contributes all " + k + " of its letters."
+              : "Cross <code>" + esc(e.label) + "</code>: its first " + (k - 1) + " letters are " +
+                "already spelled, so it adds the single letter <code>" + esc(e.label.slice(-1)) +
+                "</code>." });
+    }
+    add({ v: "graph", tr: { i: m }, hl: ["e_head", "e_spell"],
+          txt: "Every edge used exactly once, and the heap of shuffled reads has spelled out " +
+               "<code>" + esc(W.str) + "</code>" +
+               (walks.length === 1
+                 ? " &mdash; the <b>only</b> walk this graph admits, so the assembly is unique."
+                 : " &mdash; but this is walk " + (sel + 1) + " of <b>" +
+                   (wTrunc ? "at least " + walks.length : walks.length) + "</b>. Pick another one " +
+                   "from <b>Walk</b> above and trace that instead; the panel on the right says why " +
+                   "they exist.") });
+  }
+}
+
+/* ---------- panels -------------------------------------------------------- */
+
+function renderReadPanel(st) {
+  const box = el("readBox");
+  if (!walks.length) { box.innerHTML = '<div class="placeholder">No Eulerian walk.</div>'; return; }
+  const cols = ["var(--sol0)", "var(--sol1)", "var(--sol2)", "var(--sol3)"];
+  const show = Math.min(6, walks.length);
+  const shownChars = st.tr ? (k - 1) + st.tr.i + (st.tr.i < edges.length ? 1 : 0) : -1;
+  const rows = [];
+  for (let i = 0; i < show; i++) {
+    const isSel = i === sel, s = walks[i].str;
+    const other = walks[isSel ? (i + 1) % walks.length : sel].str;
+    const t = [];
+    for (let c = 0; c < s.length; c++) {
+      const on = !isSel || shownChars < 0 || c < shownChars;
+      const diff = walks.length > 1 && other[c] !== s[c];
+      t.push('<span class="t' + (on ? " on" : "") + (on && diff ? " diff" : "") + '"' +
+             (on ? ' style="background:' + (isSel ? cols[0] : "var(--wi-inert)") + '"' : "") + ">" +
+             esc(s[c]) + "</span>");
+    }
+    rows.push('<div class="readrow' + (isSel ? " sel" : "") + '"><div class="rhead">walk ' + (i + 1) +
+              (i === 0 ? " · the genome" : "") + (isSel ? " · tracing" : "") + "</div>" +
+              '<div class="tiles">' + t.join("") + "</div></div>");
+  }
+  box.innerHTML = '<div class="readlist">' + rows.join("") + "</div>" +
+    (show < walks.length ? '<div class="placeholder" style="margin-top:8px">and ' +
+      (walks.length - show) + (wTrunc ? " or more" : "") + " further walk" +
+      (walks.length - show === 1 ? "" : "s") + ".</div>" : "");
+  el("readMeta").textContent = (wTrunc ? "\u2265 " : "") + walks.length +
+    (walks.length === 1 ? " walk" : " walks");
+}
+
+function renderWhy() {
+  const n = walks.length;
+  el("whyMeta").textContent = n === 1 ? "unique" : "not unique";
+  if (n === 1) {
+    el("whyBox").innerHTML = "Every (<i>k</i>&minus;1)-mer of the genome occurs once, so no vertex has a " +
+      "choice of exits and the walk is forced. That is exactly what <i>k</i> = " + kAuto +
+      " buys here &mdash; shorter reads and the repeats come back.";
+    return;
+  }
+  const bits = [];
+  if (why.balanced)
+    bits.push("<b>The graph is balanced</b> &mdash; no vertex has one more edge out than in &mdash; so the " +
+              "walk closes into a tour and <b>every vertex is a legal start</b>. Each rotation of the " +
+              "genome is then its own reading, and no data can tell them apart: circular genomes really " +
+              "do have no beginning.");
+  if (why.branch.length)
+    bits.push("<b>" + (why.branch.length === 1 ? "One vertex has" : why.branch.length + " vertices have") +
+              " out-degree &ge; 2</b>" +
+              (why.dup ? " (<code>" + esc(why.dup) + "</code> among them)" : "") +
+              ": a (<i>k</i>&minus;1)-mer that occurs several times in the genome, so the walk may leave " +
+              "it either way. Raise <i>k</i> past the length of that repeat and the branch disappears.");
+  el("whyBox").innerHTML = bits.join("<br><br>");
+}
+
+function renderLegend(st) {
+  const items = [];
+  if (st.v === "reads" && !st.grid) {
+    items.push('<span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> the current window</span>');
+    items.push('<span class="item"><span class="sw" style="background:var(--wi-panel-2)"></span> a read</span>');
+  } else {
+    items.push('<span class="item"><span class="sw" style="border-radius:50%;background:var(--wi-panel-2)"></span> vertex = (k&minus;1)-mer</span>');
+    if (st.v !== "graph")
+      items.push('<span class="item"><span class="sw" style="border-radius:50%;background:var(--wi-panel-2);border-color:var(--wi-border-soft)"></span> not glued yet</span>');
+    items.push('<span class="item"><span class="swl" style="border-color:var(--wi-border)"></span> edge = one read</span>');
+    if (st.tr) items.push('<span class="item"><span class="swl" style="border-color:var(--wi-accent)"></span> already crossed</span>');
+  }
+  if (Object.keys(baseColor).length)
+    items.push('<span class="item">' + Object.keys(baseColor).map(c =>
+      '<b style="color:' + baseColor[c] + '">' + esc(c) + "</b>").join("&thinsp;") + "</span>");
+  el("legendBox").innerHTML = items.join("");
+}
+
+/* ---------- definitions panel --------------------------------------------- */
+
+const K = s => '<span class="kw">' + s + "</span>";
+const C = s => '<span class="cm">' + s + "</span>";
+const DEFS = [
+  { k: "d_head", t: "&#8475; = Composition<sub>k</sub>(T) = {{ T[0..k), …, T[n−k..n) }}   " + C("// a multiset") },
+  { k: "d_v",    t: "G<sub>B</sub>(&#8475;) = (V, E)   directed <b>multi</b>graph" },
+  { k: "d_v",    t: "    V = { R[0..k−1) : R ∈ &#8475; }" },
+  { k: "d_e",    t: "    for each read R ∈ &#8475;:  add edge v → w, labelled R," },
+  { k: "d_e",    t: "        with v = R[0..k−1),  w = R[1..k)" }
+];
+const EUL = [
+  { k: "e_head",  t: "assembly of &#8475;  =  Euler walk in G<sub>B</sub>(&#8475;)   " + C("// every edge exactly once") },
+  { k: "e_spell", t: "spells  T = v<sub>0</sub> · label(e<sub>1</sub>)[k−1] · … · label(e<sub>m</sub>)[k−1]" },
+  { k: "e_cond",  t: K("Euler's theorem") + " (directed):  a walk exists iff G is connected and" },
+  { k: "e_cond",  t: "    d<sub>out</sub>(v) = d<sub>in</sub>(v) for every v," },
+  { k: "e_cond",  t: "    or for all but two, where the difference is +1 and −1" },
+  { k: "e_head",  t: "and it can be computed in O(n + m) — unlike a Hamiltonian path" }
+];
+function renderCode(st) {
+  const hl = new Set(st.hl || []);
+  const block = (label, lines) =>
+    '<div class="sublabel first">' + label + "</div>" +
+    lines.map(l => '<div class="cline' + (hl.has(l.k) ? " on" : "") + '"><span>' + l.t +
+                   "</span></div>").join("");
+  el("codeBody").innerHTML = "<div>" + block("The graph", DEFS) + "</div>" +
+                             "<div>" + block("The walk", EUL) + "</div>";
+  el("codeNote").innerHTML =
+    "Both graphs are built from the same reads. The overlap graph spends a vertex per read and needs a " +
+    "<b>Hamiltonian</b> path; the de Bruijn graph spends an <b>edge</b> per read and needs an " +
+    "<b>Eulerian</b> one. Same data, same question &mdash; one of the two problems is NP-complete and " +
+    "the other is linear time.";
+}
+
+/* ---------- render pass --------------------------------------------------- */
+
+function renderPhases() {
+  const bar = el("phaseBar");
+  bar.innerHTML = "";
+  phases.forEach(p => {
+    const span = p.to - p.from + 1;
+    /* the fill edge sits exactly where the scrubber thumb sits */
+    const pct = cur > p.to ? 100 : cur < p.from ? 0 : ((cur - p.from) / span) * 100;
+    const b = document.createElement("button");
+    b.className = "phasebtn" + (cur >= p.from && cur <= p.to ? " on" : (cur > p.to ? " past" : ""));
+    b.style.flexGrow = String(Math.max(1, span));   /* exactly proportional to the scrubber */
+    b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' +
+                  pct.toFixed(2) + '%"></span><span class="lab">' + esc(p.name) + "</span>";
+    b.title = p.name + " — steps " + (p.from + 1) + "–" + (p.to + 1);
+    b.addEventListener("click", () => { stopPlay(); cur = p.from; render(true); });
+    bar.appendChild(b);
+  });
+}
+
+function title(st) {
+  return st.v === "reads" ? (st.grid ? "The composition \u211B" : "The genome and its windows")
+       : st.v === "triples" ? "One triple per read"
+       : st.v === "glue" ? "Gluing"
+       : "The de Bruijn graph";
+}
+
+function render(noMove) {
+  stopTween();
+  const st = steps[cur] || {}, prev = cur > 0 ? steps[cur - 1] : null;
+  const D = noMove ? 0 : animOf(st, prev);
+  if (D) runAnim(st, D); else drawStage(st, null);
+
+  el("stageTitle").innerHTML = title(st);
+  el("stageMeta").textContent = "k = " + k + " · " + edges.length + " reads · " +
+                                nodeOrder.length + " vertices";
+  el("statusBox").innerHTML = st.txt || "";
+  el("phaseName").textContent = phases[st.ph] ? phases[st.ph].name : "";
+  renderReadPanel(st); renderWhy(); renderLegend(st); renderPhases();
+  if (window.innerWidth > 760) renderCode(st);
+  el("scrubber").max = String(Math.max(0, steps.length - 1));
+  el("scrubber").value = String(cur);
+  el("stepNo").textContent = steps.length ? (cur + 1) + " / " + steps.length : "— / —";
+  el("backBtn").disabled = cur <= 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+  el("replayBtn").style.display = animOf(st, prev) ? "" : "none";
+}
+
+/* ---------- transport ------------------------------------------------------ */
+
+const PLAY = "\u25B6\uFE0E", PAUSE = "\u23F8\uFE0E";
+function stepFwd() { if (cur < steps.length - 1) { cur++; render(); } else stopPlay(); }
+function stepBack() { if (cur > 0) { cur--; render(true); } }
+function stopPlay() {
+  if (timer) { clearTimeout(timer); timer = null; el("playBtn").textContent = PLAY; }
+}
+/* every step carries its own delay, and a step that animates itself is never
+   cut short: the next one waits for the motion to land */
+function planNext() {
+  const d = (steps[cur] || {}).dur;
+  timer = setTimeout(playTick, d === undefined ? sp() : Math.max(20, d * sp() / 420));
+}
+function playTick() {
+  if (tweenId) { timer = setTimeout(playTick, 60); return; }
+  if (cur >= steps.length - 1) { stopPlay(); return; }
+  cur++; render(); planNext();
+}
+function togglePlay() {
+  if (timer) { stopPlay(); return; }
+  if (cur >= steps.length - 1) return;
+  el("playBtn").textContent = PAUSE;
+  planNext();
+}
+function replay() {
+  const st = steps[cur] || {}, prev = cur > 0 ? steps[cur - 1] : null;
+  const D = animOf(st, prev);
+  if (D) runAnim(st, D);
+}
+
+/* ---------- input ---------------------------------------------------------- */
+
+function fillPresets() {
+  const s = el("presetSel");
+  s.innerHTML = "";
+  Object.keys(PRESETS).forEach(key => {
+    const o = document.createElement("option");
+    o.value = key; o.textContent = PRESETS[key].name;
+    s.appendChild(o);
+  });
+}
+function syncControls() {
+  const maxK = Math.max(3, Math.min(8, seq.length - 1));
+  const sl = el("kSlider");
+  sl.max = String(maxK); sl.value = String(k);
+  el("kVal").textContent = k;
+  el("kNote").innerHTML = kAuto <= maxK
+    ? (k === kAuto
+        ? "<b>k = " + kAuto + "</b> is the smallest read length that makes every (k&minus;1)-mer distinct"
+        : "smallest k with all (k&minus;1)-mers distinct: <b>" + kAuto + "</b>")
+    : "no k below " + (maxK + 1) + " makes all (k&minus;1)-mers distinct";
+  el("inS").value = seq;
+  el("inputText").value = "# k, then the genome (either order)\n" + k + "\n" + seq;
+  const pick = el("readPick"), rs = el("readSel");
+  pick.style.display = walks.length > 1 ? "" : "none";
+  rs.innerHTML = "";
+  walks.forEach((w, i) => {
+    const o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = (i + 1) + " · " + w.str + (i === 0 ? "  (the genome)" : "");
+    rs.appendChild(o);
+  });
+  rs.value = String(sel);
+}
+function reload(keepPhase) {
+  const ph = keepPhase ? ((steps[cur] || {}).ph || 0) : 0;
+  build();
+  cur = phases[Math.min(ph, phases.length - 1)].from;
+  syncControls(); render(true);
+}
+function fail(msg) { el("parseErr").textContent = msg; return false; }
+function setSeq(s, kk) {
+  s = String(s).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (s.length < 5) return fail("At least five letters.");
+  if (s.length > MAXLEN) return fail("At most " + MAXLEN + " letters.");
+  el("parseErr").textContent = "";
+  seq = s;
+  if (kk) { kForced = true; k = clamp(Math.round(kk), 3, Math.max(3, s.length - 1)); }
+  else kForced = false;
+  sel = 0;
+  reload(false);
+  return true;
+}
+function loadFromText() {
+  const lines = el("inputText").value.split(/\r?\n/).map(l => l.trim())
+                  .filter(l => l.length && !/^#/.test(l));
+  let kk = null, data = null;
+  lines.forEach(l => {
+    if (/^\d{1,2}$/.test(l)) { if (kk === null) kk = Number(l); }
+    else if (data === null) data = l;
+  });
+  if (data === null) return fail("No genome line found.");
+  return setSeq(data, kk);
+}
+
+/* ---------- init ----------------------------------------------------------- */
+
+function init() {
+  fillPresets();
+  el("presetSel").addEventListener("change", e => {
+    stopPlay();
+    const p = PRESETS[e.target.value];
+    if (p) setSeq(p.s, p.k || null);
+  });
+  el("applyBtn").addEventListener("click", () => { stopPlay(); setSeq(el("inS").value, null); });
+  el("inS").addEventListener("keydown", ev => {
+    if (ev.key === "Enter") { stopPlay(); setSeq(el("inS").value, null); }
+  });
+  el("loadBtn").addEventListener("click", () => { stopPlay(); loadFromText(); });
+  el("kSlider").addEventListener("input", e => {
+    stopPlay(); kForced = true; k = Number(e.target.value); sel = 0; reload(true);
+  });
+  el("readSel").addEventListener("change", e => {
+    stopPlay(); sel = Number(e.target.value);
+    build();
+    cur = phases[phases.length - 1].from;
+    syncControls(); render(true);
+  });
+
+  el("stepBtn").addEventListener("click", () => { stopPlay(); stepFwd(); });
+  el("backBtn").addEventListener("click", () => { stopPlay(); stepBack(); });
+  el("playBtn").addEventListener("click", togglePlay);
+  el("resetBtn").addEventListener("click", () => { stopPlay(); cur = 0; render(true); });
+  el("replayBtn").addEventListener("click", () => { stopPlay(); replay(); });
+  el("scrubber").addEventListener("input", e => { stopPlay(); cur = Number(e.target.value); render(true); });
+  el("speed").addEventListener("input", e => {
+    el("speedVal").textContent = e.target.value + "ms";
+    if (timer) { stopPlay(); togglePlay(); }
+  });
+
+  const svg = el("mainSvg");
+  svg.addEventListener("mousemove", ev => {
+    const t = ev.target, tip = el("tooltip");
+    if (t && t.classList.contains("hit")) {
+      const n = t.dataset.node, d = (outd[n] || 0) - (ind[n] || 0);
+      tip.innerHTML = '<span class="tt-h">' + esc(n) + "</span><br>" +
+        '<span class="tt-s">out</span> ' + (outd[n] || 0) + ' &nbsp;<span class="tt-s">in</span> ' +
+        (ind[n] || 0) +
+        (d !== 0 ? '<br><span class="tt-s">unbalanced by</span> ' + (d > 0 ? "+" : "") + d : "") +
+        '<br><span class="tt-s">reads out of here:</span> ' +
+        esc((adj[n] || []).map(e => e.label).join(", ") || "—");
+      tip.style.display = "block";
+      tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - tip.offsetWidth - 10) + "px";
+      tip.style.top = Math.min(ev.clientY + 16, window.innerHeight - tip.offsetHeight - 10) + "px";
+    } else tip.style.display = "none";
+  });
+  svg.addEventListener("mouseleave", () => { el("tooltip").style.display = "none"; });
+
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT" ||
+        ev.target.tagName === "SELECT") return;
+    if (ev.key === "ArrowRight") { stopPlay(); stepFwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft") { stopPlay(); stepBack(); ev.preventDefault(); }
+    if (ev.key === " ") { togglePlay(); ev.preventDefault(); }
+  });
+
+  el("presetSel").value = "a";
+  setSeq(PRESETS.a.s, PRESETS.a.k);
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

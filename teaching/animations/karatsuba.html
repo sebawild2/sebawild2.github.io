@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Karatsuba &middot; fast multiplication of binary numbers, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-done:#902015; --wi-inert:#b6b1a1; --wi-inert-border:#8d897c;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+
+    /* --- the four ingredients of a D&C recurrence keep one colour each,
+           everywhere on this page: green!50!black, blue!80!black, violet,
+           orange of the slides (orange darkened for contrast on cream) --- */
+    --mt-a:#1a7a1a;            /* a  — how many subproblems      */
+    --mt-b:#2f2fb4;            /* b  — how much smaller they are */
+    --mt-f:#6d136d;            /* f  — the conquer effort        */
+    --mt-d:#9d5f25;            /* d  — the base case             */
+    --mt-c:#902015;            /* c = log_b(a), the exponent that decides everything */
+    --mt-f-fill:#e6d3e6; --mt-f-fill2:#d8bcd8;
+    --mt-d-fill:#f2ddc2;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .wi-topbar { display:flex; justify-content:space-between; font-size:.78rem;
+               color:var(--wi-ink-faint); margin-bottom:10px; font-family:var(--wi-font-head);
+               letter-spacing:.06em; }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  /* --- maths, set by hand: the page must stay one standalone file --- */
+  .m { font-style:italic; }
+  .mr { font-style:normal; }
+  sup, sub { font-size:.7em; line-height:0; }
+  .ca { color:var(--mt-a); font-weight:bold; }
+  .cb { color:var(--mt-b); font-weight:bold; }
+  .cf { color:var(--mt-f); font-weight:bold; }
+  .cd { color:var(--mt-d); font-weight:bold; }
+  .cc { color:var(--mt-c); font-weight:bold; }
+  .num { font-family:var(--wi-font-mono); font-size:.86em; font-style:normal; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:12px; }
+  .ctl { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  .ctl > label.mathlabel { font-family:var(--wi-font-body); font-size:.95rem; text-transform:none;
+                           letter-spacing:0; }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.tiny { width:4.2em; text-align:center; font-family:var(--wi-font-mono); font-size:.8rem; }
+  input.mid { width:9em; font-family:var(--wi-font-mono); font-size:.8rem; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* --- transport --- */
+  .tbtns { display:flex; gap:6px; }
+  .tbtn { width:40px; padding:7px 0; font-size:1.02rem; line-height:1.05; text-align:center;
+          font-variant-emoji:text; }              /* keep the glyphs monochrome, not colour emoji */
+  .tbtn:disabled { opacity:.32; }
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:16px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+  .progress { flex:1 1 320px; min-width:220px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; }
+  .phasebar { display:flex; width:100%; margin-top:3px; }
+  .phasebtn { flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn.on { background:var(--wi-panel-2); border-color:var(--wi-accent-soft); color:var(--wi-accent);
+                 font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); background:var(--wi-panel-2); }
+  .explain { margin-top:9px; font-size:.85rem; color:var(--wi-ink-strong); min-height:2.6em; line-height:1.45; }
+
+  /* --- stage --- */
+  .stage { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(340px,.95fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .col-main { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-size:.95em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius);
+                 width:100%; touch-action:none; }
+
+  /* --- the theorem, centre piece --- */
+  .recbox { border:1px solid var(--wi-border); background:var(--wi-panel-2); border-radius:var(--wi-radius);
+            padding:9px 13px; font-size:.95rem; margin-bottom:12px; text-align:center; }
+  .dcases { display:inline-grid; grid-template-columns:auto auto; gap:1px 14px; text-align:left;
+            border-left:2px solid var(--wi-ink); padding-left:9px; vertical-align:middle;
+            font-size:.92em; }
+  .dcases .cond { color:var(--wi-ink-faint); font-size:.86em; }
+  .thm { border:1px solid var(--wi-border-soft); border-left:3px solid var(--wi-accent);
+         background:var(--wi-panel-2); border-radius:var(--wi-radius); padding:10px 13px; }
+  .thm h3 { font-size:.74rem; text-transform:uppercase; letter-spacing:.1em; color:var(--wi-accent);
+            margin:0 0 7px; }
+  .thmlead { font-size:.86rem; margin-bottom:8px; }
+  .thmcase { display:grid; grid-template-columns:1.6em 1fr; gap:0 6px; padding:6px 8px; border-radius:3px;
+             font-size:.86rem; border:1px solid transparent; cursor:default; }
+  .thmcase + .thmcase { margin-top:3px; }
+  .thmcase .tag { color:var(--wi-ink-faint); }
+  .thmcase.on { background:#f6e6df; border-color:var(--wi-accent-soft); }
+  .thmcase.off { opacity:.5; }
+  .thmcase .check { grid-column:2; font-size:.84em; margin-top:3px; color:var(--wi-ink-soft); display:block; }
+  .thmcase.on .check { color:var(--wi-accent-dark); }
+  .verdict { font-size:1.05rem; text-align:center; padding:6px 0 2px; }
+  .verdict .big { font-size:1.25rem; }
+  .vnote { font-size:.78rem; color:var(--wi-ink-soft); text-align:center; margin-top:5px; line-height:1.45; }
+  .warn { border-left:3px solid var(--wi-active); background:#f7ece8; padding:7px 11px;
+          border-radius:3px; font-size:.8rem; margin-top:9px; color:var(--wi-ink-strong); }
+
+  /* --- tables --- */
+  table.led { border-collapse:collapse; width:100%; font-size:.76rem; font-family:var(--wi-font-mono); }
+  table.led th { font-family:var(--wi-font-head); font-size:.66rem; text-transform:uppercase;
+                 letter-spacing:.07em; color:var(--wi-ink-faint); font-weight:normal;
+                 text-align:right; padding:2px 5px; border-bottom:1px solid var(--wi-border-soft); }
+  table.led th:first-child, table.led td:first-child { text-align:left; }
+  table.led td { text-align:right; padding:2px 5px; border-bottom:1px solid #e4dccf; }
+  table.led tr:hover td { background:#f2e7e2; }
+  table.led tr.leafrow td { color:var(--mt-d); }
+  table.led tr.sumrow td { border-top:1px solid var(--wi-border); border-bottom:0;
+                           font-weight:bold; color:var(--wi-ink-strong); }
+  table.led td.share { color:var(--wi-ink-faint); }
+  .scroller { max-height:290px; overflow:auto; }
+
+  /* --- collapsibles --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; margin-top:16px; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .condbody { padding:12px 16px 16px; display:grid; grid-template-columns:1fr 1fr; gap:16px 22px; }
+  @media (max-width:900px) { .condbody { grid-template-columns:1fr; } }
+  .lem { font-size:.84rem; }
+  .lem h4 { font-family:var(--wi-font-head); font-size:.72rem; letter-spacing:.08em; text-transform:uppercase;
+            color:var(--wi-accent); margin:0 0 5px; }
+  .lem p { margin:0 0 7px; }
+  .quant { font-size:.86em; background:var(--wi-panel-2); border:1px solid var(--wi-border-soft);
+           border-radius:3px; padding:6px 9px; display:block; margin:6px 0; }
+  .yes { color:var(--wi-relax); font-weight:bold; }
+  .no { color:var(--wi-active); font-weight:bold; }
+  .maybe { color:var(--wi-examine); font-weight:bold; }
+  details.editor { margin-top:16px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:190px; font-family:var(--wi-font-mono); font-size:.76rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:260px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+
+  .echo { font-size:.82rem; color:var(--wi-ink-soft); font-style:italic; }
+  .echo b { font-style:normal; color:var(--wi-ink-strong); }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.75rem; color:var(--wi-ink-soft);
+            margin-top:8px; }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.8em; height:.8em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.28rem; }
+    .controls { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
+
+  :root {
+    --c-x:#2a6a63;  --c-x-fill:#d9e7e4;      /* the first operand   */
+    --c-y:#b07d18;  --c-y-fill:#f2e6ca;      /* the second operand  */
+    --c-z:#902015;  --c-z-fill:#f0d9d3;      /* the running product */
+    --c-c1:#3a5f8a; --c-c1-fill:#dbe3ee;     /* c1 = a1 b1          */
+    --c-c2:#4a7c3f; --c-c2-fill:#dfe9d7;     /* c2 = a2 b2          */
+    --c-c3:#8a4a86; --c-c3-fill:#ecdcec;     /* the third product   */
+    --c-in:#8d897c; --c-in-fill:#eee6d9;
+  }
+  .stage { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(320px,.8fr); gap:18px; align-items:start; }
+  .col-main, .col-side { min-width:0; }
+  @media (max-width:1080px) { .stage { grid-template-columns:minmax(0,1fr); } }
+  .phasebtn { min-width:44px; }
+  @media (max-width:820px) {
+    .phasebar { flex-wrap:wrap; }
+    .phasebtn { min-width:38px; border-left-width:1px; border-radius:var(--wi-radius); margin:1px; }
+    .crumb { font-size:.64rem; }
+    pre.code { font-size:.7rem; }
+  }
+
+  .crumbs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:9px; }
+  .crumb { font-family:var(--wi-font-mono); font-size:.72rem; padding:3px 7px; border-radius:3px;
+           border:1px solid var(--wi-border-soft); background:var(--wi-panel-2); color:var(--wi-ink-soft);
+           cursor:pointer; white-space:nowrap; }
+  .crumb.sel { border-color:var(--wi-accent); color:var(--wi-accent); background:#f6e6df; }
+  .crumb.arw { border:0; background:none; padding:0 1px; color:var(--wi-ink-faint); cursor:default; }
+
+  pre.code { margin:0; font-family:var(--wi-font-mono); font-size:.78rem; line-height:1.55;
+             background:var(--wi-panel-2); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius);
+             padding:8px 0; overflow-x:auto; }
+  pre.code .ln { display:block; padding:0 10px 0 0; white-space:pre; border-left:3px solid transparent; }
+  pre.code .ln .no { display:inline-block; width:2.1em; text-align:right; margin-right:.7em;
+                     color:var(--wi-ink-faint); font-size:.88em; }
+  pre.code .ln.on { background:#f6e6df; border-left-color:var(--wi-accent); }
+  pre.code .ln.callsite { background:#eef0e4; border-left-color:var(--wi-queue); }
+  pre.code .kw { color:var(--wi-accent-dark); font-weight:bold; }
+  pre.code .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .codehd { font-family:var(--wi-font-head); font-size:.7rem; letter-spacing:.09em; text-transform:uppercase;
+            color:var(--wi-ink-faint); margin:0 0 5px; }
+  summary.codehd { cursor:pointer; list-style:none; }
+  summary.codehd::-webkit-details-marker { display:none; }
+  summary.codehd::before { content:"\25be\2002"; color:var(--wi-ink-faint); }
+  details:not([open]) > summary.codehd::before { content:"\25b8\2002"; }
+  summary.codehd:hover { color:var(--wi-accent); }
+
+  .costgrid { display:grid; grid-template-columns:auto 1fr auto; gap:5px 10px; align-items:center; font-size:.8rem; }
+  .costgrid .num { font-family:var(--wi-font-mono); text-align:right; }
+  .costbar { height:9px; border-radius:2px; background:var(--wi-controls); overflow:hidden; display:flex; }
+  .costbar i { display:block; height:100%; }
+  .facts { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:.78rem; color:var(--wi-ink-soft); }
+  .chartctl { display:flex; align-items:center; gap:6px; margin-top:12px; flex-wrap:wrap; }
+  .chartctl label { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                     letter-spacing:.08em; color:var(--wi-ink-strong); }
+  .chartctl .hint { font-size:.78rem; }
+  .facts b { font-family:var(--wi-font-mono); color:var(--wi-ink-strong); font-weight:normal; }
+  .eq { font-size:.95rem; line-height:1.95; }
+  .eq .t1 { color:var(--c-c1); font-weight:bold; }
+  .eq .t2 { color:var(--c-c2); font-weight:bold; }
+  .eq .t3 { color:var(--c-c3); font-weight:bold; }
+  .eq .lit { background:#f6e6df; border-radius:3px; padding:1px 4px; box-shadow:0 0 0 1px var(--wi-accent-soft); }
+  .eq .note { font-size:.8rem; color:var(--wi-ink-soft); line-height:1.5; display:block; margin-top:4px; }
+  .pos { display:inline-block; width:44px; height:7px; border-radius:2px; background:var(--wi-controls);
+         border:1px solid var(--wi-border-soft); position:relative; vertical-align:middle; margin-right:5px; }
+  .pos i { position:absolute; top:0; bottom:0; background:currentColor; border-radius:1px; }
+  .pos b { position:absolute; top:-1px; bottom:-1px; width:1px; background:var(--wi-panel-2); }
+  .bigres { font-family:var(--wi-font-mono); font-size:.86rem; word-break:break-all; line-height:1.5; }
+
+  /* ---------- SVG ---------- */
+  svg text { font-family:var(--wi-font-body); fill:var(--wi-ink-strong); }
+  .bit { font-family:var(--wi-font-mono); text-anchor:middle; }
+  .slbl { font-size:10px; fill:var(--wi-ink-faint); font-family:var(--wi-font-head); letter-spacing:.06em; }
+  .lblr { font-size:11px; text-anchor:end; font-family:var(--wi-font-body); font-style:italic; }
+  .rule { stroke:var(--wi-border-strong); stroke-width:1; }
+  .colhi { fill:var(--wi-accent); opacity:.10; }
+  .cell { stroke-width:.8; }
+  .carry { font-family:var(--wi-font-mono); font-size:9px; text-anchor:middle; fill:var(--wi-accent); }
+  .idx { text-anchor:middle; font-size:8px; fill:var(--wi-ink-faint); font-family:var(--wi-font-mono); }
+  .knode { stroke-width:1; }
+  .kedge { stroke:var(--wi-ink-faint); stroke-width:.8; fill:none; }
+  .kedge.on { stroke:var(--wi-accent); stroke-width:1.6; }
+  .klab { font-family:var(--wi-font-mono); text-anchor:middle; }
+  .grid { stroke:var(--wi-border-soft); stroke-width:.7; stroke-dasharray:2 4; }
+  .axlab { text-anchor:end; font-size:9.5px; fill:var(--wi-ink-faint); font-family:var(--wi-font-mono); }
+  .axlab.mid { text-anchor:middle; }
+  .axtitle { text-anchor:middle; font-size:10.5px; fill:var(--wi-ink-soft); }
+  .serlab { font-size:10px; font-family:var(--wi-font-mono); }
+  .dec { font-size:10px; font-family:var(--wi-font-mono); text-anchor:start; opacity:.8; }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+  <span>Fast multiplication</span>
+</div>
+
+<div class="titlebar">
+  <h1 id="h1title">Multiplying Binary Numbers</h1>
+  <span class="seg" id="algSeg">
+    <button data-alg="school" class="on">Long multiplication</button>
+    <button data-alg="kara">Karatsuba</button>
+  </span>
+</div>
+
+<p class="subtitle" id="sub"></p>
+
+<div class="controls" id="ctlMain">
+  <div class="ctl"><label for="inX"><span class="m">x</span></label>
+    <input class="mid" id="inX" value="10110101"></div>
+  <div class="ctl"><label for="inY"><span class="m">y</span></label>
+    <input class="mid" id="inY" value="11010011"></div>
+  <div class="ctl"><label for="inN"><span class="m">n</span> bits</label>
+    <input class="tiny" id="inN" value="8"></div>
+  <div class="ctl"><button id="btnRand">Random</button></div>
+  <div class="ctl" data-only="school"><label>View</label>
+    <span class="seg" id="viewSeg">
+      <button data-view="tab" class="on">shift &amp; add</button>
+      <button data-view="z">z array</button>
+    </span></div>
+  <div class="ctl" data-only="kara"><label>Variant</label>
+    <span class="seg" id="varSeg">
+      <button data-var="simple" class="on">base case n &le; 3</button>
+      <button data-var="pow2">n = 2<sup>k</sup> throughout</button>
+    </span></div>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <div class="tbtns">
+      <button id="btnFirst" class="tbtn" title="Back to the first step"
+              aria-label="Back to the first step">&#8634;</button>
+      <button id="btnPrev" class="tbtn" title="One step back (left arrow key)"
+              aria-label="One step back">&#9198;&#65038;</button>
+      <button id="btnNext" class="tbtn" title="One step forward (right arrow key)"
+              aria-label="One step forward">&#9197;&#65038;</button>
+      <button id="playBtn" class="tbtn pri" title="Play (space bar)"
+              aria-label="Play">&#9654;&#65038;</button>
+    </div>
+    <div class="progress">
+      <input type="range" id="slider" min="0" max="1" value="0" step="1">
+      <div class="phasebar" id="phasebar"></div>
+    </div>
+    <span class="stepno" id="stepno"></span>
+  </div>
+  <div class="explain" id="explain"></div>
+</div>
+
+<div class="stage">
+  <div class="col-main">
+    <div class="sim-box" id="eqBox">
+      <div class="sim-title"><span>The identity Karatsuba exploits</span><span class="rhs" id="eqRhs"></span></div>
+      <div class="eq" id="eqBody"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span id="svgTitle">The multiplication</span><span class="rhs" id="svgRhs"></span></div>
+      <svg id="mainSvg" class="stagesvg" viewBox="0 0 720 400" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Bit operations</span><span class="rhs" id="costRhs"></span></div>
+      <div class="costgrid" id="costGrid"></div>
+      <div class="facts" id="facts" style="margin-top:10px"></div>
+      <div class="chartctl">
+        <label for="inChartMax">chart up to</label>
+        <input class="tiny" id="inChartMax" value="100000" style="width:7em">
+        <span class="lbl">bits</span>
+        <span class="hint" style="margin-left:8px">the cost model's own growth, not a live run — stays fast at any n</span>
+      </div>
+      <svg id="chartSvg" class="stagesvg" viewBox="0 0 720 210" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box" id="stackBox">
+      <div class="sim-title"><span id="stackTitle">Call stack</span><span class="rhs" id="depthRhs"></span></div>
+      <div class="crumbs" id="crumbs"></div>
+      <details id="codeDet" open>
+        <summary class="codehd" id="codeHd">pseudocode</summary>
+        <pre class="code" id="codeBox"></pre>
+      </details>
+    </div>
+    <div class="sim-box" id="stateBox">
+      <div class="sim-title"><span>State</span></div>
+      <div class="bigres" id="stateBody"></div>
+    </div>
+  </div>
+</div>
+
+<details class="code" id="modelBox">
+  <summary>The cost model &nbsp;&middot;&nbsp; what counts as one bit operation</summary>
+  <div class="condbody" style="grid-template-columns:1fr">
+    <div class="lem">
+      <p>Both algorithms are charged in the same currency, so that the two counters can be compared:</p>
+      <ul style="font-size:.85rem; line-height:1.6">
+        <li>one bit operation per execution of the inner-loop body of long multiplication (lines 4&ndash;6),
+            which gives exactly <span class="m">n</span><sup>2</sup> for an
+            <span class="m">n</span>&times;<span class="m">n</span>-bit product;</li>
+        <li>one bit operation per bit position processed by an addition or a subtraction: adding two numbers of at most
+            <span class="m">m</span> bits costs <span class="m">m</span>+1, subtracting costs <span class="m">m</span>;</li>
+        <li>one bit operation for a single 1&times;1-bit product;</li>
+        <li>shifts, index arithmetic and reading a single bit are free &mdash; they are addressing, not arithmetic.</li>
+      </ul>
+      <p class="hint">This is a model, not a theorem: it is chosen so that long multiplication costs exactly
+        <span class="m">n</span><sup>2</sup>, matching the slide, and so that everything Karatsuba does outside its
+        recursive calls is linear in the operand width. Constant factors in the chart below depend on these choices;
+        the growth rates do not.</p>
+    </div>
+  </div>
+</details>
+
+<details class="code" id="bothCode">
+  <summary>Both procedures &nbsp;&middot;&nbsp; the pseudocode this page executes</summary>
+  <div class="condbody">
+    <div><div class="codehd">long multiplication</div><pre class="code" id="codeSchoolFull"></pre></div>
+    <div><div class="codehd" id="codeKaraHd">karatsuba</div><pre class="code" id="codeKaraFull"></pre></div>
+    <div class="lem" style="grid-column:1/-1" id="variantNote"></div>
+  </div>
+</details>
+
+<details class="editor">
+  <summary>Load an input &nbsp;&middot;&nbsp; plain-text format</summary>
+  <div class="editor-body">
+    <div class="hint">
+      Write <code>x</code> and <code>y</code> in binary (<code>10110101</code>) or in decimal with a
+      <code>d</code> prefix (<code>d181</code>). <code>n</code> pads both to a common width; Karatsuba's
+      <i>n</i>&nbsp;=&nbsp;2<sup>k</sup> variant rounds it up to a power of two.
+    </div>
+    <div>
+      <textarea id="ta" spellcheck="false"></textarea>
+      <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap">
+        <button id="btnLoad" class="pri">Load</button>
+        <button id="btnDump">Copy current</button>
+      </div>
+      <div class="err" id="taErr"></div>
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tt"></div>
+
+<script>
+"use strict";
+/* ============================================================================
+   Long multiplication and Karatsuba, executed on real bits.
+
+   Cost model (the same currency for both, see the page):
+     long multiplication  1 per execution of the inner-loop body  -> exactly n^2
+     add of two <= m-bit numbers   m+1
+     sub of two <= m-bit numbers   m
+     a 1x1-bit product             1
+     shifts and indexing           0
+   ========================================================================= */
+const el = id => document.getElementById(id);
+const clamp = (x, a, b) => x < a ? a : (x > b ? b : x);
+
+/* --- bits ---------------------------------------------------------------- */
+const B = n => BigInt(n);
+const blen = v => (v <= 0n ? 1 : v.toString(2).length);
+const bstr = (v, w) => v.toString(2).padStart(w, "0");            /* MSB first */
+const bitAt = (v, i) => Number((v >> B(i)) & 1n);                 /* i from LSB */
+const low = (v, h) => v & ((1n << B(h)) - 1n);
+const high = (v, h) => v >> B(h);
+
+/* --- pseudocode ---------------------------------------------------------- */
+const CODE = {
+  school: { name:"long multiplication", lines:[
+    "for i := 0, \u2026, n\u22121",
+    "    c := 0",
+    "    for j := 0, \u2026, n\u22121",
+    "        z\u1d62\u208a\u2c7c := z\u1d62\u208a\u2c7c + c + x\u1d62 \u00b7 y\u2c7c",
+    "        c := \u230az\u1d62\u208a\u2c7c / 2\u230b",
+    "        z\u1d62\u208a\u2c7c := z\u1d62\u208a\u2c7c mod 2",
+    "    end for",
+    "    z\u1d62\u208a\u2099 := c",
+    "end for"
+  ]},
+  simple: { name:"karatsuba", lines:[
+    "procedure karatsuba(x, y):",
+    "    // x and y are n-bit integers",
+    "    if n \u2264 3 then return x \u00b7 y            // by long multiplication",
+    "    h := \u2308n/2\u2309",
+    "    a\u2081 := \u230ax/2\u02b0\u230b;  a\u2082 := x mod 2\u02b0        // implemented by shifts",
+    "    b\u2081 := \u230ay/2\u02b0\u230b;  b\u2082 := y mod 2\u02b0",
+    "    c\u2081 := karatsuba(a\u2081, b\u2081)",
+    "    c\u2082 := karatsuba(a\u2082, b\u2082)",
+    "    c  := karatsuba(a\u2081+a\u2082, b\u2081+b\u2082) \u2212 c\u2081 \u2212 c\u2082",
+    "    return c\u2081\u00b72\u00b2\u02b0 + c\u00b72\u02b0 + c\u2082          // shifts and additions"
+  ]},
+  pow2: { name:"karatsuba", lines:[
+    "procedure karatsuba(x, y):",
+    "    // x and y are n = 2\u1d4f bit integers",
+    "    if n == 1 then return x \u00b7 y",
+    "    a\u2081 := \u230ax/2\u207f\u141f\u00b2\u230b;  a\u2082 := x mod 2\u207f\u141f\u00b2",
+    "    b\u2081 := \u230ay/2\u207f\u141f\u00b2\u230b;  b\u2082 := y mod 2\u207f\u141f\u00b2",
+    "    c\u2081 := karatsuba(a\u2081, b\u2081)",
+    "    c\u2082 := karatsuba(a\u2082, b\u2082)",
+    "    u := (a\u2081+a\u2082) mod 2\u207f\u141f\u00b2;  \u03b1 := \u230a(a\u2081+a\u2082)/2\u207f\u141f\u00b2\u230b",
+    "    v := (b\u2081+b\u2082) mod 2\u207f\u141f\u00b2;  \u03b2 := \u230a(b\u2081+b\u2082)/2\u207f\u141f\u00b2\u230b",
+    "    p := karatsuba(u, v) + (\u03b1\u00b7v + \u03b2\u00b7u)\u00b72\u207f\u141f\u00b2 + \u03b1\u00b7\u03b2\u00b72\u207f",
+    "    c := p \u2212 c\u2081 \u2212 c\u2082",
+    "    return c\u2081\u00b72\u207f + c\u00b72\u207f\u141f\u00b2 + c\u2082"
+  ]}
+};
+const KEYWORDS = /\b(procedure|if|then|else|for|end|return|mod)\b/g;
+function codeHTML(which, curLine, callLine) {
+  return CODE[which].lines.map((t, i) => {
+    const n = i + 1;
+    let body = t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const cm = body.indexOf("//");
+    if (cm >= 0) body = body.slice(0, cm) + '<span class="cm">' + body.slice(cm) + "</span>";
+    body = body.replace(KEYWORDS, '<span class="kw">$1</span>');
+    const cls = n === curLine ? " on" : (n === callLine ? " callsite" : "");
+    return '<span class="ln' + cls + '"><span class="no">' + n + "</span>" + body + "</span>";
+  }).join("");
+}
+
+/* ==========================================================================
+   Long multiplication, exactly as printed.
+   ========================================================================= */
+function runSchool(x, y, n) {
+  const Z = new Array(2 * n).fill(0), steps = [];
+  let cost = 0, c = 0;
+  const emit = (line, expl, extra) => steps.push(Object.assign({
+    line:line, expl:expl, z:Z.slice(), c:c, cost:cost, phase:"row " + (extra && extra.i !== undefined ? extra.i : 0)
+  }, extra || {}));
+  for (let i = 0; i < n; i++) {
+    emit(1, "Outer round <b>i = " + i + "</b>: add <span class='m'>x</span><sub>" + i + "</sub>\u2009&middot;\u2009" +
+      "<span class='m'>y</span> into the running product, shifted " + i + " place" + (i === 1 ? "" : "s") +
+      " to the left. Here <span class='m'>x</span><sub>" + i + "</sub> = <b>" + bitAt(x, i) + "</b>" +
+      (bitAt(x, i) ? "." : ", so this round adds nothing \u2014 but it still costs n bit operations."), { i:i, j:-1 });
+    c = 0;
+    emit(2, "Clear the carry.", { i:i, j:-1 });
+    for (let j = 0; j < n; j++) {
+      const before = Z[i + j], prod = bitAt(x, i) * bitAt(y, j), s = before + c + prod;
+      cost++;
+      Z[i + j] = s % 2;
+      const nc = (s - s % 2) / 2;
+      emit(4, "z<sub>" + (i + j) + "</sub> = " + before + " + " + c + " + " + bitAt(x, i) + "\u00b7" + bitAt(y, j) +
+        " = " + s + " \u2192 keep <b>" + Z[i + j] + "</b>, carry <b>" + nc + "</b> into position " + (i + j + 1) + ".",
+        { i:i, j:j, col:i + j, cIn:c, cOut:nc, prod:prod, before:before, sum:s });
+      c = nc;
+    }
+    Z[i + n] = c;
+    emit(8, "The carry out of the round lands in z<sub>" + (i + n) + "</sub> = <b>" + c + "</b>.",
+      { i:i, j:n, col:i + n });
+  }
+  const val = Z.reduce((a, b, k) => a + (b ? 1n << B(k) : 0n), 0n);
+  return { steps:steps, cost:cost, value:val, n:n, x:x, y:y, kind:"school" };
+}
+
+/* ==========================================================================
+   Karatsuba. Two variants; the recursion tree is built as it runs.
+   ========================================================================= */
+function runKara(x, y, n, variant, quiet) {
+  const steps = [], nodes = [], stack = [];
+  let cost = 0;
+  const addCost = (p, q) => { const m = Math.max(blen(p), blen(q)); cost += m + 1; return m + 1; };
+  const subCost = (p, q) => { const m = Math.max(blen(p), blen(q)); cost += m; return m; };
+
+  function mkNode(x, y, w, parent, role, rlo, rhi, isSum) {
+    const nd = { id:nodes.length, x:x, y:y, n:w, parent:parent === null ? null : parent.id, role:role,
+                 kids:[], depth:parent === null ? 0 : parent.depth + 1, done:false, born:0,
+                 pw:parent === null ? w : parent.n,       /* the parent's operand width      */
+                 rlo:rlo === undefined ? 0 : rlo,          /* the parent bits this call uses  */
+                 rhi:rhi === undefined ? w : rhi,
+                 isSum:!!isSum };
+    if (!quiet) { nodes.push(nd); if (parent) parent.kids.push(nd.id); }
+    else nd.id = 0;
+    return nd;
+  }
+  function emit(nd, line, expl, extra) {
+    if (quiet) { nd.line = line; return; }
+    nd.line = line;
+    const snap = { h:nd.h, a1:nd.a1, a2:nd.a2, b1:nd.b1, b2:nd.b2, c1:nd.c1, c2:nd.c2, c:nd.c,
+                   s1:nd.s1, s2:nd.s2, u:nd.u, v:nd.v, al:nd.al, be:nd.be,
+                   result:nd.result, done:!!nd.done };
+    steps.push(Object.assign({
+      line:line, expl:expl, node:nd.id, cost:cost,
+      stack:stack.map(f => ({ id:f.id, n:f.n, role:f.role, line:f.line, callLine:f.callLine,
+                              tok:"karatsuba(" + f.n + " bit" + (f.n === 1 ? "" : "s") + ")" })),
+      born:nodes.length, phase:"depth " + nd.depth, rootLine:(stack[0] || nd).line, snap:snap
+    }, extra || {}));
+  }
+  const isBase = w => variant === "pow2" ? w === 1 : w <= 3;
+
+  function K(nd) {
+    stack.push(nd);
+    nd.born = steps.length;
+    emit(nd, 1, "karatsuba on two <b>" + nd.n + "-bit</b> numbers: x = " + bstr(nd.x, nd.n) + ", y = " +
+      bstr(nd.y, nd.n) + ".", { enter:true });
+    if (isBase(nd.n)) {
+      const c = variant === "pow2" ? 1 : nd.n * nd.n;
+      cost += c;
+      nd.result = nd.x * nd.y; nd.done = true; nd.doneAt = steps.length;
+      emit(nd, 3, "Base case: multiply directly, " + c + " bit operation" + (c === 1 ? "" : "s") +
+        ". x\u00b7y = " + bstr(nd.result, 2 * nd.n) + " = " + nd.result + ".", { base:true });
+      stack.pop();
+      return nd.result;
+    }
+    const h = variant === "pow2" ? nd.n / 2 : Math.ceil(nd.n / 2);
+    const L = variant === "pow2" ? 0 : 1;                 /* line offset of the two listings */
+    if (variant === "simple") emit(nd, 4, "h = \u2308" + nd.n + "/2\u2309 = <b>" + h + "</b>.", {});
+    const a1 = high(nd.x, h), a2 = low(nd.x, h), b1 = high(nd.y, h), b2 = low(nd.y, h);
+    nd.h = h; nd.a1 = a1; nd.a2 = a2; nd.b1 = b1; nd.b2 = b2;
+    emit(nd, 4 + L, "Split x at bit " + h + ": a\u2081 = " + bstr(a1, nd.n - h) + ", a\u2082 = " + bstr(a2, h) +
+      ". A shift and a mask \u2014 free.", { split:"x" });
+    emit(nd, 5 + L, "Split y the same way: b\u2081 = " + bstr(b1, nd.n - h) + ", b\u2082 = " + bstr(b2, h) + ".",
+      { split:"y" });
+
+    const w = variant === "pow2" ? h : h;                 /* nominal child width */
+    const n1 = mkNode(a1, b1, w, nd, "c1", h, nd.n, false);
+    emit(nd, 6 + L, "First recursive call: the two high halves.", { call:"c1", callLine:6 + L });
+    nd.callLine = 6 + L;
+    const c1 = K(n1); nd.callLine = null; nd.c1 = c1;
+    emit(nd, 6 + L, "c\u2081 = a\u2081b\u2081 = " + c1 + ".", { got:"c1" });
+
+    const n2 = mkNode(a2, b2, w, nd, "c2", 0, h, false);
+    emit(nd, 7 + L, "Second recursive call: the two low halves.", { call:"c2", callLine:7 + L });
+    nd.callLine = 7 + L;
+    const c2 = K(n2); nd.callLine = null; nd.c2 = c2;
+    emit(nd, 7 + L, "c\u2082 = a\u2082b\u2082 = " + c2 + ".", { got:"c2" });
+
+    let third, p;
+    if (variant === "simple") {
+      const s1 = a1 + a2, s2 = b1 + b2;
+      addCost(a1, a2); addCost(b1, b2);
+      nd.s1 = s1; nd.s2 = s2;
+      emit(nd, 9, "a\u2081+a\u2082 = " + bstr(s1, h + 1) + ", b\u2081+b\u2082 = " + bstr(s2, h + 1) +
+        " \u2014 up to " + (h + 1) + " bits, one more than the halves.", { sums:true });
+      third = mkNode(s1, s2, h + 1, nd, "c3", 0, nd.n, true);
+      emit(nd, 9, "Third recursive call, on the two sums.", { call:"c3", callLine:9 });
+      nd.callLine = 9;
+      p = K(third); nd.callLine = null;
+      emit(nd, 9, "(a\u2081+a\u2082)(b\u2081+b\u2082) = " + p + ".", { got:"c3" });
+    } else {
+      const s1 = a1 + a2, s2 = b1 + b2;
+      addCost(a1, a2); addCost(b1, b2);
+      const u = low(s1, h), al = Number(high(s1, h)), v = low(s2, h), be = Number(high(s2, h));
+      nd.s1 = s1; nd.s2 = s2; nd.u = u; nd.v = v; nd.al = al; nd.be = be;
+      emit(nd, 8, "a\u2081+a\u2082 = " + bstr(s1, h + 1) + ": low half u = " + bstr(u, h) +
+        ", carry bit \u03b1 = <b>" + al + "</b>.", { sums:true });
+      emit(nd, 9, "b\u2081+b\u2082 = " + bstr(s2, h + 1) + ": low half v = " + bstr(v, h) +
+        ", carry bit \u03b2 = <b>" + be + "</b>.", { sums:true });
+      third = mkNode(u, v, h, nd, "c3", 0, nd.n, true);
+      emit(nd, 10, "Third recursive call \u2014 on u and v only, which are exactly " + h +
+        " bits, so the width keeps halving.", { call:"c3", callLine:10 });
+      nd.callLine = 10;
+      const uv = K(third); nd.callLine = null;
+      let acc = uv;
+      if (al) { acc += v << B(h); addCost(uv, v << B(h)); }
+      if (be) { acc += u << B(h); addCost(acc, u << B(h)); }
+      if (al && be) { acc += 1n << B(nd.n); cost += 1; }
+      p = acc;
+      emit(nd, 10, "uv = " + uv + "; the carry bits contribute " + (al ? "\u03b1v\u00b72" + supNum(h) : "") +
+        (al && be ? " + " : "") + (be ? "\u03b2u\u00b72" + supNum(h) : "") + (al && be ? " + \u03b1\u03b2\u00b72" +
+        supNum(nd.n) : "") + (al || be ? ", giving p = " + p + "." : " nothing, so p = uv = " + p + "."),
+        { got:"c3" });
+    }
+    const cLine = variant === "simple" ? 9 : 11;
+    const cval = p - nd.c1 - nd.c2;
+    subCost(p, nd.c1); subCost(p, nd.c2);
+    nd.c = cval;
+    emit(nd, cLine, "c = " + p + " \u2212 " + nd.c1 + " \u2212 " + nd.c2 + " = <b>" + cval +
+      "</b> \u2014 this is a\u2081b\u2082 + a\u2082b\u2081, obtained without ever multiplying them.", { comb:true });
+
+    const shiftHi = variant === "pow2" ? nd.n : 2 * h;
+    const res = (nd.c1 << B(shiftHi)) + (cval << B(h)) + nd.c2;
+    addCost(cval << B(h), nd.c2); addCost(nd.c1 << B(shiftHi), (cval << B(h)) + nd.c2);
+    nd.result = res; nd.done = true; nd.doneAt = steps.length;
+    emit(nd, variant === "simple" ? 10 : 12, "Assemble: c\u2081\u00b72" + supNum(shiftHi) + " + c\u00b72" + supNum(h) +
+      " + c\u2082 = <b>" + bstr(res, 2 * nd.n) + "</b> = " + res + ".", { assemble:true });
+    stack.pop();
+    return res;
+  }
+  const root = mkNode(x, y, n, null, "root");
+  const value = K(root);
+  /* one phase per activity of the top-level call, so the bar stays readable */
+  const NAMES = variant === "simple"
+    ? { 1:"start", 2:"start", 3:"start", 4:"split", 5:"split", 6:"split", 7:"c\u2081", 8:"c\u2082",
+        9:"c\u2083 and c", 10:"assemble" }
+    : { 1:"start", 2:"start", 3:"start", 4:"split", 5:"split", 6:"c\u2081", 7:"c\u2082", 8:"sums",
+        9:"sums", 10:"c\u2083", 11:"c", 12:"assemble" };
+  steps.forEach(s => { s.phase = NAMES[s.rootLine] || "run"; });
+  return { steps:steps, cost:cost, value:value, nodes:nodes, n:n, x:x, y:y, kind:"kara", variant:variant };
+}
+const SUPD = { "0":"\u2070","1":"\u00b9","2":"\u00b2","3":"\u00b3","4":"\u2074","5":"\u2075",
+               "6":"\u2076","7":"\u2077","8":"\u2078","9":"\u2079" };
+const supNum = k => String(k).split("").map(d => SUPD[d] || d).join("");
+
+/* --- cost of a whole run, without recording steps (for the chart) -------- */
+function costOf(kind, x, y, n, variant) {
+  if (kind === "school") return n * n;
+  return runKara(x, y, n, variant).cost;
+}
+
+/* ==========================================================================
+   A fast, purely width-based cost model for the comparison chart.
+   Simulating Karatsuba bit-by-bit to plot n out to the millions would itself
+   take Theta(n^log2 3) time \u2014 the exact thing being illustrated \u2014 so the
+   chart instead evaluates the SAME cost accounting (addCost/subCost) but on
+   the guaranteed maximum bit-width of every intermediate quantity, rather
+   than on actual values. This is the model's worst case: it tracks closely
+   with the real simulator (checked against it for n up to 2048, where it
+   sits within about 30% either side, same order throughout) but is cheap
+   enough to memoize by n alone \u2014 O(log n) or so — for arbitrarily large n.
+   ========================================================================= */
+function idealCost(n, variant, memo) {
+  if (memo.has(n)) return memo.get(n);
+  let cost;
+  const base = variant === "pow2" ? n === 1 : n <= 3;
+  if (base) {
+    cost = variant === "pow2" ? 1 : n * n;
+  } else {
+    const h = variant === "pow2" ? n / 2 : Math.ceil(n / 2);
+    const wTop = n - h, wLow = h;                 /* widths of a1/b1 and a2/b2 */
+    let acc = idealCost(wTop, variant, memo) + idealCost(wLow, variant, memo);
+    acc += 2 * (Math.max(wTop, wLow) + 1);         /* a1+a2 and b1+b2 */
+    let pWidth;
+    if (variant === "simple") {
+      const tw = wLow + 1;
+      acc += idealCost(tw, variant, memo);
+      pWidth = 2 * tw;
+    } else {
+      const tw = wLow;
+      acc += idealCost(tw, variant, memo);
+      const uvWidth = 2 * tw;
+      acc += Math.max(uvWidth, 2 * tw) + 1;          /* addCost(uv, v<<h)      */
+      const accWidth = Math.max(uvWidth, 2 * tw) + 1;
+      acc += Math.max(accWidth, 2 * tw) + 1;         /* addCost(acc, u<<h)     */
+      acc += 1;                                      /* the alpha*beta*2^n term */
+      pWidth = Math.max(accWidth, 2 * tw) + 1;
+    }
+    const c1Width = 2 * wTop, c2Width = 2 * wLow, cWidth = n + 1;
+    acc += Math.max(pWidth, c1Width);                /* subCost(p, c1) */
+    acc += Math.max(pWidth, c2Width);                /* subCost(p, c2) */
+    const shiftHi = variant === "pow2" ? n : 2 * h;
+    const t1Width = cWidth + h;
+    acc += Math.max(t1Width, c2Width) + 1;           /* addCost(c<<h, c2) */
+    const sumWidth = Math.max(t1Width, c2Width) + 1;
+    const t2Width = c1Width + shiftHi;
+    acc += Math.max(t2Width, sumWidth) + 1;          /* addCost(c1<<shiftHi, ...) */
+    cost = acc;
+  }
+  memo.set(n, cost);
+  return cost;
+}
+/* karatsuba's ideal cost at n bits, rounding up to a power of two for the
+   pow2 variant (its recursion is undefined off that grid) */
+function karaCostAt(n, variant, memo) {
+  const w = variant === "pow2" ? Math.pow(2, Math.ceil(Math.log2(Math.max(1, n)))) : Math.max(1, Math.round(n));
+  return idealCost(w, variant, memo);
+}
+/* ==========================================================================
+   Long multiplication, drawn two ways. Both animate the same execution:
+   the shift-and-add tableau shows what is being added, the z view shows the
+   array and the carry the pseudocode actually manipulates.
+   ========================================================================= */
+const GR = 700;
+const zVal = z => z.reduce((a, b, k) => a + (b ? 1n << B(k) : 0n), 0n);                                   /* right edge of the grid  */
+
+function bitCell(x, y, w, h, txt, fill, stroke, cls, op) {
+  return '<rect x="' + (x - w / 2) + '" y="' + (y - h + 3) + '" width="' + w + '" height="' + h + '" rx="1.5" fill="' +
+    fill + '" stroke="' + stroke + '" class="cell" opacity="' + (op === undefined ? 1 : op) + '"/>' +
+    '<text class="bit ' + (cls || "") + '" x="' + x + '" y="' + (y - 1) + '" font-size="' + Math.min(11, w * .72) +
+    '" fill="' + stroke + '" opacity="' + (op === undefined ? 1 : op) + '">' + txt + '</text>';
+}
+
+function drawSchool(s) {
+  const svg = el("mainSvg"), n = RUN.n, X = RUN.x, Y = RUN.y;
+  const cols = 2 * n, cw = Math.min(22, 620 / cols);
+  const colX = k => GR - (k + 0.5) * cw;
+  const out = [];
+  const hiCol = (c, y0, h) => '<rect x="' + (colX(c) - cw / 2) + '" y="' + y0 + '" width="' + cw +
+    '" height="' + h + '" class="colhi"/>';
+
+  if (VIEW === "tab") {
+    const rowH = Math.min(17, 250 / n);
+    const yX = 26, yY = 46, ruleT = 54, rows0 = 66;
+    const rowsEnd = rows0 + n * rowH, ruleB = rowsEnd + 4, yZ = ruleB + 18, yIdx = yZ + 13;
+    if (s.col !== undefined) out.push(hiCol(s.col, 8, 400));
+    /* x and y */
+    for (let k = 0; k < n; k++) {
+      const on = (s.i === k);
+      out.push(bitCell(colX(k), yX, cw - 2, 14, bitAt(X, k), on ? "var(--c-x-fill)" : "transparent",
+        "var(--c-x)", "", on ? 1 : .8));
+      const ony = (s.j === k && s.j >= 0 && s.j < n);
+      out.push(bitCell(colX(k), yY, cw - 2, 14, bitAt(Y, k), ony ? "var(--c-y-fill)" : "transparent",
+        "var(--c-y)", "", ony ? 1 : .8));
+    }
+    out.push('<text class="lblr" x="' + (colX(n - 1) - cw / 2 - 8) + '" y="' + yX + '" fill="var(--c-x)">x = ' + X + '</text>');
+    out.push('<text class="lblr" x="' + (colX(n - 1) - cw / 2 - 8) + '" y="' + yY + '" fill="var(--c-y)">\u00d7 y = ' + Y + '</text>');
+    out.push('<line x1="' + (colX(cols - 1) - cw / 2) + '" y1="' + ruleT + '" x2="' + GR + '" y2="' + ruleT + '" class="rule"/>');
+    /* the partial products, one row per outer round */
+    for (let i = 0; i < n; i++) {
+      const y = rows0 + i * rowH + rowH - 3;
+      const state = i < s.i ? "past" : (i === s.i ? "cur" : "future");
+      const op = state === "future" ? .28 : (state === "past" ? .5 : 1);
+      const on = bitAt(X, i);
+      for (let j = 0; j < n; j++) {
+        const c = i + j, b = on ? bitAt(Y, j) : 0;
+        const hot = state === "cur" && s.j === j;
+        out.push(bitCell(colX(c), y, cw - 2, Math.min(14, rowH - 2), b,
+          hot ? "var(--c-y-fill)" : "transparent", on ? "var(--c-y)" : "var(--c-in)", "", hot ? 1 : op));
+      }
+      if (rowH >= 11)
+        out.push('<text class="lblr" x="' + (colX(cols - 1) - cw / 2 - 8) + '" y="' + y + '" opacity="' + op +
+          '" font-size="9.5">x<tspan baseline-shift="sub" font-size="70%">' + i + '</tspan>\u00b7y \u226a ' + i + '</text>');
+    }
+    out.push('<line x1="' + (colX(cols - 1) - cw / 2) + '" y1="' + ruleB + '" x2="' + GR + '" y2="' + ruleB + '" class="rule"/>');
+    /* the running product */
+    const touched = s.i * 1 + n;                    /* positions written so far */
+    for (let k = 0; k < cols; k++) {
+      const known = k <= (s.j >= 0 ? s.i + s.j : s.i + n - 1) || k <= s.i + n - 1;
+      const hot = k === s.col;
+      out.push(bitCell(colX(k), yZ, cw - 2, 15, s.z[k], hot ? "var(--c-z-fill)" : "transparent",
+        known ? "var(--c-z)" : "var(--c-in)", "", hot ? 1 : (known ? .95 : .35)));
+      if (cw >= 13) out.push('<text class="idx" x="' + colX(k) + '" y="' + yIdx + '">' + k + "</text>");
+    }
+    out.push('<text class="lblr" x="' + (colX(cols - 1) - cw / 2 - 8) + '" y="' + yZ + '" fill="var(--c-z)">z = ' +
+      zVal(s.z) + '</text>');
+    if (s.cOut !== undefined && s.col + 1 < cols)
+      out.push('<text class="carry" x="' + colX(s.col + 1) + '" y="' + (yZ - 17) + '">' + s.cOut + "\u2197</text>");
+    out.push('<text class="slbl" x="' + (GR - 620) + '" y="' + (yIdx + 20) +
+      '">every round adds one shifted copy of y; the carry runs to the left inside the round</text>');
+  } else {
+    /* --- the z array as the pseudocode sees it --------------------------- */
+    const yX = 34, yY = 62, yZ = 132, yIdx = yZ + 14;
+    if (s.col !== undefined) out.push(hiCol(s.col, yZ - 22, 34));
+    for (let k = 0; k < n; k++) {
+      const onx = s.i === k, ony = s.j === k && s.j >= 0 && s.j < n;
+      out.push(bitCell(colX(k), yX, cw - 2, 16, bitAt(X, k), onx ? "var(--c-x-fill)" : "transparent", "var(--c-x)", "", onx ? 1 : .75));
+      out.push(bitCell(colX(k), yY, cw - 2, 16, bitAt(Y, k), ony ? "var(--c-y-fill)" : "transparent", "var(--c-y)", "", ony ? 1 : .75));
+      if (cw >= 13) out.push('<text class="idx" x="' + colX(k) + '" y="' + (yY + 12) + '">' + k + "</text>");
+    }
+    out.push('<text class="lblr" x="' + (colX(n - 1) - cw / 2 - 8) + '" y="' + yX + '" fill="var(--c-x)">x = ' + X + '</text>');
+    out.push('<text class="lblr" x="' + (colX(n - 1) - cw / 2 - 8) + '" y="' + yY + '" fill="var(--c-y)">y = ' + Y + '</text>');
+    for (let k = 0; k < cols; k++) {
+      const hot = k === s.col, known = k <= s.i + n - 1 || (s.j >= 0 && k <= s.i + s.j);
+      out.push(bitCell(colX(k), yZ, cw - 2, 18, s.z[k], hot ? "var(--c-z-fill)" : "transparent",
+        known ? "var(--c-z)" : "var(--c-in)", "", hot ? 1 : (known ? .95 : .35)));
+      if (cw >= 13) out.push('<text class="idx" x="' + colX(k) + '" y="' + yIdx + '">' + k + "</text>");
+    }
+    out.push('<text class="lblr" x="' + (colX(cols - 1) - cw / 2 - 8) + '" y="' + yZ + '" fill="var(--c-z)">z = ' +
+      zVal(s.z) + '</text>');
+    /* the carry register and the arithmetic of the current step */
+    out.push('<rect x="60" y="' + (yZ - 60) + '" width="34" height="22" rx="3" fill="var(--wi-panel-2)" stroke="var(--wi-accent)"/>' +
+      '<text class="bit" x="77" y="' + (yZ - 44) + '" font-size="13" fill="var(--wi-accent)">' + s.c + '</text>' +
+      '<text class="slbl" x="77" y="' + (yZ - 66) + '" text-anchor="middle">carry c</text>');
+    if (s.j >= 0 && s.j < n)
+      out.push('<text class="bit" x="' + (GR - 310) + '" y="' + (yZ + 54) + '" font-size="13" text-anchor="middle">' +
+        'z' + subNum(s.col) + ' \u2190 ' + s.before + ' + ' + s.cIn + ' + ' + bitAt(X, s.i) + '\u00b7' + bitAt(Y, s.j) +
+        ' = ' + s.sum + '  \u2192  z' + subNum(s.col) + ' = ' + s.z[s.col] + ',  c = ' + s.cOut + '</text>');
+    out.push('<text class="slbl" x="60" y="' + (yZ + 76) + '">the same run as the tableau, seen through the array the ' +
+      'pseudocode writes</text>');
+  }
+  svg.setAttribute("viewBox", "0 0 720 " + (VIEW === "tab" ? 400 : 260));
+  svg.innerHTML = out.join("");
+}
+const SUBD = { "0":"\u2080","1":"\u2081","2":"\u2082","3":"\u2083","4":"\u2084","5":"\u2085",
+               "6":"\u2086","7":"\u2087","8":"\u2088","9":"\u2089" };
+const subNum = k => String(k).split("").map(d => SUBD[d] || d).join("");
+/* ==========================================================================
+   Karatsuba: the recursion tree above, the arithmetic of the current call
+   below, laid out on the same bit columns so the shifts are visible.
+   ========================================================================= */
+const ROLECOL = {
+  root:["var(--c-in-fill)",  "var(--wi-ink-strong)"],
+  c1:  ["var(--c-c1-fill)",  "var(--c-c1)"],
+  c2:  ["var(--c-c2-fill)",  "var(--c-c2)"],
+  c3:  ["var(--c-c3-fill)",  "var(--c-c3)"]
+};
+
+/* tidy layout of the whole tree, computed once per run */
+function layoutTree(nodes) {
+  let leaf = 0;
+  const pos = nodes.map(() => ({ x:0, d:0 }));
+  const under = nodes.map(() => 1);
+  (function walk(id) {
+    const nd = nodes[id];
+    pos[id].d = nd.depth;
+    if (!nd.kids.length) { pos[id].x = leaf++; under[id] = 1; return; }
+    nd.kids.forEach(walk);
+    pos[id].x = (pos[nd.kids[0]].x + pos[nd.kids[nd.kids.length - 1]].x) / 2;
+    under[id] = nd.kids.reduce((a, k) => a + under[k], 0);
+  })(0);
+  const maxD = Math.max(...nodes.map(n => n.depth));
+  return { pos:pos, leaves:leaf, maxD:maxD, under:under };
+}
+
+function drawKara(s) {
+  const svg = el("mainSvg"), nodes = RUN.nodes, LT = RUN.layout;
+  const out = [];
+  const TX0 = 24, TX1 = 700, TY0 = 26, TH = 118;
+  const slot = (TX1 - TX0) / Math.max(1, LT.leaves);
+  const dy = LT.maxD ? TH / LT.maxD : 0;
+  /* A box's width is proportional to the number of bits it represents (its
+     parent's width, pw — root represents itself), so the tree visibly
+     narrows as the recursion does. Capped by the room its own leaves have,
+     so wide shallow boxes never collide with a wide neighbour. */
+  function boxWidth(id) {
+    const nd = nodes[id];
+    /* the generic clamp() assumes lo <= hi, which fails once a very leafy
+       tree makes cap fall below the usual minimum \u2014 so bound explicitly
+       and let dense trees go thinner rather than overlap. */
+    const cap = LT.under[id] * slot - 3;
+    return Math.max(3, Math.min(4.4 * nd.pw + 9, cap, 74));
+  }
+  const nx = id => TX0 + (LT.pos[id].x + .5) * ((TX1 - TX0) / LT.leaves);
+  const ny = id => TY0 + LT.pos[id].d * dy;
+  const path = [];
+  for (let f = 0; f < s.stack.length; f++) path.push(s.stack[f].id);
+
+  /* edges, then boxes, for every node born so far */
+  nodes.forEach((nd, id) => {
+    if (id >= s.born || nd.parent === null) return;
+    const on = path.includes(id) && path.includes(nd.parent);
+    out.push('<path class="kedge' + (on ? " on" : "") + '" d="M' + nx(nd.parent) + ' ' + (ny(nd.parent) + 6) +
+      ' C' + nx(nd.parent) + ' ' + (ny(nd.parent) + dy * .6) + ' ' + nx(id) + ' ' + (ny(id) - dy * .5) + ' ' +
+      nx(id) + ' ' + (ny(id) - 6) + '"/>');
+  });
+  nodes.forEach((nd, id) => {
+    if (id >= s.born) return;
+    const col = ROLECOL[nd.role] || ROLECOL.root;
+    const done = nd.doneAt !== undefined && step >= nd.doneAt;
+    const cur = id === s.node, w = boxWidth(id), x0 = nx(id) - w / 2, y0 = ny(id);
+    /* Each node shows its PARENT's two operands as strips, with the part this
+       call works on filled in. A sum-call has no slice of its own: it takes
+       both halves, so both are filled and the split is marked. */
+    const seg = (yy, lo, hi) => '<rect x="' + (x0 + w * lo / nd.pw) + '" y="' + yy + '" width="' +
+      (w * (hi - lo) / nd.pw) + '" height="4" fill="' + col[1] + '" opacity="' + (done || cur ? 1 : .5) + '"/>';
+    out.push('<rect class="knode" data-nd="' + id + '" x="' + x0 + '" y="' + (y0 - 8) + '" width="' + w +
+      '" height="16" rx="2" fill="' + (done ? col[0] : "var(--wi-panel-2)") + '" stroke="' +
+      (cur ? "var(--wi-accent)" : col[1]) + '" stroke-width="' + (cur ? 2 : .9) +
+      '" opacity="' + (done || cur ? 1 : .55) + '"/>');
+    /* the strips run in bit order, most significant on the left */
+    const lo = nd.pw - nd.rhi, hi = nd.pw - nd.rlo;
+    out.push(seg(y0 - 6, lo, hi));
+    out.push(seg(y0 + 1, lo, hi));
+    if (nd.isSum && nd.pw > 1) {
+      const xm = x0 + w / 2;
+      out.push('<line x1="' + xm + '" y1="' + (y0 - 7) + '" x2="' + xm + '" y2="' + (y0 + 6) +
+        '" stroke="var(--wi-panel-2)" stroke-width="1.2"/>');
+      out.push('<text class="klab" x="' + xm + '" y="' + (y0 + 12.5) + '" font-size="7" fill="' + col[1] + '">+</text>');
+    }
+  });
+  out.push('<text class="slbl" x="' + TX0 + '" y="' + (TY0 - 12) + '">recursion tree \u2014 each call shows its parent\u2019s x and y, with the bits it takes filled in</text>');
+
+  /* ---- the current call, on aligned bit columns ------------------------- */
+  const nd = nodes[s.node], V = s.snap, W = 2 * nd.n;
+  const cw = Math.min(26, 520 / Math.max(8, W));
+  const R = 360 + W * cw / 2, colX = k => R - (k + .5) * cw;
+  let y = TY0 + TH + 46;
+  const LBL = R - W * cw - 12;
+  function row(label, val, width, shift, fill, stroke, dim) {
+    out.push('<text class="lblr" x="' + LBL + '" y="' + y + '" fill="' + stroke + '">' + label + '</text>');
+    for (let k = 0; k < width; k++)
+      out.push(bitCell(colX(k + shift), y, cw - 2, 14, bitAt(val, k), fill, stroke, "", dim ? .45 : 1));
+    out.push('<text class="dec" x="' + (R + 10) + '" y="' + y + '" fill="' + stroke + '">= ' + val + '</text>');
+    y += 20;
+  }
+  const has = f => V[f] !== undefined;
+  row("x", nd.x, nd.n, 0, "transparent", "var(--c-x)");
+  if (V.h !== undefined) {
+    /* only label the halves when there is room for the words */
+    const wHi = (nd.n - V.h) * cw, wLo = V.h * cw;
+    if (Math.min(wHi, wLo) >= 34) {
+      out.push('<text class="slbl" x="' + colX((nd.n - 1 + V.h) / 2) + '" y="' + (y - 42) +
+        '" text-anchor="middle">a\u2081 | b\u2081</text>');
+      out.push('<text class="slbl" x="' + colX((V.h - 1) / 2) + '" y="' + (y - 42) +
+        '" text-anchor="middle">a\u2082 | b\u2082</text>');
+    }
+    out.push('<line x1="' + (colX(V.h) + cw / 2) + '" y1="' + (y - 50) + '" x2="' + (colX(V.h) + cw / 2) +
+      '" y2="' + (y + 6) + '" stroke="var(--wi-accent)" stroke-width="1" stroke-dasharray="3 3"/>');
+  }
+  row("y", nd.y, nd.n, 0, "transparent", "var(--c-y)");
+  y += 6;
+  /* natural bit widths, not the value's own blen — so leading zeros show
+     and the reader can see exactly how large each quantity is allowed to be:
+     c\u2081 = a\u2081\u00b7b\u2081 is a product of two (n\u2212h)-bit numbers, c\u2082 of two h-bit
+     numbers, and c = a\u2081b\u2082+a\u2082b\u2081 sums two n-bit products, hence n+1 bits —
+     this holds in both variants, since (n\u2212h)+h = n regardless of how h is chosen. */
+  if (has("c1")) row("c\u2081 = a\u2081b\u2081" + (s.assemble || s.comb ? " \u00b7 2" + supNum(RUN.variant === "pow2" ? nd.n : 2 * V.h) : ""),
+    V.c1, Math.max(1, 2 * (nd.n - V.h)), s.assemble || s.comb ? (RUN.variant === "pow2" ? nd.n : 2 * V.h) : 0,
+    "var(--c-c1-fill)", "var(--c-c1)");
+  if (has("c2")) row("c\u2082 = a\u2082b\u2082", V.c2, Math.max(1, 2 * V.h), 0, "var(--c-c2-fill)", "var(--c-c2)");
+  if (has("c")) row("c = a\u2081b\u2082+a\u2082b\u2081" + (s.assemble ? " \u00b7 2" + supNum(V.h) : ""), V.c, nd.n + 1,
+    s.assemble ? V.h : 0, "var(--c-c3-fill)", "var(--c-c3)");
+  if (V.done) {
+    out.push('<line x1="' + (R - W * cw) + '" y1="' + (y - 12) + '" x2="' + R + '" y2="' + (y - 12) + '" class="rule"/>');
+    y += 4;
+    row("x\u00b7y", V.result, W, 0, "var(--c-z-fill)", "var(--c-z)");
+  }
+  svg.setAttribute("viewBox", "0 0 720 " + Math.max(320, y + 14));
+  svg.innerHTML = out.join("");
+}
+/* ==========================================================================
+   Panels, the comparison chart, transport and input.
+   ========================================================================= */
+let RUN = null, ALG = "school", VIEW = "tab", VAR = "simple";
+let step = 0, playing = false, timer = null, curFrame = -1;
+let XV = 0n, YV = 0n, NB = 8;
+
+function build() {
+  if (ALG === "school") RUN = runSchool(XV, YV, NB);
+  else {
+    const n = VAR === "pow2" ? Math.pow(2, Math.ceil(Math.log2(Math.max(2, NB)))) : NB;
+    RUN = runKara(XV & ((1n << B(n)) - 1n), YV & ((1n << B(n)) - 1n), n, VAR);
+    RUN.layout = layoutTree(RUN.nodes);
+  }
+  step = clamp(step, 0, RUN.steps.length - 1);
+}
+
+/* --- phases -------------------------------------------------------------- */
+function phaseList() {
+  const out = [];
+  RUN.steps.forEach((s, i) => {
+    if (out.length && out[out.length - 1].label === s.phase) out[out.length - 1].to = i;
+    else out.push({ label:s.phase, from:i, to:i });
+  });
+  return out;
+}
+function renderPhases() {
+  const ph = phaseList(), bar = el("phasebar");
+  bar.innerHTML = ph.map(p => '<button class="phasebtn' + (step >= p.from && step <= p.to ? " on" :
+    (step > p.to ? " past" : "")) + '" data-goto="' + p.from + '" title="' + p.label + ', steps ' + (p.from + 1) +
+    "\u2013" + (p.to + 1) + '">' + p.label.replace("row ", "i=") + '</button>').join("");
+  bar.querySelectorAll("[data-goto]").forEach(b => { b.onclick = () => { stop(); setStep(+b.getAttribute("data-goto")); }; });
+  ph.forEach((p, i) => { bar.children[i].style.flexGrow = (p.to - p.from + 1); });
+}
+
+/* --- the side panels ----------------------------------------------------- */
+/* a crumb shows which bits of its caller's operands the call is working on */
+function crumbBody(f) {
+  const nd = RUN.nodes[f.id];
+  const col = { root:"var(--wi-ink-soft)", c1:"var(--c-c1)", c2:"var(--c-c2)", c3:"var(--c-c3)" }[nd.role];
+  const lo = (nd.pw - nd.rhi) / nd.pw * 100, wd = (nd.rhi - nd.rlo) / nd.pw * 100;
+  const bar = '<span class="pos" style="color:' + col + '"><i style="left:' + lo + '%;width:' + wd + '%"></i>' +
+    (nd.isSum && nd.pw > 1 ? '<b style="left:50%"></b>' : "") + "</span>";
+  const what = nd.role === "root" ? "x\u00b7y" :
+    nd.role === "c1" ? "a\u2081b\u2081" : nd.role === "c2" ? "a\u2082b\u2082" :
+    "(a\u2081+a\u2082)(b\u2081+b\u2082)";
+  const where = nd.role === "root" ? "all " + nd.n + " bits"
+    : nd.isSum ? "both halves, " + nd.n + " bits"
+    : "[" + (nd.rhi - 1) + ":" + nd.rlo + "], " + nd.n + " bits";
+  return bar + '<span style="color:' + col + '">' + what + "</span> " +
+    '<span style="opacity:.7">' + where + "</span>";
+}
+function renderSide() {
+  const s = RUN.steps[step];
+  if (ALG === "school") {
+    el("stackTitle").textContent = "Where we are";
+    el("crumbs").innerHTML = '<span class="crumb sel">i = ' + s.i + (s.j >= 0 && s.j < RUN.n ? ", j = " + s.j : "") +
+      '</span>';
+    el("codeHd").textContent = "long multiplication";
+    el("codeBox").innerHTML = codeHTML("school", s.line, 0);
+    el("stateBody").innerHTML =
+      '<div><span class="slbl">x</span> <b>' + bstr(RUN.x, RUN.n) + '</b> = ' + RUN.x + "</div>" +
+      '<div><span class="slbl">y</span> <b>' + bstr(RUN.y, RUN.n) + '</b> = ' + RUN.y + "</div>" +
+      '<div style="margin-top:6px"><span class="slbl">z</span> <b>' + s.z.slice().reverse().join("") + '</b></div>' +
+      '<div><span class="slbl">carry</span> ' + s.c + "</div>" +
+      (step === RUN.steps.length - 1 ? '<div style="margin-top:6px; color:var(--c-z)">= ' + RUN.value +
+        " = " + RUN.x + "\u00b7" + RUN.y + "</div>" : "");
+    return;
+  }
+  el("stackTitle").textContent = "Call stack";
+  const st = s.stack, sel = curFrame < 0 || curFrame >= st.length ? st.length - 1 : curFrame;
+  el("crumbs").innerHTML = st.map((f, i) =>
+    (i ? '<span class="crumb arw">\u203a</span>' : "") +
+    '<span class="crumb' + (i === sel ? " sel" : "") + '" data-f="' + i + '">' + crumbBody(f) + "</span>").join("");
+  el("crumbs").querySelectorAll("[data-f]").forEach(c => {
+    c.onclick = () => { curFrame = +c.getAttribute("data-f"); if (curFrame === st.length - 1) curFrame = -1; render(); };
+  });
+  const f = st[sel];
+  el("depthRhs").textContent = "depth " + st.length;
+  el("codeHd").textContent = "karatsuba";
+  el("codeBox").innerHTML = codeHTML(VAR, f.line, f.callLine);
+  const nd = RUN.nodes[s.node], V = s.snap, L = [];
+  const put = (k, v, col) => L.push('<div><span class="slbl">' + k + '</span> <span style="color:' + col + '">' + v + "</span></div>");
+  put("x", bstr(nd.x, nd.n) + " = " + nd.x, "var(--c-x)");
+  put("y", bstr(nd.y, nd.n) + " = " + nd.y, "var(--c-y)");
+  if (V.h !== undefined) {
+    /* the pow2 pseudocode never names this quantity "h" \u2014 it writes n/2
+       directly \u2014 so match whichever notation is actually on screen */
+    const hName = VAR === "pow2" ? "n/2" : "h";
+    put("split", hName + " = " + V.h + ", a\u2081=" + V.a1 + " a\u2082=" + V.a2 +
+      " b\u2081=" + V.b1 + " b\u2082=" + V.b2, "var(--wi-ink-soft)");
+  }
+  if (V.c1 !== undefined) put("c\u2081", String(V.c1), "var(--c-c1)");
+  if (V.c2 !== undefined) put("c\u2082", String(V.c2), "var(--c-c2)");
+  if (V.c !== undefined) put("c", String(V.c), "var(--c-c3)");
+  if (V.done) put("x\u00b7y", bstr(V.result, 2 * nd.n) + " = " + V.result, "var(--c-z)");
+  el("stateBody").innerHTML = L.join("");
+}
+
+/* --- cost, and the comparison chart -------------------------------------- */
+/* The chart shows the cost model's growth, not a live simulation \u2014 see
+   idealCost() in j1.js. It is cheap enough to recompute in full whenever
+   the variant or the range changes, so there is no background job. */
+let CHART_MAX = 100000, CHART = null;
+function chartPoints(maxN) {
+  const pts = [];
+  for (let n = 2; n < maxN; n *= 1.28) pts.push(Math.round(n));
+  pts.push(Math.max(2, Math.round(maxN)));
+  return [...new Set(pts)].sort((a, b) => a - b);
+}
+function chartData() {
+  if (CHART && CHART.key === VAR && CHART.max === CHART_MAX) return CHART;
+  const xs = chartPoints(CHART_MAX), memo = new Map();
+  const sc = xs.map(n => n * n);
+  const ka = xs.map(n => karaCostAt(n, VAR, memo));
+  CHART = { key:VAR, max:CHART_MAX, xs:xs, sc:sc, ka:ka };
+  return CHART;
+}
+function fmtBits(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(n % 1e9 ? 1 : 0) + "G";
+  if (n >= 1e6) return (n / 1e6).toFixed(n % 1e6 ? 1 : 0) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(n % 1e3 ? 1 : 0) + "k";
+  return String(n);
+}
+function drawChart() {
+  const d = chartData(), svg = el("chartSvg");
+  const X0 = 52, X1 = 596, Y0 = 20, Y1 = 152;
+  if (!d.xs.length) { svg.innerHTML = ""; return; }
+  const all = d.sc.concat(d.ka).filter(v => v > 0);
+  const lo = Math.log10(Math.min(...all)), hi = Math.log10(Math.max(...all));
+  const lx0 = Math.log2(d.xs[0]), lx1 = Math.log2(d.xs[d.xs.length - 1]);
+  const sxv = n => X0 + (X1 - X0) * (Math.log2(n) - lx0) / (lx1 - lx0 || 1);
+  const sx = i => sxv(d.xs[i]);
+  const sy = v => Y1 - (Y1 - Y0) * (Math.log10(v) - lo) / (hi - lo || 1);
+  const out = [];
+  for (let e = Math.ceil(lo); e <= Math.floor(hi); e++) {
+    const y = sy(Math.pow(10, e));
+    out.push('<line x1="' + X0 + '" y1="' + y + '" x2="' + X1 + '" y2="' + y + '" class="grid"/>' +
+      '<text class="axlab" x="' + (X0 - 6) + '" y="' + (y + 3.5) + '">10' + supNum(e) + "</text>");
+  }
+  const line = (arr, col, lab) => {
+    let p = "";
+    arr.forEach((v, i) => { p += (i ? " L" : "M") + sx(i) + " " + sy(v); });
+    out.push('<path d="' + p + '" fill="none" stroke="' + col + '" stroke-width="2"/>');
+    out.push('<text class="serlab" x="' + (X1 + 4) + '" y="' + (sy(arr[arr.length - 1]) + 3.5) +
+      '" text-anchor="start" fill="' + col + '">' + lab + "</text>");
+  };
+  line(d.sc, "var(--c-z)", "n\u00b2");
+  line(d.ka, "var(--c-c3)", "karatsuba");
+  /* ticks: evenly spaced in log2, however wide the chosen range is */
+  const nt = 6;
+  for (let i = 0; i <= nt; i++) {
+    const n = Math.round(Math.pow(2, lx0 + (lx1 - lx0) * i / nt));
+    out.push('<text class="axlab mid" x="' + sxv(n) + '" y="' + (Y1 + 15) + '">' + fmtBits(n) + "</text>");
+  }
+  if (RUN.n >= d.xs[0] && RUN.n <= d.xs[d.xs.length - 1])
+    out.push('<line x1="' + sxv(RUN.n) + '" y1="' + Y0 + '" x2="' + sxv(RUN.n) + '" y2="' + Y1 +
+      '" stroke="var(--wi-accent)" stroke-width="1" stroke-dasharray="3 3"/>' +
+      '<circle cx="' + sxv(RUN.n) + '" cy="' + sy(Math.max(1, RUN.cost)) + '" r="3.5" fill="var(--wi-accent)"/>' +
+      '<text class="axlab mid" x="' + sxv(RUN.n) + '" y="' + (Y0 - 6) + '" fill="var(--wi-accent)">this run</text>');
+  /* where the two curves cross */
+  let cross = 0;
+  for (let i = 1; i < d.ka.length; i++)
+    if (d.ka[i - 1] > d.sc[i - 1] && d.ka[i] <= d.sc[i]) cross = d.xs[i];
+  if (cross) out.push('<text class="axtitle" x="' + ((X0 + X1) / 2) + '" y="' + (Y0 + 4) +
+    '" fill="var(--wi-accent)">the curves cross between ' + d.xs[d.xs.indexOf(cross) - 1] + ' and ' + cross +
+    ' bits</text>');
+  else if (d.ka[d.ka.length - 1] > d.sc[d.sc.length - 1])
+    out.push('<text class="axtitle" x="' + ((X0 + X1) / 2) + '" y="' + (Y0 + 4) +
+      '" fill="var(--wi-ink-faint)">no crossing yet at this range \u2014 raise \u201cchart up to\u201d to see it</text>');
+  out.push('<text class="axtitle" x="' + ((X0 + X1) / 2) + '" y="' + (Y1 + 32) +
+    '">n (log scale)</text>');
+  out.push('<line x1="' + X0 + '" y1="' + Y1 + '" x2="' + X1 + '" y2="' + Y1 + '" class="rule"/>');
+  svg.innerHTML = out.join("");
+}
+
+function renderCost() {
+  const s = RUN.steps[step];
+  const other = ALG === "school" ? runKara(RUN.x, RUN.y, VAR === "pow2" ?
+      Math.pow(2, Math.ceil(Math.log2(Math.max(2, RUN.n)))) : RUN.n, VAR, true).cost : RUN.n * RUN.n;
+  const mine = RUN.cost, big = Math.max(mine, other, 1);
+  const row = (lab, v, col, run) =>
+    '<span class="slbl">' + lab + '</span><span class="costbar"><i style="width:' + (100 * v / big).toFixed(1) +
+    '%;background:' + col + '"></i></span><span class="num">' + (run === undefined ? v : run + " / " + v) + "</span>";
+  el("costGrid").innerHTML =
+    (ALG === "school"
+      ? row("long multiplication", mine, "var(--c-z)", s.cost) + row("karatsuba (whole run)", other, "var(--c-c3)")
+      : row("karatsuba", mine, "var(--c-c3)", s.cost) + row("long multiplication", other, "var(--c-z)"));
+  el("costRhs").innerHTML = "n = " + RUN.n + " \u00b7 " + RUN.steps.length + " steps";
+  el("facts").innerHTML =
+    "<span>x\u00b7y = <b>" + (RUN.x * RUN.y) + "</b></span>" +
+    "<span>karatsuba costs <b>" + (other ? (ALG === "kara" ? (mine / other) : (other / mine)).toFixed(2) :
+      "\u2013") + "\u00d7</b> long multiplication here</span>" +
+    (ALG === "kara" ? "<span>calls <b>" + RUN.nodes.length + "</b></span>" : "") +
+    "<span>so far <b>" + s.cost + "</b></span>";
+}
+
+/* --- everything ---------------------------------------------------------- */
+function renderEq() {
+  const s = RUN.steps[step], nd = RUN.nodes[s.node];
+  const on = s.call || s.got ||
+    (s.sums || s.comb ? "c3" : (s.assemble ? "all" : (s.split ? "" : "")));
+  const t = (k, txt) => '<span class="' + k + (on === k || on === "all" ? " lit" : "") + '">' + txt + "</span>";
+  el("eqBody").innerHTML =
+    '<div><span class="m">x</span>\u00b7<span class="m">y</span> = ' +
+      t("t1", "a\u2081b\u2081") + '\u00b72<sup>n</sup> + (' + t("t3", "a\u2081b\u2082 + a\u2082b\u2081") +
+      ')\u00b72<sup>n/2</sup> + ' + t("t2", "a\u2082b\u2082") + "</div>" +
+    '<div>' + t("t3", "a\u2081b\u2082 + a\u2082b\u2081") + ' = (a\u2081+a\u2082)(b\u2081+b\u2082) \u2212 ' +
+      t("t1", "a\u2081b\u2081") + ' \u2212 ' + t("t2", "a\u2082b\u2082") + "</div>" +
+    '<span class="note">Three products instead of four: the middle term is bought with one extra multiplication of ' +
+    'the two sums, and two subtractions that cost \u0398(n). The colours are the same in the picture below \u2014 ' +
+    'the three coloured rows, shifted into place, are exactly the three terms of the first line.</span>';
+  el("eqRhs").innerHTML = s.snap.h !== undefined ? "n = " + nd.n + ", n/2 = " + s.snap.h : "n = " + nd.n;
+}
+function render() {
+  const s = RUN.steps[step];
+  el("algSeg").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.alg === ALG));
+  el("viewSeg").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.view === VIEW));
+  el("varSeg").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.var === VAR));
+  document.querySelectorAll("[data-only]").forEach(n => {
+    n.style.display = n.getAttribute("data-only") === ALG ? "" : "none";
+  });
+  el("slider").max = RUN.steps.length - 1;
+  el("slider").value = step;
+  el("stepno").textContent = "step " + (step + 1) + " / " + RUN.steps.length;
+  el("explain").innerHTML = s.expl;
+  el("sub").innerHTML = ALG === "school"
+    ? "Long multiplication on bits: for every 1 in <span class='m'>x</span>, one shifted copy of " +
+      "<span class='m'>y</span> is added into the running product. Every position of every copy is one bit " +
+      "operation, so the whole thing costs exactly <span class='m'>n</span><sup>2</sup> \u2014 and that is the number " +
+      "Karatsuba has to beat."
+    : "Karatsuba splits both operands in half and buys the middle term <span class='m'>a</span><sub>1</sub>" +
+      "<span class='m'>b</span><sub>2</sub> + <span class='m'>a</span><sub>2</sub><span class='m'>b</span><sub>1</sub> " +
+      "with a <i>third</i> product instead of two, at the price of a few linear-time additions. Three recursive calls " +
+      "on half-size inputs instead of four: <span class='m'>T</span>(n) = 3<span class='m'>T</span>(n/2) + \u0398(n).";
+  el("svgTitle").textContent = ALG === "school" ? (VIEW === "tab" ? "Shift and add" : "The array z") : "Recursion";
+  el("svgRhs").innerHTML = ALG === "school" ? "" :
+    "variant: " + (VAR === "pow2" ? "n = 2\u1d4f throughout" : "base case n \u2264 3");
+  renderPhases(); renderSide(); renderCost();
+  el("eqBox").style.display = ALG === "kara" ? "" : "none";
+  if (ALG === "kara") renderEq();
+  syncTransport();
+  if (ALG === "school") drawSchool(s); else drawKara(s);
+  el("legend").innerHTML = ALG === "school"
+    ? lg("var(--c-x-fill)", "var(--c-x)", "x") + lg("var(--c-y-fill)", "var(--c-y)", "y, and the shifted copies") +
+      lg("var(--c-z-fill)", "var(--c-z)", "the running product z")
+    : lg("var(--c-c1-fill)", "var(--c-c1)", "c\u2081 = a\u2081b\u2081") +
+      lg("var(--c-c2-fill)", "var(--c-c2)", "c\u2082 = a\u2082b\u2082") +
+      lg("var(--c-c3-fill)", "var(--c-c3)", "the third product, and c") +
+      lg("var(--c-z-fill)", "var(--c-z)", "the result of this call");
+  drawChart();
+  el("codeSchoolFull").innerHTML = codeHTML("school", ALG === "school" ? s.line : 0, 0);
+  el("codeKaraFull").innerHTML = codeHTML(VAR, ALG === "kara" ? s.line : 0, 0);
+  el("variantNote").innerHTML = VAR === "simple"
+    ? "<p><b>Base case n \u2264 3.</b> The listing on the slide has no base case at all, so it does not terminate. " +
+      "Three is the smallest bound that works: the third call gets operands of up to \u2308n/2\u2309+1 bits, and that " +
+      "is smaller than n only from n \u2265 4. Everything else is the printed code, except that the assembly must " +
+      "read 2<sup>2h</sup> rather than 2<sup>n</sup>, which differ when n is odd.</p>"
+    : "<p><b>n = 2<sup>k</sup> throughout.</b> The sums a\u2081+a\u2082 and b\u2081+b\u2082 need n/2+1 bits, which is " +
+      "what breaks the power-of-two invariant. Splitting off their carry bits \u03b1 and \u03b2 keeps every recursive " +
+      "call at exactly n/2 bits; the carries are paid for with two conditional additions and one bit product, all " +
+      "linear. This is what an implementation does, and it is why the recursion tree here is perfectly regular.</p>";
+}
+const lg = (f, b, t) => '<span class="item"><span class="sw" style="background:' + f + ';border-color:' + b +
+  '"></span> ' + t + '</span>';
+
+function setStep(i) { step = clamp(i, 0, RUN.steps.length - 1); curFrame = -1; render(); }
+/* --- transport ----------------------------------------------------------- */
+function setPlayGlyph(running) {
+  const b = el("playBtn");
+  b.innerHTML = running ? "\u23f8\ufe0e" : "\u25b6\ufe0e";
+  b.title = running ? "Pause (space bar)" : "Play (space bar)";
+  b.setAttribute("aria-label", running ? "Pause" : "Play");
+}
+function syncTransport() {
+  const last = RUN.steps.length - 1;
+  el("btnFirst").disabled = step <= 0;
+  el("btnPrev").disabled = step <= 0;
+  el("btnNext").disabled = step >= last;
+}
+function stop() { playing = false; if (timer) clearInterval(timer); timer = null; setPlayGlyph(false); }
+function play() {
+  if (playing) { stop(); return; }
+  if (step >= RUN.steps.length - 1) { step = 0; render(); }
+  playing = true; setPlayGlyph(true);
+  timer = setInterval(() => {
+    if (step >= RUN.steps.length - 1) { stop(); return; }
+    setStep(step + 1);
+  }, ALG === "school" ? 420 : 620);
+}
+
+/* --- input --------------------------------------------------------------- */
+function parseNum(t) {
+  t = String(t).trim().replace(/\s+/g, "");
+  if (/^d\d+$/i.test(t)) return BigInt(t.slice(1));
+  if (/^[01]+$/.test(t)) return BigInt("0b" + t);
+  if (/^\d+$/.test(t)) return BigInt("0b" + t);
+  throw new Error("cannot read \u201c" + t + "\u201d");
+}
+function readInputs() {
+  NB = clamp(Math.round(+el("inN").value) || 8, 2, 24);
+  el("inN").value = NB;
+  XV = low(parseNum(el("inX").value), NB);
+  YV = low(parseNum(el("inY").value), NB);
+  el("inX").value = bstr(XV, NB);
+  el("inY").value = bstr(YV, NB);
+}
+function randomise() {
+  const r = () => { let v = 0n; for (let i = 0; i < NB; i++) if (Math.random() < .5) v |= 1n << B(i); return v | (1n << B(NB - 1)); };
+  XV = r(); YV = r();
+  el("inX").value = bstr(XV, NB); el("inY").value = bstr(YV, NB);
+}
+function dump() { el("ta").value = "n " + NB + "\nx " + bstr(XV, NB) + "\ny " + bstr(YV, NB); }
+function loadText() {
+  const err = el("taErr"); err.textContent = "";
+  try {
+    el("ta").value.split(/\n+/).forEach(line => {
+      const m = line.trim().match(/^(\w+)\s+(.+)$/); if (!m) return;
+      const k = m[1].toLowerCase();
+      if (k === "n") el("inN").value = m[2];
+      else if (k === "x") el("inX").value = m[2];
+      else if (k === "y") el("inY").value = m[2];
+    });
+    readInputs(); step = 0; build(); render();
+  } catch (e) { err.textContent = String(e.message || e); }
+}
+
+function init() {
+  el("algSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    stop(); ALG = b.dataset.alg; step = 0; build(); render();
+  });
+  el("viewSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    VIEW = b.dataset.view;
+    el("viewSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.view === VIEW));
+    render();
+  });
+  el("varSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    stop(); VAR = b.dataset.var;
+    el("varSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.var === VAR));
+    step = 0; build(); render();
+  });
+  ["inX", "inY", "inN"].forEach(id => el(id).addEventListener("change", () => {
+    stop();
+    try { readInputs(); el("taErr").textContent = ""; } catch (e) { el("taErr").textContent = String(e.message); return; }
+    step = 0; build(); render();
+  }));
+  el("btnRand").onclick = () => { stop(); randomise(); step = 0; build(); render(); dump(); };
+  el("inChartMax").addEventListener("change", () => {
+    const v = clamp(Math.round(+el("inChartMax").value) || CHART_MAX, 32, 1e12);
+    el("inChartMax").value = v;
+    CHART_MAX = v;
+    drawChart();
+  });
+  el("slider").addEventListener("input", e => { stop(); setStep(+e.target.value); });
+  el("btnFirst").onclick = () => { stop(); setStep(0); };
+  el("btnPrev").onclick = () => { stop(); setStep(step - 1); };
+  el("btnNext").onclick = () => { stop(); setStep(step + 1); };
+  el("playBtn").onclick = play;
+  el("btnLoad").onclick = () => { stop(); loadText(); };
+  el("btnDump").onclick = dump;
+  document.addEventListener("keydown", e => {
+    if (/input|textarea|select/i.test(e.target.tagName)) return;
+    if (e.key === "ArrowRight") { stop(); setStep(step + 1); }
+    if (e.key === "ArrowLeft") { stop(); setStep(step - 1); }
+    if (e.key === " ") { e.preventDefault(); play(); }
+  });
+  el("mainSvg").addEventListener("mousemove", ev => {
+    const t = ev.target.closest ? ev.target.closest("[data-nd]") : null;
+    const tt = el("tt");
+    if (!t || ALG !== "kara") { tt.style.display = "none"; return; }
+    const nd = RUN.nodes[+t.getAttribute("data-nd")];
+    const fin = nd.doneAt !== undefined && step >= nd.doneAt;
+    tt.innerHTML = '<span class="tt-h">' + (nd.role === "root" ? "the top-level call" : nd.role) + ", " + nd.n +
+      " bits</span><br>x = " + bstr(nd.x, nd.n) + " = " + nd.x + "<br>y = " + bstr(nd.y, nd.n) + " = " + nd.y +
+      (fin ? "<br>x\u00b7y = " + nd.result : "<br>not finished yet");
+    tt.style.display = "block";
+    const r = tt.getBoundingClientRect();
+    tt.style.left = Math.min(ev.clientX + 14, window.innerWidth - r.width - 10) + "px";
+    tt.style.top = Math.max(8, ev.clientY - r.height - 12) + "px";
+  });
+  el("mainSvg").addEventListener("mouseleave", () => { el("tt").style.display = "none"; });
+
+  readInputs(); build(); render(); dump();
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

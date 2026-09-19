@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breadth-First Search — Animated</title>
+<style>
+    :root {
+        --bg: #f5ebd9;
+        --panel: #faf6ed;
+        --panel-border: #d4c5b4;
+        --controls-bg: #ecddc5;
+        --controls-border: #d4c5b4;
+        --ink: #6b675c;
+        --ink-strong: #46433a;
+        --title-muted: #8b8779;
+        --btn: #faf6ed;
+        --btn-border: #b9a793;
+        --btn-border-hover: #9c866d;
+
+        --node-cream: #faf6ed;
+        --node-cream-border: #b9a793;
+        --d-start: #e5c0b4;   /* near layer */
+        --d-end: #902015;     /* far layer */
+        --active: #cc2f22;    /* current vertex (being dequeued) */
+        --examine: #b07d18;   /* iterator currently looking at this edge */
+        --queue-border: #2a6a63; /* teal — in the queue / frontier */
+        --edge: #b9a793;
+        --tree-edge: #902015;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--wi-font-body)"Segoe UI", Roboto, sans-serif;
+        margin: 0; padding: 22px 26px 40px; min-height: 100vh;
+    }
+
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--ink-strong); }
+    .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; }
+    .subtitle code { background: #ecddc5; padding: 1px 6px; border-radius: 3px; }
+
+    .controls {
+        display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
+        background-color: var(--controls-bg); padding: 14px 22px; border-radius: 6px;
+        border: 1px solid var(--controls-border); margin-bottom: 22px;
+    }
+    .ctl-group { display: flex; align-items: center; gap: 9px; }
+    .ctl-group label { font-size: 0.82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .btn-group { display: flex; gap: 8px; }
+
+    button, select {
+        background-color: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+        padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit;
+    }
+    button:hover:not(:disabled), select:hover { background-color: #fcf9f3; border-color: var(--btn-border-hover); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.primary { background-color: #f0d9cd; border-color: #c28577; }
+    button.primary:hover:not(:disabled) { background-color: #fcf9f3; }
+    select { cursor: pointer; padding-right: 10px; }
+
+    input[type="range"] { accent-color: #cc2f22; cursor: pointer; vertical-align: middle; }
+    /* ---- transport: scrubber + phase strip (full-width row inside the controls bar) ---- */
+    .controls .transport { flex: 1 1 100%; display: grid; grid-template-columns: minmax(0,1fr) auto; column-gap: 12px; row-gap: 5px; align-items: center; --thumb: 8px; margin-top: 2px; }
+    .transport input[type="range"] { width: 100%; margin: 0; display: block; }
+    .transport .stepno { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: #46433a; min-width: 72px; text-align: right; white-space: nowrap; }
+    /* the thumb's centre stops half a thumb short of each end of the track: inset the strip the same amount */
+    .transport .phasebar { grid-column: 1; display: flex; margin: 0 var(--thumb); min-height: 20px; }
+    .phasebar .phasebtn { position: relative; overflow: hidden; min-width: 0; padding: 2px 5px; font-size: 0.68rem; line-height: 1.35; font-family: var(--wi-font-head, inherit); font-weight: 500; letter-spacing: .03em; background: var(--panel, #faf6ed); border: 1px solid var(--panel-border, #d4c5b4); border-left-width: 0; border-radius: 0; color: var(--title-muted, #7a6d5b); cursor: pointer; text-overflow: ellipsis; white-space: nowrap; }
+    .phasebar .phasebtn:first-child { border-left-width: 1px; border-radius: 4px 0 0 4px; }
+    .phasebar .phasebtn:last-child { border-radius: 0 4px 4px 0; }
+    .phasebar .phasebtn:hover { background: #f3e7d2; }
+    .phasebar .phasebtn .fill { position: absolute; left: 0; top: 0; bottom: 0; background: #eedcd3; border-right: 1px solid #c9a79d; transition: width .08s linear; }
+    .phasebar .phasebtn .fill.empty { border-right: 0; }
+    .phasebar .phasebtn .lab { position: relative; }
+    .phasebar .phasebtn.on { color: var(--ink-strong, #46433a); font-weight: 700; }
+    .slider-group span { min-width: 42px; }
+
+    /* ---- stage: graph | splitter | side panels (splitter column is draggable) ---- */
+    .stage { display: grid; grid-template-columns: minmax(0, var(--main-w, 1.55fr)) 20px minmax(330px, 1fr); gap: 0; align-items: start; }
+    .stage > .splitter { align-self: stretch; position: relative; cursor: col-resize; user-select: none; touch-action: none; }
+    .stage > .splitter::before { content: ""; position: absolute; left: 8px; right: 8px; top: 0; bottom: 0; border-radius: 2px; background: transparent; transition: background 0.15s; }
+    .stage > .splitter::after { content: ""; position: absolute; left: 50%; top: min(50%, 240px); width: 5px; height: 42px; margin-left: -2.5px; border-radius: 3px; background: var(--panel-border, #d4c5b4); transition: background 0.15s; }
+    .stage > .splitter:hover::before, .stage > .splitter.dragging::before { background: rgba(0,0,0,0.04); }
+    .stage > .splitter:hover::after, .stage > .splitter.dragging::after { background: var(--wi-heading, #902015); }
+    body.splitting, body.splitting * { cursor: col-resize !important; user-select: none !important; }
+    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; gap: 20px; } .stage > .splitter { display: none; } }
+    /* ---- zoomable graph canvas ---- */
+    canvas#graph { touch-action: none; cursor: grab; }
+    canvas#graph.panning { cursor: grabbing; }
+    .sim-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .sim-head .sim-title { flex: 1; }
+    .zoom-ctl { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+    .zoom-ctl button { padding: 0; width: 26px; height: 26px; line-height: 24px; font-size: 1rem; border-radius: 4px; }
+    .zoom-ctl .zoom-pct { min-width: 44px; text-align: center; font-size: 0.78rem; color: var(--title-muted, #7a6d5b); font-variant-numeric: tabular-nums; }
+
+    .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
+    canvas#graph { display: block; background-color: var(--bg); width: 100%; height: 460px; border-radius: 4px; }
+
+    .side { display: flex; flex-direction: column; gap: 18px; }
+
+    .status { background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px; display: flex; align-items: center; }
+    .status .stepcount { color: var(--title-muted); font-size: 0.8rem; margin-left: auto; padding-left: 12px; white-space: nowrap; }
+
+    /* queue */
+    .queue-wrap { display: flex; align-items: center; gap: 10px; min-height: 50px; }
+    .queue-end { font-size: 0.72rem; color: var(--title-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+    .queue { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; flex: 1; }
+    .queue .empty { color: var(--title-muted); font-style: italic; font-size: 0.9rem; }
+    .q-node {
+        width: 36px; height: 36px; border-radius: 7px;
+        display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem;
+        border: 2px solid var(--queue-border);
+    }
+    .q-node.front { border-color: var(--active); border-width: 3px; box-shadow: 0 0 0 3px rgba(204,47,34,0.12); }
+    .queue-tip { font-size: 0.78rem; color: var(--title-muted); margin-top: 8px; }
+    .queue-tip b { color: var(--queue-border); }
+
+    /* distance layers */
+    .layers { display: flex; flex-direction: column; gap: 7px; }
+    .layer-row { display: flex; align-items: center; gap: 10px; }
+    .layer-label { font-size: 0.78rem; color: var(--ink-strong); font-weight: 700; min-width: 64px; }
+    .layer-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .layer-chip { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; border: 1.5px solid rgba(0,0,0,0.18); }
+    .layers .none { color: var(--title-muted); font-style: italic; font-size: 0.88rem; }
+
+    /* adjacency */
+    .adj { font-size: 0.9rem; }
+    .adj-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #ecddc5; }
+    .adj-row:last-child { border-bottom: none; }
+    .adj-row.processing { background: #f3e7d2; border-radius: 4px; }
+    .adj-key { width: 34px; min-width: 34px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 700; background: var(--node-cream); border: 1px solid var(--node-cream-border); color: var(--ink-strong); }
+    .adj-row.queued .adj-key { border: 2px solid var(--queue-border); }
+    .adj-row.processing .adj-key { border: 2px solid var(--active); }
+    .adj-arrow { color: var(--title-muted); }
+    .adj-cells { display: flex; gap: 5px; flex-wrap: wrap; }
+    .adj-cell { min-width: 24px; padding: 2px 6px; border-radius: 3px; text-align: center; background: #ecddc5; border: 1px solid #d4c5b4; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .adj-cell.consumed { opacity: 0.38; text-decoration: line-through; }
+    .adj-cell.cursor { background: #fcf9f3; border: 2px solid var(--examine); color: var(--ink-strong); font-weight: 700; }
+    .adj-empty { color: var(--title-muted); font-style: italic; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 0.8rem; color: var(--ink); align-items: center; }
+    .legend .item { display: flex; align-items: center; gap: 7px; }
+    .swatch { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; }
+    .grad { width: 120px; height: 14px; border-radius: 7px; border: 1px solid rgba(0,0,0,.15); background: linear-gradient(90deg, #e5c0b4, #902015); }
+    .sw-cream { background: var(--node-cream); border-color: var(--node-cream-border); }
+    .sw-queue { background: #faf6ed; border-color: var(--queue-border); border-width: 2.5px; }
+    .sw-curr  { background: #c28577; border-color: var(--active); border-width: 2.5px; }
+    .sw-water { background: linear-gradient(135deg,#aacdf2,#225096); border-color: #183f7b; }
+    .sw-buoy  { position: relative; background: #c28577; border-color: #285ea4; border-width: 2.5px; }
+    .sw-buoy::after { content: ""; position: absolute; left: 1px; right: 1px; bottom: -4px; height: 6px; border-radius: 50%; background: #508bd2; opacity: .8; }
+
+    /* mode toggle switch */
+    .switch { position: relative; display: inline-block; width: 42px; height: 23px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; cursor: pointer; inset: 0; background: #d4c5b4; border: 1px solid #b9a793; border-radius: 23px; transition: .2s; }
+    .switch .track:before { content: ""; position: absolute; height: 17px; width: 17px; left: 3px; top: 2px; background: #faf6ed; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .track { background: #2a6a63; border-color: #1d5049; }
+    .switch input:checked + .track:before { transform: translateX(19px); }
+
+    details.editor { margin-top: 22px; }
+    details.editor summary { cursor: pointer; font-size: 0.85rem; color: var(--title-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    textarea { font-family: "SF Mono", var(--wi-font-mono); font-size: 0.85rem; background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px; padding: 10px; width: 230px; height: 230px; resize: vertical; }
+    .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 420px; line-height: 1.5; }
+    .editor-help code { background: #ecddc5; padding: 1px 5px; border-radius: 3px; }
+    .err { color: #6d180f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<h1>Breadth-First Search</h1>
+<p class="subtitle">BFS on an undirected graph from a source vertex. Reads the <code>Algs4 Graph</code> format (V, then E, then the edges). Watch the <b>FIFO queue</b> advance and the graph fill in by <b>distance layers</b> — BFS finds shortest paths in edges. Flip on <b>Water</b> mode to watch a flood spread from the source at one edge per unit time.</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="presetSel">Graph</label>
+        <select id="presetSel"></select>
+    </div>
+    <div class="ctl-group">
+        <label for="startSel">Source</label>
+        <select id="startSel"></select>
+    </div>
+    <div class="btn-group">
+        <button id="backBtn"  onclick="stepBack()">‹ Back</button>
+        <button id="stepBtn" class="primary" onclick="stepFwd()">Step ›</button>
+        <button id="playBtn" onclick="togglePlay()">Play</button>
+        <button id="resetBtn" onclick="resetRun()">Reset</button>
+    </div>
+    <div class="slider-group" style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#46433a">
+        <label style="font-size:.82rem;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:var(--ink-strong)">Delay</label>
+        <input type="range" id="speedSlider" min="40" max="1400" value="650" oninput="updateSpeed(this.value)">
+        <span id="speedVal">650ms</span>
+    </div>
+    <div class="ctl-group">
+        <label for="waterToggle">Water</label>
+        <label class="switch"><input type="checkbox" id="waterToggle" onchange="toggleWaterMode(this.checked)"><span class="track"></span></label>
+    </div>
+    <div class="transport" title="Drag to scrub through the run; click a phase to jump to its start">
+        <input type="range" id="stepSlider" min="0" max="1000" value="0" step="1" aria-label="Scrub through the run">
+        <span class="stepno" id="stepSliderVal">0 / 0</span>
+        <div class="phasebar" id="phaseBar"></div>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="sim-box">
+        <div class="sim-head"><div class="sim-title">Graph G</div><div class="zoom-ctl" title="Wheel: zoom &middot; drag: pan &middot; double-click: reset"><button type="button" id="zoomOut" title="Zoom out">&minus;</button><span class="zoom-pct" id="zoomPct">100%</span><button type="button" id="zoomIn" title="Zoom in">+</button><button type="button" id="zoomFit" title="Reset view (double-click on the graph)">&#x2922;</button></div></div>
+        <canvas id="graph"></canvas>
+        <div class="legend" style="margin-top:12px">
+            <div class="item"><span class="swatch sw-cream"></span>undiscovered</div>
+            <div class="item"><span class="swatch sw-queue"></span>in queue</div>
+            <div class="item"><span class="swatch sw-curr"></span>current source</div>
+            <div class="item"><span class="swatch sw-water"></span>water (flowing)</div>
+            <div class="item"><span class="swatch sw-buoy"></span>buoy (reached)</div>
+            <div class="item"><span class="grad"></span>distance: near → far</div>
+        </div>
+    </div>
+
+    <div class="splitter" id="stageSplitter" title="Drag to resize &middot; double-click to reset"></div>
+    <div class="side">
+        <div class="sim-box">
+            <div class="sim-title">Status</div>
+            <div class="status"><span id="statusText">Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.</span><span class="stepcount" id="stepCount"></span></div>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title" id="queueTitle">Queue &nbsp;·&nbsp; FIFO</div>
+            <div class="queue-wrap">
+                <span class="queue-end">front ▸</span>
+                <div class="queue" id="queueView"><span class="empty">empty</span></div>
+                <span class="queue-end">◂ back</span>
+            </div>
+            <div class="queue-tip" id="queueTip"><b>Front</b> is dequeued next; new neighbours join the back. FIFO order is what makes BFS explore by layers.</div>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title" id="layersTitle">Distance layers</div>
+            <div class="layers" id="layersView"><span class="none">none yet</span></div>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title">Adjacency lists &nbsp;·&nbsp; iterators</div>
+            <div class="adj" id="adjView"></div>
+        </div>
+    </div>
+</div>
+
+<details class="editor">
+    <summary>Edit / paste a graph</summary>
+    <div class="editor-body">
+        <textarea id="graphText" spellcheck="false"></textarea>
+        <div>
+            <button class="primary" onclick="loadFromText()">Load this graph</button>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--ink-strong);margin-left:10px;cursor:pointer">
+                <input type="checkbox" id="sedgewickToggle" onchange="refreshTextarea()">
+                original Sedgewick format (no coordinates)
+            </label>
+            <div class="err" id="parseErr"></div>
+            <div class="editor-help" style="margin-top:10px">
+                Format (Sedgewick &amp; Wayne <code>Graph</code>): first line is the number of vertices <code>V</code>,
+                second line is the number of edges <code>E</code>, then <code>E</code> lines each holding an
+                undirected edge <code>v w</code>. Vertices are <code>0 … V−1</code>. Parallel edges and self-loops
+                are allowed. Adjacency lists are built by prepending (a Sedgewick <code>Bag</code>), so a vertex's
+                neighbours appear in reverse order of how the edges were read — matching the booksite traversal order.
+                <br><br>
+                <b>Optional fixed layout:</b> after the edges, add exactly <code>V</code> more lines of
+                <code>x y</code> — one pair per vertex, in order — to pin down your own layout instead of the
+                automatic one. Any numeric scale works; it's auto-centred and scaled to fit, preserving relative
+                position and aspect ratio. Loading a graph always fills the box back in with its current layout's
+                coordinates so you can nudge them; tick the box above to see the plain format instead.
+                <br><br>
+                <b>Mixed-format tolerant:</b> each edge occupies exactly one line. Pasting a <i>weighted</i>
+                graph here (an extra third number per edge line) just ignores that weight, since this page is
+                unweighted — no need to strip it out by hand.
+            </div>
+        </div>
+    </div>
+</details>
+
+<script>
+/* ============================ preset graphs ============================ */
+const PRESETS = {
+    "tinyG.txt  (13 V, 13 E — the slide)":
+`13
+13
+0 5
+4 3
+0 1
+9 12
+6 4
+5 4
+0 2
+11 12
+9 10
+0 6
+7 8
+9 11
+5 3`,
+    "tinyCG.txt  (6 V, 8 E — connected)":
+`6
+8
+0 5
+2 4
+2 3
+1 2
+0 1
+3 4
+3 5
+0 2`,
+    "Path  (8 V — single chain)":
+`8
+7
+0 1
+1 2
+2 3
+3 4
+4 5
+5 6
+6 7`,
+    "Two triangles + bridge  (6 V)":
+`6
+7
+0 1
+1 2
+2 0
+3 4
+4 5
+5 3
+2 3`,
+    "Grid maze  (16 V — planar, with loops)":
+`16
+17
+0 1
+1 2
+2 3
+0 4
+2 6
+3 7
+5 6
+5 9
+4 8
+8 9
+7 11
+10 14
+11 15
+12 13
+13 14
+14 15
+9 13`
+};
+
+/* ============================ state ============================ */
+let V = 0, adj = [], pos = [], steps = [], ptr = -1;
+let lastV = 0, lastEdges = [];
+let playing = false, timer = null, delay = 650, startVertex = 0;
+let maxDist = 1;
+
+/* ---- water mode ---- */
+let waterMode = false, waterPlaying = false, tau = 0, wRaf = null, wLast = null;
+let wdist = [], waterReachable = [], waterMaxTau = 1;
+const TAU_PER_SEC = 0.7;   // edge-units of water advance per real second at default speed
+
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+
+/* ============================ optional fixed-layout coordinates ============================ */
+function normalizePositions(raw) {
+    let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+    for (const p of raw) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+    const w = Math.max(maxx-minx, 1e-6), h = Math.max(maxy-miny, 1e-6);
+    const pad = 0.08, avail = 1 - 2*pad;
+    const s = avail / Math.max(w, h);
+    const usedW = w*s, usedH = h*s;
+    const offX = pad + (avail-usedW)/2, offY = pad + (avail-usedH)/2;
+    return raw.map(p => ({ x: offX + (p.x-minx)*s, y: offY + (p.y-miny)*s }));
+}
+function fmtCoord(x) { return (Math.round(x*1000)/1000).toString(); }
+
+/* ============================ parsing ============================ */
+/* Line-based: each edge (and, later, each coordinate pair) occupies exactly one line. This makes the
+   format tolerant of pasting a weighted graph where an unweighted one is expected (the extra weight
+   token per line is simply ignored) or vice versa (a missing weight defaults to 1) — a stray/missing
+   token only ever affects the one line it's on, not the rest of the parse. */
+function tokenizeLines(text) {
+    return text.split('\n').map(line => line.trim().split(/\s+/).filter(s => s.length)).filter(toks => toks.length > 0);
+}
+function readVE(lines) {
+    if (lines.length === 0) throw new Error("Empty input.");
+    if (lines[0].length >= 2) return { v: parseInt(lines[0][0], 10), e: parseInt(lines[0][1], 10), li: 1 };
+    if (lines.length < 2) throw new Error("Need E on the second line.");
+    return { v: parseInt(lines[0][0], 10), e: parseInt(lines[1][0], 10), li: 2 };
+}
+function readTrailingPositions(lines, li, v) {
+    const remaining = lines.length - li;
+    if (remaining === 0) return null;
+    if (remaining !== v) throw new Error(`After the edges, expected either nothing or exactly ${v} coordinate line(s) ("x y" each), but found ${remaining}.`);
+    const raw = [];
+    for (let i = 0; i < v; i++) {
+        const toks = lines[li++];
+        const x = parseFloat(toks[0]), y = parseFloat(toks[1]);
+        if (toks.length < 2 || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Vertex ${i}: expected two coordinate numbers "x y".`);
+        raw.push({ x, y });
+    }
+    return normalizePositions(raw);
+}
+
+/* ============================ parsing ============================ */
+function parseGraph(text) {
+    const lines = tokenizeLines(text);
+    const { v, e, li: li0 } = readVE(lines);
+    let li = li0;
+    if (!Number.isFinite(v) || v <= 0) throw new Error("V (number of vertices) must be a positive integer.");
+    if (!Number.isFinite(e) || e < 0) throw new Error("E (number of edges) must be a non-negative integer.");
+    const a = Array.from({ length: v }, () => []);
+    const edgeList = [];
+    for (let k = 0; k < e; k++) {
+        if (li >= lines.length) throw new Error(`Expected ${e} edge line(s), only found ${k}.`);
+        const toks = lines[li++];
+        if (toks.length < 2) throw new Error(`Edge ${k+1}: expected two integers.`);
+        const x = parseInt(toks[0], 10), y = parseInt(toks[1], 10);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Edge ${k+1}: expected two integers.`);
+        if (x < 0 || x >= v || y < 0 || y >= v) throw new Error(`Edge ${k+1}: vertex out of range 0…${v-1}.`);
+        a[x].unshift(y);   // Algs4 Bag prepends
+        a[y].unshift(x);
+        edgeList.push([x, y]);
+    }
+    const customPos = readTrailingPositions(lines, li, v);
+    return { v, adj: a, edges: edgeList, pos: customPos };
+}
+
+/* ============================ layout (force-directed, per component) ============================ */
+function components(n, a) {
+    const comp = new Array(n).fill(-1); let c = 0;
+    for (let s = 0; s < n; s++) {
+        if (comp[s] !== -1) continue;
+        const q = [s]; comp[s] = c;
+        while (q.length) { const u = q.pop(); for (const w of a[u]) if (comp[w] === -1) { comp[w] = c; q.push(w); } }
+        c++;
+    }
+    return { comp, count: c };
+}
+function forceLayout(localEdges, N) {
+    if (N === 1) return [{ x: 0.5, y: 0.5 }];
+    const p = [];
+    for (let i = 0; i < N; i++) {
+        const ang = (i / N) * Math.PI * 2;
+        p.push({ x: 0.5 + 0.35*Math.cos(ang) + (Math.random()-0.5)*0.02, y: 0.5 + 0.35*Math.sin(ang) + (Math.random()-0.5)*0.02 });
+    }
+    const k = Math.sqrt(1 / N) * 0.9; let temp = 0.12; const ITER = 500;
+    for (let it = 0; it < ITER; it++) {
+        const disp = p.map(() => ({ x: 0, y: 0 }));
+        for (let i = 0; i < N; i++) for (let j = i+1; j < N; j++) {
+            let dx = p[i].x-p[j].x, dy = p[i].y-p[j].y, d = Math.hypot(dx,dy)||1e-4;
+            const f = (k*k)/d;
+            disp[i].x += (dx/d)*f; disp[i].y += (dy/d)*f;
+            disp[j].x -= (dx/d)*f; disp[j].y -= (dy/d)*f;
+        }
+        for (const [a2,b2] of localEdges) {
+            if (a2 === b2) continue;
+            let dx = p[a2].x-p[b2].x, dy = p[a2].y-p[b2].y, d = Math.hypot(dx,dy)||1e-4;
+            const f = (d*d)/k;
+            disp[a2].x -= (dx/d)*f; disp[a2].y -= (dy/d)*f;
+            disp[b2].x += (dx/d)*f; disp[b2].y += (dy/d)*f;
+        }
+        for (let i = 0; i < N; i++) {
+            let d = Math.hypot(disp[i].x, disp[i].y)||1e-4;
+            const lim = Math.min(d, temp);
+            p[i].x += (disp[i].x/d)*lim; p[i].y += (disp[i].y/d)*lim;
+        }
+        temp *= 0.985;
+    }
+    return p;
+}
+function layoutAll(n, a) {
+    const { comp, count } = components(n, a);
+    let groups = Array.from({ length: count }, () => []);
+    for (let v = 0; v < n; v++) groups[comp[v]].push(v);
+    groups.sort((g1, g2) => g2.length - g1.length);
+    const boxes = groups.map(group => {
+        const idxOf = new Map(group.map((v, i) => [v, i]));
+        const elocal = [];
+        for (const v of group) for (const w of a[v]) if (v < w && idxOf.has(w)) elocal.push([idxOf.get(v), idxOf.get(w)]);
+        const p = forceLayout(elocal, group.length);
+        let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+        for (const q of p) { minx=Math.min(minx,q.x); miny=Math.min(miny,q.y); maxx=Math.max(maxx,q.x); maxy=Math.max(maxy,q.y); }
+        return { group, p, minx, miny, w: Math.max(maxx-minx,1e-3), h: Math.max(maxy-miny,1e-3) };
+    });
+    const positions = new Array(n);
+    const cols = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count/cols);
+    boxes.forEach((box, bi) => {
+        const cx = bi % cols, cy = Math.floor(bi/cols);
+        const cellW = 1/cols, cellH = 1/rows, pad = 0.16;
+        const availW = cellW*(1-pad*2), availH = cellH*(1-pad*2);
+        const scale = Math.min(availW/box.w, availH/box.h);
+        const usedW = box.w*scale, usedH = box.h*scale;
+        const offX = cx*cellW + (cellW-usedW)/2, offY = cy*cellH + (cellH-usedH)/2;
+        box.group.forEach((v, i) => { positions[v] = { x: offX + (box.p[i].x-box.minx)*scale, y: offY + (box.p[i].y-box.miny)*scale }; });
+    });
+    return positions;
+}
+
+/* ============================ colour ramp by distance ============================ */
+function lerpColor(c1, c2, t) {
+    const r1 = parseInt(c1.slice(1,3),16), g1 = parseInt(c1.slice(3,5),16), b1 = parseInt(c1.slice(5,7),16);
+    const r2 = parseInt(c2.slice(1,3),16), g2 = parseInt(c2.slice(3,5),16), b2 = parseInt(c2.slice(5,7),16);
+    const r = Math.round(r1 + t*(r2-r1)), g = Math.round(g1 + t*(g2-g1)), b = Math.round(b1 + t*(b2-b1));
+    return { r, g, b, css: `rgb(${r},${g},${b})` };
+}
+function distColor(d) {
+    const t = maxDist <= 0 ? 0 : Math.min(1, d / maxDist);
+    return lerpColor('#e5c0b4', '#902015', t);
+}
+function waterColor(d) {
+    const t = maxDist <= 0 ? 0 : Math.min(1, d / maxDist);
+    return lerpColor('#aacdf2', '#225096', t);   // shallow sky blue → deep water blue
+}
+function ndist(a, b) { return Math.hypot(pos[a].x - pos[b].x, pos[a].y - pos[b].y); }
+function textOn(rgb) {
+    const lum = (0.299*rgb.r + 0.587*rgb.g + 0.114*rgb.b);
+    return lum < 130 ? '#f5ebd9' : '#46433a';
+}
+
+/* ============================ BFS step generator ============================ */
+function buildBFS(a, start) {
+    const n = a.length;
+    const marked = new Array(n).fill(false);
+    const distTo = new Array(n).fill(Infinity);
+    const edgeTo = new Array(n).fill(-1);
+    const processed = new Array(n).fill(false);
+    const queue = [];
+    const out = [];
+
+    const snap = (action, extra = {}) => out.push({
+        marked: marked.slice(), processed: processed.slice(),
+        distTo: distTo.slice(), edgeTo: edgeTo.slice(),
+        queue: queue.slice(), action, ...extra
+    });
+
+    marked[start] = true; distTo[start] = 0; queue.push(start);
+    snap(`Enqueue source ${start} at distance 0.`, { current: start, enqueued: start });
+
+    while (queue.length) {
+        const v = queue.shift();
+        processed[v] = true;
+        snap(`Dequeue ${v} (distance ${distTo[v]}). Scan its neighbours.`, { current: v, dequeued: v });
+        for (let idx = 0; idx < a[v].length; idx++) {
+            const w = a[v][idx];
+            snap(`At ${v}: look at neighbour ${w} (iterator position ${idx}).`, { current: v, examV: v, examW: w, examIdx: idx });
+            if (!marked[w]) {
+                marked[w] = true; distTo[w] = distTo[v] + 1; edgeTo[w] = v; queue.push(w);
+                snap(`${w} is undiscovered → enqueue at distance ${distTo[w]}.`, { current: v, enqueued: w, treeEdge: [v, w] });
+            } else {
+                snap(`${w} already discovered → skip.`, { current: v, skipW: w, skipFrom: v });
+            }
+        }
+    }
+    const reached = marked.map((m, i) => m ? i : null).filter(x => x !== null);
+    snap(`Done. Reached ${reached.length} vert${reached.length===1?'ex':'ices'} from ${start}. Distances are shortest-path lengths in edges.`, { current: null, done: true });
+
+    let md = 0;
+    for (let i = 0; i < n; i++) if (marked[i] && distTo[i] > md) md = distTo[i];
+    return { out, maxDist: Math.max(1, md) };
+}
+
+/* ============================ rendering — canvas ============================ */
+let dpr = 1, cw = 0, ch = 0, radius = 16;
+/* ============================ canvas fit + viewport (zoom & pan) ============================
+   World coordinates are the canvas layout at zoom 1 (as before). Nodes are sized so that they stay
+   clearly separated (radius <= SEP x nearest-neighbour distance); if that would make them too small
+   to read, the default zoom is raised instead (and the canvas grows in height, up to a limit), so the
+   graph may extend beyond the viewport and can be panned. Everything is drawn in world coordinates;
+   the camera is a single canvas transform, so all drawing code is zoom-agnostic. */
+const M = 34;   // canvas margin around the graph
+const R_SCREEN_MIN = 13, R_MAX = 22, SEP = 0.34;
+const H_DEFAULT = 460, H_MIN = 400;
+const view = { zRel: 1, cx: null, cy: null };   // zoom relative to the default zoom; normalised point at the canvas centre
+let world = null, cam = { z: 1, tx: 0, ty: 0 }, posCustom = false, normCache = null;
+
+function normStats() {
+    if (normCache && normCache.ref === pos) return normCache;
+    let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity, minD=Infinity;
+    for (const p of pos) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+    for (let i = 0; i < pos.length; i++) for (let j = i+1; j < pos.length; j++) {
+        const d = Math.hypot(pos[i].x-pos[j].x, pos[i].y-pos[j].y); if (d < minD) minD = d;
+    }
+    if (!pos.length) { minx = miny = 0; maxx = maxy = 1; }
+    normCache = { ref: pos, minx, miny, bw: Math.max(maxx-minx, 1e-6), bh: Math.max(maxy-miny, 1e-6), minD: Number.isFinite(minD) ? minD : 1 };
+    return normCache;
+}
+function worldMap(w, h) {   // normalised -> world px:  x = ox + sx*nx,  y = oy + sy*ny
+    const st = normStats();
+    if (posCustom) {        // drawn coordinates: uniform scale, centred (no distortion)
+        const s = Math.min((w-2*M)/st.bw, (h-2*M)/st.bh);
+        return { ox: M + ((w-2*M) - s*st.bw)/2 - s*st.minx, sx: s, oy: M + ((h-2*M) - s*st.bh)/2 - s*st.miny, sy: s };
+    }
+    return { ox: M, sx: w-2*M, oy: M, sy: h-2*M };   // automatic layout fills the canvas
+}
+function buildWorld(w, h) {
+    const map = worldMap(w, h);
+    const px = pos.map(p => ({ x: map.ox + map.sx*p.x, y: map.oy + map.sy*p.y }));
+    let minD = Infinity;
+    for (let i = 0; i < px.length; i++) for (let j = i+1; j < px.length; j++) {
+        const d = Math.hypot(px[i].x-px[j].x, px[i].y-px[j].y); if (d < minD) minD = d;
+    }
+    if (!Number.isFinite(minD)) minD = 80;
+    const r = Math.min(R_MAX, minD*SEP);
+    return { px, radius: r, z0: Math.max(1, R_SCREEN_MIN / r), map };
+}
+function preferredHeight(w) {
+    const hMax = Math.max(H_MIN, Math.round(window.innerHeight * 0.78));
+    const st = normStats();
+    let h;
+    if (posCustom) {
+        const sFill = (w-2*M)/st.bw;                    // fill the width at uniform scale...
+        const sNeed = (R_MAX/SEP)/st.minD;              // ...but no taller than needed for full-size nodes
+        h = st.bh*Math.min(sFill, sNeed) + 2*M;
+    } else {
+        h = H_DEFAULT;                                  // grow until nodes are properly separated
+        const t = buildWorld(w, h); if (t.z0 > 1) h *= t.z0;
+    }
+    return Math.round(Math.max(H_MIN, Math.min(hMax, h)));
+}
+function fitCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    let rect = canvas.getBoundingClientRect();
+    if (!world || world.posRef !== pos || Math.abs(rect.width - world.cw) > 0.5) {
+        const h = preferredHeight(rect.width);
+        if (Math.abs(h - rect.height) > 0.5) { canvas.style.height = h + 'px'; rect = canvas.getBoundingClientRect(); }
+    }
+    cw = rect.width; ch = rect.height;
+    canvas.width = Math.round(cw*dpr); canvas.height = Math.round(ch*dpr);
+    if (!world || world.posRef !== pos || world.cw !== cw || world.ch !== ch) {
+        if (!world || world.posRef !== pos) { view.zRel = 1; view.cx = view.cy = null; }
+        world = Object.assign(buildWorld(cw, ch), { posRef: pos, cw, ch });
+    }
+    radius = world.radius;
+    const st = normStats(), map = world.map;
+    if (view.cx === null) { view.cx = st.minx + st.bw/2; view.cy = st.miny + st.bh/2; }
+    const z = world.z0 * view.zRel;
+    cam = { z, tx: cw/2 - z*(map.ox + map.sx*view.cx), ty: ch/2 - z*(map.oy + map.sy*view.cy) };
+    ctx.setTransform(dpr*z, 0, 0, dpr*z, dpr*cam.tx, dpr*cam.ty);
+    const pct = document.getElementById('zoomPct'); if (pct) pct.textContent = Math.round(view.zRel*100) + '%';
+    return world.px;
+}
+function screenToNorm(sx, sy) {
+    const map = world.map, wx = (sx - cam.tx)/cam.z, wy = (sy - cam.ty)/cam.z;
+    return { x: (wx - map.ox)/map.sx, y: (wy - map.oy)/map.sy };
+}
+function zoomAt(factor, sx, sy) {    // zoom keeping the graph point under (sx, sy) fixed
+    if (!world) return;
+    const zRel = Math.max(0.3, Math.min(12, view.zRel*factor));
+    const a = screenToNorm(sx, sy), map = world.map, z = world.z0*zRel;
+    const tx = sx - z*(map.ox + map.sx*a.x), ty = sy - z*(map.oy + map.sy*a.y);
+    view.zRel = zRel;
+    view.cx = ((cw/2 - tx)/z - map.ox)/map.sx; view.cy = ((ch/2 - ty)/z - map.oy)/map.sy;
+    redrawCanvas();
+}
+function panBy(dx, dy) {
+    if (!world) return;
+    view.cx -= dx/(cam.z*world.map.sx); view.cy -= dy/(cam.z*world.map.sy);
+    redrawCanvas();
+}
+function resetView() { view.zRel = 1; view.cx = view.cy = null; redrawCanvas(); }
+(function setupViewport() {
+    const ptrs = new Map(); let panning = false, pinchD = 0;
+    const local = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        const d = e.deltaMode === 1 ? e.deltaY*16 : e.deltaY;
+        const p = local(e); zoomAt(Math.max(0.5, Math.min(2, Math.exp(-d*0.0015))), p.x, p.y);
+    }, { passive: false });
+    canvas.addEventListener('pointerdown', e => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        ptrs.set(e.pointerId, local(e)); canvas.setPointerCapture(e.pointerId);
+        if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinchD = Math.hypot(a.x-b.x, a.y-b.y); }
+        panning = true; canvas.classList.add('panning');
+    });
+    canvas.addEventListener('pointermove', e => {
+        if (!ptrs.has(e.pointerId)) return;
+        const prev = ptrs.get(e.pointerId), cur = local(e); ptrs.set(e.pointerId, cur);
+        if (ptrs.size === 2) {
+            const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x-b.x, a.y-b.y);
+            if (pinchD > 0) zoomAt(d/pinchD, (a.x+b.x)/2, (a.y+b.y)/2); pinchD = d;
+        } else panBy(cur.x - prev.x, cur.y - prev.y);
+    });
+    const up = e => { ptrs.delete(e.pointerId); pinchD = 0; if (!ptrs.size) { panning = false; canvas.classList.remove('panning'); } };
+    canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+    canvas.addEventListener('dblclick', e => { e.preventDefault(); resetView(); });
+    const zi = document.getElementById('zoomIn'), zo = document.getElementById('zoomOut'), zf = document.getElementById('zoomFit');
+    if (zi) zi.addEventListener('click', () => zoomAt(1.25, cw/2, ch/2));
+    if (zo) zo.addEventListener('click', () => zoomAt(1/1.25, cw/2, ch/2));
+    if (zf) zf.addEventListener('click', resetView);
+    if (window.ResizeObserver) new ResizeObserver(() => { if (world) redrawCanvas(); }).observe(canvas);
+})();
+
+/* ============================ draggable stage splitter ============================ */
+(function setupSplitter() {
+    const sp = document.getElementById('stageSplitter'); if (!sp) return;
+    const stage = sp.parentElement, KEY = 'wi-stage-main-w:' + location.pathname;
+    const clampW = w => { const total = stage.getBoundingClientRect().width; return Math.max(260, Math.min(total - 20 - 330, w)); };
+    const apply = w => { stage.style.setProperty('--main-w', clampW(w) + 'px'); };
+    try { const s = localStorage.getItem(KEY); if (s) apply(parseFloat(s)); } catch (_) {}
+    let dragging = false;
+    sp.addEventListener('pointerdown', e => {
+        dragging = true; sp.setPointerCapture(e.pointerId); sp.classList.add('dragging'); document.body.classList.add('splitting'); e.preventDefault();
+    });
+    sp.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        apply(e.clientX - stage.getBoundingClientRect().left - 10);
+    });
+    const end = () => {
+        if (!dragging) return; dragging = false; sp.classList.remove('dragging'); document.body.classList.remove('splitting');
+        try { localStorage.setItem(KEY, parseFloat(stage.style.getPropertyValue('--main-w'))); } catch (_) {}
+    };
+    sp.addEventListener('pointerup', end); sp.addEventListener('pointercancel', end);
+    sp.addEventListener('dblclick', () => { stage.style.removeProperty('--main-w'); try { localStorage.removeItem(KEY); } catch (_) {} });
+    window.addEventListener('resize', () => { const w = parseFloat(stage.style.getPropertyValue('--main-w')); if (w) apply(w); });
+})();
+
+function redrawCanvas() { render(); }
+
+function render() {
+    if (waterMode && waterPlaying) return;          // rAF loop is driving the canvas
+    if (waterMode) { drawWaterAt(tau); return; }     // paused water frame
+    const state = ptr >= 0 ? steps[ptr] : null;
+    const px = fitCanvas();
+    ctx.clearRect(0, 0, cw, ch);
+
+    // base edges
+    const seen = new Set();
+    ctx.lineWidth = 1.6; ctx.strokeStyle = '#b9a793';
+    for (let v = 0; v < V; v++) for (const w of adj[v]) {
+        if (v === w) continue;
+        const key = v < w ? v+'_'+w : w+'_'+v; if (seen.has(key)) continue; seen.add(key);
+        ctx.beginPath(); ctx.moveTo(px[v].x, px[v].y); ctx.lineTo(px[w].x, px[w].y); ctx.stroke();
+    }
+    // BFS tree edges
+    if (state && state.edgeTo) {
+        ctx.lineWidth = 3; ctx.strokeStyle = '#902015';
+        for (let w = 0; w < V; w++) { const v = state.edgeTo[w]; if (v >= 0) { ctx.beginPath(); ctx.moveTo(px[v].x, px[v].y); ctx.lineTo(px[w].x, px[w].y); ctx.stroke(); } }
+    }
+    // examined edge
+    if (state && state.examV !== undefined) {
+        ctx.lineWidth = 3.5; ctx.strokeStyle = '#b07d18'; ctx.setLineDash([7,5]);
+        ctx.beginPath(); ctx.moveTo(px[state.examV].x, px[state.examV].y); ctx.lineTo(px[state.examW].x, px[state.examW].y); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (state && state.skipW !== undefined) {
+        ctx.lineWidth = 2.5; ctx.strokeStyle = '#b07d18'; ctx.setLineDash([3,4]);
+        ctx.beginPath(); ctx.moveTo(px[state.skipFrom].x, px[state.skipFrom].y); ctx.lineTo(px[state.skipW].x, px[state.skipW].y); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // nodes
+    const inQueue = new Set(state ? state.queue : []);
+    ctx.font = `700 ${Math.round(radius*0.92)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let v = 0; v < V; v++) {
+        let fill = '#faf6ed', border = '#b9a793', text = '#6b675c';
+        if (state && state.marked && state.marked[v]) {
+            const rgb = distColor(state.distTo[v]);
+            fill = rgb.css; text = textOn(rgb); border = 'rgba(109,24,15,0.65)';
+        }
+        ctx.beginPath(); ctx.arc(px[v].x, px[v].y, radius, 0, Math.PI*2); ctx.fillStyle = fill; ctx.fill();
+
+        const isCurrent = state && state.current === v;
+        const isQueued = inQueue.has(v);
+        if (isCurrent) { ctx.lineWidth = 4; ctx.strokeStyle = '#cc2f22'; }
+        else if (state && state.examW === v) { ctx.lineWidth = 3; ctx.strokeStyle = '#b07d18'; }
+        else if (isQueued) { ctx.lineWidth = 3; ctx.strokeStyle = '#2a6a63'; }
+        else { ctx.lineWidth = 2; ctx.strokeStyle = border; }
+        ctx.stroke();
+
+        ctx.fillStyle = text; ctx.fillText(String(v), px[v].x, px[v].y + 1);
+    }
+
+    renderSidePanels(state);
+    syncTransport();
+}
+
+/* ============================ rendering — side panels ============================ */
+function renderSidePanels(state) {
+    const st = document.getElementById('statusText');
+    const sc = document.getElementById('stepCount');
+    if (state) { st.innerHTML = escapeHtml(state.action); sc.textContent = `step ${ptr+1} / ${steps.length}`; }
+    else { st.innerHTML = 'Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.'; sc.textContent = `0 / ${steps.length}`; }
+
+    // queue
+    const qv = document.getElementById('queueView'); qv.innerHTML = '';
+    const q = state ? state.queue : [];
+    if (!q || q.length === 0) qv.innerHTML = '<span class="empty">empty</span>';
+    else q.forEach((v, i) => {
+        const node = document.createElement('div');
+        node.className = 'q-node' + (i === 0 ? ' front' : '');
+        const rgb = distColor(state.distTo[v]); node.style.background = rgb.css; node.style.color = textOn(rgb);
+        if (i !== 0) node.style.borderColor = '#2a6a63';
+        node.textContent = v; qv.appendChild(node);
+    });
+
+    // distance layers
+    const lv = document.getElementById('layersView'); lv.innerHTML = '';
+    if (!state) { lv.innerHTML = '<span class="none">none yet</span>'; }
+    else {
+        const byLayer = new Map();
+        for (let v = 0; v < V; v++) if (state.marked[v]) {
+            const d = state.distTo[v];
+            if (!byLayer.has(d)) byLayer.set(d, []);
+            byLayer.get(d).push(v);
+        }
+        if (byLayer.size === 0) { lv.innerHTML = '<span class="none">none yet</span>'; }
+        else {
+            [...byLayer.keys()].sort((a,b)=>a-b).forEach(d => {
+                const row = document.createElement('div'); row.className = 'layer-row';
+                const label = document.createElement('div'); label.className = 'layer-label'; label.textContent = `dist ${d}`; row.appendChild(label);
+                const chips = document.createElement('div'); chips.className = 'layer-chips';
+                byLayer.get(d).forEach(v => {
+                    const chip = document.createElement('div'); chip.className = 'layer-chip';
+                    const rgb = distColor(d); chip.style.background = rgb.css; chip.style.color = textOn(rgb);
+                    chip.textContent = v; chips.appendChild(chip);
+                });
+                row.appendChild(chips); lv.appendChild(row);
+            });
+        }
+    }
+
+    // adjacency lists + iterators
+    const av = document.getElementById('adjView'); av.innerHTML = '';
+    const inQueue = new Set(state ? state.queue : []);
+    for (let v = 0; v < V; v++) {
+        const processing = state && state.current === v && state.processed && state.processed[v];
+        const queued = inQueue.has(v);
+        const row = document.createElement('div');
+        row.className = 'adj-row' + (processing ? ' processing' : (queued ? ' queued' : ''));
+
+        const key = document.createElement('div'); key.className = 'adj-key'; key.textContent = v; row.appendChild(key);
+        const arrow = document.createElement('span'); arrow.className = 'adj-arrow'; arrow.textContent = '→'; row.appendChild(arrow);
+
+        const cells = document.createElement('div'); cells.className = 'adj-cells';
+        if (adj[v].length === 0) { const e = document.createElement('span'); e.className = 'adj-empty'; e.textContent = '∅'; cells.appendChild(e); }
+        else {
+            const showIter = processing && state.examV === v;
+            adj[v].forEach((w, i) => {
+                const cell = document.createElement('span'); cell.className = 'adj-cell'; cell.textContent = w;
+                if (showIter) { if (i < state.examIdx) cell.classList.add('consumed'); else if (i === state.examIdx) cell.classList.add('cursor'); }
+                cells.appendChild(cell);
+            });
+        }
+        row.appendChild(cells); av.appendChild(row);
+    }
+}
+
+function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c])); }
+
+/* ============================ water mode ============================ */
+function computeWaterField() {
+    wdist = new Array(V).fill(Infinity);
+    if (startVertex < V) {
+        const q = [startVertex]; wdist[startVertex] = 0;
+        for (let h = 0; h < q.length; h++) { const u = q[h]; for (const w of adj[u]) if (wdist[w] === Infinity) { wdist[w] = wdist[u] + 1; q.push(w); } }
+    }
+    waterReachable = [];
+    let md = 0;
+    for (let v = 0; v < V; v++) if (wdist[v] !== Infinity) { waterReachable.push(v); if (wdist[v] > md) md = wdist[v]; }
+    waterMaxTau = md + 1;     // +1 so the final edge into the deepest layer finishes filling
+}
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+
+function drawWaterAt(t) {
+    const px = fitCanvas();
+    ctx.clearRect(0, 0, cw, ch);
+
+    // dry edges (everything starts as a dry channel)
+    const seen = new Set();
+    ctx.lineWidth = 1.6; ctx.strokeStyle = '#b9a793';
+    for (let v = 0; v < V; v++) for (const w of adj[v]) {
+        if (v === w) continue;
+        const key = v < w ? v+'_'+w : w+'_'+v; if (seen.has(key)) continue; seen.add(key);
+        ctx.beginPath(); ctx.moveTo(px[v].x, px[v].y); ctx.lineTo(px[w].x, px[w].y); ctx.stroke();
+    }
+
+    // water flowing along edges — fills from each wet endpoint, one edge-unit per unit time
+    seen.clear();
+    ctx.lineCap = 'round';
+    for (let v = 0; v < V; v++) for (const w of adj[v]) {
+        if (v === w) continue;
+        const key = v < w ? v+'_'+w : w+'_'+v; if (seen.has(key)) continue; seen.add(key);
+        if (wdist[v] === Infinity || wdist[w] === Infinity) continue;     // unreachable channel stays dry
+        const A = px[v], B = px[w];
+        const fa = clamp01(t - wdist[v]);   // how far water has run from v toward w
+        const fb = clamp01(t - wdist[w]);   // …and from w toward v
+        // a longer drawn edge ⇒ the same fraction covers more pixels ⇒ visibly faster water
+        if (fa > 0) {
+            ctx.lineWidth = 6; ctx.strokeStyle = waterColor(wdist[v]).css;
+            ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(A.x + (B.x-A.x)*fa, A.y + (B.y-A.y)*fa); ctx.stroke();
+        }
+        if (fb > 0) {
+            ctx.lineWidth = 6; ctx.strokeStyle = waterColor(wdist[w]).css;
+            ctx.beginPath(); ctx.moveTo(B.x, B.y); ctx.lineTo(B.x + (A.x-B.x)*fb, B.y + (A.y-B.y)*fb); ctx.stroke();
+        }
+    }
+    ctx.lineCap = 'butt';
+
+    // vertices: undiscovered cream until the wavefront arrives, then a bobbing buoy in its distance colour
+    ctx.font = `700 ${Math.round(radius*0.92)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let v = 0; v < V; v++) {
+        const x = px[v].x;
+        if (wdist[v] === Infinity || t < wdist[v]) {
+            // dry / not yet reached
+            ctx.beginPath(); ctx.arc(x, px[v].y, radius, 0, Math.PI*2);
+            ctx.fillStyle = '#faf6ed'; ctx.fill();
+            ctx.lineWidth = (v === startVertex) ? 3 : 2;
+            ctx.strokeStyle = (v === startVertex) ? '#2a6a63' : '#b9a793'; ctx.stroke();
+            ctx.fillStyle = '#6b675c'; ctx.fillText(String(v), x, px[v].y + 1);
+            continue;
+        }
+        const phase = t - wdist[v];                       // 0 at the moment the wave hits
+        const bob = phase < 1 ? -(radius*0.5) * Math.sin(Math.PI * Math.min(phase/0.55, 1)) * Math.exp(-2.0*phase) : 0;
+        const y = px[v].y + bob;
+
+        // expanding splash ring at the moment of arrival
+        if (phase < 0.6) {
+            const rr = radius * (1 + phase*2.2), a = 0.5 * (1 - phase/0.6);
+            ctx.beginPath(); ctx.arc(x, px[v].y, rr, 0, Math.PI*2);
+            ctx.lineWidth = 3; ctx.strokeStyle = `rgba(36,94,168,${a.toFixed(3)})`; ctx.stroke();
+        }
+
+        const rgb = distColor(wdist[v]);
+        ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2); ctx.fillStyle = rgb.css; ctx.fill();
+        // little waterline highlight to read as a floating buoy
+        ctx.beginPath(); ctx.arc(x, y - radius*0.32, radius*0.5, Math.PI*1.08, Math.PI*1.92);
+        ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.stroke();
+        ctx.lineWidth = (v === startVertex) ? 3.5 : 2.5;
+        ctx.strokeStyle = (v === startVertex) ? '#cc2f22' : '#285ea4';
+        ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2); ctx.stroke();
+        ctx.fillStyle = textOn(rgb); ctx.fillText(String(v), x, y + 1);
+    }
+
+    renderWaterPanels(t);
+    syncTransport();
+}
+
+function renderWaterPanels(t) {
+    const st = document.getElementById('statusText');
+    const sc = document.getElementById('stepCount');
+    const frontier = Math.min(waterMaxTau - 1, Math.max(0, Math.ceil(t - 1e-9)));
+    if (t <= 0) st.innerHTML = `Source <b>&nbsp;${startVertex}&nbsp;</b> flooded. Press <b>&nbsp;Play&nbsp;</b> to release the water.`;
+    else if (t >= waterMaxTau) st.innerHTML = `Flood complete — all ${waterReachable.length} reachable vert${waterReachable.length===1?'ex':'ices'} covered. Each was reached in exactly its BFS distance.`;
+    else st.innerHTML = `Water at <b>&nbsp;t = ${t.toFixed(2)}&nbsp;</b> — wavefront reaching distance ${frontier}.`;
+    sc.textContent = `t ${Math.min(t,waterMaxTau).toFixed(2)} / ${waterMaxTau}`;
+
+    // relabel queue panel as the live wavefront
+    document.getElementById('queueTitle').innerHTML = 'Wavefront &nbsp;·&nbsp; bobbing now';
+    document.getElementById('queueTip').innerHTML = 'Every edge fills in <b>one unit of time</b> regardless of drawn length — so the front advances by one full distance layer per unit.';
+    const qv = document.getElementById('queueView'); qv.innerHTML = '';
+    const active = [];
+    for (const v of waterReachable) { const ph = t - wdist[v]; if (ph >= 0 && ph < 1) active.push(v); }
+    if (active.length === 0) qv.innerHTML = '<span class="empty">—</span>';
+    else active.sort((a,b)=>wdist[a]-wdist[b]).forEach(v => {
+        const node = document.createElement('div'); node.className = 'q-node';
+        const rgb = distColor(wdist[v]); node.style.background = rgb.css; node.style.color = textOn(rgb);
+        node.style.borderColor = '#2a6a63'; node.textContent = v; qv.appendChild(node);
+    });
+
+    // distance layers — same panel, with the frontier layer outlined
+    document.getElementById('layersTitle').textContent = 'Distance layers';
+    const lv = document.getElementById('layersView'); lv.innerHTML = '';
+    const byLayer = new Map();
+    for (const v of waterReachable) if (t >= wdist[v]) { const d = wdist[v]; if (!byLayer.has(d)) byLayer.set(d, []); byLayer.get(d).push(v); }
+    if (byLayer.size === 0) lv.innerHTML = '<span class="none">none yet</span>';
+    else [...byLayer.keys()].sort((a,b)=>a-b).forEach(d => {
+        const row = document.createElement('div'); row.className = 'layer-row';
+        const label = document.createElement('div'); label.className = 'layer-label'; label.textContent = `dist ${d}`; row.appendChild(label);
+        const chips = document.createElement('div'); chips.className = 'layer-chips';
+        byLayer.get(d).forEach(v => {
+            const chip = document.createElement('div'); chip.className = 'layer-chip';
+            const rgb = distColor(d); chip.style.background = rgb.css; chip.style.color = textOn(rgb);
+            if (d === frontier && t < waterMaxTau) { chip.style.borderColor = '#2a6a63'; chip.style.borderWidth = '2.5px'; }
+            chip.textContent = v; chips.appendChild(chip);
+        });
+        row.appendChild(chips); lv.appendChild(row);
+    });
+
+    // adjacency — tint reached keys teal
+    const av = document.getElementById('adjView'); av.innerHTML = '';
+    for (let v = 0; v < V; v++) {
+        const reached = wdist[v] !== Infinity && t >= wdist[v];
+        const row = document.createElement('div'); row.className = 'adj-row' + (reached ? ' queued' : '');
+        const key = document.createElement('div'); key.className = 'adj-key'; key.textContent = v;
+        if (reached) { const rgb = distColor(wdist[v]); key.style.background = rgb.css; key.style.color = textOn(rgb); key.style.borderColor = '#285ea4'; }
+        row.appendChild(key);
+        const arrow = document.createElement('span'); arrow.className = 'adj-arrow'; arrow.textContent = '→'; row.appendChild(arrow);
+        const cells = document.createElement('div'); cells.className = 'adj-cells';
+        if (adj[v].length === 0) { const e = document.createElement('span'); e.className = 'adj-empty'; e.textContent = '∅'; cells.appendChild(e); }
+        else adj[v].forEach(w => { const cell = document.createElement('span'); cell.className = 'adj-cell'; cell.textContent = w; cells.appendChild(cell); });
+        row.appendChild(cells); av.appendChild(row);
+    }
+}
+
+function restoreBfsPanelLabels() {
+    document.getElementById('queueTitle').innerHTML = 'Queue &nbsp;·&nbsp; FIFO';
+    document.getElementById('queueTip').innerHTML = '<b>Front</b> is dequeued next; new neighbours join the back. FIFO order is what makes BFS explore by layers.';
+    document.getElementById('layersTitle').textContent = 'Distance layers';
+}
+
+function speedMult() { return 650 / delay; }
+function updatePlayBtn() { document.getElementById('playBtn').textContent = (waterMode ? waterPlaying : playing) ? 'Pause' : 'Play'; }
+function stopWaterLoop() { waterPlaying = false; if (wRaf) cancelAnimationFrame(wRaf); wRaf = null; wLast = null; updatePlayBtn(); }
+function playWater() {
+    if (tau >= waterMaxTau) tau = 0;
+    waterPlaying = true; wLast = null; updatePlayBtn();
+    wRaf = requestAnimationFrame(waterFrame);
+}
+function pauseWater() { stopWaterLoop(); syncButtons(); }
+function waterFrame(ts) {
+    if (!waterPlaying) return;
+    if (wLast === null) wLast = ts;
+    let dt = (ts - wLast) / 1000; wLast = ts;
+    if (dt > 0.1) dt = 0.1;
+    tau += dt * TAU_PER_SEC * speedMult();
+    if (tau >= waterMaxTau) { tau = waterMaxTau; drawWaterAt(tau); stopWaterLoop(); syncButtons(); return; }
+    drawWaterAt(tau); syncButtons();
+    wRaf = requestAnimationFrame(waterFrame);
+}
+
+function toggleWaterMode(on) {
+    waterMode = on;
+    stopPlay(); stopWaterLoop();
+    if (waterMode) { if (tau > waterMaxTau) tau = waterMaxTau; }
+    else { restoreBfsPanelLabels(); }
+    render(); updatePlayBtn(); syncButtons();
+}
+
+
+/* ============================ run control ============================ */
+function rebuildSteps() {
+    const r = buildBFS(adj, startVertex); steps = r.out; maxDist = r.maxDist;
+    computeWaterField();
+    ptr = -1; tau = 0;
+    stopPlay(); stopWaterLoop();
+    render(); syncButtons(); updatePlayBtn();
+}
+function stepFwd() {
+    if (waterMode) {
+        stopWaterLoop();
+        tau = Math.min(waterMaxTau, Math.floor(tau + 1e-9) + 1);
+        render(); syncButtons(); return;
+    }
+    if (ptr < steps.length-1) { ptr++; render(); } if (ptr >= steps.length-1) stopPlay(); syncButtons();
+}
+function stepBack() {
+    if (waterMode) {
+        stopWaterLoop();
+        tau = Math.max(0, Math.ceil(tau - 1e-9) - 1);
+        render(); syncButtons(); return;
+    }
+    if (ptr > -1) { ptr--; render(); } stopPlay(); syncButtons();
+}
+function resetRun() {
+    stopPlay(); stopWaterLoop();
+    ptr = -1; tau = 0; render(); syncButtons(); updatePlayBtn();
+}
+function togglePlay() {
+    if (waterMode) { waterPlaying ? pauseWater() : playWater(); return; }
+    playing ? stopPlay() : startPlay();
+}
+function startPlay() { if (ptr >= steps.length-1) ptr = -1; playing = true; updatePlayBtn(); tick(); }
+function stopPlay() { playing = false; clearTimeout(timer); updatePlayBtn(); }
+function tick() { if (!playing) return; if (ptr < steps.length-1) { ptr++; render(); syncButtons(); timer = setTimeout(tick, delay); } else stopPlay(); }
+function syncButtons() {
+    if (waterMode) {
+        document.getElementById('backBtn').disabled = tau <= 0;
+        document.getElementById('stepBtn').disabled = tau >= waterMaxTau;
+        return;
+    }
+    document.getElementById('backBtn').disabled = ptr <= -1; document.getElementById('stepBtn').disabled = ptr >= steps.length-1;
+}
+function updateSpeed(val) { delay = parseInt(val, 10); document.getElementById('speedVal').textContent = val + 'ms'; }
+
+/* ============================ graph loading ============================ */
+function graphToText(v, edgeList, positions, sedgewick) {
+    let s = `${v}\n${edgeList.length}\n` + edgeList.map(([x,y]) => `${x} ${y}`).join('\n');
+    if (!sedgewick && positions) s += '\n' + positions.map(p => `${fmtCoord(p.x)} ${fmtCoord(p.y)}`).join('\n');
+    return s;
+}
+function refreshTextarea() {
+    const sedgewick = document.getElementById('sedgewickToggle').checked;
+    document.getElementById('graphText').value = graphToText(lastV, lastEdges, pos, sedgewick);
+}
+function applyGraph(v, a, edgeList, customPos) {
+    V = v; adj = a; pos = customPos || layoutAll(V, adj); posCustom = !!customPos;
+    lastV = v; lastEdges = edgeList;
+    const sel = document.getElementById('startSel'); sel.innerHTML = '';
+    for (let i = 0; i < V; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i; sel.appendChild(o); }
+    if (startVertex >= V) startVertex = 0; sel.value = startVertex;
+    refreshTextarea();
+    rebuildSteps();
+}
+function loadPreset(name) {
+    const text = PRESETS[name];
+    try { const { v, adj: a, edges, pos: customPos } = parseGraph(text); startVertex = 0; applyGraph(v, a, edges, customPos); document.getElementById('parseErr').textContent = ''; }
+    catch (e) { document.getElementById('parseErr').textContent = e.message; }
+}
+function loadFromText() {
+    const text = document.getElementById('graphText').value;
+    try { const { v, adj: a, edges, pos: customPos } = parseGraph(text); if (startVertex >= v) startVertex = 0; applyGraph(v, a, edges, customPos); document.getElementById('parseErr').textContent = ''; }
+    catch (e) { document.getElementById('parseErr').textContent = e.message; }
+}
+
+/* ============================ external graphs (graphs/ folder) ============================ */
+function prettyGraphName(filename) {
+    return decodeURIComponent(filename).replace(/\.[^./]+$/, '').replace(/[_-]+/g, ' ');
+}
+async function discoverExternalGraphs() {
+    try {
+        const r = await fetch('graphs/index.json', { cache: 'no-store' });
+        if (r.ok) {
+            const data = await r.json();
+            if (Array.isArray(data)) {
+                return data.map(item => {
+                    const file = typeof item === 'string' ? item : item.file;
+                    const label = (typeof item === 'object' && (item.label || item.name)) || prettyGraphName(file);
+                    return { label, path: 'graphs/' + encodeURIComponent(file) };
+                });
+            }
+        }
+    } catch (e) { /* no manifest — fall through to directory listing */ }
+    try {
+        const r = await fetch('graphs/', { cache: 'no-store' });
+        if (r.ok) {
+            const html = await r.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const hrefs = [...doc.querySelectorAll('a')]
+                .map(a => a.getAttribute('href') || '')
+                .filter(h => h && h !== '../' && h !== './' && !h.startsWith('?') && !h.startsWith('/') && !h.endsWith('/'));
+            const uniq = [...new Set(hrefs)];
+            if (uniq.length) return uniq.map(h => ({ label: prettyGraphName(decodeURIComponent(h)), path: 'graphs/' + h }));
+        }
+    } catch (e) { /* no directory listing either — that's fine, just no external graphs */ }
+    return [];
+}
+function loadExternalGraph(path) {
+    const errEl = document.getElementById('parseErr');
+    errEl.textContent = `Loading ${path}…`;
+    fetch(path, { cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => {
+            const { v, adj: a, edges, pos: customPos } = parseGraph(text);
+            startVertex = 0;
+            applyGraph(v, a, edges, customPos);
+            errEl.textContent = '';
+        })
+        .catch(err => { errEl.textContent = `Could not load ${path}: ${err.message}`; });
+}
+function populateExternalGraphs(presetSel) {
+    discoverExternalGraphs().then(list => {
+        if (!list.length) return;
+        const grp = document.createElement('optgroup');
+        grp.label = 'From graphs/ folder';
+        list.forEach(({ label, path }) => {
+            const o = document.createElement('option');
+            o.value = path; o.textContent = label; o.dataset.external = '1';
+            grp.appendChild(o);
+        });
+        presetSel.appendChild(grp);
+    });
+}
+
+/* ============================ transport: scrubber + phase strip ============================
+   One slider for the whole run (fraction 0..1). transportState() reports the current position, a
+   short label and the phases (as fractions); scrubTo(f) moves the run there. The phase strip sits
+   flush under the slider, each segment as wide as the share of the run it covers, so the fill inside
+   it is a second reading of the slider position: which phase, and how far into it. */
+let phaseBarKey = '';
+function syncTransport() {
+    const sl = document.getElementById('stepSlider'), out = document.getElementById('stepSliderVal'), bar = document.getElementById('phaseBar');
+    if (!sl || typeof transportState !== 'function') return;
+    const ts = transportState();
+    const f = Math.max(0, Math.min(1, ts.frac || 0));
+    sl.value = Math.round(1000 * f);
+    out.textContent = ts.label;
+    const phases = ts.phases || [];
+    const key = phases.map(p => p.name + '@' + p.from.toFixed(5) + '-' + p.to.toFixed(5)).join('|');
+    if (key !== phaseBarKey) {
+        phaseBarKey = key; bar.innerHTML = '';
+        phases.forEach(p => {
+            const b = document.createElement('button'); b.type = 'button'; b.className = 'phasebtn';
+            b.style.flex = `${Math.max(0.002, p.to - p.from)} 1 0`;
+            b.title = p.title || p.name;
+            b.innerHTML = '<span class="fill empty" style="width:0%"></span><span class="lab"></span>';
+            b.querySelector('.lab').textContent = p.name;
+            b.addEventListener('click', () => { scrubTo(p.jump); b.blur(); });
+            bar.appendChild(b);
+        });
+    }
+    Array.from(bar.children).forEach((b, i) => {
+        const p = phases[i]; if (!p) return;
+        const pct = f >= p.to - 1e-9 ? 100 : f <= p.from + 1e-9 ? 0 : (f - p.from) / (p.to - p.from) * 100;
+        const fill = b.firstChild; fill.style.width = pct.toFixed(2) + '%'; fill.classList.toggle('empty', pct === 0);
+        b.classList.toggle('on', f > p.from + 1e-9 && f <= p.to + 1e-9);
+    });
+}
+/* consecutive steps with the same key form one phase; span/jump map step indices to fractions */
+function groupPhases(keys, labelOf, spanFrom, spanTo, jumpOf) {
+    const out = [];
+    for (let i = 0; i < keys.length; ) {
+        let j = i; while (j + 1 < keys.length && keys[j+1] === keys[i]) j++;
+        out.push({ name: labelOf(keys[i], i, j), from: spanFrom(i), to: spanTo(j), jump: jumpOf(i) });
+        i = j + 1;
+    }
+    return out;
+}
+const stepSpan = N => ({ from: a => a / N, to: b => (b + 1) / N, jump: a => (a + 1) / N });
+(function setupTransport() {
+    const sl = document.getElementById('stepSlider'); if (!sl) return;
+    sl.addEventListener('input', () => scrubTo(sl.value / 1000));
+    sl.addEventListener('change', () => sl.blur());   // give the arrow keys back to step navigation
+})();
+
+let phaseCache = { steps: null, phases: null };
+function bfsStepPhases() {
+    if (phaseCache.steps === steps) return phaseCache.phases;
+    const N = steps.length, sp = stepSpan(N);
+    let last = 0;
+    const keys = steps.map(s => {
+        if (s.current !== null && s.current !== undefined && s.distTo[s.current] !== Infinity) last = s.distTo[s.current];
+        return last;
+    });
+    const phases = groupPhases(keys, d => `dist ${d}`, sp.from, sp.to, sp.jump);
+    phaseCache = { steps, phases }; return phases;
+}
+function transportState() {
+    if (waterMode) {
+        const T = waterMaxTau || 1, phases = [];
+        for (let d = 0; d < T; d++) phases.push({ name: `dist ${d}`, from: d / T, to: (d + 1) / T, jump: d / T, title: `water front at distance ${d}` });
+        return { frac: Math.min(tau, T) / T, label: `t ${Math.min(tau, T).toFixed(2)} / ${T}`, phases };
+    }
+    const N = steps.length;
+    return { frac: N ? (ptr + 1) / N : 0, label: `${ptr + 1} / ${N}`, phases: N ? bfsStepPhases() : [] };
+}
+function scrubTo(f) {
+    f = Math.max(0, Math.min(1, f));
+    if (waterMode) { stopWaterLoop(); tau = f * waterMaxTau; render(); syncButtons(); return; }
+    stopPlay();
+    ptr = Math.max(-1, Math.min(steps.length - 1, Math.round(f * steps.length) - 1));
+    render(); syncButtons();
+}
+
+/* ============================ init ============================ */
+function init() {
+    const presetSel = document.getElementById('presetSel');
+    Object.keys(PRESETS).forEach(name => { const o = document.createElement('option'); o.value = name; o.textContent = name; presetSel.appendChild(o); });
+    presetSel.addEventListener('change', () => {
+        const opt = presetSel.selectedOptions[0];
+        if (opt && opt.dataset.external) loadExternalGraph(opt.value); else loadPreset(opt.value);
+    });
+    document.getElementById('startSel').addEventListener('change', e => { startVertex = parseInt(e.target.value, 10); rebuildSteps(); });
+    window.addEventListener('resize', () => { if (waterMode && waterPlaying) drawWaterAt(tau); else render(); });
+    loadPreset(Object.keys(PRESETS)[0]);
+    populateExternalGraphs(presetSel);
+}
+init();
+</script>
+</body>
+</html>

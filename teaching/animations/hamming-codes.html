@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hamming codes · locating a flipped bit, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    /* the three parity checks keep the colours of the lecture slide */
+    --wi-c0:#8a5675; --wi-c1:#3d6b3a; --wi-c2:#2f6a8a; --wi-c3:#9a6a1c; --wi-c4:#6a4a8a;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --wi-radius:4px; --wi-radius-lg:5px;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.str { font-family:var(--wi-font-mono); font-size:.82rem; width:11em; letter-spacing:.1em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  .opbar { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:10px 18px;
+           background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+           border-radius:var(--wi-radius-lg); margin-bottom:14px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+  .opnote code { font-family:var(--wi-font-mono); font-size:.9em; }
+
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0;
+              width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden;
+              flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  .stage { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(320px,1fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-box + .sim-box { margin-top:14px; }
+  .col-side .sim-box + .sim-box { margin-top:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:92px; }
+  .status code, .status .ch { font-family:var(--wi-font-mono); font-size:.9em; background:var(--wi-panel-2);
+                 padding:1px 4px; border-radius:3px; letter-spacing:.08em; }
+  .status .warn { color:var(--wi-active); }
+  .status .good { color:var(--wi-relax); }
+  .c0 { color:var(--wi-c0); font-weight:bold; } .c1 { color:var(--wi-c1); font-weight:bold; }
+  .c2 { color:var(--wi-c2); font-weight:bold; } .c3 { color:var(--wi-c3); font-weight:bold; }
+  .c4 { color:var(--wi-c4); font-weight:bold; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem;
+            color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  .word { font-family:var(--wi-font-mono); font-size:1.15rem; letter-spacing:.22em;
+          color:var(--wi-ink-strong); line-height:1.7; }
+  .word .flip { color:var(--wi-active); font-weight:bold; }
+  .word .par { color:var(--wi-examine); }
+  .word .todo { color:var(--wi-inert); }
+  .kv { display:flex; flex-wrap:wrap; gap:3px 16px; font-size:.78rem; color:var(--wi-ink-soft); margin-top:7px; }
+  .kv b { font-family:var(--wi-font-mono); font-weight:normal; color:var(--wi-ink-strong); }
+
+  table.cw { border-collapse:collapse; width:100%; font-size:.76rem; }
+  table.cw th { font-family:var(--wi-font-head); font-size:.64rem; text-transform:uppercase;
+                letter-spacing:.08em; color:var(--wi-ink-faint); font-weight:normal;
+                text-align:left; padding:2px 6px; border-bottom:1px solid var(--wi-border-soft); }
+  table.cw td { font-family:var(--wi-font-mono); font-size:.76rem; padding:1.5px 6px;
+                border-bottom:1px solid #e8ddc9; color:var(--wi-ink-strong); letter-spacing:.08em; }
+  table.cw td.d { text-align:right; letter-spacing:0; color:var(--wi-ink-soft); }
+  table.cw tr.best td { background:#e8f0e2; color:var(--wi-relax); }
+  table.cw tr.sent td { outline:1px solid var(--wi-accent-soft); }
+  table.cw tr:hover td { background:#f6e6df; cursor:pointer; }
+  .tblwrap { max-height:250px; overflow-y:auto; }
+
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
+  @media (max-width:900px) { .codebody { grid-template-columns:1fr; } }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em;
+              text-transform:uppercase; color:var(--wi-ink-faint); padding:2px 12px 3px; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45;
+              grid-column:1 / -1; }
+  .codenote b { color:var(--wi-accent); }
+
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:150px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .hint b { color:var(--wi-ink-strong); }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:280px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); font-family:var(--wi-font-mono); font-size:.94em; }
+
+  .mobile-note { display:none; background:var(--wi-controls); border:1px solid var(--wi-accent-soft);
+                 border-radius:var(--wi-radius-lg); padding:11px 15px; font-size:.82rem;
+                 color:var(--wi-ink-strong); margin-bottom:14px; }
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls, .opbar { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; border-radius:var(--wi-radius); }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .stepno { font-size:.7rem; }
+    .mobile-note { display:block; }
+    .desk-only { display:none !important; }
+  }
+
+  /* --- SVG --- */
+  .bitbox { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.2; cursor:pointer; }
+  .bitbox.data { fill:var(--wi-panel-2); }
+  .bitbox.parity { fill:#f7edd9; }
+  .bitbox.empty { fill:var(--wi-bg); stroke-dasharray:3 3; }
+  .bitbox.hot { stroke:var(--wi-active); stroke-width:2.4; }
+  .bitbox.computed { stroke-width:2.8; }
+  .bitbox.flipped { fill:#f7ded8; stroke:var(--wi-active); stroke-width:2.2; }
+  .bitbox.fixed { fill:#e8f0e2; stroke:var(--wi-relax); stroke-width:2.2; }
+  .bitbox.msg { stroke:var(--wi-accent); stroke-width:2.2; }
+  .bitbox.dimmed { opacity:.34; }
+  .bitv { font-family:var(--wi-font-mono); font-size:17px; fill:var(--wi-ink-strong);
+          text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .bitv.q { fill:var(--wi-ink-faint); }
+  .bitix { font-family:var(--wi-font-mono); font-size:10.5px; text-anchor:middle;
+           dominant-baseline:central; pointer-events:none; }
+  .bitnm { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-ink-soft);
+           text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .bitnm.halo { paint-order:stroke; stroke:var(--wi-bg); stroke-width:3.5px;
+                stroke-linejoin:round; }
+  .hook { fill:none; stroke-width:1.4; opacity:.85; }
+  .hook.off { opacity:.13; }
+  .chkline { fill:none; stroke-width:1.6; }
+  .chkline.off { opacity:.18; }
+  .chklab { font-family:var(--wi-font-mono); font-size:13px; dominant-baseline:central; }
+  .chklab.off { opacity:.35; }
+  .arrowhead { stroke:none; }
+  .flash { animation:flash .45s ease-out both; transform-box:fill-box; transform-origin:center; }
+  @keyframes flash { 0% { transform:scale(1) } 40% { transform:scale(1.32) } 100% { transform:scale(1) } }
+  .pop { animation:popin .3s ease-out both; transform-box:fill-box; }
+  @keyframes popin { from { opacity:0; transform:translateY(-7px) } to { opacity:1; transform:none } }
+  .bolt { stroke:var(--wi-active); stroke-width:2.4; fill:none; }
+  .pointer { fill:var(--wi-active); }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>Hamming codes &nbsp;·&nbsp; locating a flipped bit</h1>
+</div>
+
+<p class="subtitle">
+  Several parity bits, each covering a cleverly chosen <b>subset</b> of the positions: check
+  <i>C<sub>j</sub></i> covers exactly those <i>B<sub>i</sub></i> whose index has a 1 in binary digit&nbsp;<i>j</i>.
+  If a single bit flips, every check covering it is violated and no other is — so the violated checks,
+  read as a binary number, spell out the <b>position of the error</b>, parity bits included.
+  <b>Click any bit in the channel to flip it</b> and watch the syndrome point at it.
+  Hovering isolates one strand of the picture: a data bit shows the parity bits it feeds, a parity
+  bit shows the data it is computed from, and a <i>C<sub>j</sub></i> shows that check alone.
+</p>
+
+<div class="mobile-note">
+  <b>Small screen:</b> this is the compact demo — the block, the scrubber and the syndrome.
+  The encoding and decoding recipes with live highlighting are on the desktop version.
+</div>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Block</span>
+    <span class="seg" id="lSeg"></span>
+  </div>
+  <div class="ctl">
+    <label for="inMsg">Message</label>
+    <input type="text" id="inMsg" class="str" spellcheck="false">
+    <button id="applyBtn" class="pri">Set</button>
+    <button id="randBtn">Random</button>
+  </div>
+  <div class="ctl">
+    <label class="chk"><input type="checkbox" id="extChk"> extra overall parity bit</label>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="codeNote2"></span>
+  <button id="clearErrBtn">No errors</button>
+  <button id="err1Btn">One random flip</button>
+  <button id="err2Btn">Two random flips</button>
+  <span class="opnote" style="margin-left:auto">Arrow keys step; click a bit to flip it in the channel.</span>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">— / —</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="60" max="1400" value="520" style="width:88px">
+      <span class="stepno" id="speedVal">520ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The block and its parity checks</span><span class="rhs" id="blockMeta"></span></div>
+      <div class="svgscroll" id="blockWrap"><svg id="blockSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#f7edd9"></span> parity bit (index a power of 2)</span>
+        <span class="item"><span class="sw" style="background:var(--wi-panel-2)"></span> data bit</span>
+        <span class="item"><span class="sw" style="background:#f7ded8;border-color:var(--wi-active)"></span> flipped in the channel</span>
+        <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> repaired</span>
+        <span class="item">hover a bit, a box below, or a <i>C<sub>j</sub></i> to see only what it touches</span>
+      </div>
+    </div>
+
+    <div class="sim-box" id="cwBox">
+      <div class="sim-title"><span>All codewords, by distance from what arrived</span><span class="rhs" id="cwMeta"></span></div>
+      <div class="tblwrap"><table class="cw" id="cwTab"></table></div>
+      <div class="legend"><span class="item">decoding means picking the nearest valid codeword — click a row to send that message instead</span></div>
+    </div>
+  </div>
+
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Message, codeword, syndrome</span><span class="rhs" id="wordMeta"></span></div>
+      <div id="wordBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>This code</span><span class="rhs" id="propMeta"></span></div>
+      <div id="propBox" class="hint"></div>
+    </div>
+  </div>
+</div>
+
+<details class="code desk-only" id="codeBox" open style="margin-top:18px">
+  <summary>Encoding and decoding</summary>
+  <div class="codebody" id="codeBody"></div>
+  <div class="codenote" id="codeNote"></div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      One directive per line; <code>#</code> starts a comment.
+      <br><br>
+      <b>l</b> <code>3</code> — the block has <i>n</i> = 2<sup><i>l</i></sup> − 1 bits, of which <i>l</i> are
+      parity bits, so the message has <i>k</i> = <i>n</i> − <i>l</i> bits.  <code>l 3</code> is the (7,4) code
+      of the lecture; <code>n 7</code> works as well.<br>
+      <b>message</b> <code>1011</code> — the <i>k</i> data bits, written <i>D</i><sub><i>k</i>−1</sub> … <i>D</i><sub>0</sub>.
+      Shorter input is padded with zeros on the left.<br>
+      <b>flip</b> <code>5</code> — a channel error at position <i>i</i>, i.e. bit <i>B<sub>i</sub></i> arrives
+      inverted.  Repeat the directive, or list several indices, for several errors.  Position 0 is the extra
+      overall parity bit, if there is one.<br>
+      <b>extended</b> <code>yes</code> — add one parity bit over the whole block, giving distance 4: any
+      2-bit error is then detected instead of being “corrected” into a third wrong word.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Hamming codes, following the lecture.
+
+   Bits are B_1 ... B_n with n = 2^l - 1, drawn left to right as B_n ... B_1
+   exactly as on the slide.  Check C_j is the XOR of all B_i whose index i has
+   bit j set; a valid codeword has C_j = 0 for all j.  The l positions that
+   are powers of two occur in exactly one check each and are therefore the
+   parity bits; the rest carry the message, filled from the top:
+   D_{k-1} ... D_0  ->  B_n, B_{n-1}, ..., skipping powers of two.  For l = 3
+   that is D_3 D_2 D_1 D_0 -> B_7 B_6 B_5 B_3, as in the lecture.
+
+   The optional extended bit is B_0, the parity of the whole block; it turns
+   distance 3 into distance 4 (SECDED).
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const isPow2 = i => (i & (i - 1)) === 0 && i > 0;
+const ordinal = k => k + (k === 1 ? "st" : k === 2 ? "nd" : k === 3 ? "rd" : "th");
+
+/* ---------- the code ------------------------------------------------------ */
+
+function makeCode(l, ext) {
+  const n = (1 << l) - 1, k = n - l;
+  const parityPos = [];                      /* 1, 2, 4, ... */
+  for (let j = 0; j < l; j++) parityPos.push(1 << j);
+  const dataPos = [];                        /* descending: B_n first */
+  for (let i = n; i >= 1; i--) if (!isPow2(i)) dataPos.push(i);
+  return { l: l, n: n, k: k, ext: !!ext, parityPos: parityPos, dataPos: dataPos,
+           covers: j => { const a = []; for (let i = n; i >= 1; i--) if (i & (1 << j)) a.push(i); return a; } };
+}
+
+/* B is a 1-based array of bits, B[0] is the extended parity bit if present */
+function encode(code, msg) {
+  const B = new Array(code.n + 1).fill(0);
+  code.dataPos.forEach((pos, t) => B[pos] = msg[t]);        /* D_{k-1} first */
+  for (let j = 0; j < code.l; j++) {
+    let x = 0;
+    code.covers(j).forEach(i => { if (!isPow2(i)) x ^= B[i]; });
+    B[1 << j] = x;
+  }
+  if (code.ext) { let x = 0; for (let i = 1; i <= code.n; i++) x ^= B[i]; B[0] = x; }
+  return B;
+}
+function syndrome(code, B) {
+  const C = [];
+  for (let j = 0; j < code.l; j++) {
+    let x = 0; code.covers(j).forEach(i => x ^= B[i]); C.push(x);
+  }
+  return C;                                   /* C[0] = C_0, least significant */
+}
+const synVal = C => C.reduce((a, b, j) => a + b * (1 << j), 0);
+function overallParity(code, B) { let x = B[0] || 0; for (let i = 1; i <= code.n; i++) x ^= B[i]; return x; }
+const readMessage = (code, B) => code.dataPos.map(i => B[i]);
+const bitsToStr = a => a.join("");
+
+/* ---------- state --------------------------------------------------------- */
+
+let code = null, msg = [], flips = [], steps = [], phases = [], cur = 0, timer = null;
+
+/* ---------- presets -------------------------------------------------------- */
+
+const PRESETS = {
+  lecture:  { name: "(7,4) code, 1011, no error",        src: "l 3\nmessage 1011\n" },
+  one:      { name: "(7,4) code, 1011, one bit flipped", src: "l 3\nmessage 1011\nflip 5\n" },
+  parityErr:{ name: "(7,4) code, the flip hits a parity bit", src: "l 3\nmessage 1011\nflip 2\n" },
+  two:      { name: "(7,4) code, two bits flipped",      src: "l 3\nmessage 1011\nflip 5 6\n" },
+  twoExt:   { name: "(8,4) extended, two bits flipped",  src: "l 3\nextended yes\nmessage 1011\nflip 5 6\n" },
+  zero:     { name: "(7,4) code, all-zero message",      src: "l 3\nmessage 0000\nflip 7\n" },
+  tiny:     { name: "(3,1) code = majority of three",    src: "l 2\nmessage 1\nflip 2\n" },
+  big:      { name: "(15,11) code",                      src: "l 4\nmessage 10110010110\nflip 13\n" },
+  huge:     { name: "(31,26) code",                      src: "l 5\nmessage 10110010110101100101101011\nflip 22\n" }
+};
+
+/* ---------- input ---------------------------------------------------------- */
+
+function parseInput(src) {
+  let l = 3, ext = false, mstr = null, fl = [];
+  src.split(/\r?\n/).forEach((raw, ln) => {
+    const line = raw.replace(/#.*$/, "").trim();
+    if (!line) return;
+    const t = line.split(/\s+/), key = t[0].toLowerCase(), where = " (line " + (ln + 1) + ")";
+    if (key === "l") l = parseInt(t[1], 10);
+    else if (key === "n") {
+      const n = parseInt(t[1], 10);
+      l = Math.round(Math.log2(n + 1));
+      if ((1 << l) - 1 !== n) throw new Error("n must be 2^l \u2212 1, i.e. 3, 7, 15, 31" + where);
+    }
+    else if (key === "message") mstr = (t[1] || "").replace(/[^01]/g, "");
+    else if (key === "flip") t.slice(1).forEach(v => { const i = parseInt(v, 10); if (!isNaN(i)) fl.push(i); });
+    else if (key === "extended") ext = /^(yes|true|1)$/i.test(t[1] || "yes");
+    else throw new Error("unknown directive \u201c" + t[0] + "\u201d" + where);
+  });
+  if (!(l >= 2 && l <= 5)) throw new Error("l must be between 2 and 5 (blocks of 3 to 31 bits)");
+  const c = makeCode(l, ext);
+  if (mstr === null) mstr = "";
+  if (mstr.length > c.k) throw new Error("the message has " + mstr.length + " bits, but k = " + c.k);
+  const m = mstr.padStart(c.k, "0").split("").map(Number);
+  const lo = ext ? 0 : 1;
+  fl.forEach(i => { if (i < lo || i > c.n) throw new Error("cannot flip bit " + i + ": positions are " + lo + " to " + c.n); });
+  return { code: c, msg: m, flips: Array.from(new Set(fl)).sort((a, b) => a - b) };
+}
+function toSource() {
+  const L = ["l " + code.l];
+  if (code.ext) L.push("extended yes");
+  L.push("message " + bitsToStr(msg));
+  if (flips.length) L.push("flip " + flips.join(" "));
+  return L.join("\n") + "\n";
+}
+
+/* ---------- steps ---------------------------------------------------------- */
+
+function mkPhase(name) { phases.push({ name: name, from: steps.length, to: steps.length }); }
+function closePhase() { if (phases.length) phases[phases.length - 1].to = steps.length; }
+
+function build() {
+  steps = []; phases = [];
+  const n = code.n, l = code.l;
+  const sent = encode(code, msg);
+  const recv = sent.slice();
+  flips.forEach(i => recv[i] ^= 1);
+
+  /* B: what is drawn; null entries are still unknown */
+  let B = new Array(n + 1).fill(null);
+  const snap = ex => Object.assign({
+    B: B.slice(), sent: sent, recv: recv,
+    C: null, hot: null, hotJ: null, cover: null, flipped: [], fixed: null, out: null, extBit: null
+  }, ex || {});
+  const add = (line, msg2, ex) => steps.push({ line: line, msg: msg2, st: snap(ex), phase: phases.length - 1 });
+
+  /* ---- encoding ---- */
+  mkPhase("encode");
+  add("e1", "<b>Given: message " + fmtBits(bitsToStr(msg)) + " of length k = " + code.k + "</b>. "
+      + "Its bits are called D<sub>" + (code.k - 1) + "</sub> \u2026 D<sub>0</sub>.");
+  code.dataPos.forEach((pos, t) => { B[pos] = msg[t]; });
+  add("e2", "<b>Copy the message into the positions that are not powers of two</b>: "
+      + code.dataPos.map((p, t) => "D<sub>" + (code.k - 1 - t) + "</sub>&rarr;B<sub>" + p + "</sub>").join(", ")
+      + ". The " + l + " remaining positions " + code.parityPos.slice().reverse().map(p => "B<sub>" + p + "</sub>").join(", ")
+      + " are still free \u2014 and each of them sits in exactly one check.",
+      { cover: null, hi: code.dataPos });
+
+  for (let j = 0; j < l; j++) {
+    const cov = code.covers(j).filter(i => !isPow2(i));
+    let x = 0; cov.forEach(i => x ^= B[i]);
+    B[1 << j] = x;
+    add("e3", "<b>P<sub>" + j + "</sub> = B<sub>" + (1 << j) + "</sub> := "
+        + cov.map(i => "B<sub>" + i + "</sub>").join(" \u2295 ") + " = " + x + "</b> \u2014 chosen so that check "
+        + chk(j) + " comes out 0. B<sub>" + (1 << j) + "</sub> appears in no other check, so setting it "
+        + "cannot disturb what is already done.",
+        { cover: j, hot: 1 << j, hotJ: j });
+  }
+  if (code.ext) {
+    let x = 0; for (let i = 1; i <= n; i++) x ^= B[i];
+    B[0] = x;
+    add("e3", "<b>B<sub>0</sub> := B<sub>1</sub> \u2295 \u2026 \u2295 B<sub>" + n + "</sub> = " + x + "</b> \u2014 one more "
+        + "parity bit over the whole block. It is not part of the original construction; it raises the distance "
+        + "from 3 to 4.", { hot: 0, hotJ: "ext", cover: "all" });
+  }
+  add("e4", "<b>Send " + fmtBits(codeStr(B)) + "</b> \u2014 " + code.k + " message bits carried by " + (n + (code.ext ? 1 : 0))
+      + " transmitted bits, an overhead of " + Math.round(100 * (n + (code.ext ? 1 : 0) - code.k) / code.k) + "%.");
+  closePhase();
+
+  /* ---- channel ---- */
+  mkPhase("channel");
+  B = recv.slice();
+  if (!flips.length) {
+    add("ch", "<b>The channel does not touch the block this time.</b> Click any bit to flip it, or use the "
+        + "buttons above the scrubber.", { flipped: [] });
+  } else {
+    add("ch", "<b>The channel flips " + flips.length + " bit" + (flips.length > 1 ? "s" : "") + ": "
+        + flips.map(i => "B<sub>" + i + "</sub>").join(", ") + "</b>. What arrives is "
+        + fmtBits(codeStr(recv)) + ". The receiver does not know this \u2014 it only sees the block.",
+        { flipped: flips.slice(), flash: flips[0] });
+  }
+  closePhase();
+
+  /* ---- decoding ---- */
+  mkPhase("decode");
+  add("d1", "<b>Given: the block " + fmtBits(codeStr(recv)) + " of length n = " + n + "</b>. "
+      + "Now recompute the checks.", { flipped: flips.slice() });
+
+  const C = [];
+  for (let j = 0; j < l; j++) {
+    const cov = code.covers(j);
+    let x = 0; cov.forEach(i => x ^= recv[i]);
+    C.push(x);
+    add("d2", "<b>" + chk(j) + " = " + cov.map(i => "B<sub>" + i + "</sub>").join(" \u2295 ") + " = " + x + "</b> \u2014 "
+        + (x ? "<span class=\"warn\">violated</span>: an odd number of the bits it covers is wrong."
+             : "<span class=\"good\">satisfied</span>: this check sees no error \u2014 either none of its bits flipped, or an even number did.")
+        , { flipped: flips.slice(), cover: j, C: C.slice(), hot: 1 << j, hotJ: j });
+  }
+
+  const Cv = synVal(C);
+  const bin = C.slice().reverse().join("");
+  add("d2", "<b>C = " + chkList() + " = " + bin + "<sub>2</sub> = " + Cv + "</b> \u2014 the violated checks, read as a "
+      + "binary number. Every position is covered by a different set of checks, so this number can only be one thing: "
+      + (Cv === 0 ? "no error was seen." : "the index of the flipped bit."),
+      { flipped: flips.slice(), C: C.slice(), cover: "all" });
+
+  let fixed = null, B2 = recv.slice();
+  if (code.ext) {
+    const par = overallParity(code, recv);
+    add("d3", "<b>Overall parity = " + par + "</b>" + (par ? " (odd) " : " (even) ")
+        + "\u2014 together with C this tells the two cases apart: "
+        + (par === 1 ? "an odd number of bits is wrong, and C says where."
+                     : (Cv === 0 ? "the block looks clean." : "an <i>even</i> number of bits is wrong \u2014 C is nonzero but the parity is even, which no single error can produce.")),
+        { flipped: flips.slice(), C: C.slice(), extBit: par });
+    if (par === 0 && Cv !== 0) {
+      add("d3", "<b>Two bits are wrong (at least).</b> The extra parity bit turns this from a silent "
+          + "mis-correction into an honest \u201cplease retransmit\u201d: the code has distance 4, so any 2-bit "
+          + "error is detected, though it cannot be located.",
+          { flipped: flips.slice(), C: C.slice(), extBit: par, detect2: true });
+      finish(B2, false);
+      return;
+    }
+  }
+
+  if (Cv === 0) {
+    add("d3", "<b>C = 0 \u2014 no detectable error.</b> Nothing is flipped back.",
+        { flipped: flips.slice(), C: C.slice() });
+  } else if (Cv > n) {
+    add("d3", "<b>C = " + Cv + " is larger than n = " + n + "</b> \u2014 with the extra parity bit in play this "
+        + "means the error is B<sub>0</sub> itself.", { flipped: flips.slice(), C: C.slice() });
+  } else {
+    B2[Cv] ^= 1; fixed = Cv;
+    add("d3", "<b>Flip B<sub>" + Cv + "</sub></b> \u2014 the " + ordinal(Cv) + " bit was twisted. The block becomes "
+        + fmtBits(codeStr(B2)) + ", and all checks are satisfied again."
+        + (flips.length === 1 && flips[0] === Cv ? " <span class=\"good\">That is exactly the bit the channel flipped.</span>"
+           : flips.length === 0 ? ""
+           : " <span class=\"warn\">The channel flipped " + flips.length + " bits, so this \u201crepair\u201d lands on a "
+             + "third codeword \u2014 a valid one, but not the one that was sent. Distance 3 can correct one error, not two.</span>"),
+        { flipped: flips.slice(), C: C.slice(), fixed: Cv, flash: Cv });
+  }
+  finish(B2, true);
+
+  function finish(Bfin, didFix) {
+    B = Bfin;
+    const out = readMessage(code, Bfin);
+    const okMsg = bitsToStr(out) === bitsToStr(msg);
+    add("d4", "<b>Return the " + code.k + "-bit message " + fmtBits(bitsToStr(out)) + "</b> \u2014 the data positions "
+        + code.dataPos.map(p => "B<sub>" + p + "</sub>").join(", ") + ". "
+        + (okMsg ? "<span class=\"good\">It is what was sent.</span>"
+                 : "<span class=\"warn\">It differs from what was sent (" + bitsToStr(msg) + ").</span>"),
+        { flipped: flips.slice(), C: C.slice(), fixed: fixed, out: out, done: true, msgOK: okMsg });
+    closePhase();
+  }
+}
+
+const chk = j => '<span class="c' + (j % 5) + '">C<sub>' + j + "</sub></span>";
+function chkList() { let a = []; for (let j = code.l - 1; j >= 0; j--) a.push(chk(j)); return a.join(""); }
+function codeStr(B) {
+  let s = "";
+  for (let i = code.n; i >= 1; i--) s += (B[i] === null || B[i] === undefined) ? "\u00b7" : B[i];
+  if (code.ext) s += " " + ((B[0] === null || B[0] === undefined) ? "\u00b7" : B[0]);
+  return s;
+}
+const fmtBits = s => '<span class="ch">' + esc(s) + "</span>";
+
+/* ---------- drawing --------------------------------------------------------- */
+
+const NS = "http://www.w3.org/2000/svg";
+function svgEl(name, attrs) {
+  const e = document.createElementNS(NS, name);
+  for (const k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function txt(x, y, s, cls, extra) {
+  const t = svgEl("text", Object.assign({ x: x, y: y, class: cls }, extra || {}));
+  t.textContent = s; return t;
+}
+const CC = j => "var(--wi-c" + (j % 5) + ")";
+
+/* ---------- geometry, fixed for a given code and width --------------------
+   Everything below is computed from the code and the container width only,
+   never from the step, so the canvas keeps one bounding box from the first
+   frame to the last and nothing jumps or gets clipped. ------------------- */
+
+let hoverBit = null;
+
+function blockGeom(W) {
+  const l = code.l, n = code.n;
+  const cells = [];
+  for (let i = n; i >= 1; i--) cells.push(i);
+  if (code.ext) cells.push(0);
+
+  const wide = l <= 3;                       /* room for the full formulas */
+  const labelW = Math.min(Math.max(96, W * 0.32), wide ? 232 : 150);
+  const maxGrid = Math.max(120, W - 16 - labelW);
+  let cw = Math.min(54, Math.max(16, Math.floor(maxGrid / cells.length) - 6));
+  let gap = Math.max(3, Math.min(9, Math.round(cw * 0.16)));
+  if (cells.length * (cw + gap) - gap > maxGrid)
+    cw = Math.max(13, Math.floor((maxGrid + gap) / cells.length) - gap);
+  const totalW = cells.length * (cw + gap) - gap;
+  const x0 = 6;
+
+  const laneH = 18, topPad = 10, ixH = 15, boxH = 30, nameH = 15, synH = 24;
+  const wireGap = 13, oplusH = 28, srcH = 24;
+  const ixY = topPad + l * laneH + 3;
+  const boxTop = ixY + ixH;
+  const nameY = boxTop + boxH + 3;
+  const synY = nameY + nameH;
+  const wireTop = synY + synH;
+  const oplusY = wireTop + l * wireGap + 8;
+  const srcTop = oplusY + oplusH;
+  const H = srcTop + srcH + 14;
+
+  return { cells, cw, gap, totalW, x0, l, wide, labelW,
+           laneY: j => topPad + (l - 1 - j) * laneH,
+           ixY, boxTop, boxH, nameY, synY, wireTop, wireGap, oplusY, srcTop, srcH, H,
+           xr: x0 + totalW + 9,
+           SW: Math.min(W, x0 + totalW + 18 + labelW),
+           cx: t => x0 + t * (cw + gap) + cw / 2,
+           bx: t => x0 + t * (cw + gap) };
+}
+
+/* The checks covering bit i, from the top lane down.  Every line that leaves a
+   bit gets its own slot across the width of the box, so parallel runs never sit
+   on top of each other -- above the box one slot per check, below the box one
+   per check plus one for the copy arrow. */
+function checksOf(i) {
+  const a = [];
+  for (let j = code.l - 1; j >= 0; j--) if (i & (1 << j)) a.push(j);
+  return a;
+}
+const slotAt = (bx, cw, k, total) => bx + cw * (k + 1) / (total + 1);
+function hookX(G, i, t, j) {
+  const cs = checksOf(i);
+  return slotAt(G.bx(t), G.cw, cs.indexOf(j), cs.length);
+}
+function busX(G, i, t, j) {                 /* j, or "copy" for the data arrow */
+  const cs = checksOf(i), n = cs.length + 1;
+  return slotAt(G.bx(t), G.cw, j === "copy" ? n - 1 : cs.indexOf(j), n);
+}
+
+/* what a hovered bit is connected to */
+function relatedTo(i) {
+  if (i === null || i === undefined) return null;
+  const bits = new Set([i]), checks = [];
+  if (i === 0) {                                   /* the overall parity bit */
+    for (let k = 1; k <= code.n; k++) bits.add(k);
+    return { checks: [], bits: bits, whole: true };
+  }
+  for (let j = 0; j < code.l; j++) if (i & (1 << j)) checks.push(j);
+  if (isPow2(i)) {                                 /* a parity bit: its data */
+    const j = Math.round(Math.log2(i));
+    code.covers(j).forEach(k => bits.add(k));
+    return { checks: [j], bits: bits };
+  }
+  checks.forEach(j => bits.add(1 << j));           /* a data bit: its parities */
+  return { checks: checks, bits: bits };
+}
+
+function drawBlock() {
+  const svg = el("blockSvg"); svg.textContent = "";
+  const st = steps[cur].st, l = code.l;
+  const G = blockGeom(Math.max(320, Math.floor(el("blockWrap").clientWidth) - 2));
+  svg.setAttribute("viewBox", "0 0 " + G.SW + " " + G.H);
+  svg.setAttribute("width", G.SW); svg.setAttribute("height", G.H);
+  svg.style.margin = "0 auto";
+
+  const hl = relatedTo(hoverBit);
+  const active = st.cover;
+  const laneOn = j => hl ? hl.checks.indexOf(j) >= 0
+                         : (active === null || active === "all" || active === j);
+  const boxDim = i => hl ? !hl.bits.has(i)
+                         : (active !== null && active !== "all" && (i & (1 << active)) === 0 && i !== 0);
+
+  const defs = svgEl("defs", {});
+  [["ahr", "var(--wi-accent-dark)"]].concat(
+    Array.from({ length: l }, (_, j) => ["ah" + j, CC(j)])).forEach(([id, col]) => {
+    const m = svgEl("marker", { id: id, markerWidth: 8, markerHeight: 8, refX: 7, refY: 4,
+                                orient: "auto", markerUnits: "userSpaceOnUse" });
+    m.appendChild(svgEl("path", { d: "M0,0.6 L7.5,4 L0,7.4 z", fill: col }));
+    defs.appendChild(m);
+  });
+  svg.appendChild(defs);
+
+  /* ---------- the parity checks: one lane each, hooks down to the bits ---- */
+  for (let j = l - 1; j >= 0; j--) {
+    const y = G.laneY(j), on = laneOn(j), cls = on ? "" : " off";
+    const cov = new Set(code.covers(j));
+    let xmin = Infinity;
+    G.cells.forEach((i, t) => {
+      if (!cov.has(i)) return;
+      const xh = hookX(G, i, t, j);
+      xmin = Math.min(xmin, xh);
+      svg.appendChild(svgEl("path", {
+        d: "M" + xh + "," + (G.boxTop - 3) + " L" + xh + "," + (y + 5)
+         + " Q" + xh + "," + y + " " + (xh + 5) + "," + y, class: "hook" + cls, stroke: CC(j) }));
+    });
+    svg.appendChild(svgEl("line", { x1: xmin, y1: y, x2: G.xr, y2: y, class: "chkline" + cls, stroke: CC(j) }));
+    svg.appendChild(svgEl("path", { d: "M" + G.xr + "," + y + " l-6,-3.4 v6.8 z",
+                                    class: "arrowhead" + cls, fill: CC(j) }));
+    const val = st.C && st.C[j] !== undefined ? st.C[j] : null;
+    let s;
+    if (G.wide) s = "C" + sub(j) + " = " + code.covers(j).slice().reverse()
+                        .map(i => "B" + sub(i)).join("\u2295");
+    else s = "C" + sub(j) + " = \u2295 " + code.covers(j).length + " bits";
+    s += val === null ? "  \u225F 0" : "  = " + val;
+    const lab = txt(G.xr + 9, y, s, "chklab" + cls, { fill: CC(j), "text-anchor": "start",
+                    style: "font-size:" + (G.wide ? 12 : 11) + "px" });
+    if (val !== null) lab.setAttribute("font-weight", "bold");
+    svg.appendChild(lab);
+    /* hovering the lane or its formula shows that check on its own */
+    [svgEl("line", { x1: xmin, y1: y, x2: G.xr, y2: y, stroke: "#fcf9f3", "stroke-opacity": 0,
+                     "stroke-width": 11, "pointer-events": "stroke" }),
+     svgEl("rect", { x: G.xr, y: y - 9, width: Math.max(10, G.SW - G.xr), height: 18,
+                     fill: "#fcf9f3", "fill-opacity": 0, "pointer-events": "all" })].forEach(h => {
+      h.__tip = 1 << j; h.__lane = j;
+      h.addEventListener("mouseenter", onBitOver);
+      h.addEventListener("mousemove", moveTip);
+      h.addEventListener("mouseleave", onBitOut);
+      svg.appendChild(h);
+    });
+  }
+
+  /* ---------- the encoding wiring, below the block ------------------------ */
+  const dimWire = !!st.C;                       /* decoding: fade it out */
+  const wg = svgEl("g", { opacity: dimWire ? .22 : 1 });
+  const pcol = {}; G.cells.forEach((i, t) => { if (i > 0 && isPow2(i)) pcol[Math.round(Math.log2(i))] = t; });
+
+  G.cells.forEach((i, t) => {
+    if (i === 0) return;
+    const x = G.bx(t), cx = G.cx(t);
+    const dim = boxDim(i);
+    const isP = isPow2(i);
+    const sb = svgEl("rect", { x: x, y: G.srcTop, width: G.cw, height: G.srcH, rx: 3,
+                               class: "bitbox " + (isP ? "parity" : "data") + (dim ? " dimmed" : "") });
+    sb.__tip = i;                                   /* hovering D_3 or P_2 works too */
+    sb.addEventListener("mouseenter", onBitOver);
+    sb.addEventListener("mousemove", moveTip);
+    sb.addEventListener("mouseleave", onBitOut);
+    sb.addEventListener("click", () => toggleFlip(i));
+    wg.appendChild(sb);
+    if (fitsLabel(G, name(i)))
+      wg.appendChild(txt(cx, G.srcTop + G.srcH / 2, name(i), "bitnm",
+                         { opacity: dim ? .45 : 1, style: "font-size:12px" }));
+    if (!isP) {
+      /* a data bit is copied straight up into its position in the block */
+      const ax = busX(G, i, t, "copy");
+      wg.appendChild(svgEl("line", { x1: ax, y1: G.srcTop - 2, x2: ax, y2: G.boxTop + G.boxH + 3,
+                                     stroke: "var(--wi-accent-dark)", "stroke-width": dim ? 1.2 : 2.2,
+                                     opacity: dim ? .3 : 1, "marker-end": "url(#ahr)" }));
+    } else {
+      /* a parity bit is computed: the lines meet in a XOR just above it */
+      const j = Math.round(Math.log2(i));
+      wg.appendChild(svgEl("circle", { cx: cx, cy: G.oplusY + 8, r: 7, fill: "var(--wi-panel-2)",
+                                       stroke: CC(j), "stroke-width": 1.4, opacity: dim ? .35 : 1 }));
+      wg.appendChild(txt(cx, G.oplusY + 8, "\u2295", "bitnm",
+                         { fill: CC(j), opacity: dim ? .35 : 1, style: "font-size:11px" }));
+      wg.appendChild(svgEl("line", { x1: cx, y1: G.oplusY + 15, x2: cx, y2: G.srcTop - 3,
+                                     stroke: CC(j), "stroke-width": 1.6, opacity: dim ? .3 : 1,
+                                     "marker-end": "url(#ah" + j + ")" }));
+    }
+  });
+
+  /* the bus: every data bit of check j runs along lane j into the XOR of P_j */
+  for (let j = 0; j < l; j++) {
+    const y = G.wireTop + (l - 1 - j) * G.wireGap;
+    const pt = pcol[j]; if (pt === undefined) continue;
+    const xP = G.cx(pt);
+    const on = laneOn(j);
+    code.covers(j).forEach(i => {
+      if (isPow2(i)) return;
+      const t = G.cells.indexOf(i); if (t < 0) return;
+      /* hovering a data bit shows only the lines leaving it; hovering a parity
+         bit shows only the lines arriving at it */
+      const shown = hl ? (hoverBit === i || hoverBit === (1 << j)) : on;
+      const quiet = !hl && active === null && l >= 4;   /* many checks: hover to read it */
+      const xa = busX(G, i, t, j);
+      wg.appendChild(svgEl("path", { d: busPath(xa, G.srcTop - 2, y, xP, G.oplusY + 1),
+                                     fill: "none", stroke: CC(j),
+                                     "stroke-width": shown ? 1.5 : 1,
+                                     opacity: shown ? (quiet ? .3 : .9) : .13 }));
+    });
+    if (G.wide) {
+      const terms = code.covers(j).filter(i => !isPow2(i)).map(i => name(i));
+      wg.appendChild(txt(G.xr + 9, y, "P" + sub(j) + " = " + terms.join(" \u2295 "), "chklab",
+                         { fill: CC(j), "text-anchor": "start", opacity: on ? 1 : .3,
+                           style: "font-size:12px" }));
+    }
+  }
+  svg.appendChild(wg);
+
+  /* ---------- the block itself ------------------------------------------- */
+  G.cells.forEach((i, t) => {
+    const x = G.bx(t), y = G.boxTop, v = st.B[i];
+    let cls = "bitbox " + (i === 0 || isPow2(i) ? "parity" : "data");
+    if (v === null || v === undefined) cls += " empty";
+    if (st.flipped && st.flipped.indexOf(i) >= 0) cls += " flipped";
+    if (st.fixed === i) cls += " fixed";
+    const computing = st.hotJ !== null && st.hotJ !== undefined && st.hot === i;
+    if (st.hot === i && !computing) cls += " hot";
+    if (computing) cls += " computed";
+    if (hoverBit === i) cls += " hot";
+    if (boxDim(i)) cls += " dimmed";
+    const r = svgEl("rect", { x: x, y: y, width: G.cw, height: G.boxH, rx: 3,
+                              class: cls + (st.flash === i ? " flash" : "") });
+    if (computing)                       /* inline, or the .bitbox class rule wins */
+      r.setAttribute("style", "stroke:" + (st.hotJ === "ext" ? "var(--wi-accent)" : CC(st.hotJ)));
+    r.__tip = i;
+    r.addEventListener("mouseenter", onBitOver);
+    r.addEventListener("mousemove", moveTip);
+    r.addEventListener("mouseleave", onBitOut);
+    r.addEventListener("click", () => toggleFlip(i));
+    svg.appendChild(r);
+    svg.appendChild(txt(x + G.cw / 2, y + G.boxH / 2,
+                        v === null || v === undefined ? "?" : String(v),
+                        "bitv" + (v === null || v === undefined ? " q" : "")));
+    /* the index in binary, one colour per check, above the box as on the slide */
+    if (G.cw >= code.l * 6.2 + 11 && i > 0) {
+      const bstr = i.toString(2).padStart(l, "0"), chW = 6.2;
+      const start = x + G.cw / 2 - (bstr.length * chW) / 2 + chW / 2;
+      bstr.split("").forEach((b, q) => {
+        const j = l - 1 - q;
+        svg.appendChild(txt(start + q * chW, G.ixY + 6, b, "bitix",
+          { fill: b === "1" ? CC(j) : "var(--wi-ink-faint)",
+            opacity: boxDim(i) ? .4 : (b === "1" && !laneOn(j) ? .35 : 1) }));
+      });
+      svg.appendChild(txt(start + bstr.length * chW - chW / 2 + 4, G.ixY + 6, "\u2082", "bitix",
+                          { fill: "var(--wi-ink-faint)", opacity: .7 }));
+    }
+    if (fitsLabel(G, "B" + sub(i)))
+      svg.appendChild(txt(x + G.cw / 2, G.nameY + 7, "B" + sub(i), "bitnm halo",
+                          { opacity: boxDim(i) ? .4 : 1 }));
+  });
+
+  /* ---------- the syndrome pointer ---------------------------------------- */
+  if (st.C && !st.detect2) {
+    const Cv = synVal(st.C), t = G.cells.indexOf(Cv);
+    if (Cv > 0 && t >= 0) {
+      const X = G.cx(t), Y = G.synY + 4;
+      const g = svgEl("g", { class: "pop" });
+      g.appendChild(svgEl("path", { d: "M" + X + "," + Y + " l-5.5,8 h11 z", class: "pointer" }));
+      g.appendChild(txt(X, Y + 16, "C = " + Cv, "bitnm halo", { fill: "var(--wi-active)" }));
+      svg.appendChild(g);
+    }
+  }
+  el("blockMeta").textContent = "n = " + code.n + (code.ext ? "+1" : "") + ", k = " + code.k
+    + ", d = " + (code.ext ? 4 : 3);
+}
+
+const fitsLabel = (G, t) => G.cw >= t.length * 6.6 + 3;
+
+/* an orthogonal route: up from (x1,y1) to lane y, across to x2, then to y2 */
+function busPath(x1, y1, ly, x2, y2) {
+  const dir = x2 > x1 ? 1 : -1;
+  const r = Math.min(4, Math.abs(x2 - x1) / 2, Math.abs(y1 - ly) / 2 || 4);
+  const a1 = y1 > ly ? ly + r : ly - r;
+  const a2 = y2 > ly ? ly + r : ly - r;
+  return "M" + x1 + "," + y1 + " V" + a1
+       + " Q" + x1 + "," + ly + " " + (x1 + dir * r) + "," + ly
+       + " H" + (x2 - dir * r)
+       + " Q" + x2 + "," + ly + " " + x2 + "," + a2
+       + " V" + y2;
+}
+
+const sub = j => String(j).split("").map(d => "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"[+d]).join("");
+function name(i) {
+  if (i === 0) return "B\u2080";
+  if (isPow2(i)) { const j = Math.round(Math.log2(i)); return "P" + sub(j); }
+  const t = code.dataPos.indexOf(i);
+  return "D" + sub(code.k - 1 - t);
+}
+
+/* ---------- tooltips / interaction ------------------------------------------ */
+
+function onBitOut() { hideTip(); if (hoverBit !== null) { hoverBit = null; drawBlock(); } }
+
+function onBitOver(ev) {
+  const i = ev.currentTarget.__tip, tt = el("tooltip");
+  if (hoverBit !== i) { hoverBit = i; drawBlock(); }
+  const st = steps[cur].st;
+  let inChecks = [];
+  for (let j = 0; j < code.l; j++) if (i & (1 << j)) inChecks.push("C" + sub(j));
+  tt.innerHTML = '<span class="tt-h">B' + sub(i) + " \u2014 " + (i === 0 ? "overall parity" : isPow2(i) ? "parity bit " + name(i) : "data bit " + name(i)) + "</span><br>"
+    + (i > 0 ? '<span class="tt-s">index ' + i + " = " + i.toString(2).padStart(code.l, "0") + "\u2082</span><br>"
+             + '<span class="tt-s">in ' + (inChecks.length ? inChecks.join(", ") : "no check") + "</span><br>"
+             : '<span class="tt-s">covers the whole block</span><br>')
+    + '<span class="tt-s">value ' + (st.B[i] === null || st.B[i] === undefined ? "?" : st.B[i]) + "</span>"
+    + '<br><span class="tt-s">' + (i === 0 ? "covers every bit"
+        : isPow2(i) ? "computed from the highlighted data bits"
+                    : "feeds the highlighted parity bits") + "</span>"
+    + '<br><span class="tt-s">click: flip it in the channel</span>';
+  tt.style.display = "block"; moveTip(ev);
+}
+function moveTip(ev) {
+  const tt = el("tooltip");
+  let x = ev.clientX + 14, y = ev.clientY + 16;
+  const r = tt.getBoundingClientRect();
+  if (x + r.width > window.innerWidth - 8) x = ev.clientX - r.width - 12;
+  if (y + r.height > window.innerHeight - 8) y = ev.clientY - r.height - 12;
+  tt.style.left = x + "px"; tt.style.top = y + "px";
+}
+function hideTip() { el("tooltip").style.display = "none"; }
+
+function toggleFlip(i) {
+  const k = flips.indexOf(i);
+  if (k >= 0) flips.splice(k, 1); else flips.push(i);
+  flips.sort((a, b) => a - b);
+  hideTip();
+  rebuild(true);
+}
+
+/* ---------- the codeword table ----------------------------------------------- */
+
+function renderCodewords() {
+  const box = el("cwBox");
+  if (code.k > 6) { box.style.display = "none"; return; }
+  box.style.display = "";
+  const st = steps[cur].st;
+  const recv = st.recv;
+  const rows = [];
+  for (let v = 0; v < (1 << code.k); v++) {
+    const m = [];
+    for (let t = code.k - 1; t >= 0; t--) m.push((v >> t) & 1);
+    const B = encode(code, m);
+    let d = 0;
+    for (let i = code.ext ? 0 : 1; i <= code.n; i++) if (B[i] !== recv[i]) d++;
+    rows.push({ m: m, B: B, d: d, sent: bitsToStr(m) === bitsToStr(msg) });
+  }
+  rows.sort((a, b) => a.d - b.d || bitsToStr(a.m).localeCompare(bitsToStr(b.m)));
+  const best = rows[0].d, ties = rows.filter(r => r.d === best).length;
+  let h = "<tr><th>message</th><th>codeword</th><th>d</th></tr>";
+  rows.forEach(r => {
+    const cls = (r.d === best ? "best" : "") + (r.sent ? " sent" : "");
+    h += '<tr class="' + cls + '" data-m="' + bitsToStr(r.m) + '"><td>' + bitsToStr(r.m) + "</td><td>"
+       + esc(codeStr(r.B)) + '</td><td class="d">' + r.d + "</td></tr>";
+  });
+  el("cwTab").innerHTML = h;
+  Array.from(el("cwTab").querySelectorAll("tr[data-m]")).forEach(tr => {
+    tr.addEventListener("click", () => {
+      msg = tr.getAttribute("data-m").split("").map(Number);
+      el("inMsg").value = bitsToStr(msg);
+      rebuild(false);
+    });
+  });
+  el("cwMeta").textContent = "nearest at distance " + best + (ties > 1 ? " (" + ties + " of them \u2014 ambiguous)" : "");
+}
+
+/* ---------- side panels ------------------------------------------------------- */
+
+function renderWord() {
+  const st = steps[cur].st;
+  let h = '<div class="kv" style="margin:0 0 4px"><span>message D<sub>' + (code.k - 1) + "</sub>\u2026D<sub>0</sub></span></div>";
+  h += '<div class="word">' + bitsToStr(msg) + "</div>";
+  h += '<div class="kv" style="margin:8px 0 4px"><span>sent B<sub>' + code.n + "</sub>\u2026B<sub>1</sub>"
+     + (code.ext ? " B<sub>0</sub>" : "") + "</span></div>";
+  h += '<div class="word">' + markWord(codeStr(st.sent), []) + "</div>";
+  h += '<div class="kv" style="margin:8px 0 4px"><span>received</span></div>';
+  h += '<div class="word">' + markWord(codeStr(st.recv), flips) + "</div>";
+  if (st.C) {
+    const Cv = synVal(st.C);
+    h += '<div class="kv" style="margin:8px 0 4px"><span>syndrome C</span></div>';
+    h += '<div class="word">' + st.C.slice().reverse().map((v, q) =>
+      '<span class="c' + ((code.l - 1 - q) % 5) + '">' + v + "</span>").join("")
+      + '<span style="letter-spacing:0;font-size:.8em;color:var(--wi-ink-faint)">\u2082</span> = ' + Cv + "</div>";
+  }
+  if (st.out) {
+    h += '<div class="kv" style="margin:8px 0 4px"><span>decoded message</span></div>';
+    h += '<div class="word" style="color:' + (st.msgOK ? "var(--wi-relax)" : "var(--wi-active)") + '">'
+       + bitsToStr(st.out) + "</div>";
+  }
+  el("wordBox").innerHTML = h;
+  el("wordMeta").textContent = flips.length ? flips.length + " bit" + (flips.length > 1 ? "s" : "") + " flipped" : "clean channel";
+}
+function markWord(s, fl) {
+  /* s is drawn B_n ... B_1 [space B_0] */
+  let out = "", t = 0;
+  for (const chx of s) {
+    if (chx === " ") { out += " "; continue; }
+    const idx = t < code.n ? code.n - t : 0;
+    const cls = fl.includes(idx) ? "flip" : (idx === 0 || isPow2(idx)) ? "par" : "";
+    out += '<span class="' + cls + '">' + chx + "</span>";
+    t++;
+  }
+  return out;
+}
+
+function renderProps() {
+  const n = code.n + (code.ext ? 1 : 0), k = code.k, d = code.ext ? 4 : 3;
+  const t = Math.floor((d - 1) / 2);
+  let ball = 0;
+  for (let f = 0; f <= t; f++) ball += binom(n, f);
+  const hamOK = Math.pow(2, k) * ball <= Math.pow(2, n);
+  const perfect = Math.pow(2, k) * ball === Math.pow(2, n);
+  let h = "<b>(" + n + ", " + k + ")</b> code, distance <b>d = " + d + "</b>: detects up to " + (d - 1)
+        + " flipped bits, corrects up to " + t + ".<br>"
+        + "Overhead " + (n - k) + " bits on " + k + " = <b>" + Math.round(100 * (n - k) / k) + "%</b>"
+        + " (repeating every bit three times would cost 200%).<br><br>"
+        + "<b>Hamming bound</b>: 2<sup>" + k + "</sup> \u00b7 " + ball + " = " + (Math.pow(2, k) * ball)
+        + (perfect ? " = " : hamOK ? " \u2264 " : " > ") + "2<sup>" + n + "</sup> = " + Math.pow(2, n) + ". "
+        + (perfect ? "The balls of radius " + t + " around the codewords tile the whole space exactly \u2014 this code is <b>perfect</b>."
+                   : "The balls of radius " + t + " around the codewords are disjoint but leave room over.")
+        + "<br><b>Singleton bound</b>: n \u2265 k + d \u2212 1, here " + n + " \u2265 " + (k + d - 1) + ".";
+  el("propBox").innerHTML = h;
+  el("propMeta").textContent = perfect ? "perfect" : "";
+}
+function binom(n, k) { let r = 1; for (let i = 0; i < k; i++) r = r * (n - i) / (i + 1); return Math.round(r); }
+
+/* ---------- the recipes (pseudocode panel) ------------------------------------ */
+
+function renderCode() {
+  const on = steps[cur].line;
+  const l = code.l, n = code.n, k = code.k;
+  const dp = code.dataPos, pp = code.parityPos.slice().reverse();
+  const D = t => "D" + sub(k - 1 - t);
+  const encLines = [
+    ["e1", "1. Given: message " + dp.map((p, t) => D(t)).join("") + " of length k = " + k],
+    ["e2", "2. copy " + dp.map((p, t) => D(t)).join("") + " to " + dp.map(p => "B" + sub(p)).join("")],
+    ["e3", "3. compute " + pp.map(p => "P" + sub(Math.round(Math.log2(p)))).join("") + " = "
+         + pp.map(p => "B" + sub(p)).join("") + " so that C = 0"],
+    ["e4", "4. send " + wordOrder()]
+  ];
+  const decLines = [
+    ["d1", "1. Given: block " + wordOrder() + " of length n = " + n],
+    ["d2", "2. compute C (as above)"],
+    ["d3", "3. if C = 0 no (detectable) error occurred"],
+    ["d3", "   otherwise, flip B_C (the C-th bit was twisted)"],
+    ["d4", "4. return " + k + "-bit message " + dp.map(p => "B" + sub(p)).join("")]
+  ];
+  const box = (title, lines) => {
+    let h = '<div><div class="sublabel">' + title + "</div>";
+    lines.forEach(([id, s], q) => {
+      h += '<div class="cline' + (id === on ? " on" : "") + '"><span class="ln"></span><span>'
+         + esc(s) + "</span></div>";
+    });
+    return h + "</div>";
+  };
+  el("codeBody").innerHTML =
+      box("(" + n + ", " + k + ") Hamming code \u2014 encoding", encLines)
+    + box("(" + n + ", " + k + ") Hamming code \u2014 decoding", decLines);
+  el("codeNote").innerHTML =
+    "The two recipes of the lecture, written out for the block size currently selected. The checks are "
+    + "C<sub>j</sub> = \u2295 { B<sub>i</sub> : bit j of i is 1 }, "
+    + code.covers(0).slice(0, 4).map(i => "B" + sub(i)).join(" \u2295 ") + " \u2026 for C<sub>0</sub>"
+    + ". The parity positions are the powers of two because those indices have a single 1 in binary, so each "
+    + "occurs in exactly one check and can be solved for."
+    + (code.ext ? " <b>The extra overall parity bit B<sub>0</sub> is not part of this recipe</b>; it is the variant "
+                + "mentioned at the end, which detects (but cannot correct) any 2-bit error." : "");
+}
+function wordOrder() {
+  let a = [];
+  for (let i = code.n; i >= 1; i--) a.push(isPow2(i) ? "P" + sub(Math.round(Math.log2(i))) : name(i));
+  return a.join("");
+}
+
+/* ---------- transport --------------------------------------------------------- */
+
+function renderPhases() {
+  const bar = el("phaseBar"); bar.textContent = "";
+  phases.forEach(ph => {
+    const len = Math.max(1, ph.to - ph.from);
+    const b = document.createElement("button");
+    b.className = "phasebtn"; b.style.flexGrow = len;
+    const done = cur >= ph.to, on = cur >= ph.from && cur < ph.to;
+    if (on) b.className += " on"; else if (done) b.className += " past";
+    const f = document.createElement("span");
+    f.className = "fill" + (cur <= ph.from ? " empty" : "");
+    f.style.width = (done ? 100 : on ? Math.round(100 * (cur - ph.from) / len) : 0) + "%";
+    b.appendChild(f);
+    const lb = document.createElement("span"); lb.className = "lab"; lb.textContent = ph.name;
+    b.appendChild(lb);
+    b.title = ph.name + " \u2014 steps " + ph.from + "\u2013" + (ph.to - 1);
+    b.addEventListener("click", () => goto(ph.from));
+    bar.appendChild(b);
+  });
+  el("stepNo").textContent = (cur + 1) + " / " + steps.length;
+}
+
+function render() {
+  const s = steps[cur];
+  el("statusBox").innerHTML = s.msg;
+  el("phaseName").textContent = phases[s.phase] ? phases[s.phase].name : "";
+  drawBlock(); renderWord(); renderProps(); renderCodewords(); renderCode(); renderPhases();
+  el("scrubber").max = steps.length - 1;
+  el("scrubber").value = cur;
+  el("backBtn").disabled = cur === 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+  el("codeNote2").innerHTML = "Sent " + fmtBits(codeStr(s.st.sent)) + ", received " + fmtBits(codeStr(s.st.recv))
+    + (flips.length ? " \u2014 " + flips.length + " flip" + (flips.length > 1 ? "s" : "") : " \u2014 clean");
+}
+
+function goto(k) { cur = Math.max(0, Math.min(steps.length - 1, k)); render(); }
+function stepBy(d) { stop(); goto(cur + d); }
+function stop() { if (timer) { clearInterval(timer); timer = null; el("playBtn").innerHTML = "&#x25B6;&#xFE0E;"; } }
+function play() {
+  if (timer) { stop(); return; }
+  if (cur >= steps.length - 1) cur = 0;
+  el("playBtn").innerHTML = "&#x23F8;&#xFE0E;";
+  timer = setInterval(() => { if (cur >= steps.length - 1) { stop(); return; } goto(cur + 1); }, +el("speed").value);
+}
+
+/* rebuild after a change; jump to the channel phase when an error was toggled */
+function rebuild(toChannel) {
+  stop();
+  build();
+  if (toChannel) {
+    const ph = phases.find(p => p.name === "channel");
+    cur = ph ? ph.from : 0;
+  } else cur = 0;
+  el("inputText").value = toSource();
+  render();
+}
+
+function loadSource(src) {
+  try {
+    const r = parseInput(src);
+    code = r.code; msg = r.msg; flips = r.flips;
+    el("parseErr").textContent = "";
+    el("inMsg").value = bitsToStr(msg);
+    el("extChk").checked = code.ext;
+    renderLSeg();
+    rebuild(false);
+    return true;
+  } catch (e) { el("parseErr").textContent = e.message; return false; }
+}
+
+function renderLSeg() {
+  const seg = el("lSeg"); seg.textContent = "";
+  [2, 3, 4, 5].forEach(l => {
+    const c = makeCode(l, false);
+    const b = document.createElement("button");
+    b.textContent = "(" + c.n + "," + c.k + ")";
+    if (l === code.l) b.className = "on";
+    b.addEventListener("click", () => {
+      const old = bitsToStr(msg);
+      const nc = makeCode(l, code.ext);
+      const m = old.slice(-nc.k).padStart(nc.k, "0");
+      loadSource("l " + l + (code.ext ? "\nextended yes" : "") + "\nmessage " + m + "\n");
+    });
+    seg.appendChild(b);
+  });
+}
+
+function init() {
+  const sel = el("presetSel");
+  Object.keys(PRESETS).forEach(k => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = PRESETS[k].name; sel.appendChild(o);
+  });
+  sel.addEventListener("change", () => loadSource(PRESETS[sel.value].src));
+
+  el("applyBtn").addEventListener("click", () => {
+    const v = el("inMsg").value.replace(/[^01]/g, "");
+    if (v.length > code.k) { el("parseErr").textContent = "at most k = " + code.k + " bits"; return; }
+    el("parseErr").textContent = "";
+    msg = v.padStart(code.k, "0").split("").map(Number);
+    el("inMsg").value = bitsToStr(msg);
+    rebuild(false);
+  });
+  el("inMsg").addEventListener("keydown", ev => { if (ev.key === "Enter") el("applyBtn").click(); });
+  el("randBtn").addEventListener("click", () => {
+    msg = Array.from({ length: code.k }, () => Math.random() < .5 ? 0 : 1);
+    el("inMsg").value = bitsToStr(msg); rebuild(false);
+  });
+  el("extChk").addEventListener("change", () => {
+    code = makeCode(code.l, el("extChk").checked);
+    flips = flips.filter(i => i >= (code.ext ? 0 : 1));
+    rebuild(false);
+  });
+  el("clearErrBtn").addEventListener("click", () => { flips = []; rebuild(true); });
+  el("err1Btn").addEventListener("click", () => { flips = [randPos()]; rebuild(true); });
+  el("err2Btn").addEventListener("click", () => {
+    const a = randPos(); let b = randPos();
+    while (b === a) b = randPos();
+    flips = [a, b].sort((x, y) => x - y); rebuild(true);
+  });
+  el("loadBtn").addEventListener("click", () => loadSource(el("inputText").value));
+
+  el("resetBtn").addEventListener("click", () => { stop(); goto(0); });
+  el("backBtn").addEventListener("click", () => stepBy(-1));
+  el("stepBtn").addEventListener("click", () => stepBy(1));
+  el("playBtn").addEventListener("click", play);
+  el("scrubber").addEventListener("input", ev => { stop(); goto(+ev.target.value); });
+  el("speed").addEventListener("input", ev => {
+    el("speedVal").textContent = ev.target.value + "ms";
+    if (timer) { stop(); play(); }
+  });
+  document.addEventListener("keydown", ev => {
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+    if (ev.key === "ArrowRight") { stepBy(1); ev.preventDefault(); }
+    else if (ev.key === "ArrowLeft") { stepBy(-1); ev.preventDefault(); }
+    else if (ev.key === " ") { play(); ev.preventDefault(); }
+    else if (ev.key === "Home") { stop(); goto(0); ev.preventDefault(); }
+    else if (ev.key === "End") { stop(); goto(steps.length - 1); ev.preventDefault(); }
+  });
+  let rt = null;
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(drawBlock, 120); });
+
+  loadSource(PRESETS.one.src);
+  if (location.hash === "#selftest") runSelfTest(true);
+}
+const randPos = () => (code.ext ? 0 : 1) + Math.floor(Math.random() * (code.n + (code.ext ? 1 : 0)));
+
+/* ---------- self test ---------------------------------------------------------- */
+
+function runSelfTest(show) {
+  const res = [];
+  const ok = (name, got, want) => res.push({ name: name, got: String(got), want: String(want), ok: String(got) === String(want) });
+
+  /* the worked example of the lecture: the constraints on slide 25 */
+  const c3 = makeCode(3, false);
+  ok("(7,4): C_0 covers", c3.covers(0).join(","), "7,5,3,1");
+  ok("(7,4): C_1 covers", c3.covers(1).join(","), "7,6,3,2");
+  ok("(7,4): C_2 covers", c3.covers(2).join(","), "7,6,5,4");
+  ok("(7,4): data positions", c3.dataPos.join(","), "7,6,5,3");
+  ok("(7,4): parity positions", c3.parityPos.join(","), "1,2,4");
+
+  /* P_2 = D_3^D_2^D_1, P_1 = D_3^D_2^D_0, P_0 = D_3^D_1^D_0 */
+  let bad = 0;
+  for (let v = 0; v < 16; v++) {
+    const m = [3, 2, 1, 0].map(t => (v >> t) & 1);           /* D_3 D_2 D_1 D_0 */
+    const B = encode(c3, m);
+    const [d3, d2, d1, d0] = m;
+    if (B[4] !== (d3 ^ d2 ^ d1)) bad++;
+    if (B[2] !== (d3 ^ d2 ^ d0)) bad++;
+    if (B[1] !== (d3 ^ d1 ^ d0)) bad++;
+    if (synVal(syndrome(c3, B)) !== 0) bad++;
+  }
+  ok("(7,4): P_2,P_1,P_0 formulas and C = 0", bad, 0);
+
+  /* every single-bit error is located exactly */
+  let bad2 = 0, dmin = 99;
+  for (let l = 2; l <= 5; l++) {
+    const c = makeCode(l, false);
+    const m = Array.from({ length: c.k }, (_, t) => (t * 7 + 3) % 2);
+    const B = encode(c, m);
+    for (let i = 1; i <= c.n; i++) {
+      const R = B.slice(); R[i] ^= 1;
+      if (synVal(syndrome(c, R)) !== i) bad2++;
+      R[i] ^= 1;
+    }
+  }
+  ok("single-bit errors located, l = 2..5", bad2, 0);
+
+  /* distance: the minimum weight over all nonzero codewords */
+  for (const ext of [false, true]) {
+    const c = makeCode(3, ext);
+    let w = 99;
+    for (let v = 1; v < 16; v++) {
+      const m = [3, 2, 1, 0].map(t => (v >> t) & 1);
+      const B = encode(c, m);
+      let s = 0; for (let i = ext ? 0 : 1; i <= c.n; i++) s += B[i];
+      w = Math.min(w, s);
+    }
+    ok("distance of the " + (ext ? "extended (8,4)" : "(7,4)") + " code", w, ext ? 4 : 3);
+  }
+
+  /* round trip through the channel with one flip: message always recovered */
+  let bad3 = 0;
+  for (let v = 0; v < 16; v++) {
+    const m = [3, 2, 1, 0].map(t => (v >> t) & 1);
+    const B = encode(c3, m);
+    for (let i = 1; i <= 7; i++) {
+      const R = B.slice(); R[i] ^= 1;
+      const C = synVal(syndrome(c3, R));
+      R[C] ^= 1;
+      if (readMessage(c3, R).join("") !== m.join("")) bad3++;
+    }
+  }
+  ok("(7,4): every 1-bit error corrected, all 16 messages", bad3, 0);
+
+  /* two flips: the extended code detects, the plain one silently mis-corrects */
+  const cx = makeCode(3, true);
+  let detected = 0, total = 0;
+  const mm = [1, 0, 1, 1], Bx = encode(cx, mm);
+  for (let i = 1; i <= 7; i++) for (let j = i + 1; j <= 7; j++) {
+    const R = Bx.slice(); R[i] ^= 1; R[j] ^= 1;
+    total++;
+    if (synVal(syndrome(cx, R)) !== 0 && overallParity(cx, R) === 0) detected++;
+  }
+  ok("extended code detects all 2-bit errors", detected, total);
+
+  /* the perfect-code identity 2^k * (1+n) = 2^n */
+  let perfect = true;
+  for (let l = 2; l <= 5; l++) {
+    const c = makeCode(l, false);
+    if (Math.pow(2, c.k) * (1 + c.n) !== Math.pow(2, c.n)) perfect = false;
+  }
+  ok("Hamming bound met exactly (perfect), l = 2..5", perfect, true);
+
+  if (show) {
+    const box = document.createElement("div");
+    box.className = "sim-box"; box.style.marginTop = "18px";
+    box.innerHTML = '<div class="sim-title"><span>Self test</span><span class="rhs">'
+      + res.filter(r => r.ok).length + " / " + res.length + " passed</span></div>"
+      + "<table class=\"cw\">" + res.map(r =>
+        "<tr><td>" + esc(r.name) + "</td><td>" + esc(r.got) + "</td><td>"
+        + (r.ok ? "\u2713" : "expected " + esc(r.want)) + "</td></tr>").join("") + "</table>";
+    document.body.appendChild(box);
+  }
+  return res;
+}
+window.runSelfTest = runSelfTest;
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

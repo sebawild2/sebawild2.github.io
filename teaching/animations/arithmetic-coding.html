@@ -1,0 +1,2665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arithmetic coding · zooming into an interval, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --wi-radius:4px; --wi-radius-lg:5px;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.str { font-family:var(--wi-font-mono); font-size:.8rem; width:12em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* --- operation bar --- */
+  .opbar { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:10px 18px;
+           background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+           border-radius:var(--wi-radius-lg); margin-bottom:14px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+  .opnote code { font-family:var(--wi-font-mono); font-size:.9em; }
+
+  /* --- transport: slider + phase bar --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0;
+              width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden;
+              flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage --- */
+  .stage { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(320px,1fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-box + .sim-box { margin-top:14px; }
+  .col-side .sim-box + .sim-box { margin-top:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:92px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status code, .status .ch { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-panel-2);
+                 padding:1px 4px; border-radius:3px; }
+  .status .warn { color:var(--wi-active); }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem;
+            color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  /* --- the state table (l and p per iteration) --- */
+  table.state { border-collapse:collapse; width:100%; font-size:.78rem; }
+  table.state th { font-family:var(--wi-font-head); font-size:.66rem; text-transform:uppercase;
+                   letter-spacing:.08em; color:var(--wi-ink-faint); font-weight:normal;
+                   text-align:right; padding:2px 6px; border-bottom:1px solid var(--wi-border-soft); }
+  table.state th:first-child { text-align:left; }
+  table.state td { font-family:var(--wi-font-mono); font-size:.76rem; padding:2px 6px; text-align:right;
+                   border-bottom:1px solid #e8ddc9; color:var(--wi-ink-strong); white-space:nowrap; }
+  table.state td:first-child { text-align:left; color:var(--wi-ink-faint); }
+  table.state tr.cur td { background:#f6e6df; color:var(--wi-accent-dark); }
+  table.state tr.cur td:first-child { color:var(--wi-accent); }
+  table.state .frac { color:var(--wi-ink-soft); }
+  .frac { font-family:var(--wi-font-mono); font-size:.92em; }
+  .tblwrap { max-height:260px; overflow-y:auto; }
+
+  .bits { font-family:var(--wi-font-mono); font-size:1.05rem; letter-spacing:.16em; word-break:break-all;
+          color:var(--wi-accent-dark); line-height:1.7; }
+  .bits .todo { color:var(--wi-inert); }
+  .bits .new { background:#f6e6df; border-radius:2px; }
+  .kv { display:flex; flex-wrap:wrap; gap:3px 16px; font-size:.78rem; color:var(--wi-ink-soft); margin-top:7px; }
+  .kv b { font-family:var(--wi-font-mono); font-weight:normal; color:var(--wi-ink-strong); }
+  .srcline { font-family:var(--wi-font-mono); font-size:1rem; letter-spacing:.1em; word-break:break-all; }
+  .srcline .done { color:var(--wi-ink-strong); }
+  .srcline .cur { background:#f6e6df; color:var(--wi-accent); font-weight:bold; border-radius:2px; }
+  .srcline .todo { color:var(--wi-inert); }
+  .srcline .eof { color:var(--wi-examine); }
+
+  /* --- pseudocode --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; overflow-x:auto; }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent;
+           white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline.skip { opacity:.42; }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em;
+              text-transform:uppercase; color:var(--wi-ink-faint); padding:10px 12px 3px;
+              border-top:1px solid var(--wi-border-soft); margin-top:6px; }
+  .sublabel:first-child { border-top:0; margin-top:0; padding-top:2px; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  /* --- editor --- */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:190px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .hint b { color:var(--wi-ink-strong); }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  /* --- tabs --- */
+  .tabs { display:flex; gap:0; margin:0 0 16px; border-bottom:1px solid var(--wi-border-soft); }
+  .tabbtn { font-family:var(--wi-font-head); letter-spacing:.05em; font-size:.86rem;
+            background:transparent; border:0; border-bottom:3px solid transparent;
+            border-radius:0; padding:8px 16px 7px; color:var(--wi-ink-soft); cursor:pointer; }
+  .tabbtn:hover { color:var(--wi-ink-strong); background:transparent; }
+  .tabbtn.on { color:var(--wi-accent); border-bottom-color:var(--wi-accent); font-weight:bold; }
+  .tabpane[hidden] { display:none; }
+
+  /* --- the explorer --- */
+  .crumb { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:.8rem;
+           color:var(--wi-ink-soft); }
+  .crumb button { font-family:var(--wi-font-mono); font-size:.78rem; padding:2px 8px; }
+  .crumb .sep { color:var(--wi-ink-faint); }
+  .xnode { stroke:var(--wi-border-soft); stroke-width:1; cursor:pointer; }
+  .xnode.a { fill:var(--wi-panel-2); } .xnode.b { fill:#f3ecdc; }
+  .xnode.term { fill:#f2e2bd; stroke:var(--wi-examine); }
+  .xnode.ctx  { fill:#f0d7cd; stroke:var(--wi-accent); stroke-width:1.6; }
+  .xnode.anc  { fill:#efe6d6; stroke:var(--wi-border); }
+  .expscroll { max-height:min(46vh, 380px); overflow-y:auto; overflow-x:auto;
+               border-bottom:1px solid var(--wi-border-soft); }
+  /* touch-action is per element, not inherited: without this the rects keep the
+     default 'auto' and the browser swallows pinches that start over a block */
+  #expWrap, #expWrap svg, #expWrap svg *,
+  #expBinWrap, #expBinWrap svg, #expBinWrap svg *,
+  #expNavWrap, #expNavWrap svg, #expNavWrap svg * { touch-action:none; }
+  #expWrap, #expBinWrap, #expNavWrap { user-select:none; -webkit-user-select:none; }
+
+  /* the overview strip: the whole unit interval, with the visible part marked */
+  #expNavWrap { margin-top:8px; cursor:grab; }
+  #expNavWrap.grabbing { cursor:grabbing; }
+  .navbg { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1; }
+  .navwin { fill:var(--wi-accent-soft); fill-opacity:.55; stroke:var(--wi-accent); stroke-width:1.4; }
+  .navtick { stroke:var(--wi-border); stroke-width:1; }
+  .navlab { font-family:var(--wi-font-mono); font-size:9.5px; fill:var(--wi-ink-faint);
+            dominant-baseline:central; pointer-events:none; }
+  .xnode.hi   { fill:#eccbbf; stroke:var(--wi-accent-soft); stroke-width:1.6; }
+  .xnode.sel  { fill:#e3bcac; stroke:var(--wi-accent); stroke-width:2.4; }
+  .xlab { font-family:var(--wi-font-mono); fill:var(--wi-ink-strong); text-anchor:middle;
+          dominant-baseline:central; pointer-events:none; }
+  .xlab.dim { fill:var(--wi-ink-faint); }
+  .xrow { font-family:var(--wi-font-mono); font-size:10px; fill:var(--wi-ink-faint);
+          text-anchor:end; dominant-baseline:central; pointer-events:none; }
+  .xcell { fill:var(--wi-bg); stroke:var(--wi-border-soft); stroke-width:1; }
+  .xcell.code { fill:#e8f0e2; stroke:var(--wi-relax); stroke-width:2; }
+  .xcell.sel  { fill:#e3bcac; stroke:var(--wi-accent); stroke-width:2.4; }
+  .xcell { cursor:pointer; }
+  .xaxis { stroke:var(--wi-border-strong); stroke-width:1; }
+  .xtick { stroke:var(--wi-ink-faint); stroke-width:1; }
+  .xticklab { font-family:var(--wi-font-mono); font-size:10px; fill:var(--wi-ink-faint);
+              text-anchor:middle; dominant-baseline:hanging; pointer-events:none; }
+  .xguide { stroke:var(--wi-accent); stroke-width:1; stroke-dasharray:3 3; opacity:.55; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:280px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); font-family:var(--wi-font-mono); font-size:.94em; }
+
+  .mobile-note { display:none; background:var(--wi-controls); border:1px solid var(--wi-accent-soft);
+                 border-radius:var(--wi-radius-lg); padding:11px 15px; font-size:.82rem;
+                 color:var(--wi-ink-strong); margin-bottom:14px; }
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls, .opbar { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; border-radius:var(--wi-radius); }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .stepno { font-size:.7rem; }
+    .mobile-note { display:block; }
+    .desk-only { display:none !important; }
+  }
+
+  /* --- SVG classes --- */
+  .slice { stroke:var(--wi-border-soft); stroke-width:1; cursor:pointer; }
+  .slice.a { fill:var(--wi-panel-2); }
+  .slice.b { fill:#f3ecdc; }
+  .slice.eof { fill:#f4e7cb; }
+  .slice.chosen { fill:#e3bcac; stroke:var(--wi-accent); stroke-width:2; }
+  .slice.summed { fill:#eedfba; stroke:var(--wi-examine); }
+  .slice.dim { opacity:.62; }
+  .rowbox { fill:none; stroke:var(--wi-border-strong); stroke-width:1; }
+  .rowbox.cur { stroke:var(--wi-accent); stroke-width:2; }
+  .wedge { fill:var(--wi-accent-soft); fill-opacity:.36; stroke:var(--wi-accent);
+           stroke-opacity:.45; stroke-width:1.1; }
+  .wedge.fresh { animation:fade .3s ease-out both; }
+  .slab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-ink-strong);
+          text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .slab.dim { fill:var(--wi-ink-faint); font-size:11px; }
+  .rowlab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint);
+            text-anchor:end; dominant-baseline:central; pointer-events:none; }
+  .endlab { font-family:var(--wi-font-mono); font-size:10.5px; fill:var(--wi-ink-faint);
+            dominant-baseline:central; pointer-events:none; }
+  .qmark { stroke:var(--wi-examine); stroke-width:2; }
+  .tgt { stroke:var(--wi-active); stroke-width:2; }
+  .tgtdot { fill:var(--wi-active); }
+  .dyadband { fill:#f0d7cd; opacity:.55; }
+  .dyadcell { fill:var(--wi-panel-2); stroke:var(--wi-border-soft); stroke-width:1; }
+  .dyadcell.cand { fill:#f7edd9; stroke:var(--wi-examine); stroke-width:1.8; }
+  .dyadcell.bad  { fill:#f7ded8; stroke:var(--wi-active); stroke-width:1.8; }
+  .dyadcell.good { fill:#e8f0e2; stroke:var(--wi-relax); stroke-width:2.2; }
+  .dyadcell.dim  { fill:var(--wi-bg); stroke:var(--wi-border-soft); opacity:.55; }
+  .dyadlab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-strong);
+             text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .dyadcell { cursor:pointer; }
+  .dyadcell.pin { stroke:var(--wi-accent); stroke-width:2.4; }
+  .dyadread { margin-top:9px; padding:7px 10px; background:var(--wi-controls);
+              border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius);
+              font-size:.76rem; color:var(--wi-ink-soft); line-height:1.6; }
+  .dyadread .val { font-family:var(--wi-font-mono); font-size:.86rem; letter-spacing:.11em;
+                   color:var(--wi-ink-strong); word-break:break-all; display:block; margin-top:2px; }
+  .dyadread .val .pre { color:var(--wi-ink-faint); }
+  .dyadread .val .suf { color:var(--wi-accent); font-weight:bold; }
+  .dyadread .hint2 { color:var(--wi-ink-faint); }
+  .dyadrow { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint);
+             text-anchor:end; dominant-baseline:central; pointer-events:none; }
+  .edge { stroke:var(--wi-accent); stroke-width:1.4; stroke-dasharray:3 3; }
+
+  /* --- the live zooming viewport --- */
+  .rulerax { stroke:var(--wi-border-strong); stroke-width:1; }
+  .rtick { stroke:var(--wi-ink-faint); stroke-width:1; }
+  .rtick.l0 { stroke:var(--wi-ink-strong); stroke-width:1.4; }
+  .rlab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-soft);
+          text-anchor:middle; dominant-baseline:hanging; pointer-events:none; }
+  .rlab.l0 { fill:var(--wi-ink-strong); }
+  .livebox { fill:none; stroke:var(--wi-accent); stroke-width:2.2; }
+  .liveghost { fill:none; stroke:var(--wi-inert); stroke-width:1.2; stroke-dasharray:4 3; }
+  .liveend { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-accent-dark);
+             dominant-baseline:central; pointer-events:none; }
+  .livedy { fill:#dfeed6; stroke:var(--wi-relax); stroke-width:2; }
+  .livedy.bad { fill:#f7ded8; stroke:var(--wi-active); }
+
+  @keyframes fade { from { opacity:0 } to { opacity:1 } }
+  @keyframes popin { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+  .pop { animation:popin .28s ease-out both; transform-box:fill-box; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>Arithmetic coding &nbsp;·&nbsp; zooming into an interval</h1>
+</div>
+
+<p class="subtitle">
+  A <b>stream code</b>: instead of one codeword per character, the whole text becomes a single subinterval of
+  [0,&nbsp;1).  Every character zooms into a subinterval of the current one, in proportion to its probability;
+  at the end, the shortest <b>dyadic</b> interval [<i>x</i>/2<sup><i>m</i></sup>, (<i>x</i>+1)/2<sup><i>m</i></sup>)
+  that still fits inside is written down, and its numerator <i>x</i> in binary <i>is</i> the code.
+  All arithmetic here is <b>exact</b> (rationals with big integers), so the numbers agree with a hand
+  calculation to the last digit.  On the first tab every string is shown as an interval, zoomable to any depth;
+  on the second, one text is encoded step by step. Hover a slice for its probability and its
+  subinterval; <b>click a slice to put that character into the text</b>.
+</p>
+
+<div class="tabs">
+  <button class="tabbtn on" id="tabExpBtn">Where strings land</button>
+  <button class="tabbtn" id="tabAnimBtn">Encoding, step by step</button>
+</div>
+
+<div class="tabpane" id="paneExp">
+  <div class="controls">
+    <div class="ctl">
+      <label for="presetSel2">Example</label>
+      <select id="presetSel2"></select>
+    </div>
+    <div class="ctl">
+      <span class="lbl">Levels</span>
+      <input type="range" id="expDepth" min="3" max="14" value="8" style="width:96px">
+      <span class="stepno" id="expDepthVal">8</span>
+    </div>
+    <div class="ctl">
+      <label class="chk"><input type="checkbox" id="expCodes" checked> mark the codeword of each finished string</label>
+    </div>
+    <div class="ctl" style="margin-left:auto">
+      <button id="expOut">Zoom out</button>
+      <button id="expReset">Whole line</button>
+    </div>
+  </div>
+
+  <div class="opbar">
+    <span class="crumb" id="expCrumb"></span>
+    <span class="opnote" id="expSelInfo" style="margin-left:auto">Tap a block to select it.</span>
+    <button id="expIn" class="pri" disabled>Zoom in</button>
+  </div>
+
+  <div class="sim-box">
+    <div class="sim-title"><span>Every string is an interval &nbsp;·&nbsp; every interval is a string</span><span class="rhs" id="expMeta"></span></div>
+    <div class="svgscroll expscroll" id="expWrap"><svg id="expSvg" class="stagesvg"></svg></div>
+    <div class="svgscroll" id="expBinWrap"><svg id="expBinSvg" class="stagesvg"></svg></div>
+    <div id="expNavWrap"><svg id="expNavSvg" class="stagesvg"></svg></div>
+    <div class="legend">
+      <span class="item"><span class="sw" style="background:#f3ecdc"></span> a string still being extended</span>
+      <span class="item"><span class="sw" style="background:#f2e2bd;border-color:var(--wi-examine)"></span> a finished string, ending in $</span>
+      <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> the dyadic interval that encodes it</span>
+      <span class="item">tap a ruler cell to see what those bits decode to</span>
+      <span class="item">shift + scroll sweeps sideways; ctrl + scroll zooms</span>
+    </div>
+  </div>
+
+  <div class="sim-box" style="margin-top:14px">
+    <div class="sim-title"><span>What this shows</span></div>
+    <div class="hint" id="expNote"></div>
+  </div>
+</div>
+
+<div class="tabpane" id="paneAnim" hidden>
+<div class="mobile-note">
+  <b>Small screen:</b> this is the compact demo — the zoom picture, the scrubber and the state table.
+  The pseudocode with live line highlighting is on the desktop version.
+</div>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Direction</span>
+    <span class="seg" id="dirSeg">
+      <button id="dirEnc" class="on">Encode</button>
+      <button id="dirDec">Decode</button>
+    </span>
+  </div>
+  <div class="ctl" id="encIn">
+    <label for="inText">Text <i>S</i></label>
+    <input type="text" id="inText" class="str" spellcheck="false">
+    <button id="applyBtn" class="pri">Set</button>
+  </div>
+  <div class="ctl" id="decIn" style="display:none">
+    <label for="inBits">Code <i>C</i></label>
+    <input type="text" id="inBits" class="str" spellcheck="false">
+    <label for="inN" id="nWrap"><i>n</i></label>
+    <input type="number" id="inN" min="1" max="20" style="width:4.6em">
+    <button id="applyBitsBtn" class="pri">Set</button>
+  </div>
+  <div class="ctl">
+    <span class="lbl">End of text</span>
+    <span class="seg" id="termSeg">
+      <button id="termLen" title="the number of symbols is known to the decoder from elsewhere">fixed length n</button>
+      <button id="termEof" title="the text ends with a designated symbol $, encoded like any other">symbol $</button>
+    </span>
+    <span id="eofWrap" style="display:none"><label for="eofIn">P($)</label>
+      <input type="text" id="eofIn" class="str" style="width:5em" spellcheck="false"></span>
+  </div>
+  <div class="ctl">
+    <label class="chk"><input type="checkbox" id="fracChk" checked> exact fractions</label>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="modelNote"></span>
+  <button id="toDecBtn" style="display:none">Decode this output &rarr;</button>
+  <span class="opnote" style="margin-left:auto">Arrow keys step; click a slice to change that character.</span>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">— / —</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="60" max="1400" value="480" style="width:88px">
+      <span class="stepno" id="speedVal">480ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Step 1 &nbsp;·&nbsp; zooming in</span><span class="rhs" id="liveMeta"></span></div>
+      <div class="svgscroll" id="liveWrap"><svg id="liveSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item">the number line, rescaled as the interval narrows &mdash; tick heights are the binary ruler: a mark at <i>k</i>/2<sup><i>j</i></sup> is as tall as its smallest such <i>j</i></span>
+      </div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Every character so far</span><span class="rhs" id="zoomMeta"></span></div>
+      <div class="svgscroll" id="zoomWrap"><svg id="zoomSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#f0d7cd;border-color:var(--wi-accent)"></span> the character's slice</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> summed into <i>q</i></span>
+        <span class="item"><span class="sw" style="background:#f4e7cb"></span> end-of-text $</span>
+        <span class="item" id="lgTgt" style="display:none"><span class="sw" style="background:var(--wi-active);border-color:var(--wi-active)"></span> the target <i>x</i>/2<sup><i>m</i></sup></span>
+      </div>
+    </div>
+
+    <div class="sim-box" id="dyadBox">
+      <div class="sim-title"><span>Step 2 &nbsp;·&nbsp; dyadic encoding</span><span class="rhs" id="dyadMeta"></span></div>
+      <div class="svgscroll" id="dyadWrap"><svg id="dyadSvg" class="stagesvg"></svg></div>
+      <div class="dyadread" id="dyadRead"></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#f0d7cd"></span> the final interval [ℓ, ℓ+<i>p</i>)</span>
+        <span class="item"><span class="sw" style="background:#f7ded8;border-color:var(--wi-active)"></span> candidate sticks out</span>
+        <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> candidate fits</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span id="ioTitle">Source and code</span><span class="rhs" id="ioMeta"></span></div>
+      <div id="ioBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>State</span><span class="rhs" id="tabMeta"></span></div>
+      <div class="tblwrap"><table class="state" id="stateTab"></table></div>
+    </div>
+  </div>
+</div>
+
+<details class="code desk-only" id="codeBox" open style="margin-top:18px">
+  <summary>Pseudocode</summary>
+  <div class="codebody" id="codeBody"></div>
+  <div class="codenote" id="codeNote"></div>
+</details>
+
+</div><!-- /paneAnim -->
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      One directive per line; <code>#</code> starts a comment.  Probabilities may be written as decimals
+      (<code>0.425</code>) or as exact fractions (<code>1/3</code>); they are used exactly as written.
+      <br><br>
+      <b>model</b> <code>uniform</code> | <code>fixed</code> | <code>adaptive</code><br>
+      <b>alphabet</b> <code>0 1 2</code> — the symbols, in the order in which they divide the interval.
+      A single token of several characters is split into its characters, so <code>alphabet 012</code> works too.<br>
+      <b>eof</b> <code>0.15</code> — probability of the end-of-text symbol&nbsp;$, which always takes the
+      topmost slice.  <code>eof 0</code> means <i>no</i> $ at all: the text length is assumed known, and
+      lines&nbsp;10–11 of the encoder are skipped (this is the setting of the worked trit example).<br>
+      <b>p</b> <code>a 0.425</code> — one symbol's probability, for <code>model fixed</code>.  Symbols
+      mentioned in a <code>p</code> line are added to the alphabet in order of appearance.<br>
+      <b>text</b> <code>21101</code> — the source text.  Split into characters when all symbols are single
+      characters, on spaces otherwise.<br>
+      <b>bits</b> <code>110100100</code> — a codeword, used in the decode direction.<br>
+      <b>n</b> <code>5</code> — how many symbols to decode when <code>eof 0</code> (without $ nothing tells
+      the decoder when to stop).
+      <br><br>
+      <code>model adaptive</code> keeps one count per symbol, all starting at&nbsp;1 and incremented after
+      each symbol; $ keeps its fixed probability and the rest is split in proportion to the counts.
+      At most 20 symbols of text and 12 alphabet symbols — beyond that the picture stops being one.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Arithmetic coding, following the lecture pseudocode literally.
+
+   Model.  At each position i the model gives a probability P_ij for every
+   symbol j of the alphabet, plus P_i$ for the end-of-text symbol, which
+   always occupies the topmost slice of the current interval.  With sigma
+   real symbols, U_i = sigma-1 is the largest real symbol index and $ sits
+   at index U_i+1 -- that is the convention under which line 9 of the
+   decoder ("if c == U_i + 1") is exactly the test "the target fell into
+   the $ slice".
+
+   Arithmetic.  Everything is exact: l and p are rationals over BigInt, so
+   ceil(l*2^m) and the test (x+1)/2^m > l+p are decided without rounding.
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const vis = c => c === " " ? "\u2423" : c;
+
+/* ---------- exact rational arithmetic ------------------------------------ */
+
+function bgcd(a, b) { if (a < 0n) a = -a; if (b < 0n) b = -b; while (b) { const t = a % b; a = b; b = t; } return a; }
+
+class R {
+  constructor(n, d) {
+    n = BigInt(n); d = d === undefined ? 1n : BigInt(d);
+    if (d === 0n) throw new Error("zero denominator");
+    if (d < 0n) { n = -n; d = -d; }
+    const g = bgcd(n, d) || 1n;
+    this.n = n / g; this.d = d / g;
+  }
+  add(o) { return new R(this.n * o.d + o.n * this.d, this.d * o.d); }
+  sub(o) { return new R(this.n * o.d - o.n * this.d, this.d * o.d); }
+  mul(o) { return new R(this.n * o.n, this.d * o.d); }
+  div(o) { return new R(this.n * o.d, this.d * o.n); }
+  cmp(o) { const l = this.n * o.d, r = o.n * this.d; return l < r ? -1 : l > r ? 1 : 0; }
+  lt(o) { return this.cmp(o) < 0; }  gt(o) { return this.cmp(o) > 0; }
+  le(o) { return this.cmp(o) <= 0; } ge(o) { return this.cmp(o) >= 0; }
+  eq(o) { return this.cmp(o) === 0; }
+  isZero() { return this.n === 0n; }
+  /* a double, safe for values in [0,1] however large the terms */
+  num() { const S = 10n ** 18n; return Number(this.n * S / this.d) / 1e18; }
+  dec(k) {
+    const S = 10n ** BigInt(k);
+    let v = this.n * S / this.d, neg = v < 0n; if (neg) v = -v;
+    const w = v / S, f = (v % S).toString().padStart(k, "0");
+    return (neg ? "-" : "") + w.toString() + "." + f;
+  }
+  frac() { return this.d === 1n ? this.n.toString() : this.n + "/" + this.d; }
+  short() { return this.d.toString().length <= 9 && this.n.toString().length <= 9; }
+}
+R.ZERO = new R(0n); R.ONE = new R(1n);
+
+/* smallest m with 2^m >= 1/p, i.e. ceil(lg(1/p)) */
+function ceilLgInv(p) { let m = 0, t = 1n; while (t * p.n < p.d) { t *= 2n; m++; } return m; }
+function ceilDiv(a, b) { return (a + b - 1n) / b; }              /* a,b > 0 */
+
+function parseR(tok) {
+  tok = tok.trim();
+  let m = /^(-?\d+)\s*\/\s*(\d+)$/.exec(tok);
+  if (m) return new R(BigInt(m[1]), BigInt(m[2]));
+  m = /^(-?)(\d*)(?:\.(\d+))?$/.exec(tok);
+  if (m && (m[2] || m[3])) {
+    const frac = m[3] || "";
+    const n = BigInt((m[2] || "0") + frac) * (m[1] === "-" ? -1n : 1n);
+    return new R(n, 10n ** BigInt(frac.length));
+  }
+  throw new Error("cannot read the number \u201c" + tok + "\u201d");
+}
+
+/* ---------- the model ---------------------------------------------------- */
+
+/* dist(prefix) -> [{ch, p:R}, ...] real symbols in alphabet order,
+   followed by {ch:"$", p:eof} when eof > 0.  Probabilities sum to 1. */
+function makeModel(spec) {
+  const A = spec.alphabet, eof = spec.eof;
+  const rest = R.ONE.sub(eof);
+  const M = {
+    kind: spec.kind, alphabet: A, eof: eof,
+    hasEof: !eof.isZero(),
+    U: A.length,                       /* the universe size: real symbols are 0..U-1, $ is U */
+    dist(prefix) {
+      let out;
+      if (M.kind === "uniform") {
+        const q = rest.div(new R(BigInt(A.length)));
+        out = A.map(c => ({ ch: c, p: q }));
+      } else if (M.kind === "fixed") {
+        let tot = R.ZERO; A.forEach(c => tot = tot.add(spec.probs[c]));
+        out = A.map(c => ({ ch: c, p: rest.mul(spec.probs[c]).div(tot) }));
+      } else {                                            /* adaptive */
+        const cnt = {}; A.forEach(c => cnt[c] = 1n);
+        for (const c of prefix) if (cnt[c] !== undefined) cnt[c]++;
+        let tot = 0n; A.forEach(c => tot += cnt[c]);
+        out = A.map(c => ({ ch: c, p: rest.mul(new R(cnt[c], tot)) }));
+      }
+      if (M.hasEof) out = out.concat([{ ch: "$", p: eof }]);
+      return out;
+    },
+    describe() {
+      if (M.kind === "uniform") return "uniform over " + A.length + " symbol" + (A.length > 1 ? "s" : "");
+      if (M.kind === "fixed") return "fixed probabilities";
+      return "adaptive (counts start at 1)";
+    }
+  };
+  return M;
+}
+
+/* ---------- presets ------------------------------------------------------ */
+
+const PRESETS = {
+  trits: {
+    name: "trits 21101 (worked example)",
+    src: "# uniform trits, no end-of-text symbol: the text length is known\nmodel uniform\nalphabet 0 1 2\neof 0\ntext 21101\nbits 110100100\nn 5\n"
+  },
+  tritsOnes: {
+    name: "trits 111111111 (the awkward case)",
+    src: "# l creeps up to 1/2 from below and p shrinks: neither bit is ever decided\nmodel uniform\nalphabet 0 1 2\neof 0\ntext 111111111\nn 9\n"
+  },
+  adaptive: {
+    name: "adaptive a/b/$, text bbba",
+    src: "# adaptive model: counts start at 1, $ keeps a fixed probability\nmodel adaptive\nalphabet a b\neof 0.15\ntext bbba\nbits 100111101\n"
+  },
+  skew: {
+    name: "low-entropy bits 000000010000000",
+    src: "# entropy about 0.08 bit per character -- a Huffman code must spend 1\nmodel fixed\np 0 0.99\np 1 0.01\neof 0\ntext 000000010000000\nn 15\n"
+  },
+  lossless: {
+    name: "LOSSLESS with letter probabilities",
+    src: "model fixed\np E 1/8\np L 2/8\np O 1/8\np S 4/8\neof 0\ntext LOSSLESS\nbits 00111110010011\nn 8\n"
+  },
+  eofDemo: {
+    name: "a/b/$ with an end-of-text symbol",
+    src: "model fixed\np a 0.7\np b 0.2\np $ 0.1\ntext aabab\n"
+  },
+  adaptText: {
+    name: "adaptive on a small text",
+    src: "model adaptive\nalphabet a b r c d\neof 0.05\ntext abracadabra\n"
+  },
+  bin: {
+    name: "fair bits with $",
+    src: "model uniform\nalphabet 0 1\neof 0.1\ntext 0110\n"
+  }
+};
+
+/* ---------- parsing the input -------------------------------------------- */
+
+function parseInput(src) {
+  const spec = { kind: "uniform", alphabet: [], probs: {}, eof: R.ZERO,
+                 text: [], bits: "", nDec: null };
+  let sawEof = false, order = [];
+  src.split(/\r?\n/).forEach((raw, ln) => {
+    const line = raw.replace(/#.*$/, "").trim();
+    if (!line) return;
+    const tok = line.split(/\s+/);
+    const key = tok[0].toLowerCase();
+    const where = " (line " + (ln + 1) + ")";
+    if (key === "model") {
+      const k = (tok[1] || "").toLowerCase();
+      if (!["uniform", "fixed", "adaptive"].includes(k)) throw new Error("unknown model \u201c" + tok[1] + "\u201d" + where);
+      spec.kind = k;
+    } else if (key === "alphabet") {
+      let syms = tok.slice(1);
+      if (syms.length === 1 && syms[0].length > 1) syms = syms[0].split("");
+      syms.forEach(s => { if (s !== "$" && !order.includes(s)) order.push(s); });
+    } else if (key === "p") {
+      if (tok.length < 3) throw new Error("p needs a symbol and a probability" + where);
+      const s = tok[1], v = parseR(tok[2]);
+      if (s === "$") { spec.eof = v; sawEof = true; }
+      else { if (!order.includes(s)) order.push(s); spec.probs[s] = v; }
+    } else if (key === "eof") {
+      spec.eof = parseR(tok[1]); sawEof = true;
+    } else if (key === "text") {
+      spec.textRaw = line.slice(tok[0].length).trim();
+    } else if (key === "bits") {
+      spec.bits = (tok[1] || "").replace(/[^01]/g, "");
+    } else if (key === "n") {
+      spec.nDec = parseInt(tok[1], 10);
+    } else throw new Error("unknown directive \u201c" + tok[0] + "\u201d" + where);
+  });
+
+  spec.alphabet = order;
+  if (!spec.alphabet.length) throw new Error("the alphabet is empty \u2014 give an alphabet or p lines");
+  if (spec.alphabet.length > 12) throw new Error("at most 12 alphabet symbols");
+  if (!sawEof && spec.kind === "adaptive") throw new Error("model adaptive needs an eof probability");
+
+  if (spec.kind === "fixed") {
+    for (const c of spec.alphabet) {
+      if (!spec.probs[c]) throw new Error("no probability given for \u201c" + c + "\u201d");
+      if (spec.probs[c].n <= 0n) throw new Error("probability of \u201c" + c + "\u201d must be positive");
+    }
+  }
+  if (spec.eof.n < 0n || spec.eof.ge(R.ONE)) throw new Error("the eof probability must be in [0,1)");
+
+  /* the text */
+  const single = spec.alphabet.every(s => s.length === 1);
+  const raw = spec.textRaw === undefined ? "" : spec.textRaw;
+  spec.text = raw === "" ? [] : (single ? raw.split("") : raw.split(/\s+/));
+  spec.text = spec.text.filter(c => c !== "");
+  for (const c of spec.text)
+    if (!spec.alphabet.includes(c)) throw new Error("\u201c" + vis(c) + "\u201d is not in the alphabet");
+  if (spec.text.length > 20) throw new Error("at most 20 symbols of text");
+  return spec;
+}
+
+function specToSource(spec) {
+  const L = [];
+  L.push("model " + spec.kind);
+  if (spec.kind === "fixed") spec.alphabet.forEach(c => L.push("p " + c + " " + spec.probs[c].frac()));
+  else L.push("alphabet " + spec.alphabet.join(" "));
+  L.push("eof " + spec.eof.frac());
+  const single = spec.alphabet.every(s => s.length === 1);
+  L.push("text " + spec.text.join(single ? "" : " "));
+  if (spec.bits) L.push("bits " + spec.bits);
+  if (spec.nDec != null) L.push("n " + spec.nDec);
+  return L.join("\n") + "\n";
+}
+
+/* ---------- state -------------------------------------------------------- */
+
+let spec = null, model = null;
+let dir = "enc";
+let steps = [], phases = [], cur = 0, timer = null;
+let showFrac = true;
+let savedEof = null;
+let lastCode = "";
+
+/* ---------- step construction: encoding ---------------------------------- */
+/*  Snapshots are cheap: a row is {ell, p, dist, chosen, qHi} and the rows
+    array is copied per step.  Every step names the pseudocode line it is. */
+
+function build() {
+  steps = []; phases = [];
+  try { return dir === "enc" ? buildEncode() : buildDecode(); }
+  catch (e) {
+    steps = [{ line: null, msg: '<span class="warn">' + esc(e.message) + "</span>", st: emptySt(), phase: 0 }];
+    phases = [{ name: "\u2014", from: 0, to: 1 }];
+  }
+}
+function emptySt() { return { rows: [], dyad: [], bits: "", out: [], ell: R.ZERO, p: R.ONE }; }
+
+function mkPhase(name) { phases.push({ name: name, from: steps.length, to: steps.length }); }
+function closePhase() { if (phases.length) phases[phases.length - 1].to = steps.length; }
+
+function buildEncode() {
+  const rows = [];
+  const dyad = [];                       /* [{m, x, fits}] in test order */
+  let ell = R.ZERO, p = R.ONE, q = R.ZERO, mMin = null, m = null, x = null, bits = "";
+  const text = spec.text;
+  const n = text.length;
+
+  const snap = ex => Object.assign({
+    rows: rows.map(r => ({ ell: r.ell, p: r.p, dist: r.dist, chosen: r.chosen, qHi: r.qHi })),
+    dyad: dyad.map(d => ({ m: d.m, x: d.x, fits: d.fits })),
+    ell: ell, p: p, q: q, mMin: mMin, m: m, x: x, bits: bits,
+    ip: null, out: null
+  }, ex || {});
+  const add = (line, msg, ex) => steps.push({ line: line, msg: msg, st: snap(ex), phase: phases.length - 1 });
+
+  mkPhase(n ? "init" : "\u2014");
+  add(5, "<b>\u2113 := 0; &nbsp; p := 1</b> \u2014 the interval is all of [0,\u20091), and every text is somewhere in it.",
+      { ip: -1 });
+  closePhase();
+
+  for (let i = 0; i < n; i++) {
+    const dist = model.dist(text.slice(0, i));
+    const k = dist.findIndex(s => s.ch === text[i]);
+    rows.push({ ell: ell, p: p, dist: dist, chosen: null, qHi: null });
+    mkPhase(vis(text[i]));
+
+    add(6, "<b>i = " + i + "</b>: the model splits the current interval into "
+        + dist.length + " slices" + (model.hasEof ? " (the topmost is $)" : "") + ". The character to encode is "
+        + "<span class=\"ch\">" + esc(vis(text[i])) + "</span>.", { ip: i });
+
+    q = R.ZERO; for (let j = 0; j < k; j++) q = q.add(dist[j].p);
+    rows[i].qHi = q; rows[i].chosen = k;
+    add(7, "<b>q := \u03a3<sub>j&lt;X<sub>" + i + "</sub></sub> P<sub>" + i + "j</sub> = " + fm(q) + "</b> \u2014 "
+        + (k === 0 ? "nothing to sum, <span class=\"ch\">" + esc(vis(text[i])) + "</span> is the first slice."
+                   : "the total width of the " + k + " slice" + (k > 1 ? "s" : "") + " before <span class=\"ch\">"
+                     + esc(vis(text[i])) + "</span>."), { ip: i });
+
+    const before = { ell: ell, p: p };
+    ell = ell.add(q.mul(p)); p = p.mul(dist[k].p);
+    add(8, "<b>\u2113 := \u2113 + q\u00b7p; &nbsp; p := p \u00b7 P<sub>" + i + ",X<sub>" + i + "</sub></sub></b> \u2014 zoom into the slice of "
+        + "<span class=\"ch\">" + esc(vis(text[i])) + "</span>: the interval becomes " + iv(ell, p)
+        + ", narrower by the factor " + fm(dist[k].p) + ".", { ip: i, zoomed: true });
+    closePhase();
+  }
+
+  if (model.hasEof) {
+    const dist = model.dist(text);
+    const k = dist.length - 1;
+    rows.push({ ell: ell, p: p, dist: dist, chosen: null, qHi: null });
+    mkPhase("$");
+    q = R.ONE.sub(spec.eof); rows[rows.length - 1].qHi = q; rows[rows.length - 1].chosen = k;
+    add(10, "<b>q := 1 \u2212 P<sub>n,$</sub> = " + fm(q) + "</b> \u2014 $ is encoded like any other character, "
+        + "except that it always takes the topmost slice, so everything else is summed into q.", { ip: n });
+    ell = ell.add(q.mul(p)); p = p.mul(spec.eof);
+    add(11, "<b>\u2113 := \u2113 + q\u00b7p; &nbsp; p := p \u00b7 P<sub>n,$</sub></b> \u2014 the final interval is "
+        + iv(ell, p) + ". Anything inside it decodes to this text and nothing else.", { ip: n, zoomed: true });
+    closePhase();
+  }
+
+  /* --- step 2: dyadic encoding --- */
+  mkPhase("dyadic");
+  mMin = ceilLgInv(p);
+  m = mMin - 1;
+  add(13, "<b>m := \u2308lg(1/p)\u2309 \u2212 1 = " + m + "</b> \u2014 a dyadic interval of width 2<sup>\u2212m</sup> can only "
+      + "fit inside one of width p = " + fm(p) + " if 2<sup>\u2212m</sup> \u2264 p, so there is no point testing "
+      + "any m below " + mMin + ".");
+
+  let guard = 0;
+  for (;;) {
+    if (++guard > 200) break;
+    m = m + 1;
+    x = ceilDiv(ell.n * (2n ** BigInt(m)), ell.d);
+    dyad.push({ m: m, x: x, fits: null });
+    add(15, "<b>m := m+1 = " + m + "; &nbsp; x := \u2308\u2113 \u00b7 2<sup>" + m + "</sup>\u2309 = " + x + "</b> \u2014 the "
+        + "leftmost multiple of 2<sup>\u2212" + m + "</sup> that is not below \u2113.");
+    const hi = new R(x + 1n, 2n ** BigInt(m));
+    const fits = !hi.gt(ell.add(p));
+    dyad[dyad.length - 1].fits = fits;
+    if (!fits) {
+      add(16, "<b>(x+1)/2<sup>" + m + "</sup> = " + fm(hi) + " &gt; \u2113 + p = " + fm(ell.add(p))
+          + "</b> \u2014 the candidate sticks out on the right, so it is not contained in the final interval. "
+          + "Try one more bit.");
+    } else {
+      add(16, "<b>(x+1)/2<sup>" + m + "</sup> = " + fm(hi) + " \u2264 \u2113 + p</b> \u2014 the candidate fits: "
+          + "[" + x + "/2<sup>" + m + "</sup>, " + (x + 1n) + "/2<sup>" + m + "</sup>) \u2286 [\u2113, \u2113+p). Done.");
+      break;
+    }
+  }
+  bits = x.toString(2).padStart(m, "0");
+  lastCode = bits;
+  add(17, "<b>return x = " + x + " in binary using m = " + m + " bits</b>: <code>" + bits + "</code>. "
+      + "That is " + bits.length + " bits for " + n + " symbol" + (n === 1 ? "" : "s")
+      + (n ? " \u2014 " + (bits.length / n).toFixed(2) + " bits per symbol." : "."),
+      { done: true });
+  closePhase();
+  return;
+}
+
+/* ---------- step construction: decoding ---------------------------------- */
+
+function buildDecode() {
+  const bits = spec.bits;
+  if (!bits.length) throw new Error("no codeword given \u2014 put a bit string into the “Code C” box");
+  const rows = [];
+  let ell = R.ZERO, p = R.ONE, q = R.ZERO, i = 0, c = 0;
+  const out = [];
+  const m = bits.length;
+  let x = 0n; for (const b of bits) x = x * 2n + BigInt(b);
+  const target = new R(x, 2n ** BigInt(m));
+
+  const stopAfter = model.hasEof ? Infinity
+                  : (spec.nDec != null ? spec.nDec : (spec.text.length || 0));
+  if (!model.hasEof && !(stopAfter > 0))
+    throw new Error("without $ the decoder has no stopping rule \u2014 add an “n” line saying how many symbols to decode");
+
+  const snap = ex => Object.assign({
+    rows: rows.map(r => ({ ell: r.ell, p: r.p, dist: r.dist, chosen: r.chosen, qHi: r.qHi })),
+    dyad: [], ell: ell, p: p, q: q, m: m, x: x, bits: bits, target: target,
+    out: out.slice(), i: i, c: c, ip: null
+  }, ex || {});
+  const add = (line, msg, ex) => steps.push({ line: line, msg: msg, st: snap(ex), phase: phases.length - 1 });
+
+  mkPhase("x");
+  add(4, "<b>x = \u03a3 C[i]\u00b72<sup>m\u22121\u2212i</sup> = " + x + "</b>, so the codeword stands for the dyadic interval "
+      + "[" + x + "/2<sup>" + m + "</sup>, " + (x + 1n) + "/2<sup>" + m + "</sup>) \u2014 in decimal, the target point "
+      + "<b>" + target.dec(6) + "</b>. Decoding follows the same zoom as encoding and simply asks, at every step, "
+      + "which slice this point lies in.");
+  add(5, "<b>\u2113 := 0; p := 1; i := 0</b> \u2014 same start as the encoder.");
+  closePhase();
+
+  let guard = 0;
+  for (;;) {
+    if (++guard > 40) break;
+    const dist = model.dist(out.filter(s => s !== "$"));
+    const U = model.U;
+    rows.push({ ell: ell, p: p, dist: dist, chosen: null, qHi: null });
+    const row = rows[rows.length - 1];
+    mkPhase("i = " + i);
+
+    c = 0; q = R.ZERO; row.qHi = q;
+    add(7, "<b>c := 0; q := 0</b> \u2014 walk through the slices of the current interval from the left until "
+        + "the target point is passed.", { scan: true });
+
+    let isEof = false;
+    for (;;) {
+      const lhs = ell.add(q.mul(p));
+      const goOn = lhs.le(target);
+      if (!goOn) {
+        add(8, "<b>\u2113 + q\u00b7p = " + fm(lhs) + " &gt; x/2<sup>m</sup></b> \u2014 this boundary has passed the "
+            + "target, so the loop ends with c = " + c + ".", { scan: true });
+        break;
+      }
+      if (c === U) {
+        add(9, "<b>c == U<sub>i</sub></b> \u2014 the scan has walked past all U<sub>i</sub> real symbols, so the "
+            + "target lies in the $ slice above them: "
+            + "the text is complete.", { scan: true, eofHit: true });
+        isEof = true; break;
+      }
+      const pc = dist[c].p;
+      q = q.add(pc); c = c + 1; row.qHi = q;
+      add(13, "<b>\u2113 + q\u00b7p = " + fm(lhs) + " &lt; x/2<sup>m</sup> = " + target.dec(6) + "</b>, so the target is "
+          + "further right: <b>q := q + P<sub>i," + (c - 1) + "</sub> = " + fm(q) + "; c := " + c + "</b>.",
+          { scan: true });
+    }
+
+    if (isEof) {
+      out.push("$");
+      add(11, "<b>X[" + i + "] := $; return X[0.." + i + "]</b> \u2014 decoded <span class=\"ch\">"
+          + esc(out.slice(0, -1).map(vis).join("")) + "</span>.", { done: true, out: out.slice() });
+      closePhase();
+      break;
+    }
+
+    c = c - 1;
+    if (c < 0) {
+      add(15, '<span class="warn">The scan stopped at c = 0, so c \u2212 1 = \u22121.</span> The target point '
+          + "coincides exactly with the left end of the current interval, and the strict &lt; in line 8 stops one "
+          + "slice too early. This can only happen when \u2113\u00b72<sup>m</sup> is an integer.", { done: true });
+      closePhase();
+      break;
+    }
+    q = q.sub(dist[c].p); row.qHi = q; row.chosen = c;
+    add(15, "<b>c := c \u2212 1 = " + c + "; &nbsp; q := q \u2212 P<sub>i," + c + "</sub> = " + fm(q) + "</b> \u2014 the scan "
+        + "always overshoots by one slice; step back into the slice that really contains the target.", { scan: true });
+    out.push(dist[c].ch);
+    add(16, "<b>X[" + i + "] := " + esc(dist[c].ch) + "</b> \u2014 the " + ord(c + 1) + " slice of the current interval "
+        + "contains the target, so this character was encoded here.", { out: out.slice() });
+
+    ell = ell.add(q.mul(p)); p = p.mul(dist[c].p);
+    add(17, "<b>\u2113 := \u2113 + q\u00b7p; &nbsp; p := p \u00b7 P<sub>i,c</sub></b> \u2014 zoom into that slice, exactly as the "
+        + "encoder did: " + iv(ell, p) + ". The target is still inside.", { zoomed: true, out: out.slice() });
+    i = i + 1;
+    add(18, "<b>i := " + i + "</b>", { out: out.slice() });
+    closePhase();
+
+    if (i >= stopAfter) {
+      mkPhase("done");
+      add(null, "<b>" + i + " symbol" + (i === 1 ? "" : "s") + " decoded</b>: <span class=\"ch\">"
+          + esc(out.map(vis).join("")) + "</span>. This model has no $, so the loop has no stopping rule of its own "
+          + "\u2014 the length must be known from elsewhere.", { done: true, out: out.slice() });
+      closePhase();
+      break;
+    }
+  }
+  return;
+}
+
+const ord = k => k + (k === 1 ? "st" : k === 2 ? "nd" : k === 3 ? "rd" : "th");
+
+/* ---------- number formatting -------------------------------------------- */
+
+function fm(r) {
+  if (showFrac && r.short()) return '<span class="frac">' + r.frac() + "</span>";
+  return r.dec(5);
+}
+function iv(ell, p) { return "[" + fm(ell) + ", " + fm(ell.add(p)) + ")"; }
+
+/* ---------- the zoom picture --------------------------------------------- */
+
+const NS = "http://www.w3.org/2000/svg";
+function svgEl(name, attrs) {
+  const e = document.createElementNS(NS, name);
+  for (const k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function stageWidth(wrap) { return Math.max(300, Math.floor(wrap.clientWidth) - 2); }
+
+function drawZoom() {
+  const svg = el("zoomSvg"); svg.textContent = "";
+  const st = steps[cur].st, rows = st.rows;
+  const W = stageWidth(el("zoomWrap"));
+  const padL = 30, padR = 16, x0 = padL, x1 = W - padR, IW = x1 - x0;
+  const rowH = 28, gap = 30, top = 12;
+  const H = Math.max(80, top + rows.length * (rowH + gap) + 16);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+
+  if (!rows.length) {
+    svg.appendChild(txt(W / 2, H / 2, "the interval [0, 1)", "slab dim"));
+    return;
+  }
+
+  const isLast = k => k === rows.length - 1;
+
+  rows.forEach((r, k) => {
+    const y = top + k * (rowH + gap);
+    const g = svgEl("g", {});
+    /* slices */
+    let acc = R.ZERO;
+    r.dist.forEach((s, j) => {
+      const a = acc, b = acc.add(s.p); acc = b;
+      const xa = x0 + IW * a.num(), xb = x0 + IW * b.num();
+      let cls = "slice " + (s.ch === "$" ? "eof" : (j % 2 ? "b" : "a"));
+      if (r.chosen === j) cls = "slice chosen";
+      else if (r.qHi && r.chosen === null && b.le(r.qHi) && !r.qHi.isZero()) cls = "slice summed";
+      else if (r.chosen !== null && j < r.chosen) cls = "slice summed dim";
+      const rect = svgEl("rect", { x: xa, y: y, width: Math.max(.6, xb - xa), height: rowH, class: cls });
+      rect.__tip = { ch: s.ch, p: s.p, lo: r.ell.add(a.mul(r.p)), hi: r.ell.add(b.mul(r.p)), row: k, idx: j };
+      rect.addEventListener("mouseenter", onSliceOver);
+      rect.addEventListener("mousemove", moveTip);
+      rect.addEventListener("mouseleave", hideTip);
+      rect.addEventListener("click", () => onSliceClick(k, s.ch));
+      g.appendChild(rect);
+      if (xb - xa > 11) g.appendChild(txt((xa + xb) / 2, y + rowH / 2, vis(s.ch), "slab"));
+    });
+    g.appendChild(svgEl("rect", { x: x0, y: y, width: IW, height: rowH,
+                                  class: "rowbox" + (isLast(k) ? " cur" : "") }));
+    g.appendChild(txt(padL - 6, y + rowH / 2, "i=" + k, "rowlab"));
+
+    /* the q bracket */
+    if (r.qHi && !r.qHi.isZero()) {
+      const xq = x0 + IW * r.qHi.num();
+      g.appendChild(svgEl("line", { x1: xq, y1: y - 3, x2: xq, y2: y + rowH + 3, class: "qmark" }));
+    }
+    /* the target point, decode direction */
+    if (st.target) {
+      const t = st.target.sub(r.ell).div(r.p).num();
+      if (t >= -0.001 && t <= 1.001) {
+        const xt = x0 + IW * Math.min(1, Math.max(0, t));
+        g.appendChild(svgEl("line", { x1: xt, y1: y - 4, x2: xt, y2: y + rowH + 4, class: "tgt" }));
+        if (isLast(k)) g.appendChild(svgEl("circle", { cx: xt, cy: y + rowH + 4, r: 3, class: "tgtdot" }));
+      }
+    }
+    /* endpoints of the last row */
+    if (isLast(k)) {
+      const lab = svgEl("g", {});
+      const t1 = txt(x0, y + rowH + 11, "\u2113 = " + r.ell.dec(5), "endlab");
+      t1.setAttribute("text-anchor", "start");
+      const t2 = txt(x1, y + rowH + 11, (r.ell.add(r.p)).dec(5), "endlab");
+      t2.setAttribute("text-anchor", "end");
+      lab.appendChild(t1); lab.appendChild(t2); g.appendChild(lab);
+    }
+    /* the wedge down to the next row */
+    if (r.chosen !== null && rows[k + 1]) {
+      let a = R.ZERO;
+      for (let j = 0; j < r.chosen; j++) a = a.add(r.dist[j].p);
+      const b = a.add(r.dist[r.chosen].p);
+      const xa = x0 + IW * a.num(), xb = x0 + IW * b.num();
+      const y2 = y + rowH + gap;
+      const w = svgEl("path", { d: "M" + xa + "," + (y + rowH) + " L" + xb + "," + (y + rowH)
+                                 + " L" + x1 + "," + y2 + " L" + x0 + "," + y2 + " Z",
+                                class: "wedge" + (k === rows.length - 2 && steps[cur].st.zoomed ? " fresh" : "") });
+      g.insertBefore(w, g.firstChild);
+    }
+    svg.appendChild(g);
+  });
+
+  /* once the code is known, show where it sits inside the final interval */
+  const fin = rows[rows.length - 1];
+  if (dir === "enc" && st.m != null && st.x != null && st.dyad.length && st.dyad[st.dyad.length - 1].fits) {
+    const y = top + (rows.length - 1) * (rowH + gap);
+    const two = 2n ** BigInt(st.m);
+    const lo = new R(st.x, two), hi = new R(st.x + 1n, two);
+    const a = lo.sub(fin.ell).div(fin.p).num(), b = hi.sub(fin.ell).div(fin.p).num();
+    svg.appendChild(svgEl("rect", { x: x0 + IW * a, y: y + 3, width: Math.max(1.5, IW * (b - a)),
+                                    height: rowH - 6, class: "dyadband pop" }));
+  }
+}
+
+function txt(x, y, s, cls, extra) {
+  const t = svgEl("text", Object.assign({ x: x, y: y, class: cls }, extra || {}));
+  t.textContent = s;
+  return t;
+}
+
+/* ---------- the live zooming viewport -------------------------------------
+   A window of the number line, rescaled as the interval narrows.  Tick marks
+   are the binary ruler: every dyadic rational k/2^j carries a mark whose
+   height is set by the smallest j that expresses it, so halves are tallest,
+   then quarters, then eighths.  Zooming in is animated -- the window travels
+   from the old interval to the new one, and finer marks emerge as there is
+   room for them. --------------------------------------------------------- */
+
+let liveView = null, liveAnim = null, lastRendered = -1;
+
+function liveTarget(st) {
+  const l = st.ell.num();
+  let p = st.p.num();
+  if (!isFinite(l) || !isFinite(p) || p <= 0) return { a: 0, b: 1 };
+  if (p < 1e-13) p = 1e-13;                     /* the ruler bottoms out here */
+  const m = 0.20 * p;
+  return { a: l - m, b: l + p + m };
+}
+
+function drawLive() {
+  const st = steps[cur].st;
+  const tgt = liveTarget(st);
+  const reduce = typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (liveAnim) { cancelAnimationFrame(liveAnim.h); liveAnim = null; }
+  const stepped = cur === lastRendered + 1 && liveView;
+  const moved = liveView && (Math.abs(tgt.a - liveView.a) > 1e-14 || Math.abs(tgt.b - liveView.b) > 1e-14);
+  lastRendered = cur;
+  if (!stepped || reduce || !moved) { liveView = tgt; paintLive(tgt, 1); return; }
+  animateLive(liveView, tgt);
+}
+
+function animateLive(from, to) {
+  if (typeof requestAnimationFrame !== "function") { liveView = to; paintLive(to, 1); return; }
+  const dur = Math.min(520, Math.max(200, (+el("speed").value || 480) * 0.8));
+  const wa = from.b - from.a, wb = to.b - to.a;
+  const ca = (from.a + from.b) / 2, cb = (to.a + to.b) / 2;
+  const t0 = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const ease = u => u < .5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u);
+  const frame = () => {
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    let u = Math.min(1, (now - t0) / dur);
+    const e = ease(u);
+    const w = wa * Math.pow(wb / wa, e), c = ca + (cb - ca) * e;
+    const win = { a: c - w / 2, b: c + w / 2 };
+    liveView = win;
+    paintLive(win, e);
+    if (u < 1) liveAnim = { h: requestAnimationFrame(frame) };
+    else { liveAnim = null; liveView = to; paintLive(to, 1); }
+  };
+  paintLive(from, 0);                     /* never leave the panel showing a stale window */
+  liveAnim = { h: requestAnimationFrame(frame) };
+}
+
+function fmtTick(v, digits) {
+  let t = v.toFixed(digits);
+  if (t.indexOf(".") >= 0) t = t.replace(/0+$/, "").replace(/\.$/, "");
+  return t;
+}
+
+/* the smallest j with v = k/2^j, for the height of a ruler mark */
+function paintLive(win, prog) {
+  const svg = el("liveSvg"); if (!svg) return;
+  svg.textContent = "";
+  const st = steps[cur].st;
+  const W = stageWidth(el("liveWrap"));
+  const padL = 14, padR = 14, x0 = padL, x1 = W - padR, IW = x1 - x0;
+  const bandY = 22, bandH = 34, axisY = bandY + bandH + 14;
+  const tickMax = 22, H = axisY + tickMax + 30;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+
+  const a = win.a, wdt = Math.max(win.b - win.a, 1e-15);
+  const px = v => x0 + IW * (v - a) / wdt;
+
+  /* --- the binary ruler --- */
+  const J = Math.max(0, Math.min(48, Math.floor(Math.log2(IW / (7 * wdt)))));
+  svg.appendChild(svgEl("line", { x1: x0, y1: axisY, x2: x1, y2: axisY, class: "rulerax" }));
+  const digits = Math.max(2, Math.min(15, Math.ceil(-Math.log10(wdt)) + 3));
+  let drawn = 0;
+  for (let j = 0; j <= J && drawn < 600; j++) {
+    const stepv = Math.pow(2, -j);
+    const spacing = IW * stepv / wdt;
+    const h = J === 0 ? tickMax : tickMax * (1 - 0.82 * j / (J + 1));
+    const kLo = Math.ceil(a / stepv - 1e-9), kHi = Math.floor(win.b / stepv + 1e-9);
+    if (kHi - kLo > 2000) continue;
+    for (let k = kLo; k <= kHi; k++) {
+      if (j > 0 && k % 2 === 0) continue;        /* already marked at a coarser level */
+      const v = k * stepv;
+      if (v < -1e-12 || v > 1 + 1e-12) continue; /* the model lives in [0,1] */
+      const X = px(v);
+      svg.appendChild(svgEl("line", { x1: X, y1: axisY, x2: X, y2: axisY + h,
+                                      class: "rtick" + (j === 0 ? " l0" : ""),
+                                      opacity: (0.35 + 0.65 * (1 - j / (J + 1))).toFixed(3) }));
+      drawn++;
+      if (drawn < 200) {                     /* label only where the text really fits */
+        const lb = fmtTick(v, digits);
+        if (spacing > lb.length * 6.9 + 12)
+          svg.appendChild(txt(X, axisY + h + 4, lb, "rlab" + (j === 0 ? " l0" : "")));
+      }
+    }
+  }
+
+  /* --- the interval, subdivided when the model has spoken --- */
+  const rows = st.rows;
+  const row = rows.length ? rows[rows.length - 1] : null;
+  const fresh = row && row.ell.eq(st.ell) && row.p.eq(st.p);
+  const bx = px(st.ell.num()), bw = Math.max(2, px(st.ell.add(st.p).num()) - bx);
+
+  if (fresh && row.dist) {
+    let acc = R.ZERO;
+    row.dist.forEach((sl, j) => {
+      const lo = row.ell.add(acc.mul(row.p));
+      acc = acc.add(sl.p);
+      const hi = row.ell.add(acc.mul(row.p));
+      const xa = px(lo.num()), xb = px(hi.num());
+      let cls = "slice " + (sl.ch === "$" ? "eof" : (j % 2 ? "b" : "a"));
+      if (row.chosen === j) cls = "slice chosen";
+      else if (row.chosen !== null && j < row.chosen) cls = "slice summed dim";
+      else if (row.qHi && row.chosen === null && hi.sub(row.ell).div(row.p).le(row.qHi) && !row.qHi.isZero())
+        cls = "slice summed";
+      const rr = svgEl("rect", { x: xa, y: bandY, width: Math.max(.8, xb - xa), height: bandH, class: cls });
+      rr.__tip = { ch: sl.ch, p: sl.p, lo: lo, hi: hi, row: rows.length - 1, idx: j };
+      rr.addEventListener("mouseenter", onSliceOver);
+      rr.addEventListener("mousemove", moveTip);
+      rr.addEventListener("mouseleave", hideTip);
+      rr.addEventListener("click", () => onSliceClick(rows.length - 1, sl.ch));
+      svg.appendChild(rr);
+      if (xb - xa > 13) svg.appendChild(txt((xa + xb) / 2, bandY + bandH / 2, vis(sl.ch), "slab"));
+    });
+  } else {
+    svg.appendChild(svgEl("rect", { x: bx, y: bandY, width: bw, height: bandH,
+                                    fill: "#f0d7cd", stroke: "none" }));
+  }
+  svg.appendChild(svgEl("rect", { x: bx, y: bandY, width: bw, height: bandH, class: "livebox" }));
+
+  /* the interval we came from, fading out as the zoom completes */
+  if (prog < 1 && rows.length > 1) {
+    const pr = rows[rows.length - (fresh ? 2 : 1)];
+    if (pr) {
+      const gx = px(pr.ell.num()), gw = Math.max(2, px(pr.ell.add(pr.p).num()) - gx);
+      svg.appendChild(svgEl("rect", { x: gx, y: bandY - 4, width: gw, height: bandH + 8,
+                                      class: "liveghost", opacity: (1 - prog).toFixed(3) }));
+    }
+  }
+
+  /* the dyadic candidate, once step 2 is running */
+  if (dir === "enc" && st.dyad && st.dyad.length) {
+    const d = st.dyad[st.dyad.length - 1];
+    const two = 2n ** BigInt(d.m);
+    const lo = new R(d.x, two), hi = new R(d.x + 1n, two);
+    const xa = px(lo.num()), xb = px(hi.num());
+    if (xb > x0 - 400 && xa < x1 + 400)
+      svg.appendChild(svgEl("rect", { x: xa, y: bandY + 7, width: Math.max(2, xb - xa), height: bandH - 14,
+                                      class: "livedy" + (d.fits ? "" : " bad") }));
+  }
+
+  /* the decoder's target point */
+  if (st.target) {
+    const X = px(st.target.num());
+    if (X > x0 - 50 && X < x1 + 50) {
+      svg.appendChild(svgEl("line", { x1: X, y1: bandY - 6, x2: X, y2: axisY, class: "tgt" }));
+      svg.appendChild(svgEl("circle", { cx: X, cy: bandY - 6, r: 3.5, class: "tgtdot" }));
+    }
+  }
+
+  /* the endpoints */
+  const eL = txt(Math.max(x0, bx), bandY - 5, st.ell.dec(Math.min(9, digits)), "liveend");
+  eL.setAttribute("text-anchor", "start");
+  const eR = txt(Math.min(x1, bx + bw), bandY - 5, st.ell.add(st.p).dec(Math.min(9, digits)), "liveend");
+  eR.setAttribute("text-anchor", "end");
+  if (bw > 150) { svg.appendChild(eL); svg.appendChild(eR); }
+
+  el("liveMeta").textContent = "width " + st.p.dec(Math.min(9, digits))
+    + (J > 0 ? "  ·  down to 2^-" + J : "");
+}
+
+/* ---------- the dyadic ruler --------------------------------------------- */
+
+/* ---------- the dyadic labels ---------------------------------------------
+   A cell at level m carries an m-bit label, so at m = 32 the text is far
+   wider than the cell.  Shrink the font to fit; when even the smallest size
+   will not do, keep the tail, which is where neighbouring cells differ --
+   they all share a long common prefix.  The full value is always one hover
+   or click away, in the field under the ruler. ---------------------------- */
+
+let dyadPin = null;                 /* {m, j} kept in the readout until clicked again */
+const DY_MAX_FS = 11, DY_MIN_FS = 6.4, DY_ADV = 0.62;   /* advance per unit font size */
+
+function fitLabel(j, m, w) {
+  const full = j.toString(2).padStart(m, "0");
+  const avail = w - 7;
+  let fs = avail / (DY_ADV * full.length);
+  if (fs >= DY_MAX_FS) return { s: full, fs: DY_MAX_FS, full: full };
+  if (fs >= DY_MIN_FS) return { s: full, fs: fs, full: full };
+  const k = Math.floor(avail / (DY_ADV * DY_MIN_FS)) - 1;
+  if (k < 3) return { s: null, fs: DY_MIN_FS, full: full };
+  return { s: "\u2026" + full.slice(full.length - k), fs: DY_MIN_FS, full: full };
+}
+
+function dyadHtml(m, j, note) {
+  const full = j.toString(2).padStart(m, "0");
+  const two = 2n ** BigInt(m);
+  const lo = new R(BigInt(j), two), hi = new R(BigInt(j) + 1n, two);
+  /* mark off the part shared with the neighbour on the left, so the eye finds
+     the bits that actually distinguish this cell */
+  let cut = full.length;
+  if (j > 0) {
+    const prev = (j - 1).toString(2).padStart(m, "0");
+    cut = 0; while (cut < full.length && full[cut] === prev[cut]) cut++;
+  }
+  return "<span>" + (note || ("x = " + j + ",&nbsp; m = " + m)) + "</span>"
+    + '<span class="val"><span class="pre">' + full.slice(0, cut) + '</span><span class="suf">'
+    + full.slice(cut) + "</span></span>"
+    + '<span class="hint2">[' + lo.dec(Math.min(12, m)) + ", " + hi.dec(Math.min(12, m))
+    + "),&nbsp; width 2<sup>\u2212" + m + "</sup></span>";
+}
+
+function renderDyadRead(over) {
+  const box = el("dyadRead"); if (!box) return;
+  const st = steps[cur].st;
+  const pick = over || dyadPin;
+  if (pick) {
+    const t = (st.dyad || []).find(d => d.m === pick.m);
+    const isCand = t && t.x === BigInt(pick.j);
+    box.innerHTML = dyadHtml(pick.m, pick.j,
+      (over ? "" : "pinned \u00b7 ") + "x = " + pick.j + ",\u2009 m = " + pick.m
+      + (isCand ? (t.fits ? " \u2014 this is the candidate, and it fits"
+                          : " \u2014 this is the candidate; it sticks out on the right") : ""));
+    return;
+  }
+  const d = (st.dyad || [])[st.dyad ? st.dyad.length - 1 : 0];
+  if (!d) {
+    box.innerHTML = '<span class="hint2">Step 2 has not started. Hover a cell for its exact value, '
+      + "click to keep it here.</span>";
+    return;
+  }
+  box.innerHTML = dyadHtml(d.m, Number(d.x),
+    "candidate x = " + d.x + ",\u2009 m = " + d.m
+    + (d.fits === null ? "" : d.fits ? " \u2014 it fits inside [\u2113, \u2113+p)"
+                                     : " \u2014 it sticks out on the right"));
+}
+
+function onDyadOver(ev) {
+  const d = ev.currentTarget.__dy;
+  renderDyadRead({ m: d.m, j: d.j });
+  const tt = el("tooltip");
+  tt.innerHTML = '<span class="tt-h">m = ' + d.m + ",\u2009 x = " + d.j + "</span><br>"
+    + '<span class="tt-s">' + d.j.toString(2).padStart(d.m, "0") + "</span>"
+    + (d.cand ? '<br><span class="tt-s">' + (d.fits ? "fits" : "sticks out") + "</span>" : "")
+    + '<br><span class="tt-s">click to keep it below</span>';
+  tt.style.display = "block"; moveTip(ev);
+}
+function onDyadOut() { hideTip(); renderDyadRead(null); }
+
+function drawDyadic() {
+  const box = el("dyadBox");
+  const st = steps[cur].st;
+  if (dir !== "enc" || !st.rows.length) { box.style.display = "none"; return; }
+  box.style.display = "";
+  const svg = el("dyadSvg"); svg.textContent = "";
+  const W = stageWidth(el("dyadWrap"));
+  const padL = 34, padR = 14, x0 = padL, x1 = W - padR, IW = x1 - x0;
+  const ell = st.ell, p = st.p;
+  const mMax = st.m != null ? st.m : (st.mMin != null ? st.mMin : 1);
+
+  /* window: the final interval with a margin of one interval on each side */
+  const lo = Math.max(0, ell.num() - p.num()), hi = Math.min(1, ell.num() + 2 * p.num());
+  const span = hi - lo || 1;
+  const px = v => x0 + IW * (v - lo) / span;
+
+  const rowH = 19, gap = 5, top = 10;
+  const mFrom = Math.max(1, (st.mMin != null ? st.mMin : 1) - 3);
+  const rowsN = Math.max(1, mMax - mFrom + 1);
+  const H = top + rowsN * (rowH + gap) + 22;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+
+  /* the final interval as a band behind everything */
+  const bx0 = px(ell.num()), bx1 = px(ell.add(p).num());
+  svg.appendChild(svgEl("rect", { x: bx0, y: top - 4, width: Math.max(1.5, bx1 - bx0),
+                                  height: rowsN * (rowH + gap) + 6, class: "dyadband" }));
+
+  const tested = {}; st.dyad.forEach(d => tested[d.m] = d);
+
+  for (let m = mFrom; m <= mMax; m++) {
+    const y = top + (m - mFrom) * (rowH + gap);
+    const w = 1 / Math.pow(2, m);
+    const t = tested[m];
+    const jLo = Math.floor(lo / w), jHi = Math.ceil(hi / w);
+    if (jHi - jLo <= 400) {
+      for (let j = jLo; j < jHi; j++) {
+        const a = j * w, b = (j + 1) * w;
+        const xa = Math.max(x0, px(a)), xb = Math.min(x1, px(b));
+        if (xb <= xa) continue;
+        let cls = "dyadcell";
+        const isCand = t && BigInt(j) === t.x;
+        if (isCand) cls += t.fits ? " good" : " bad";
+        else if (!t) cls += " dim";
+        if (dyadPin && dyadPin.m === m && dyadPin.j === j) cls += " pin";
+        const rc = svgEl("rect", { x: xa, y: y, width: xb - xa, height: rowH, class: cls });
+        rc.__dy = { m: m, j: j, fits: t ? t.fits : null, cand: !!isCand };
+        rc.addEventListener("mouseenter", onDyadOver);
+        rc.addEventListener("mousemove", moveTip);
+        rc.addEventListener("mouseleave", onDyadOut);
+        rc.addEventListener("click", () => {
+          dyadPin = (dyadPin && dyadPin.m === m && dyadPin.j === j) ? null : { m: m, j: j };
+          drawDyadic();
+        });
+        svg.appendChild(rc);
+        if (t) {
+          const lab = fitLabel(j, m, xb - xa);
+          if (lab.s) svg.appendChild(txt((xa + xb) / 2, y + rowH / 2, lab.s, "dyadlab",
+                                         { style: "font-size:" + lab.fs.toFixed(1) + "px" }));
+        }
+      }
+    }
+    const lab = txt(padL - 6, y + rowH / 2, "m=" + m, "dyadrow");
+    svg.appendChild(lab);
+    if (st.mMin != null && m < st.mMin) {
+      const s = txt(x1 + 2, y + rowH / 2, "", "dyadrow"); svg.appendChild(s);
+    }
+  }
+  /* labels for l and l+p */
+  const b1 = txt(bx0, top + rowsN * (rowH + gap) + 12, "\u2113", "dyadlab"); svg.appendChild(b1);
+  const b2 = txt(bx1, top + rowsN * (rowH + gap) + 12, "\u2113+p", "dyadlab"); svg.appendChild(b2);
+  svg.appendChild(svgEl("line", { x1: bx0, y1: top - 4, x2: bx0, y2: top + rowsN * (rowH + gap) + 2, class: "edge" }));
+  svg.appendChild(svgEl("line", { x1: bx1, y1: top - 4, x2: bx1, y2: top + rowsN * (rowH + gap) + 2, class: "edge" }));
+  if (mFrom > 1) {
+    const t0 = txt(padL - 6, top - 2, "\u22ee", "dyadrow"); svg.appendChild(t0);
+  }
+
+  renderDyadRead(null);
+  el("dyadMeta").textContent = st.mMin != null
+    ? (mFrom > 1 ? "m = 1\u2026" + (mFrom - 1) + " omitted; every " : "")
+      + "row below m = " + st.mMin + " is too coarse: 2^-m > p"
+    : "";
+}
+
+/* ---------- tooltips ------------------------------------------------------ */
+
+function onSliceOver(ev) {
+  const d = ev.currentTarget.__tip, tt = el("tooltip");
+  tt.innerHTML = '<span class="tt-h">' + (d.ch === "$" ? "end of text $" : "symbol " + esc(vis(d.ch))) + "</span><br>"
+    + '<span class="tt-s">P = ' + (d.p.short() ? d.p.frac() + " = " : "") + d.p.dec(5) + "</span><br>"
+    + '<span class="tt-s">[' + d.lo.dec(6) + ", " + d.hi.dec(6) + ")</span>"
+    + (dir === "enc" ? '<br><span class="tt-s">click: put ' + esc(vis(d.ch)) + " at position " + d.row + "</span>" : "");
+  tt.style.display = "block";
+  moveTip(ev);
+}
+function moveTip(ev) {
+  const tt = el("tooltip");
+  let x = ev.clientX + 14, y = ev.clientY + 16;
+  const r = tt.getBoundingClientRect();
+  if (x + r.width > window.innerWidth - 8) x = ev.clientX - r.width - 12;
+  if (y + r.height > window.innerHeight - 8) y = ev.clientY - r.height - 12;
+  tt.style.left = x + "px"; tt.style.top = y + "px";
+}
+function hideTip() { el("tooltip").style.display = "none"; }
+
+function onSliceClick(row, ch) {
+  if (dir !== "enc" || ch === "$") return;
+  const t = spec.text.slice();
+  if (row < t.length) t[row] = ch; else t.push(ch);
+  spec.text = t;
+  hideTip();
+  refresh(Math.min(cur, 1e9), true);
+}
+
+/* ---------- side panels --------------------------------------------------- */
+
+function renderState() {
+  const st = steps[cur].st, rows = st.rows;
+  const T = el("stateTab");
+  let h = "<tr><th>i</th><th>\u2113</th><th>p</th><th>interval</th></tr>";
+  const line = (k, ell, p, isCur) =>
+    "<tr" + (isCur ? ' class="cur"' : "") + "><td>" + k + "</td><td>" + cell(ell) + "</td><td>" + cell(p)
+    + "</td><td>[" + ell.dec(5) + ", " + ell.add(p).dec(5) + ")</td></tr>";
+  const cell = r => showFrac && r.short() ? r.frac() : r.dec(5);
+  h += line(0, R.ZERO, R.ONE, rows.length === 0);
+  rows.forEach((r, k) => {
+    if (k === rows.length - 1 && r.chosen === null) return;   /* not zoomed yet */
+    const nxt = rows[k + 1];
+    const e = nxt ? nxt.ell : st.ell, p = nxt ? nxt.p : st.p;
+    h += line(k + 1, e, p, k === rows.length - 1);
+  });
+  T.innerHTML = h;
+  const wrap = T.parentElement;
+  const c = T.querySelector("tr.cur");
+  if (c) wrap.scrollTop = Math.max(0, c.offsetTop - wrap.clientHeight + 30);
+  el("tabMeta").textContent = showFrac ? "exact" : "rounded";
+}
+
+function renderIO() {
+  const st = steps[cur].st;
+  let h = "";
+  if (dir === "enc") {
+    const ip = st.ip;
+    h += '<div class="srcline">';
+    spec.text.forEach((c, k) => {
+      const cls = k < ip ? "done" : k === ip ? "cur" : "todo";
+      h += '<span class="' + cls + '">' + esc(vis(c)) + "</span>";
+    });
+    if (model.hasEof) h += '<span class="' + (ip === spec.text.length ? "cur" : ip > spec.text.length || st.done ? "eof" : "todo") + '">$</span>';
+    h += "</div>";
+    h += '<div class="kv"><span>n = <b>' + spec.text.length + "</b></span>"
+       + "<span>U<sub>i</sub> = <b>" + model.U + "</b></span>"
+       + "<span>model: <b>" + model.describe() + "</b></span></div>";
+    if (st.bits) {
+      h += '<div class="bits" style="margin-top:9px">' + st.bits + "</div>";
+      h += '<div class="kv"><span>x = <b>' + st.x + "</b></span><span>m = <b>" + st.m + "</b></span>"
+         + (spec.text.length ? "<span><b>" + (st.bits.length / spec.text.length).toFixed(2) + "</b> bits/symbol</span>" : "")
+         + "</div>";
+    } else if (st.mMin != null) {
+      h += '<div class="kv" style="margin-top:9px"><span>\u2308lg(1/p)\u2309 = <b>' + st.mMin + "</b></span></div>";
+    }
+    el("ioTitle").textContent = "Source and code";
+    el("ioMeta").textContent = st.bits ? st.bits.length + " bits" : "";
+  } else {
+    h += '<div class="bits">' + st.bits + "</div>";
+    h += '<div class="kv"><span>x = <b>' + st.x + "</b></span><span>m = <b>" + st.m + "</b></span>"
+       + "<span>x/2<sup>m</sup> = <b>" + (st.target ? st.target.dec(6) : "") + "</b></span></div>";
+    h += '<div class="srcline" style="margin-top:9px">';
+    if (!st.out || !st.out.length) h += '<span class="todo">\u2014</span>';
+    else st.out.forEach(c => h += '<span class="' + (c === "$" ? "eof" : "done") + '">' + esc(vis(c)) + "</span>");
+    h += "</div>";
+    el("ioTitle").textContent = "Code and decoded text";
+    el("ioMeta").textContent = st.out ? st.out.filter(c => c !== "$").length + " symbols" : "";
+  }
+  el("ioBox").innerHTML = h;
+}
+
+/* ---------- pseudocode ---------------------------------------------------- */
+
+const CODE_ENC = [
+  [1, "procedure arithmeticEncode(X\u2080, \u2026, X\u2099):"],
+  [2, "  // Assume model U\u1d62 and P\u1d62\u2c7c are fixed."],
+  [3, "  // Assume X\u1d62 \u2208 [0..U\u1d62) for i < n and X\u2099 = $"],
+  [4, "  // Step 1: Interval zooming"],
+  [5, "  \u2113 := 0;  p := 1"],
+  [6, "  for i := 0, \u2026, n\u22121 do"],
+  [7, "    q := \u03a3(j = 0 .. X\u1d62\u22121) P\u1d62\u2c7c;"],
+  [8, "    \u2113 := \u2113 + q\u00b7p;  p := p \u00b7 P\u1d62\u201aX\u1d62"],
+  [9, "  end for"],
+  [10, "  q := 1 \u2212 P\u2099\u201a$              // encode $ as last character"],
+  [11, "  \u2113 := \u2113 + q\u00b7p;  p := p \u00b7 P\u2099\u201a$"],
+  [12, "  // Step 2: Dyadic encoding"],
+  [13, "  m := \u2308lg(1/p)\u2309 \u2212 1"],
+  [14, "  do"],
+  [15, "    m := m+1;  x := \u2308\u2113 \u00b7 2\u1d50\u2309"],
+  [16, "  while (x+1)/2\u1d50 > \u2113+p"],
+  [17, "  return x in binary using m bits"]
+];
+const CODE_DEC = [
+  [1, "procedure arithmeticDecode(C[0..m)):"],
+  [2, "  // Assume model U\u1d62 and P\u1d62\u2c7c are fixed."],
+  [3, "  // C[0..m) bit string produced by arithmeticEncode"],
+  [4, "  x = \u03a3(i = 0 .. m\u22121) C[i]\u00b72\u1d50\u207b\u00b9\u207b\u2071   // final interval [x/2\u1d50,(x+1)/2\u1d50)"],
+  [5, "  \u2113 := 0;  p := 1;  i := 0"],
+  [6, "  while true"],
+  [7, "    c := 0;  q := 0                 // Decode next character c"],
+  [8, "    while \u2113 + q\u00b7p \u2264 x/2\u1d50            // Iterate through characters until final interval"],
+  [9, "      if c == U\u1d62                    // reached $"],
+  [10, "        X[i] := $"],
+  [11, "        return X[0..i]"],
+  [12, "      else"],
+  [13, "        q := q + P\u1d62\u201a\ua700;  c := c+1"],
+  [14, "    end while"],
+  [15, "    c := c\u22121;  q := q \u2212 P\u1d62\u201a\ua700        // we overshot by 1"],
+  [16, "    X[i] := c"],
+  [17, "    \u2113 := \u2113 + q\u00b7p;  p := p \u00b7 P\u1d62\u201a\ua700"],
+  [18, "    i := i+1"],
+  [19, "  end while"]
+];
+
+function renderCode() {
+  const lines = dir === "enc" ? CODE_ENC : CODE_DEC;
+  const on = steps[cur].line;
+  const skipEof = dir === "enc" && !model.hasEof;
+  let h = "";
+  lines.forEach(([no, s0]) => {
+    const s = s0;
+    const cls = "cline" + (no === on ? " on" : "")
+              + (skipEof && (no === 10 || no === 11) ? " skip" : "");
+    const body = esc(s).replace(/(\/\/.*)$/, '<span class="cm">$1</span>')
+                       .replace(/\b(procedure|for|do|while|end|return|if|else|true)\b/g, '<span class="kw">$1</span>');
+    h += '<div class="' + cls + '"><span class="ln">' + no + "</span><span>" + body + "</span></div>";
+  });
+  el("codeBody").innerHTML = h;
+  el("codeNote").innerHTML = dir === "enc"
+    ? "Written exactly as in the lecture. <b>Lines 10\u201311</b> encode the end-of-text symbol and are greyed out "
+      + "in the <b>fixed length</b> setting: there is no $, and with P<sub>n,$</sub> = 0 they would set p := 0. The "
+      + "number of symbols then has to reach the decoder by other means \u2014 which is the setting of the worked "
+      + "example, where 5 trits are encoded and the 5 is known."
+    : "The alphabet is 0, \u2026, U<sub>i</sub>\u22121 \u2014 U<sub>i</sub> is the size of the universe at step i "
+      + "\u2014 and $ takes the slice above all of them, at index U<sub>i</sub>. That is why <b>line 9</b> tests "
+      + "c == U<sub>i</sub>: reaching that value means the scan has walked past every real symbol, so the target "
+      + "lies in the $ slice. <b>Line 8</b> compares with \u2264 because the slices are half-open \u2014 the "
+      + "character to decode is the unique c with \u2113 + q<sub>c</sub>\u00b7p \u2264 x/2<sup>m</sup> &lt; "
+      + "\u2113 + q<sub>c+1</sub>\u00b7p.";
+}
+
+/* ==========================================================================
+   Where strings land -- a zoomable version of the picture that shows the
+   whole code at once.
+
+   The top half subdivides [0,1) level by level: one row per character, each
+   block an interval of the strings that begin that way.  A block whose last
+   character is $ is finished; it is a leaf, and the shortest dyadic interval
+   inside it is its codeword.  The bottom half is that dyadic ruler, so the
+   two halves together are the code: read a string off the top, read its bits
+   off the bottom.
+
+   Nothing is precomputed.  Only blocks that meet the current window and are
+   at least a few pixels wide are expanded, so zooming in computes exactly
+   the detail that has become visible and no more.
+   ========================================================================== */
+
+let expWin = { a: 0, b: 1 };
+let expDepth = 8, expShowCodes = true, expHover = null, expSel = null, expSelNode = null;
+let expSelBin = null;
+const EXP_MIN_PX = 3, EXP_MAX_PER_ROW = 420;
+
+const asNum = r => r.num();
+function expChildren(node) {
+  if (node.term) return [];
+  const dist = model.dist(node.prefix.filter(c => c !== "$"));
+  const out = [];
+  let acc = R.ZERO;
+  const w = node.hi.sub(node.lo);
+  dist.forEach(sl => {
+    const lo = node.lo.add(acc.mul(w));
+    acc = acc.add(sl.p);
+    const hi = node.lo.add(acc.mul(w));
+    out.push({ lo: lo, hi: hi, prefix: node.prefix.concat([sl.ch]),
+               term: sl.ch === "$", ch: sl.ch, depth: node.depth + 1 });
+  });
+  return out;
+}
+const expRoot = () => ({ lo: R.ZERO, hi: R.ONE, prefix: [], term: false, ch: null, depth: 0 });
+
+
+/* the shortest dyadic interval inside a block: its codeword */
+function expCodeOf(node) {
+  const p = node.hi.sub(node.lo);
+  if (p.isZero()) return null;
+  let m = 0, t = 1n;
+  while (t * p.n < p.d) { t *= 2n; m++; }
+  m = m - 1;
+  for (;;) {
+    m++;
+    if (m > 200) return null;
+    const two = 2n ** BigInt(m);
+    const x = ceilDiv(node.lo.n * two, node.lo.d);
+    if (!(new R(x + 1n, two).gt(node.hi))) return { m: m, x: x, bits: x.toString(2).padStart(m, "0") };
+  }
+}
+
+const expStr = n => n.prefix.length ? n.prefix.map(vis).join("") : "\u03b5";
+
+/* the chain of blocks from the whole line down to the one containing the window */
+function expChain() {
+  const chain = [expRoot()];
+  let n = chain[0], guard = 0;
+  for (;;) {
+    if (n.term || ++guard > 200) break;
+    const kids = expChildren(n);
+    const k = kids.find(c => asNum(c.lo) <= expWin.a + 1e-15 && asNum(c.hi) >= expWin.b - 1e-15);
+    if (!k) break;
+    n = k; chain.push(n);
+  }
+  return chain;
+}
+
+const EXP_ROW_H = 22, EXP_ROW_GAP = 3, EXP_TOP = 8;
+const expRowY = d => EXP_TOP + d * (EXP_ROW_H + EXP_ROW_GAP);
+
+function drawExplorer() {
+  const svg = el("expSvg"), bsvg = el("expBinSvg");
+  if (!svg || !bsvg) return;
+  svg.textContent = ""; bsvg.textContent = "";
+  const W = stageWidth(el("expWrap"));
+  const padL = 30, padR = 12, x0 = padL, x1 = W - padR, IW = x1 - x0;
+  const wa = expWin.a, wid2 = Math.max(expWin.b - expWin.a, 1e-15);
+  const px = v => x0 + IW * (v - wa) / wid2;
+  const clampX = v => Math.max(x0, Math.min(x1, v));
+
+  /* --- everything above the window is context; below it, expand on demand --- */
+  const chain = expChain(), ctx = chain[chain.length - 1];
+  /* a pinch or a wheel can drop several levels at once; shift the scroll by the
+     same amount so the row you are looking at stays where it is */
+  const depthNow = chain.length - 1;
+  if (expLastDepth !== null && depthNow !== expLastDepth && !expScrollAnim) {
+    const wr = el("expWrap");
+    if (wr) wr.scrollTop = Math.max(0, wr.scrollTop + (depthNow - expLastDepth) * (EXP_ROW_H + EXP_ROW_GAP));
+  }
+  expLastDepth = depthNow;
+  const rows = [];
+  chain.slice(0, -1).forEach(n => rows.push([n]));      /* the ancestors, level 0 up */
+  let level = [ctx], nodes = 0;
+  for (let d = 0; d < expDepth; d++) {
+    rows.push(level);
+    const next = [];
+    for (const n of level) {
+      if (n.term) continue;
+      if (px(asNum(n.hi)) - px(asNum(n.lo)) < EXP_MIN_PX) continue;
+      for (const c of expChildren(n)) {
+        if (asNum(c.hi) <= wa || asNum(c.lo) >= expWin.b) continue;
+        next.push(c);
+        if (++nodes > EXP_MAX_PER_ROW * expDepth) break;
+      }
+      if (next.length > EXP_MAX_PER_ROW) break;
+    }
+    if (!next.length) break;
+    level = next;
+  }
+
+  const strH = EXP_TOP + rows.length * (EXP_ROW_H + EXP_ROW_GAP) + 6;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + strH);
+  svg.setAttribute("width", W); svg.setAttribute("height", strH);
+
+  /* --- the string rows --- */
+  const codeCells = [];
+  rows.forEach((lvl, d) => {
+    const y = expRowY(d);
+    svg.appendChild(txt(padL - 5, y + EXP_ROW_H / 2, d === 0 ? "\u03b5" : String(d), "xrow"));
+    lvl.forEach((n, q) => {
+      const xa = clampX(px(asNum(n.lo))), xb = clampX(px(asNum(n.hi)));
+      if (xb - xa < .4) return;
+      const key = n.prefix.join("\u0001");
+      let cls = "xnode " + (n.term ? "term" : (q % 2 ? "b" : "a"));
+      if (d < chain.length - 1) cls = "xnode anc";
+      if (d === chain.length - 1) cls = "xnode ctx";
+      if (expHover === key) cls = "xnode hi";
+      if (expSel === key) cls = "xnode sel";
+      const r = svgEl("rect", { x: xa, y: y, width: Math.max(.6, xb - xa), height: EXP_ROW_H, class: cls });
+      r.__x = n;
+      r.addEventListener("mouseenter", onExpOver);
+      r.addEventListener("mousemove", moveTip);
+      r.addEventListener("mouseleave", onExpOut);
+      r.addEventListener("click", ev => {
+        if (!expDragged && Date.now() - expTapHandled > 400) expTap(n);
+        ev.stopPropagation();
+      });
+      svg.appendChild(r);
+      const full = expStr(n), w = xb - xa;
+      if (w > full.length * 7.2 + 6)
+        svg.appendChild(txt((xa + xb) / 2, y + EXP_ROW_H / 2, full, "xlab", { style: "font-size:12px" }));
+      else if (w > 11 && n.ch !== null)
+        svg.appendChild(txt((xa + xb) / 2, y + EXP_ROW_H / 2, vis(n.ch), "xlab dim", { style: "font-size:11px" }));
+      if (n.term && (expShowCodes || expHover === key || expSel === key)) {
+        const c = expCodeOf(n);
+        if (c) codeCells.push({ m: c.m, x: c.x, node: n });
+      }
+    });
+  });
+
+  /* --- the ruler, in its own canvas so it never scrolls away --- */
+  const axisY = 16, binTop = axisY + 26, binH = 16, binGap = 2, binRows = 8;
+  const binHt = binTop + binRows * (binH + binGap) + 12;
+  bsvg.setAttribute("viewBox", "0 0 " + W + " " + binHt);
+  bsvg.setAttribute("width", W); bsvg.setAttribute("height", binHt);
+
+  bsvg.appendChild(svgEl("line", { x1: x0, y1: axisY, x2: x1, y2: axisY, class: "xaxis" }));
+  const digits = Math.max(2, Math.min(15, Math.ceil(-Math.log10(wid2)) + 2));
+  let step = Math.pow(10, Math.floor(Math.log10(wid2)) - 1);
+  while (IW * step / wid2 < 90) step *= 2;
+  for (let k = Math.ceil(wa / step); k * step <= expWin.b; k++) {
+    const v = k * step, X = px(v);
+    bsvg.appendChild(svgEl("line", { x1: X, y1: axisY - 4, x2: X, y2: axisY + 4, class: "xtick" }));
+    bsvg.appendChild(txt(X, axisY + 7, v.toFixed(digits), "xticklab"));
+  }
+
+  let m0 = 1; while (Math.pow(2, -m0) > wid2 && m0 < 60) m0++;
+  m0 = Math.max(1, m0 - 1);
+  const codeAt = {};
+  codeCells.forEach(c => { codeAt[c.m + ":" + c.x] = c; });
+  for (let r2 = 0; r2 < binRows; r2++) {
+    const m = m0 + r2, y = binTop + r2 * (binH + binGap), w = Math.pow(2, -m);
+    bsvg.appendChild(txt(padL - 5, y + binH / 2, "m=" + m, "xrow"));
+    const jLo = Math.floor(wa / w), jHi = Math.ceil(expWin.b / w);
+    if (jHi - jLo > 500) continue;
+    for (let j = jLo; j < jHi; j++) {
+      const xa = clampX(px(j * w)), xb = clampX(px((j + 1) * w));
+      if (xb - xa < .6) continue;
+      const hit = codeAt[m + ":" + BigInt(j)];
+      const bkey = "b" + m + ":" + j;
+      const rc = svgEl("rect", { x: xa, y: y, width: xb - xa, height: binH,
+                                 class: "xcell" + (hit ? " code" : "") + (expSelBin === bkey ? " sel" : "") });
+      rc.__bin = { m: m, j: j, hit: hit };
+      rc.addEventListener("mouseenter", onBinOver);
+      rc.addEventListener("mousemove", moveTip);
+      rc.addEventListener("mouseleave", onExpOut);
+      rc.addEventListener("click", ev => {
+        if (!expDragged && Date.now() - expTapHandled > 400) expTapBin({ m: m, j: j });
+        ev.stopPropagation();
+      });
+      bsvg.appendChild(rc);
+      const lab = fitLabel(j, m, xb - xa);
+      if (lab.s) bsvg.appendChild(txt((xa + xb) / 2, y + binH / 2, lab.s, "dyadlab",
+                                      { style: "font-size:" + lab.fs.toFixed(1) + "px" }));
+    }
+  }
+
+  /* --- guides for whatever is selected or under the pointer --- */
+  let guideAt = null;
+  const guideKey = expHover || expSel;
+  if (guideKey) {
+    const all = [].concat.apply([], rows);
+    const n = all.find(z => z.prefix.join("\u0001") === guideKey);
+    if (n) guideAt = [asNum(n.lo), asNum(n.hi)];
+  } else if (expSelBin) {
+    const mm = +expSelBin.slice(1).split(":")[0], jj = +expSelBin.split(":")[1];
+    guideAt = [jj / Math.pow(2, mm), (jj + 1) / Math.pow(2, mm)];
+  }
+  if (guideAt) {
+    {
+      const n = { lo: null };
+      guideAt.forEach(v => {
+        const X = px(v);
+        if (X < x0 - 1 || X > x1 + 1) return;
+        svg.appendChild(svgEl("line", { x1: X, y1: EXP_TOP, x2: X, y2: strH - 4, class: "xguide" }));
+        bsvg.appendChild(svgEl("line", { x1: X, y1: 4, x2: X, y2: binHt - 8, class: "xguide" }));
+      });
+    }
+  }
+
+  const dg = Math.max(3, Math.min(12, Math.ceil(-Math.log10(wid2)) + 3));
+  el("expMeta").textContent = "[" + expWin.a.toFixed(dg) + ", " + expWin.b.toFixed(dg) + ")"
+    + "  \u00b7  width " + wid2.toExponential(2)
+    + "  \u00b7  level " + (chain.length - 1) + ", " + (rows.length - chain.length + 1) + " expanded";
+  drawNav();
+  renderCrumb(ctx);
+  renderSelInfo();
+  el("expNote").innerHTML =
+    "Reading down the top half spells out a string; reading across gives every string of that length, "
+    + "each occupying an interval as wide as its probability. A string ending in <b>$</b> is finished, and "
+    + "the widest dyadic interval that fits inside it \u2014 marked in the ruler below \u2014 is its codeword. "
+    + "Longer strings are rarer, so their intervals are narrower, so their codewords need more bits: that is "
+    + "the whole of arithmetic coding in one picture. Drag up and down to walk back to level 0, "
+    + "drag sideways to move along the line, and pinch \u2014 or ctrl-scroll \u2014 to zoom; the ruler "
+    + "takes the same gestures, and the strip underneath sweeps along the whole line at the current zoom. "
+    + "Tapping a cell of the ruler reads the other way round, which is decoding: "
+    + "it says which strings begin with those bits, and zooming in on it narrows that down one character "
+    + "at a time."
+    + (model.hasEof ? "" : " <b>This model has no $</b>, so no string is ever finished and there are no "
+      + "codewords to mark; switch on an end-of-text symbol to see them.");
+  return chain.length - 1;
+}
+
+/* ---------- animated movement ---------------------------------------------
+   The buttons move the window rather than jumping it, and once the window has
+   settled the panel scrolls so that the new deepest level sits near the top --
+   the two motions run one after the other, so a zoom reads as "go in, then
+   drop a level" instead of everything changing at once. ------------------- */
+
+let expAnim = null, expScrollAnim = null, expLastDepth = null;
+const expEase = u => u < .5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u);
+
+function expAnimateTo(to, settle) {
+  const from = { a: expWin.a, b: expWin.b };
+  const reduce = typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (expAnim) { cancelAnimationFrame(expAnim); expAnim = null; }
+  const same = Math.abs(from.a - to.a) < 1e-15 && Math.abs(from.b - to.b) < 1e-15;
+  if (reduce || same || typeof requestAnimationFrame !== "function") {
+    expWin = to; drawExplorer(); if (settle !== false) expSettleScroll(); return;
+  }
+  const w0 = from.b - from.a, w1 = Math.max(to.b - to.a, 1e-15);
+  const c0 = (from.a + from.b) / 2, c1 = (to.a + to.b) / 2;
+  const dur = 420, t0 = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const frame = () => {
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const u = Math.min(1, (now - t0) / dur), e = expEase(u);
+    const w = w0 * Math.pow(w1 / w0, e), c = c0 + (c1 - c0) * e;
+    expWin = { a: Math.max(0, c - w / 2), b: Math.min(1, c + w / 2) };
+    drawExplorer();
+    if (u < 1) expAnim = requestAnimationFrame(frame);
+    else { expAnim = null; expWin = to; drawExplorer(); if (settle !== false) expSettleScroll(); }
+  };
+  expAnim = requestAnimationFrame(frame);
+}
+
+/* slide the panel so the deepest context row sits just below the fold */
+function expSettleScroll() {
+  const wrap = el("expWrap"); if (!wrap) return;
+  const depth = expChain().length - 1;
+  const target = Math.max(0, expRowY(depth) - (EXP_ROW_H + EXP_ROW_GAP) * 1.5);
+  const from = wrap.scrollTop;
+  if (Math.abs(target - from) < 1) return;
+  const reduce = typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (expScrollAnim) { cancelAnimationFrame(expScrollAnim); expScrollAnim = null; }
+  if (reduce || typeof requestAnimationFrame !== "function") { wrap.scrollTop = target; return; }
+  const dur = 300, t0 = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const frame = () => {
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const u = Math.min(1, (now - t0) / dur);
+    wrap.scrollTop = from + (target - from) * expEase(u);
+    if (u < 1) expScrollAnim = requestAnimationFrame(frame);
+    else { expScrollAnim = null; wrap.scrollTop = target; }
+  };
+  expScrollAnim = requestAnimationFrame(frame);
+}
+
+function renderCrumb(ctx) {
+  const box = el("expCrumb"); box.textContent = "";
+  const mk = (label, node) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.addEventListener("click", () => expZoomTo(node));
+    box.appendChild(b);
+  };
+  const KEEP = 8, cut = Math.max(0, ctx.prefix.length - KEEP);
+  let n = expRoot();
+  mk("\u03b5", n);
+  ctx.prefix.forEach((ch, k) => {
+    const kids = expChildren(n);
+    const nx = kids.find(c => c.ch === ch) || n;
+    if (k >= cut) {
+      const sep = document.createElement("span");
+      sep.className = "sep"; sep.textContent = k === cut && cut > 0 ? "\u203a \u2026 \u203a" : "\u203a";
+      box.appendChild(sep);
+      const full = n.prefix.concat([ch]).map(vis).join("");
+      mk(full.length > 14 ? "\u2026" + full.slice(-13) : full, nx);
+    }
+    n = nx;
+  });
+  if (cut > 0) {
+    const t = document.createElement("span");
+    t.className = "sep"; t.textContent = "(" + ctx.prefix.length + " characters deep)";
+    box.appendChild(t);
+  }
+}
+
+/* On a touchscreen there is no hover, so a tap has to do both jobs: the first
+   selects a block and shows what it is, the second (or the Zoom in button)
+   goes into it.  A mouse click behaves the same way, which also gives a way
+   to read a block's numbers without losing your place. */
+let expTapHandled = 0;                 /* when the pointer path last took a tap */
+
+function expTap(node) {
+  const key = node.prefix.join("\u0001");
+  if (expSel === key) { expZoomTo(node); return; }
+  expSel = key; expSelNode = node; expSelBin = null;
+  drawExplorer();
+}
+
+function expSelectNone() { expSel = null; expSelNode = null; }
+function expClearAllSel() { expSelectNone(); expSelBin = null; }
+
+function renderSelInfo() {
+  const info = el("expSelInfo"), btn = el("expIn");
+  if (expSelBin) {                       /* a cell of the ruler: what do these bits decode to? */
+    const m = +expSelBin.slice(1).split(":")[0], j = +expSelBin.split(":")[1];
+    const two = 2n ** BigInt(m);
+    const lo = new R(BigInt(j), two), hi = new R(BigInt(j) + 1n, two);
+    const host = expStringAt(lo, hi);
+    const code = host.term ? expCodeOf(host) : null;
+    const exact = code && code.m === m && code.x === BigInt(j);
+    info.innerHTML = "<code>" + j.toString(2).padStart(m, "0") + "</code>  \u00b7  ["
+      + lo.dec(Math.min(9, m + 2)) + ", " + hi.dec(Math.min(9, m + 2)) + ")  \u00b7  "
+      + (host.prefix.length
+          ? (exact ? "decodes <b>" + esc(expStr(host)) + "</b>"
+                   : (host.term ? "inside the finished string <b>" + esc(expStr(host)) + "</b>"
+                                : "every text here starts <b>" + esc(expStr(host)) + "</b>"))
+          : "too wide to fix even the first character");
+    btn.disabled = false; return;
+  }
+  if (!expSelNode) {
+    info.textContent = "Tap a block, or a cell of the ruler, to select it; tap again to zoom in.";
+    btn.disabled = true; return;
+  }
+  const n = expSelNode, p = n.hi.sub(n.lo);
+  let h = "<b>" + esc(expStr(n)) + "</b>  \u00b7  P = " + p.dec(6)
+        + "  \u00b7  [" + n.lo.dec(6) + ", " + n.hi.dec(6) + ")";
+  if (n.term) {
+    const c = expCodeOf(n);
+    if (c) h += "  \u00b7  code <code>" + c.bits + "</code> (" + c.m + " bits)";
+  }
+  info.innerHTML = h;
+  btn.disabled = !!n.term && false;
+}
+
+function expZoomTo(node) {
+  /* exactly the block, so it becomes the context row and the breadcrumb follows */
+  expHover = null; expClearAllSel();
+  expAnimateTo({ a: asNum(node.lo), b: asNum(node.hi) });
+}
+function expZoomBy(f, at, animate) {
+  const w = expWin.b - expWin.a, c = at === undefined ? (expWin.a + expWin.b) / 2 : at;
+  let nw = Math.min(1, Math.max(1e-14, w * f));
+  let a = c - (c - expWin.a) * (nw / w), b = a + nw;
+  if (a < 0) { a = 0; b = nw; }
+  if (b > 1) { b = 1; a = Math.max(0, 1 - nw); }
+  if (animate) { expAnimateTo({ a: a, b: b }); return; }
+  expWin = { a: a, b: b };                       /* wheel and pinch move live */
+  drawExplorer();
+}
+
+function onExpOver(ev) {
+  const n = ev.currentTarget.__x, tt = el("tooltip");
+  const p = n.hi.sub(n.lo);
+  let h = '<span class="tt-h">' + esc(expStr(n)) + (n.term ? "  (finished)" : "") + "</span><br>"
+    + '<span class="tt-s">P = ' + (p.short() ? p.frac() + " = " : "") + p.dec(6) + "</span><br>"
+    + '<span class="tt-s">[' + n.lo.dec(8) + ", " + n.hi.dec(8) + ")</span>";
+  if (n.term) {
+    const c = expCodeOf(n);
+    if (c) h += '<br><span class="tt-s">code ' + c.bits + "  (" + c.m + " bits)</span>";
+  }
+  h += '<br><span class="tt-s">click to select, again to zoom in</span>';
+  tt.innerHTML = h; tt.style.display = "block"; moveTip(ev);
+  if (ev.currentTarget.classList) ev.currentTarget.classList.add("hi");
+}
+function onBinOver(ev) {
+  const d = ev.currentTarget.__bin, tt = el("tooltip");
+  const two = 2n ** BigInt(d.m);
+  const lo = new R(BigInt(d.j), two), hi = new R(BigInt(d.j) + 1n, two);
+  tt.innerHTML = '<span class="tt-h">' + d.j.toString(2).padStart(d.m, "0") + "</span><br>"
+    + '<span class="tt-s">x = ' + d.j + ",  m = " + d.m + "</span><br>"
+    + '<span class="tt-s">[' + lo.dec(Math.min(12, d.m)) + ", " + hi.dec(Math.min(12, d.m)) + ")</span>"
+    + (d.hit ? '<br><span class="tt-s">the codeword of \u201c' + esc(expStr(d.hit.node)) + "\u201d</span>" : "");
+  tt.style.display = "block"; moveTip(ev);
+}
+function onExpOut(ev) {
+  hideTip();
+  if (ev && ev.currentTarget && ev.currentTarget.classList) ev.currentTarget.classList.remove("hi");
+}
+
+/* ---------- gestures -------------------------------------------------------
+   One code path for mouse, pen and touch, built on pointer events, with
+   touch-action:none on the figure so the browser hands us every gesture
+   instead of deciding for itself which ones it wants.  That also means the
+   vertical scrolling of the panel is ours to do, which is five lines and
+   removes the last thing a browser could disagree with us about.
+
+     one contact, mostly vertical    scroll the panel
+     one contact, mostly horizontal  pan the window
+     two contacts                    pinch to zoom
+     a contact that barely moved     tap: select, or zoom if already selected
+
+   Plain wheel scrolls the panel; ctrl/cmd + wheel zooms, which is what a
+   trackpad pinch sends.  Add #touchdebug to the URL to see what arrives.
+   -------------------------------------------------------------------------- */
+
+let expDragged = false;                 /* suppresses the click after a drag */
+let expWheelEnd = null;
+
+function expDbg(msg) {
+  const box = el("expDebug");
+  if (!box) return;
+  box.textContent = (msg + "\n" + box.textContent).split("\n").slice(0, 14).join("\n");
+}
+
+/* the deepest string block that contains a given interval */
+function expStringAt(lo, hi) {
+  let n = expRoot(), guard = 0;
+  for (;;) {
+    if (n.term || ++guard > 200) break;
+    const k = expChildren(n).find(c => c.lo.le(lo) && c.hi.ge(hi));
+    if (!k) break;
+    n = k;
+  }
+  return n;
+}
+
+function expTapBin(d) {
+  const key = "b" + d.m + ":" + d.j;
+  if (expSelBin === key) {                       /* second tap: go there */
+    const two = 2n ** BigInt(d.m);
+    expSelBin = null; expSelectNone();
+    expAnimateTo({ a: Number(d.j) / Math.pow(2, d.m), b: (Number(d.j) + 1) / Math.pow(2, d.m) });
+    return;
+  }
+  expSelBin = key; expSelectNone();
+  drawExplorer();
+}
+
+/* one gesture handler, used for both canvases; they differ only in what a
+   vertical drag means -- scrolling the panel of rows, or the page itself */
+function wireGestures(wrap, svgOf, verticalIs) {
+  const pts = new Map();
+  let gest = null, pendingSettle = false;
+
+  const arr = () => [...pts.values()];
+  const spanOf = () => { const a = arr(); return Math.max(1, Math.abs(a[0].x - a[1].x)); };
+  const midOf = () => { const a = arr(); return (a[0].x + a[1].x) / 2; };
+  const fracAt = clientX => {
+    const r = svgOf().getBoundingClientRect(), W = stageWidth(wrap);
+    return Math.max(0, Math.min(1, (clientX - r.left - 30) / (W - 42)));
+  };
+  const startPinch = () => {
+    gest = { mode: "pinch", d0: spanOf(), f0: fracAt(midOf()), a: expWin.a, b: expWin.b };
+    expDbg("pinch start  span=" + gest.d0.toFixed(0));
+  };
+
+  wrap.addEventListener("pointerdown", ev => {
+    if (tab !== "exp") return;
+    pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    try { wrap.setPointerCapture(ev.pointerId); } catch (e) { /* not fatal */ }
+    expDbg("down  " + ev.pointerType + "  n=" + pts.size);
+    if (pts.size === 2) startPinch();
+    else if (pts.size === 1) {
+      gest = { mode: "maybe", id: ev.pointerId, x: ev.clientX, y: ev.clientY,
+               t0: Date.now(), a: expWin.a, b: expWin.b,
+               top: wrap.scrollTop, pageTop: (window.scrollY || 0), moved: 0 };
+      expDragged = false;
+    }
+  });
+
+  wrap.addEventListener("pointermove", ev => {
+    if (!gest || tab !== "exp" || !pts.has(ev.pointerId)) return;
+    pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+    if (pts.size >= 2) {
+      if (gest.mode !== "pinch") startPinch();
+      const w0 = gest.b - gest.a;
+      let nw = Math.min(1, Math.max(1e-14, w0 * (gest.d0 / spanOf())));
+      const anchor = gest.a + gest.f0 * w0;
+      let a = anchor - gest.f0 * nw, b = a + nw;
+      if (a < 0) { a = 0; b = nw; }
+      if (b > 1) { b = 1; a = Math.max(0, 1 - nw); }
+      expWin = { a: a, b: b };
+      expDragged = true;
+      drawExplorer();
+      ev.preventDefault();
+      return;
+    }
+    if (ev.pointerId !== gest.id) return;
+    const dx = ev.clientX - gest.x, dy = ev.clientY - gest.y;
+    gest.moved = Math.max(gest.moved, Math.abs(dx), Math.abs(dy));
+    if (gest.mode === "maybe" && gest.moved > 7) {
+      gest.mode = Math.abs(dy) > Math.abs(dx) ? "scroll" : "pan";
+      expDragged = true;
+      expDbg(gest.mode + " start");
+    }
+    if (gest.mode === "scroll") {
+      if (verticalIs === "page") window.scrollTo(0, Math.max(0, gest.pageTop - dy));
+      else wrap.scrollTop = Math.max(0, gest.top - dy);
+      ev.preventDefault();
+    } else if (gest.mode === "pan") {
+      const w0 = gest.b - gest.a, shift = -dx / (stageWidth(wrap) - 42) * w0;
+      let a = gest.a + shift, b = gest.b + shift;
+      if (a < 0) { b -= a; a = 0; }
+      if (b > 1) { a -= b - 1; b = 1; }
+      expWin = { a: Math.max(0, a), b: Math.min(1, b) };
+      drawExplorer();
+      ev.preventDefault();
+    }
+  });
+
+  const finish = ev => {
+    const g0 = gest;
+    pts.delete(ev.pointerId);
+    try { wrap.releasePointerCapture(ev.pointerId); } catch (e) { /* fine */ }
+    if (g0 && (g0.mode === "pinch" || g0.mode === "pan")) pendingSettle = true;
+    expDbg("up    n=" + pts.size + "  mode=" + (g0 ? g0.mode : "-"));
+    /* lifting the first of two fingers must not end the gesture, and the one
+       still down must not start a new one -- wait for the last release */
+    if (pts.size >= 1) { gest = null; return; }
+    gest = null;
+    if (g0 && g0.mode === "maybe" && !pendingSettle
+        && g0.moved <= 7 && Date.now() - g0.t0 < 700) {
+      expTapHandled = Date.now();
+      const hit = document.elementFromPoint(g0.x, g0.y);
+      if (hit && hit.__x) expTap(hit.__x);
+      else if (hit && hit.__bin) expTapBin(hit.__bin);
+      else { expSelectNone(); expSelBin = null; drawExplorer(); }
+      setTimeout(() => { expDragged = false; }, 0);
+      return;
+    }
+    if (pendingSettle) { pendingSettle = false; expSettleScroll(); }
+    setTimeout(() => { expDragged = false; }, 0);
+  };
+  wrap.addEventListener("pointerup", finish);
+  wrap.addEventListener("pointercancel", finish);
+
+  /* Safari fires these instead of a second pointer on some versions; swallow
+     them so the page itself does not zoom out from under the figure */
+  ["gesturestart", "gesturechange", "gestureend"].forEach(t =>
+    wrap.addEventListener(t, ev => { if (tab === "exp") ev.preventDefault(); }));
+
+  wrap.addEventListener("wheel", ev => {
+    if (tab !== "exp") return;
+    if (ev.shiftKey) {                            /* sweep along the line */
+      ev.preventDefault();
+      const w0 = expWin.b - expWin.a;
+      const d = (ev.deltaX || ev.deltaY) / (stageWidth(wrap) - 42) * w0;
+      let a = expWin.a + d, b = expWin.b + d;
+      if (a < 0) { b -= a; a = 0; }
+      if (b > 1) { a -= b - 1; b = 1; }
+      expWin = { a: Math.max(0, a), b: Math.min(1, b) };
+      drawExplorer();
+      clearTimeout(expWheelEnd);
+      expWheelEnd = setTimeout(expSettleScroll, 220);
+      return;
+    }
+    if (!(ev.ctrlKey || ev.metaKey)) return;      /* plain wheel scrolls */
+    ev.preventDefault();
+    const r = svgOf().getBoundingClientRect(), W = stageWidth(wrap), IW = W - 42;
+    const frac = Math.max(0, Math.min(1, (ev.clientX - r.left - 30) / IW));
+    expZoomBy(ev.deltaY > 0 ? 1.25 : 0.8, expWin.a + frac * (expWin.b - expWin.a));
+    clearTimeout(expWheelEnd);
+    expWheelEnd = setTimeout(expSettleScroll, 220);
+  }, { passive: false });
+}
+
+/* the overview strip: always the whole of [0,1), with the visible slice marked.
+   Drag it to sweep along the line at the current zoom; tap anywhere to jump. */
+function drawNav() {
+  const svg = el("expNavSvg"); if (!svg) return;
+  svg.textContent = "";
+  const W = stageWidth(el("expNavWrap"));
+  const padL = 30, padR = 12, x0 = padL, x1 = W - padR, IW = x1 - x0;
+  const y = 6, h = 15, H = y + h + 12;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.appendChild(txt(padL - 5, y + h / 2, "all", "xrow"));
+  svg.appendChild(svgEl("rect", { x: x0, y: y, width: IW, height: h, rx: 2, class: "navbg" }));
+  [.25, .5, .75].forEach(v => svg.appendChild(svgEl("line",
+    { x1: x0 + IW * v, y1: y, x2: x0 + IW * v, y2: y + h, class: "navtick" })));
+  const wx = x0 + IW * expWin.a;
+  const ww = Math.max(5, IW * (expWin.b - expWin.a));
+  svg.appendChild(svgEl("rect", { x: Math.min(wx, x1 - ww), y: y - 2, width: ww, height: h + 4,
+                                  rx: 2, class: "navwin" }));
+  const l0 = txt(x0, y + h + 7, "0", "navlab"); l0.setAttribute("text-anchor", "start");
+  const l1 = txt(x1, y + h + 7, "1", "navlab"); l1.setAttribute("text-anchor", "end");
+  svg.appendChild(l0); svg.appendChild(l1);
+}
+
+function wireNav() {
+  const wrap = el("expNavWrap"), svg = el("expNavSvg");
+  if (!wrap) return;
+  let drag = null;
+  const fracAt = clientX => {
+    const r = svg.getBoundingClientRect(), W = stageWidth(wrap);
+    return Math.max(0, Math.min(1, (clientX - r.left - 30) / (W - 42)));
+  };
+  const moveTo = centre => {
+    const w = expWin.b - expWin.a;
+    let a = centre - w / 2;
+    a = Math.max(0, Math.min(1 - w, a));
+    expWin = { a: a, b: a + w };
+    drawExplorer();
+  };
+  wrap.addEventListener("pointerdown", ev => {
+    if (tab !== "exp") return;
+    const f = fracAt(ev.clientX), w = expWin.b - expWin.a;
+    const inside = f >= expWin.a && f <= expWin.b;
+    drag = { off: inside ? f - (expWin.a + w / 2) : 0 };
+    try { wrap.setPointerCapture(ev.pointerId); } catch (e) { /* fine */ }
+    wrap.classList.add("grabbing");
+    moveTo(f - drag.off);
+    ev.preventDefault();
+  });
+  wrap.addEventListener("pointermove", ev => {
+    if (!drag || tab !== "exp") return;
+    moveTo(fracAt(ev.clientX) - drag.off);
+    ev.preventDefault();
+  });
+  const up = ev => {
+    if (!drag) return;
+    drag = null;
+    wrap.classList.remove("grabbing");
+    try { wrap.releasePointerCapture(ev.pointerId); } catch (e) { /* fine */ }
+    expSettleScroll();
+  };
+  wrap.addEventListener("pointerup", up);
+  wrap.addEventListener("pointercancel", up);
+}
+
+function wireExplorer() {
+  const wrap = el("expWrap");
+  if (!wrap) return;
+  wireGestures(wrap, () => el("expSvg"), "panel");
+  wireGestures(el("expBinWrap"), () => el("expBinSvg"), "page");
+  wireNav();
+
+  el("expIn").addEventListener("click", () => {
+    if (expSelNode) expZoomTo(expSelNode);
+    else if (expSelBin) {
+      const m = +expSelBin.slice(1).split(":")[0], j = +expSelBin.split(":")[1];
+      expTapBin({ m: m, j: j });                 /* already selected, so this zooms */
+    }
+  });
+  el("expOut").addEventListener("click", () => { expSelectNone(); expSelBin = null; expZoomBy(3, undefined, true); });
+  el("expReset").addEventListener("click", () => {
+    expHover = null; expSelectNone(); expSelBin = null; expAnimateTo({ a: 0, b: 1 });
+  });
+  el("expDepth").addEventListener("input", ev => {
+    expDepth = +ev.target.value; el("expDepthVal").textContent = expDepth; drawExplorer();
+  });
+  el("expCodes").addEventListener("change", ev => { expShowCodes = ev.target.checked; drawExplorer(); });
+
+  if (location.hash === "#touchdebug") {
+    const d = document.createElement("pre");
+    d.id = "expDebug";
+    d.style.cssText = "position:fixed;right:8px;bottom:8px;z-index:99;margin:0;padding:8px 10px;"
+      + "background:rgba(250,246,237,.94);border:1px solid #b9a793;border-radius:4px;"
+      + "font:11px ui-monospace,monospace;white-space:pre;max-height:40vh;overflow:hidden;color:#46433a";
+    d.textContent = "pointer log — " + (window.PointerEvent ? "PointerEvent ok" : "NO PointerEvent")
+      + ", maxTouchPoints=" + (navigator.maxTouchPoints || 0);
+    document.body.appendChild(d);
+  }
+}
+
+/* ---------- tabs ---------------------------------------------------------- */
+let tab = "exp";
+function setTab(t) {
+  tab = t;
+  el("tabExpBtn").classList.toggle("on", t === "exp");
+  el("tabAnimBtn").classList.toggle("on", t === "anim");
+  el("paneExp").hidden = t !== "exp";
+  el("paneAnim").hidden = t !== "anim";
+  if (t === "exp") drawExplorer(); else { liveView = null; lastRendered = -1; render(); }
+}
+
+/* ---------- phases, transport, render ------------------------------------- */
+
+function renderPhases() {
+  const bar = el("phaseBar");
+  bar.textContent = "";
+  const N = steps.length;
+  phases.forEach((ph, k) => {
+    const len = Math.max(1, ph.to - ph.from);
+    const b = document.createElement("button");
+    b.className = "phasebtn";
+    b.style.flexGrow = len;
+    const done = cur >= ph.to, on = cur >= ph.from && cur < ph.to;
+    if (on) b.className += " on"; else if (done) b.className += " past";
+    const f = document.createElement("span");
+    f.className = "fill" + (cur <= ph.from ? " empty" : "");
+    f.style.width = (done ? 100 : on ? Math.round(100 * (cur - ph.from) / len) : 0) + "%";
+    b.appendChild(f);
+    const l = document.createElement("span");
+    l.className = "lab"; l.textContent = ph.name;
+    b.appendChild(l);
+    b.title = ph.name + " \u2014 steps " + ph.from + "\u2013" + (ph.to - 1);
+    b.addEventListener("click", () => goto(ph.from));
+    bar.appendChild(b);
+  });
+  el("stepNo").textContent = (cur + 1) + " / " + N;
+}
+
+function render() {
+  const s = steps[cur];
+  syncPresetSels();
+  el("statusBox").innerHTML = s.msg;
+  el("phaseName").textContent = phases[s.phase] ? phases[s.phase].name : "";
+  if (tab === "exp") drawExplorer(); else { drawLive(); drawZoom(); drawDyadic(); }
+  renderState(); renderIO(); renderCode(); renderPhases();
+  el("scrubber").max = steps.length - 1;
+  el("scrubber").value = cur;
+  el("backBtn").disabled = cur === 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+  el("zoomMeta").textContent = s.st.rows.length ? "n = " + spec.text.length : "";
+  el("toDecBtn").style.display = (dir === "enc" && lastCode) ? "" : "none";
+  el("lgTgt").style.display = dir === "dec" ? "" : "none";
+}
+
+function syncPresetSels() {
+  const a = el("presetSel"), b = el("presetSel2");
+  if (a && b && a.value !== b.value) b.value = a.value;
+}
+
+function goto(k) {
+  cur = Math.max(0, Math.min(steps.length - 1, k));
+  render();
+}
+function stepBy(d) { stop(); goto(cur + d); }
+function stop() { if (timer) { clearInterval(timer); timer = null; el("playBtn").innerHTML = "&#x25B6;&#xFE0E;"; } }
+function play() {
+  if (timer) { stop(); return; }
+  if (cur >= steps.length - 1) cur = 0;
+  el("playBtn").innerHTML = "&#x23F8;&#xFE0E;";
+  const tick = () => { if (cur >= steps.length - 1) { stop(); return; } goto(cur + 1); };
+  timer = setInterval(tick, +el("speed").value);
+}
+
+/* ---------- wiring -------------------------------------------------------- */
+
+function refresh(keep, keepPos) {
+  stop();
+  dyadPin = null;
+  expWin = { a: 0, b: 1 }; expHover = null; expSelectNone();
+  if (expAnim) { cancelAnimationFrame(expAnim); expAnim = null; }
+  model = makeModel(spec);
+  build();
+  cur = keepPos ? Math.min(keep === undefined ? cur : keep, steps.length - 1) : 0;
+  syncInputs();
+  render();
+}
+
+function syncInputs() {
+  const single = spec.alphabet.every(s => s.length === 1);
+  el("inText").value = spec.text.join(single ? "" : " ");
+  el("inBits").value = spec.bits;
+  el("inputText").value = specToSource(spec);
+  el("termEof").classList.toggle("on", model.hasEof);
+  el("termLen").classList.toggle("on", !model.hasEof);
+  el("eofWrap").style.display = model.hasEof ? "" : "none";
+  el("eofIn").value = spec.eof.short() ? spec.eof.frac() : spec.eof.dec(4);
+  el("inN").value = spec.nDec != null ? spec.nDec : spec.text.length;
+  const showN = dir === "dec" && !model.hasEof;
+  el("inN").style.display = showN ? "" : "none";
+  el("nWrap").style.display = showN ? "" : "none";
+  el("modelNote").innerHTML = "Model: <b>" + esc(model.describe()) + "</b> over {"
+    + spec.alphabet.map(c => esc(vis(c))).join(", ") + "}"
+    + (model.hasEof ? " and $ with P = " + (spec.eof.short() ? spec.eof.frac() : spec.eof.dec(4)) : ", no $");
+}
+
+function loadSource(src, resetPos) {
+  try {
+    const sp = parseInput(src);
+    spec = sp; el("parseErr").textContent = "";
+    lastCode = "";
+    refresh(0, false);
+    return true;
+  } catch (e) {
+    el("parseErr").textContent = e.message;
+    return false;
+  }
+}
+
+function setDir(d) {
+  dir = d;
+  el("dirEnc").classList.toggle("on", d === "enc");
+  el("dirDec").classList.toggle("on", d === "dec");
+  el("encIn").style.display = d === "enc" ? "" : "none";
+  el("decIn").style.display = d === "dec" ? "" : "none";
+  refresh(0, false);
+}
+
+function init() {
+  [el("presetSel"), el("presetSel2")].forEach(sel => {
+    Object.keys(PRESETS).forEach(k => {
+      const o = document.createElement("option");
+      o.value = k; o.textContent = PRESETS[k].name;
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", () => {
+      el("presetSel").value = sel.value; el("presetSel2").value = sel.value;
+      loadSource(PRESETS[sel.value].src);
+    });
+  });
+  el("tabExpBtn").addEventListener("click", () => setTab("exp"));
+  el("tabAnimBtn").addEventListener("click", () => setTab("anim"));
+  wireExplorer();
+
+  el("dirEnc").addEventListener("click", () => setDir("enc"));
+  el("dirDec").addEventListener("click", () => setDir("dec"));
+  el("applyBtn").addEventListener("click", () => {
+    const single = spec.alphabet.every(s => s.length === 1);
+    const t = el("inText").value;
+    const arr = (single ? t.split("") : t.split(/\s+/)).filter(c => c !== "");
+    const bad = arr.find(c => !spec.alphabet.includes(c));
+    if (bad !== undefined) { el("parseErr").textContent = "\u201c" + bad + "\u201d is not in the alphabet"; return; }
+    if (arr.length > 20) { el("parseErr").textContent = "at most 20 symbols"; return; }
+    el("parseErr").textContent = "";
+    spec.text = arr; refresh(0, false);
+  });
+  el("inText").addEventListener("keydown", ev => { if (ev.key === "Enter") el("applyBtn").click(); });
+  el("applyBitsBtn").addEventListener("click", () => {
+    spec.bits = el("inBits").value.replace(/[^01]/g, ""); refresh(0, false);
+  });
+  el("inBits").addEventListener("keydown", ev => { if (ev.key === "Enter") el("applyBitsBtn").click(); });
+  el("toDecBtn").addEventListener("click", () => { spec.bits = lastCode; setDir("dec"); });
+  el("fracChk").addEventListener("change", () => { showFrac = el("fracChk").checked; render(); });
+  el("termLen").addEventListener("click", () => {
+    if (!model.hasEof) return;
+    savedEof = spec.eof; spec.eof = R.ZERO;
+    if (spec.nDec == null) spec.nDec = spec.text.length;
+    refresh(0, false);
+  });
+  el("termEof").addEventListener("click", () => {
+    if (model.hasEof) return;
+    spec.eof = (savedEof && !savedEof.isZero()) ? savedEof : new R(1n, 10n);
+    refresh(0, false);
+  });
+  el("eofIn").addEventListener("change", () => {
+    try {
+      const v = parseR(el("eofIn").value);
+      if (v.n <= 0n || v.ge(R.ONE)) throw new Error("P($) must be strictly between 0 and 1");
+      el("parseErr").textContent = ""; spec.eof = v; refresh(0, false);
+    } catch (e) { el("parseErr").textContent = e.message; }
+  });
+  el("inN").addEventListener("change", () => {
+    const v = parseInt(el("inN").value, 10);
+    if (v >= 1 && v <= 20) { spec.nDec = v; refresh(0, false); }
+  });
+  el("loadBtn").addEventListener("click", () => loadSource(el("inputText").value));
+
+  el("resetBtn").addEventListener("click", () => { stop(); goto(0); });
+  el("backBtn").addEventListener("click", () => stepBy(-1));
+  el("stepBtn").addEventListener("click", () => stepBy(1));
+  el("playBtn").addEventListener("click", play);
+  el("scrubber").addEventListener("input", ev => { stop(); goto(+ev.target.value); });
+  el("speed").addEventListener("input", ev => {
+    el("speedVal").textContent = ev.target.value + "ms";
+    if (timer) { stop(); play(); }
+  });
+  document.addEventListener("keydown", ev => {
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+    if (ev.key === "ArrowRight") { stepBy(1); ev.preventDefault(); }
+    else if (ev.key === "ArrowLeft") { stepBy(-1); ev.preventDefault(); }
+    else if (ev.key === " ") { play(); ev.preventDefault(); }
+    else if (ev.key === "Home") { stop(); goto(0); ev.preventDefault(); }
+    else if (ev.key === "End") { stop(); goto(steps.length - 1); ev.preventDefault(); }
+  });
+  let rt = null;
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { liveView = null; lastRendered = -1; drawLive(); drawZoom(); drawDyadic(); }, 120); });
+
+  el("presetSel").value = "adaptive"; el("presetSel2").value = "adaptive";
+  loadSource(PRESETS.adaptive.src);
+  setTab("exp");
+  if (location.hash === "#selftest") runSelfTest(true);
+}
+
+/* ---------- self test ------------------------------------------------------ */
+
+function encodeOnce(src) {
+  const sp = parseInput(src), M = makeModel(sp);
+  let ell = R.ZERO, p = R.ONE;
+  sp.text.forEach((c, i) => {
+    const d = M.dist(sp.text.slice(0, i));
+    const k = d.findIndex(s => s.ch === c);
+    let q = R.ZERO; for (let j = 0; j < k; j++) q = q.add(d[j].p);
+    ell = ell.add(q.mul(p)); p = p.mul(d[k].p);
+  });
+  if (M.hasEof) { const q = R.ONE.sub(sp.eof); ell = ell.add(q.mul(p)); p = p.mul(sp.eof); }
+  let m = ceilLgInv(p) - 1, x;
+  do { m++; x = ceilDiv(ell.n * 2n ** BigInt(m), ell.d); }
+  while (new R(x + 1n, 2n ** BigInt(m)).gt(ell.add(p)));
+  return { bits: x.toString(2).padStart(m, "0"), ell: ell, p: p, x: x, m: m };
+}
+function decodeOnce(src, bits, limit, le) {
+  const sp = parseInput(src), M = makeModel(sp);
+  let x = 0n; for (const b of bits) x = x * 2n + BigInt(b);
+  const target = new R(x, 2n ** BigInt(bits.length));
+  let ell = R.ZERO, p = R.ONE, out = [];
+  for (let i = 0; i < (limit || 40); i++) {
+    const d = M.dist(out);
+    let c = 0, q = R.ZERO;
+    while (le ? ell.add(q.mul(p)).le(target) : ell.add(q.mul(p)).lt(target)) {
+      if (c === M.U) return out.join("") + "$";
+      q = q.add(d[c].p); c++;
+    }
+    c--; if (c < 0) return "\u26a0 boundary";
+    q = q.sub(d[c].p);
+    out.push(d[c].ch);
+    ell = ell.add(q.mul(p)); p = p.mul(d[c].p);
+  }
+  return out.join("");
+}
+
+function runSelfTest(show) {
+  const res = [];
+  const ok = (name, got, want) => res.push({ name: name, got: String(got), want: String(want), ok: String(got) === String(want) });
+
+  const e1 = encodeOnce(PRESETS.trits.src);
+  ok("trits 21101: final l", e1.ell.frac(), "199/243");
+  ok("trits 21101: final p", e1.p.frac(), "1/243");
+  ok("trits 21101: m", e1.m, 9);
+  ok("trits 21101: x", e1.x, 420);
+  ok("trits 21101: code", e1.bits, "110100100");
+  ok("trits 21101: decode", decodeOnce(PRESETS.trits.src, "110100100", 5), "21101");
+
+  const e2 = encodeOnce(PRESETS.adaptive.src);
+  ok("adaptive bbba$: code", e2.bits, "100111101");
+  ok("adaptive bbba$: m", e2.m, 9);
+  ok("adaptive bbba$: decode", decodeOnce(PRESETS.adaptive.src, e2.bits), "bbba$");
+
+  const e3 = encodeOnce(PRESETS.eofDemo.src);
+  ok("a/b/$ aabab: decode", decodeOnce(PRESETS.eofDemo.src, e3.bits), "aabab$");
+  const e4 = encodeOnce(PRESETS.adaptText.src);
+  ok("adaptive abracadabra: decode", decodeOnce(PRESETS.adaptText.src, e4.bits), "abracadabra$");
+  const e5 = encodeOnce(PRESETS.lossless.src);
+  ok("LOSSLESS: powers of two give a dyadic interval", e5.p.frac(), "1/16384");
+  ok("LOSSLESS: decode with \u2264", decodeOnce(PRESETS.lossless.src, e5.bits, 8, true), "LOSSLESS");
+  ok("LOSSLESS: strict < mis-decodes the boundary",
+     decodeOnce(PRESETS.lossless.src, e5.bits, 8, false) !== "LOSSLESS", true);
+  const e6 = encodeOnce(PRESETS.skew.src);
+  ok("low entropy: well under 15 bits", e6.bits.length <= 9, true);
+  ok("low entropy: decode", decodeOnce(PRESETS.skew.src, e6.bits, 15), "000000010000000");
+
+  /* the length bound of the lecture: n*lg(sigma) + 2 bits for uniform trits */
+  const e7 = encodeOnce("model uniform\nalphabet 0 1 2\neof 0\ntext 111111111\n");
+  ok("trits^9 within lg(3^9)+2", e7.m <= Math.ceil(9 * Math.log2(3)) + 2, true);
+
+  if (show) {
+    const box = document.createElement("div");
+    box.className = "sim-box"; box.style.marginTop = "18px";
+    box.innerHTML = '<div class="sim-title"><span>Self test</span><span class="rhs">'
+      + res.filter(r => r.ok).length + " / " + res.length + " passed</span></div>"
+      + "<table class=\"state\">" + res.map(r =>
+        '<tr><td style="text-align:left">' + esc(r.name) + '</td><td>' + esc(r.got) + "</td><td>"
+        + (r.ok ? "\u2713" : "expected " + esc(r.want)) + "</td></tr>").join("") + "</table>";
+    document.body.appendChild(box);
+  }
+  return res;
+}
+window.runSelfTest = runSelfTest;
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

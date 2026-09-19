@@ -1,54 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
-<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
-<link rel="stylesheet" href="/css/animations.css">
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dijkstra's Algorithm — Springs &amp; Rings</title>
 <style>
     :root {
-        --bg: #f1eed9;
-        --panel: #f8f6ec;
-        --panel-border: #cdc9bb;
-        --controls-bg: #e7e3ca;
-        --controls-border: #cdc9bb;
-        --ink: #6b675c;
-        --ink-strong: #46433a;
-        --title-muted: #8b8779;
-        --btn: #f8f6ec;
-        --btn-border: #aeaa9e;
-        --btn-border-hover: #8d897c;
+        --bg: #f1e9d2;
+        --panel: #f6efe0;
+        --panel-border: #e2d6b5;
+        --controls-bg: #e8ddbe;
+        --controls-border: #dcd0b0;
+        --ink: #726253;
+        --ink-strong: #4a3f35;
+        --title-muted: #8c7b70;
+        --btn: #faf6eb;
+        --btn-border: #bcaf92;
+        --btn-border-hover: #9a8c6f;
 
-        --node-cream: #f8f6ec;
-        --node-cream-border: #aeaa9e;
-        --active: #cc2f22;
-        --examine: #b07d18;
-        --queue-border: #2a6a63;
-        --relax: #4a7c3f;
-        --tree-edge: #902015;
-        --steel: #8d897c;
+        --node-cream: #f6efe0;
+        --node-cream-border: #bcaf92;
+        --active: #ff0000;
+        --examine: #c98a1b;
+        --queue-border: #1f6f6a;
+        --relax: #3c8a3c;
+        --tree-edge: #670c07;
+        --steel: #8c8578;
     }
     * { box-sizing: border-box; }
     body {
         background-color: var(--bg); color: var(--ink);
-        font-family: var(--wi-font-body)"Segoe UI", Roboto, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         margin: 0; padding: 22px 26px 40px; min-height: 100vh;
     }
     .nav { display: flex; gap: 6px; margin-bottom: 16px; }
     .nav a {
         text-decoration: none; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.4px;
         padding: 7px 15px; border-radius: 5px 5px 0 0; color: var(--title-muted);
-        background: #e7e3ca; border: 1px solid var(--controls-border); border-bottom: none;
+        background: #e8ddbe; border: 1px solid var(--controls-border); border-bottom: none;
     }
     .nav a.active { background: var(--panel); color: var(--ink-strong); }
-    .nav a:hover:not(.active) { background: #e7e3ca; color: var(--ink-strong); }
+    .nav a:hover:not(.active) { background: #efe6cd; color: var(--ink-strong); }
 
     h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--ink-strong); }
     .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; max-width: 1000px; line-height: 1.5; }
-    .subtitle code { background: #e7e3ca; padding: 1px 6px; border-radius: 3px; }
+    .subtitle code { background: #efe6cd; padding: 1px 6px; border-radius: 3px; }
     .subtitle b { color: var(--ink-strong); }
 
     .controls {
@@ -64,23 +60,38 @@
         padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
         transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit;
     }
-    button:hover:not(:disabled), select:hover { background-color: #fbfaf4; border-color: var(--btn-border-hover); }
+    button:hover:not(:disabled), select:hover { background-color: #fff; border-color: var(--btn-border-hover); }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
-    button.primary { background-color: #f0d9cd; border-color: #c08777; }
-    button.primary:hover:not(:disabled) { background-color: #fbfaf4; }
+    button.primary { background-color: #efd9c8; border-color: #c08b6f; }
+    button.primary:hover:not(:disabled) { background-color: #f3e2d4; }
     select { cursor: pointer; padding-right: 10px; }
-    input[type="range"] { accent-color: #cc2f22; cursor: pointer; vertical-align: middle; }
+    input[type="range"] { accent-color: #e60000; cursor: pointer; vertical-align: middle; }
     .slider-group span { min-width: 42px; }
 
-    .stage { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(320px,1fr); gap: 20px; align-items: start; }
-    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+        /* ---- stage: graph | splitter | side panels (splitter column is draggable) ---- */
+        .stage { display: grid; grid-template-columns: minmax(0, var(--main-w, 1.55fr)) 20px minmax(320px, 1fr); gap: 0; align-items: start; }
+        .stage > .splitter { align-self: stretch; position: relative; cursor: col-resize; user-select: none; touch-action: none; }
+        .stage > .splitter::before { content: ""; position: absolute; left: 8px; right: 8px; top: 0; bottom: 0; border-radius: 2px; background: transparent; transition: background 0.15s; }
+        .stage > .splitter::after { content: ""; position: absolute; left: 50%; top: min(50%, 240px); width: 5px; height: 42px; margin-left: -2.5px; border-radius: 3px; background: var(--panel-border, #d4c5b4); transition: background 0.15s; }
+        .stage > .splitter:hover::before, .stage > .splitter.dragging::before { background: rgba(0,0,0,0.04); }
+        .stage > .splitter:hover::after, .stage > .splitter.dragging::after { background: var(--wi-heading, #902015); }
+        body.splitting, body.splitting * { cursor: col-resize !important; user-select: none !important; }
+        @media (max-width: 980px) { .stage { grid-template-columns: 1fr; gap: 20px; } .stage > .splitter { display: none; } }
+        /* ---- zoomable graph canvas ---- */
+        canvas#graph { touch-action: none; cursor: grab; }
+        canvas#graph.panning { cursor: grabbing; }
+        .sim-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .sim-head .sim-title { flex: 1; }
+        .zoom-ctl { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+        .zoom-ctl button { padding: 0; width: 26px; height: 26px; line-height: 24px; font-size: 1rem; border-radius: 4px; }
+        .zoom-ctl .zoom-pct { min-width: 44px; text-align: center; font-size: 0.78rem; color: var(--title-muted, #7a6d5b); font-variant-numeric: tabular-nums; }
 
     .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
     .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
     canvas#graph { display: block; background-color: var(--bg); width: 100%; height: 560px; border-radius: 4px; }
 
     .side { display: flex; flex-direction: column; gap: 18px; }
-    .status { background: #e7e3ca; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px; display: flex; align-items: center; }
+    .status { background: #efe6cd; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px; display: flex; align-items: center; }
     .status .stepcount { color: var(--title-muted); font-size: 0.8rem; margin-left: auto; padding-left: 12px; white-space: nowrap; }
 
     .queue-wrap { display: flex; align-items: center; gap: 10px; min-height: 56px; }
@@ -90,45 +101,51 @@
     .q-node { width: 42px; height: 42px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 2px solid var(--queue-border); line-height: 1; }
     .q-node .qv { font-weight: 800; font-size: 0.95rem; }
     .q-node .qd { font-size: 0.58rem; font-weight: 700; opacity: 0.85; font-variant-numeric: tabular-nums; }
-    .q-node.front { border-color: var(--active); border-width: 3px; box-shadow: 0 0 0 3px rgba(204,47,34,0.12); }
+    .q-node.front { border-color: var(--active); border-width: 3px; box-shadow: 0 0 0 3px rgba(255,0,0,0.12); }
     .queue-tip { font-size: 0.78rem; color: var(--title-muted); margin-top: 8px; }
     .queue-tip b { color: var(--queue-border); }
 
     .dist-table { display: flex; flex-direction: column; gap: 5px; max-height: 240px; overflow-y: auto; }
+    .dist-row { cursor: default; }
+    .dist-row.hot { background: #f3e7d2; border-radius: 4px; }
+
+    /* adjacency lists */
+    .adj { font-size: 0.88rem; }
+    .adj-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #e6dabb; }
+    .adj-row:last-child { border-bottom: none; }
+    .adj-row.hot { background: #f3e7d2; border-radius: 4px; }
+    .adj-key { width: 30px; min-width: 30px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 700; background: #f6efe0; border: 1px solid #bcaf92; color: var(--ink-strong); font-size: 0.85rem; cursor: pointer; }
+    .adj-arrow { color: var(--title-muted); }
+    .adj-cells { display: flex; gap: 5px; flex-wrap: wrap; }
+    .adj-cell { min-width: 24px; padding: 2px 6px; border-radius: 3px; text-align: center; background: #efe6cd; border: 1px solid #ddd0b1; color: var(--ink); font-variant-numeric: tabular-nums; font-size: 0.82rem; cursor: pointer; }
+    .adj-cell.tree { background: #f4e0dc; border-color: #670c07; color: #670c07; font-weight: 700; }
+    .adj-cell.hot { outline: 2px solid #ff0000; outline-offset: 1px; }
+    .adj-empty { color: var(--title-muted); font-style: italic; }
     .dist-row { display: flex; align-items: center; gap: 9px; font-size: 0.85rem; }
     .dist-key { width: 26px; height: 26px; min-width: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.78rem; border: 1.5px solid rgba(0,0,0,0.18); }
-    .dist-bar-wrap { flex: 1; height: 12px; background: #e7e3ca; border-radius: 6px; overflow: hidden; border: 1px solid #cdc9bb; }
+    .dist-bar-wrap { flex: 1; height: 12px; background: #efe6cd; border-radius: 6px; overflow: hidden; border: 1px solid #ddd0b1; }
     .dist-bar { height: 100%; border-radius: 6px 0 0 6px; }
     .dist-val { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 30px; text-align: right; color: var(--ink-strong); }
     .dist-val.inf { color: var(--title-muted); }
-    .dist-row.settled .dist-key { border-color: #2a6a63; border-width: 2px; }
+    .dist-row.settled .dist-key { border-color: #15616d; border-width: 2px; }
 
     .legend { display: flex; flex-wrap: wrap; gap: 12px 20px; font-size: 0.8rem; color: var(--ink); align-items: center; }
     .legend .item { display: flex; align-items: center; gap: 7px; }
     .swatch { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; }
     .sw-cream { background: var(--node-cream); border-color: var(--node-cream-border); }
-    .sw-settled { background: #c08777; border-color: #6d180f; }
-    .sw-pq { background: #f8f6ec; border-color: var(--queue-border); border-width: 2.5px; }
-    .sw-curr  { background: #c08777; border-color: var(--active); border-width: 2.5px; }
-    .sw-disc { width: 20px; height: 20px; border-radius: 50%; background: rgba(103,12,7,0.10); border: 1px dashed #2a6a63; }
-    .sw-spring { width: 26px; height: 12px; background: repeating-linear-gradient(90deg,#8d897c 0 2px, transparent 2px 5px); border-radius: 2px; }
+    .sw-settled { background: #d98a76; border-color: #43271f; }
+    .sw-pq { background: #f6efe0; border-color: var(--queue-border); border-width: 2.5px; }
+    .sw-curr  { background: #d98a76; border-color: var(--active); border-width: 2.5px; }
+    .sw-disc { width: 20px; height: 20px; border-radius: 50%; background: rgba(103,12,7,0.10); border: 1px dashed #1f6f6a; }
+    .sw-spring { width: 26px; height: 12px; background: repeating-linear-gradient(90deg,#8c8578 0 2px, transparent 2px 5px); border-radius: 2px; }
 
     details.editor { margin-top: 22px; }
     details.editor summary { cursor: pointer; font-size: 0.85rem; color: var(--title-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
     .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-    textarea { font-family: "SF Mono", var(--wi-font-mono); font-size: 0.85rem; background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px; padding: 10px; width: 230px; height: 230px; resize: vertical; }
+    textarea { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px; padding: 10px; width: 230px; height: 230px; resize: vertical; }
     .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 420px; line-height: 1.5; }
-    .editor-help code { background: #e7e3ca; padding: 1px 5px; border-radius: 3px; }
-    .err { color: #6d180f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
-</style>
-<style>
-/* wild-inter.net: re-assert the site type stack over the page's own styles */
-h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
-  font-family: var(--wi-font-head);
-  letter-spacing: .05em;
-}
-h1, h2, h3 { color: var(--wi-accent); }
-body { font-family: var(--wi-font-body); }
+    .editor-help code { background: #efe6cd; padding: 1px 5px; border-radius: 3px; }
+    .err { color: #9a3b2f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
 </style>
 </head>
 <body>
@@ -136,6 +153,7 @@ body { font-family: var(--wi-font-body); }
 <div class="nav">
     <a href="dijkstra.html">Water &amp; Queue</a>
     <a class="active" href="dijkstra-springs.html">Springs &amp; Rings</a>
+    <a href="dijkstra-strings.html">Strings &amp; Gravity</a>
 </div>
 
 <h1>Dijkstra's Algorithm — Springs &amp; Rings</h1>
@@ -156,7 +174,11 @@ body { font-family: var(--wi-font-body); }
         <button id="playBtn" onclick="togglePlay()">Play</button>
         <button id="resetBtn" onclick="resetRun()">Reset</button>
     </div>
-    <div class="slider-group" style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#46433a">
+    <div class="slider-group" style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#5c4f43">
+        <input type="range" id="stepSlider" aria-label="Scrub through the run" min="0" max="1000" value="0" step="1" oninput="scrubStep(this.value)">
+        <span id="stepSliderVal" style="min-width:62px">0 / 0</span>
+    </div>
+    <div class="slider-group" style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#5c4f43">
         <label style="font-size:.82rem;letter-spacing:.6px;text-transform:uppercase;font-weight:600;color:var(--ink-strong)">Delay</label>
         <input type="range" id="speedSlider" min="120" max="1800" value="850" oninput="updateSpeed(this.value)">
         <span id="speedVal">850ms</span>
@@ -165,14 +187,14 @@ body { font-family: var(--wi-font-body); }
         <label for="coilToggle">Coils</label>
         <label class="switch" style="position:relative;display:inline-block;width:42px;height:23px">
             <input type="checkbox" id="coilToggle" checked onchange="toggleCoils(this.checked)" style="opacity:0;width:0;height:0">
-            <span class="track" style="position:absolute;cursor:pointer;inset:0;background:#2a6a63;border:1px solid #1d5049;border-radius:23px;transition:.2s"></span>
+            <span class="track" style="position:absolute;cursor:pointer;inset:0;background:#15616d;border:1px solid #0f4750;border-radius:23px;transition:.2s"></span>
         </label>
     </div>
 </div>
 
 <div class="stage">
     <div class="sim-box">
-        <div class="sim-title">Distance rings &nbsp;·&nbsp; spring relaxation</div>
+        <div class="sim-head"><div class="sim-title">Distance rings &nbsp;·&nbsp; spring relaxation</div><div class="zoom-ctl" title="Wheel: zoom &middot; drag: pan &middot; double-click: reset"><button type="button" id="zoomOut" title="Zoom out">&minus;</button><span class="zoom-pct" id="zoomPct">100%</span><button type="button" id="zoomIn" title="Zoom in">+</button><button type="button" id="zoomFit" title="Reset view (double-click on the graph)">&#x2922;</button></div></div>
         <canvas id="graph"></canvas>
         <div class="legend" style="margin-top:12px">
             <div class="item"><span class="swatch sw-cream"></span>undiscovered (∞ ring)</div>
@@ -184,6 +206,7 @@ body { font-family: var(--wi-font-body); }
         </div>
     </div>
 
+    <div class="splitter" id="stageSplitter" title="Drag to resize &middot; double-click to reset"></div>
     <div class="side">
         <div class="sim-box">
             <div class="sim-title">Status</div>
@@ -201,6 +224,10 @@ body { font-family: var(--wi-font-body); }
         <div class="sim-box">
             <div class="sim-title">Distances &nbsp;·&nbsp; distTo[v]</div>
             <div class="dist-table" id="distTable"></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Adjacency lists &nbsp;·&nbsp; hover to highlight</div>
+            <div class="adj" id="adjView"></div>
         </div>
     </div>
 </div>
@@ -323,6 +350,11 @@ let ringR = 0, ringTarget = 0;  // settled frontier radius (animated)
 let featured = -1;              // vertex getting the bouncy relax
 let coils = true;
 let animating = false, rafId = null, lastTs = null;
+
+/* ---- hover highlighting ---- */
+let hoverV = -1, hoverE = -1;              // hoverE indexes edges[]
+let panelsFrozen = false;
+let hitPos = [], hitNr = 12;
 
 const canvas = document.getElementById('graph');
 const ctx = canvas.getContext('2d');
@@ -523,19 +555,107 @@ function lerpColor(c1, c2, t) {
 }
 function distColor(d) {
     const t = maxFinalDist <= 0 ? 0 : Math.min(1, d / maxFinalDist);
-    const c = lerpColor('#e5c0b4', '#902015', t);
+    const c = lerpColor('#e2b3a3', '#670c07', t);
     return { css: `rgb(${c.r},${c.g},${c.b})`, r: c.r, g: c.g, b: c.b };
 }
-function textOn(rgb) { return (0.299*rgb.r + 0.587*rgb.g + 0.114*rgb.b) < 130 ? '#f1eed9' : '#46433a'; }
+function textOn(rgb) { return (0.299*rgb.r + 0.587*rgb.g + 0.114*rgb.b) < 130 ? '#f1e9d2' : '#4a3f35'; }
 
 /* ============================ geometry / radius mapping ============================ */
+/* ============================ viewport (zoom & pan) ============================
+   World coordinates are the canvas layout at zoom 1; the camera is a single canvas transform, so all
+   drawing code is zoom-agnostic. view.dx/dy: world offset of the point shown at the canvas centre. */
+const view2 = { z: 1, dx: 0, dy: 0 };
+let cam = { z: 1, tx: 0, ty: 0 }, camW = 0, camH = 0;
+function preferredHeight(w) {
+    const hMax = Math.max(500, Math.round(window.innerHeight * 0.78));
+    return Math.round(Math.max(500, Math.min(hMax, w * 0.75)));
+}
+function camFit() {   // size the canvas (height follows width, bounded), apply the camera transform; returns { cw, ch }
+    dpr = window.devicePixelRatio || 1;
+    let rect = canvas.getBoundingClientRect();
+    const h = preferredHeight(rect.width);
+    if (Math.abs(h - rect.height) > 0.5) { canvas.style.height = h + 'px'; rect = canvas.getBoundingClientRect(); }
+    camW = rect.width; camH = rect.height;
+    canvas.width = Math.round(camW*dpr); canvas.height = Math.round(camH*dpr);
+    const z = view2.z;
+    cam = { z, tx: camW/2 - z*(camW/2 + view2.dx), ty: camH/2 - z*(camH/2 + view2.dy) };
+    ctx.setTransform(dpr*z, 0, 0, dpr*z, dpr*cam.tx, dpr*cam.ty);
+    const pct = document.getElementById('zoomPct'); if (pct) pct.textContent = Math.round(z*100) + '%';
+    return { cw: camW, ch: camH };
+}
+function toWorld(sx, sy) { return { x: (sx - cam.tx)/cam.z, y: (sy - cam.ty)/cam.z }; }
+function screenFill(style) {   // fill the whole visible canvas regardless of the camera
+    ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = style; ctx.fillRect(0, 0, camW, camH); ctx.restore();
+}
+function zoomAt(factor, sx, sy) {    // zoom keeping the world point under (sx, sy) fixed
+    const z = Math.max(0.3, Math.min(12, view2.z*factor));
+    const a = toWorld(sx, sy);
+    const tx = sx - z*a.x, ty = sy - z*a.y;
+    view2.z = z; view2.dx = (camW/2 - tx)/z - camW/2; view2.dy = (camH/2 - ty)/z - camH/2;
+    redrawCanvas();
+}
+function panBy(dx, dy) { view2.dx -= dx/cam.z; view2.dy -= dy/cam.z; redrawCanvas(); }
+function resetView() { view2.z = 1; view2.dx = view2.dy = 0; redrawCanvas(); }
+function redrawCanvas() { if (!animating) draw(); }
+
+(function setupViewport() {
+    const ptrs = new Map(); let pinchD = 0;
+    const local = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        const d = e.deltaMode === 1 ? e.deltaY*16 : e.deltaY;
+        const p = local(e); zoomAt(Math.max(0.5, Math.min(2, Math.exp(-d*0.0015))), p.x, p.y);
+    }, { passive: false });
+    canvas.addEventListener('pointerdown', e => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        ptrs.set(e.pointerId, local(e)); canvas.setPointerCapture(e.pointerId);
+        if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinchD = Math.hypot(a.x-b.x, a.y-b.y); }
+        canvas.classList.add('panning');
+    });
+    canvas.addEventListener('pointermove', e => {
+        if (!ptrs.has(e.pointerId)) return;
+        const prev = ptrs.get(e.pointerId), cur = local(e); ptrs.set(e.pointerId, cur);
+        if (ptrs.size === 2) {
+            const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x-b.x, a.y-b.y);
+            if (pinchD > 0) zoomAt(d/pinchD, (a.x+b.x)/2, (a.y+b.y)/2); pinchD = d;
+        } else panBy(cur.x - prev.x, cur.y - prev.y);
+    });
+    const up = e => { ptrs.delete(e.pointerId); pinchD = 0; if (!ptrs.size) canvas.classList.remove('panning'); };
+    canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+    canvas.addEventListener('dblclick', e => { e.preventDefault(); resetView(); });
+    const zi = document.getElementById('zoomIn'), zo = document.getElementById('zoomOut'), zf = document.getElementById('zoomFit');
+    if (zi) zi.addEventListener('click', () => zoomAt(1.25, camW/2, camH/2));
+    if (zo) zo.addEventListener('click', () => zoomAt(1/1.25, camW/2, camH/2));
+    if (zf) zf.addEventListener('click', resetView);
+    if (window.ResizeObserver) new ResizeObserver(() => redrawCanvas()).observe(canvas);
+})();
+/* ============================ draggable stage splitter ============================ */
+(function setupSplitter() {
+    const sp = document.getElementById('stageSplitter'); if (!sp) return;
+    const stage = sp.parentElement, KEY = 'wi-stage-main-w:' + location.pathname;
+    const clampW = w => { const total = stage.getBoundingClientRect().width; return Math.max(260, Math.min(total - 20 - 330, w)); };
+    const apply = w => { stage.style.setProperty('--main-w', clampW(w) + 'px'); };
+    try { const s = localStorage.getItem(KEY); if (s) apply(parseFloat(s)); } catch (_) {}
+    let dragging = false;
+    sp.addEventListener('pointerdown', e => {
+        dragging = true; sp.setPointerCapture(e.pointerId); sp.classList.add('dragging'); document.body.classList.add('splitting'); e.preventDefault();
+    });
+    sp.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        apply(e.clientX - stage.getBoundingClientRect().left - 10);
+    });
+    const end = () => {
+        if (!dragging) return; dragging = false; sp.classList.remove('dragging'); document.body.classList.remove('splitting');
+        try { localStorage.setItem(KEY, parseFloat(stage.style.getPropertyValue('--main-w'))); } catch (_) {}
+    };
+    sp.addEventListener('pointerup', end); sp.addEventListener('pointercancel', end);
+    sp.addEventListener('dblclick', () => { stage.style.removeProperty('--main-w'); try { localStorage.removeItem(KEY); } catch (_) {} });
+    window.addEventListener('resize', () => { const w = parseFloat(stage.style.getPropertyValue('--main-w')); if (w) apply(w); });
+})();
 let cx = 0, cy = 0, avail = 1, R_inf = 1, R_finite = 1, innerFloor = 1, scale = 1, nr = 13, dpr = 1;
 function fitCanvas() {
     dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const cw = rect.width, ch = rect.height;
-    canvas.width = Math.round(cw*dpr); canvas.height = Math.round(ch*dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const { cw, ch } = camFit();
     cx = cw / 2; cy = ch / 2;
     avail = Math.min(cw, ch) / 2 - 30;
     R_inf = avail * 0.99;
@@ -566,6 +686,7 @@ function settledDistUpTo(p) {
     return s;
 }
 function setTargetsForPtr() {
+    syncAdjState();
     const d = distAtPtr(ptr);
     for (let v = 0; v < V; v++) springState[v].target = Rof(d[v]);
     ringTarget = Rof(settledDistUpTo(ptr));
@@ -619,9 +740,9 @@ function drawWeightLabel(x, y, text) {
     ctx.font = '700 11px -apple-system, "Segoe UI", Roboto, sans-serif';
     const w = ctx.measureText(text).width, pad = 4;
     roundRect(x-w/2-pad, y-8, w+2*pad, 16, 4);
-    ctx.fillStyle = 'rgba(248,246,236,0.95)'; ctx.strokeStyle = '#aeaa9e'; ctx.lineWidth = 1;
+    ctx.fillStyle = 'rgba(246,239,224,0.95)'; ctx.strokeStyle = '#bcaf92'; ctx.lineWidth = 1;
     ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#46433a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#4a3f35'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(text, x, y+0.5);
 }
 function drawSpring(ax, ay, bx, by, restPx, color, width, refBodyL) {
@@ -663,7 +784,7 @@ function draw() {
 
     // 1. PQ region (light) then settled disc (warm) then frontier ring
     ctx.beginPath(); ctx.arc(cx, cy, R_inf, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(42,106,99,0.05)'; ctx.fill();
+    ctx.fillStyle = 'rgba(31,111,106,0.05)'; ctx.fill();
     ctx.beginPath(); ctx.arc(cx, cy, Math.max(0, ringR), 0, Math.PI*2);
     ctx.fillStyle = 'rgba(103,12,7,0.09)'; ctx.fill();
 
@@ -675,20 +796,20 @@ function draw() {
         const R = Rof(d);
         if (R < 2) return;
         ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2);
-        ctx.strokeStyle = 'rgba(70,67,58,0.16)'; ctx.lineWidth = 1; ctx.setLineDash([3,4]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle = 'rgba(74,63,53,0.16)'; ctx.lineWidth = 1; ctx.setLineDash([3,4]); ctx.stroke(); ctx.setLineDash([]);
         ctx.font = '600 10px -apple-system, "Segoe UI", Roboto, sans-serif';
-        ctx.fillStyle = 'rgba(70,67,58,0.55)';
+        ctx.fillStyle = 'rgba(74,63,53,0.55)';
         drawTinyLabel(cx, cy - R, String(d));
     });
     // ∞ ring
     ctx.beginPath(); ctx.arc(cx, cy, R_inf, 0, Math.PI*2);
-    ctx.strokeStyle = 'rgba(139,135,121,0.5)'; ctx.lineWidth = 1.2; ctx.setLineDash([2,5]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(140,124,112,0.5)'; ctx.lineWidth = 1.2; ctx.setLineDash([2,5]); ctx.stroke(); ctx.setLineDash([]);
     drawTinyLabel(cx, cy - R_inf, '∞');
 
     // 3. frontier ring (delMin)
     if (ringR > 2) {
         ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI*2);
-        ctx.strokeStyle = 'rgba(42,106,99,0.85)'; ctx.lineWidth = 2; ctx.setLineDash([6,5]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle = 'rgba(31,111,106,0.85)'; ctx.lineWidth = 2; ctx.setLineDash([6,5]); ctx.stroke(); ctx.setLineDash([]);
     }
 
     // 4. springs (undirected edges, drawn once each)
@@ -702,10 +823,10 @@ function draw() {
         const key = ekey(e.u, e.v);
         let color = 'rgba(140,133,120,0.75)', width = 1.8;
         const isTree = state && state.edgeTo && (state.edgeTo[e.u] === e.v || state.edgeTo[e.v] === e.u);
-        if (isTree) { color = '#902015'; width = 3; }
+        if (isTree) { color = '#670c07'; width = 3; }
         if (skipKey === key)  { color = 'rgba(201,138,27,0.5)'; width = 2; }
-        if (examKey === key)  { color = '#b07d18'; width = 3.2; }
-        if (relaxKey === key) { color = '#4a7c3f'; width = 3.4; }
+        if (examKey === key)  { color = '#c98a1b'; width = 3.2; }
+        if (relaxKey === key) { color = '#3c8a3c'; width = 3.4; }
         const Tu = targetPosOf(e.u), Tv = targetPosOf(e.v);
         const refLen = Math.hypot(Tv.x-Tu.x, Tv.y-Tu.y);
         drawSpring(A.x, A.y, B.x, B.y, e.weight * scale, color, width, refLen);
@@ -723,15 +844,15 @@ function draw() {
         const p = posOf(v);
         const d = dcur[v];
         const settledV = state && state.settled && state.settled[v];
-        let fill = '#f8f6ec', border = '#aeaa9e', tcol = '#6b675c';
-        if (Number.isFinite(d)) { const rgb = distColor(d); fill = rgb.css; tcol = textOn(rgb); border = 'rgba(109,24,15,0.6)'; }
+        let fill = '#f6efe0', border = '#bcaf92', tcol = '#726253';
+        if (Number.isFinite(d)) { const rgb = distColor(d); fill = rgb.css; tcol = textOn(rgb); border = 'rgba(67,39,31,0.6)'; }
 
 
         ctx.beginPath(); ctx.arc(p.x, p.y, nr, 0, Math.PI*2); ctx.fillStyle = fill; ctx.fill();
         const isCurrent = state && state.current === v;
-        if (isCurrent) { ctx.lineWidth = 4; ctx.strokeStyle = '#cc2f22'; }
-        else if (state && state.examW === v) { ctx.lineWidth = 3; ctx.strokeStyle = '#b07d18'; }
-        else if (inQueue.has(v) && !settledV) { ctx.lineWidth = 3; ctx.strokeStyle = '#2a6a63'; }
+        if (isCurrent) { ctx.lineWidth = 4; ctx.strokeStyle = '#ff0000'; }
+        else if (state && state.examW === v) { ctx.lineWidth = 3; ctx.strokeStyle = '#c98a1b'; }
+        else if (inQueue.has(v) && !settledV) { ctx.lineWidth = 3; ctx.strokeStyle = '#1f6f6a'; }
         else { ctx.lineWidth = 2; ctx.strokeStyle = border; }
         ctx.stroke();
 
@@ -743,20 +864,25 @@ function draw() {
         ctx.fillText(String(v), p.x, p.y + 0.5);
     }
 
+    hitPos = []; hitNr = nr;
+    for (let v = 0; v < V; v++) hitPos.push(posOf(v));
+    drawHover(posOf, state, dcur, cw, ch);
+
     renderPanels(state);
 }
 function drawTinyLabel(x, y, text) {
     ctx.font = '600 10px -apple-system, "Segoe UI", Roboto, sans-serif';
     const w = ctx.measureText(text).width, pad = 3;
     roundRect(x-w/2-pad, y-7, w+2*pad, 14, 3);
-    ctx.fillStyle = 'rgba(241,238,217,0.9)'; ctx.fill();
-    ctx.fillStyle = 'rgba(70,67,58,0.7)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(241,233,210,0.9)'; ctx.fill();
+    ctx.fillStyle = 'rgba(74,63,53,0.7)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(text, x, y);
 }
 
 /* ============================ side panels ============================ */
 function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c])); }
 function renderPanels(state) {
+    if (panelsFrozen) { syncHot(); return; }   // never rebuild the lists under the pointer
     const st = document.getElementById('statusText'), sc = document.getElementById('stepCount');
     if (state) { st.innerHTML = escapeHtml(state.action); sc.textContent = `step ${ptr+1} / ${steps.length}`; }
     else { st.innerHTML = 'Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.'; sc.textContent = `0 / ${steps.length}`; }
@@ -767,7 +893,7 @@ function renderPanels(state) {
     else q.forEach((v, i) => {
         const node = document.createElement('div'); node.className = 'q-node' + (i===0 ? ' front' : '');
         const rgb = distColor(state.distTo[v]); node.style.background = rgb.css; node.style.color = textOn(rgb);
-        if (i !== 0) node.style.borderColor = '#2a6a63';
+        if (i !== 0) node.style.borderColor = '#1f6f6a';
         node.innerHTML = `<span class="qv">${v}</span><span class="qd">${formatNum(state.distTo[v])}</span>`;
         qv.appendChild(node);
     });
@@ -775,13 +901,15 @@ function renderPanels(state) {
     const dt = document.getElementById('distTable'); dt.innerHTML = '';
     const dcur = distAtPtr(ptr);
     for (let v = 0; v < V; v++) {
-        const row = document.createElement('div'); row.className = 'dist-row';
+        const row = document.createElement('div'); row.className = 'dist-row'; row.dataset.v = v;
+        row.onmouseenter = () => setHover(v, -1);
+        row.onmouseleave = () => setHover(-1, -1);
         const settledV = state && state.settled && state.settled[v];
         if (settledV) row.classList.add('settled');
         const key = document.createElement('div'); key.className = 'dist-key';
         const d = dcur[v];
         if (Number.isFinite(d)) { const rgb = distColor(d); key.style.background = rgb.css; key.style.color = textOn(rgb); }
-        else { key.style.background = '#f8f6ec'; key.style.color = '#a89a86'; }
+        else { key.style.background = '#f6efe0'; key.style.color = '#a89a86'; }
         key.textContent = v; row.appendChild(key);
         const barWrap = document.createElement('div'); barWrap.className = 'dist-bar-wrap';
         const bar = document.createElement('div'); bar.className = 'dist-bar';
@@ -792,6 +920,138 @@ function renderPanels(state) {
         val.textContent = formatNum(d); row.appendChild(val);
         dt.appendChild(row);
     }
+    syncHot();
+}
+
+/* ============================ hover highlighting ============================ */
+/* One vertex or one spring at a time. Hovering a vertex lights up its whole current tree path
+   back to the source; hovering a spring lights up just that edge. The drawing, the distance
+   table and the adjacency list all drive each other, in both directions. */
+/* the tree as known at the current step (tentative edges included); before the run starts there is none */
+function currentEdgeTo(state) {
+    return state && state.edgeTo ? state.edgeTo : null;
+}
+function drawHiEdge(posOf, u, v, weight, color) {
+    const a = posOf(u), b = posOf(v);
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(246,239,224,0.95)'; ctx.stroke();   // clear a lane, then redraw the coil
+    ctx.restore();
+    const Tu = nodePos(u, springState[u].target), Tv = nodePos(v, springState[v].target);
+    drawSpring(a.x, a.y, b.x, b.y, weight * scale, color, 3.4, Math.hypot(Tv.x-Tu.x, Tv.y-Tu.y));
+    drawWeightLabel((a.x+b.x)/2, (a.y+b.y)/2, formatNum(weight));
+}
+function drawHiVertex(v, p, d) {
+    let fill = '#f6efe0', tcol = '#726253';
+    if (Number.isFinite(d)) { const rgb = distColor(d); fill = rgb.css; tcol = textOn(rgb); }
+    ctx.beginPath(); ctx.arc(p.x, p.y, nr, 0, Math.PI*2); ctx.fillStyle = fill; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = (v === hoverV) ? '#ff0000' : '#670c07'; ctx.stroke();
+    ctx.font = `700 ${Math.round(nr*0.95)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = tcol; ctx.fillText(String(v), p.x, p.y + 0.5);
+}
+function drawHover(posOf, state, dcur, cw, ch) {
+    if (hoverV < 0 && hoverE < 0) return;
+    ctx.save();
+    screenFill('rgba(241,233,210,0.76)');   // veil (screen space), then repaint the highlight
+    const keep = new Set();
+    if (hoverE >= 0 && edges[hoverE]) {
+        const e = edges[hoverE];
+        drawHiEdge(posOf, e.u, e.v, e.weight, '#e60000');
+        keep.add(e.u); keep.add(e.v);
+    }
+    if (hoverV >= 0) {
+        const eTo = currentEdgeTo(state);
+        keep.add(hoverV);
+        if (eTo) {
+            let x = hoverV, guard = 0;
+            while (eTo[x] >= 0 && guard++ < V) {
+                const u = eTo[x];
+                const id = edgeIndex.get(ekey(u, x));
+                if (id !== undefined) drawHiEdge(posOf, u, x, edges[id].weight, '#670c07');
+                keep.add(u); x = u;
+            }
+        }
+    }
+    for (const v of keep) drawHiVertex(v, posOf(v), dcur[v]);
+    ctx.restore();
+}
+/* an edge is tinted in the list only once the run has actually made it load-bearing */
+function syncAdjState() {
+    const state = ptr >= 0 ? steps[ptr] : null;
+    const eTo = state && state.edgeTo ? state.edgeTo : null;
+    document.querySelectorAll('#adjView .adj-cell').forEach(c => {
+        const e = edges[+c.dataset.e];
+        c.classList.toggle('tree', !!(eTo && e && (eTo[e.u] === e.v || eTo[e.v] === e.u)));
+    });
+}
+function syncHot() {
+    document.querySelectorAll('#adjView .adj-row').forEach(r => r.classList.toggle('hot', +r.dataset.v === hoverV));
+    document.querySelectorAll('#distTable .dist-row').forEach(r => r.classList.toggle('hot', +r.dataset.v === hoverV));
+    document.querySelectorAll('#adjView .adj-cell').forEach(c => c.classList.toggle('hot', +c.dataset.e === hoverE));
+}
+function setHover(v, e) {
+    if (v === hoverV && e === hoverE) return;
+    hoverV = v; hoverE = e;
+    panelsFrozen = true;
+    draw();
+    panelsFrozen = false;
+    syncHot();
+}
+function segDist(px, py, x1, y1, x2, y2) {
+    const dx = x2-x1, dy = y2-y1, L2 = dx*dx + dy*dy;
+    let t = L2 > 0 ? ((px-x1)*dx + (py-y1)*dy) / L2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t*dx), py - (y1 + t*dy));
+}
+function pickAt(mx, my) {
+    for (let v = 0; v < hitPos.length; v++) if (Math.hypot(hitPos[v].x - mx, hitPos[v].y - my) <= hitNr + 4) return { v, e: -1 };
+    let best = -1, bestD = 10;
+    edges.forEach((e, i) => {
+        if (!hitPos[e.u] || !hitPos[e.v]) return;
+        const d = segDist(mx, my, hitPos[e.u].x, hitPos[e.u].y, hitPos[e.v].x, hitPos[e.v].y);
+        if (d < bestD) { bestD = d; best = i; }
+    });
+    return { v: -1, e: best };
+}
+canvas.addEventListener('mousemove', ev => {
+    const r = canvas.getBoundingClientRect();
+    if (canvas.classList.contains('panning')) return;
+    const m = toWorld(ev.clientX - r.left, ev.clientY - r.top);
+    const hit = pickAt(m.x, m.y);
+    canvas.style.cursor = (hit.v >= 0 || hit.e >= 0) ? 'pointer' : 'grab';
+    setHover(hit.v, hit.e);
+});
+canvas.addEventListener('mouseleave', () => setHover(-1, -1));
+
+/* the adjacency list is graph structure only, so it is rebuilt on load — never under the pointer */
+function renderAdjPanel() {
+    const av = document.getElementById('adjView');
+    if (!av) return;
+    av.innerHTML = '';
+    for (let v = 0; v < V; v++) {
+        const row = document.createElement('div'); row.className = 'adj-row'; row.dataset.v = v;
+        const key = document.createElement('div'); key.className = 'adj-key'; key.textContent = v;
+        key.onmouseenter = () => setHover(v, -1);
+        key.onmouseleave = () => setHover(-1, -1);
+        row.appendChild(key);
+        const arrow = document.createElement('span'); arrow.className = 'adj-arrow'; arrow.textContent = '—'; row.appendChild(arrow);
+        const cells = document.createElement('div'); cells.className = 'adj-cells';
+        const nb = adj[v] || [];
+        if (!nb.length) { const em = document.createElement('span'); em.className = 'adj-empty'; em.textContent = '∅'; cells.appendChild(em); }
+        nb.forEach(e => {
+            const id = edgeIndex.get(ekey(v, e.w));
+            const cell = document.createElement('span'); cell.className = 'adj-cell';
+            cell.textContent = `${e.w} (${formatNum(e.weight)})`;
+            cell.dataset.e = id === undefined ? -1 : id;
+            cell.onmouseenter = () => setHover(-1, id === undefined ? -1 : id);
+            cell.onmouseleave = () => setHover(-1, -1);
+            cells.appendChild(cell);
+        });
+        row.appendChild(cells); av.appendChild(row);
+    }
+    syncHot(); syncAdjState();
 }
 
 /* ============================ run control ============================ */
@@ -804,7 +1064,9 @@ function rebuildSteps() {
     assignAngles();
     springState = Array.from({ length: V }, () => ({ r: 0, vel: 0, target: 0 }));
     ptr = -1; stopPlay();
+    hoverV = -1; hoverE = -1;
     setTargetsForPtr(); snapToTargets();
+    renderAdjPanel();
     draw(); syncButtons();
 }
 function stepFwd() { if (ptr < steps.length-1) { ptr++; setTargetsForPtr(); ensureAnim(); } if (ptr >= steps.length-1) stopPlay(); syncButtons(); }
@@ -822,6 +1084,21 @@ function updatePlayBtn() { document.getElementById('playBtn').textContent = play
 function syncButtons() {
     document.getElementById('backBtn').disabled = ptr <= -1;
     document.getElementById('stepBtn').disabled = ptr >= steps.length-1;
+    syncStepSlider();
+}
+/* One slider for the whole run — scrubbing snaps the springs rather than animating each step. */
+function scrubStep(val) {
+    stopPlay();
+    ptr = Math.round(((+val) / 1000) * steps.length) - 1;
+    if (ptr < -1) ptr = -1;
+    if (ptr > steps.length - 1) ptr = steps.length - 1;
+    setTargetsForPtr(); snapToTargets(); draw(); syncButtons();
+}
+function syncStepSlider() {
+    const sl = document.getElementById('stepSlider'), out = document.getElementById('stepSliderVal');
+    if (!sl) return;
+    sl.value = steps.length ? Math.round(1000 * (ptr + 1) / steps.length) : 0;
+    out.textContent = `${ptr + 1} / ${steps.length}`;
 }
 function updateSpeed(val) { delay = parseInt(val, 10); document.getElementById('speedVal').textContent = val + 'ms'; }
 function toggleCoils(on) { coils = on; draw(); }

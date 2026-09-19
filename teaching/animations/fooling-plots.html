@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How to Fool the Plot-Inspection Heuristic</title>
+<style>
+    :root {
+        --bg: #f5ebd9;
+        --panel: #faf6ed;
+        --panel-border: #d4c5b4;
+        --controls-bg: #ecddc5;
+        --controls-border: #d4c5b4;
+        --ink: #6b675c;
+        --ink-strong: #46433a;
+        --title-muted: #8b8779;
+        --btn: #faf6ed;
+        --btn-border: #b9a793;
+        --grid: #d4c5b4;
+        --f: #902015;   /* f(x) = x^2 */
+        --g: #3f7d86;   /* g(x)       */
+        --accent: #b07d18;
+        --active: #cc2f22;
+    }
+    * { box-sizing: border-box; }
+    body {
+        background: var(--bg); color: var(--ink);
+        font-family: var(--wi-font-body)"Segoe UI", Roboto, sans-serif;
+        margin: 0; padding: 22px 26px 60px; min-height: 100vh;
+    }
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; color: var(--ink-strong); letter-spacing: .3px; }
+    .subtitle { font-size: .92rem; color: var(--title-muted); margin: 0 0 18px; max-width: 900px; line-height: 1.5; }
+    code, .mono { font-family: "SF Mono", var(--wi-font-mono); }
+    code { background: #ecddc5; padding: 1px 6px; border-radius: 3px; font-size: .88em; }
+
+    .controls {
+        display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
+        background: var(--controls-bg); padding: 13px 20px; border-radius: 6px;
+        border: 1px solid var(--controls-border); margin-bottom: 18px;
+    }
+    .cap { font-size: .82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
+    button {
+        background: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+        padding: 7px 14px; font-size: .9rem; border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: 500;
+    }
+    button:hover { background: #fcf9f3; }
+    button.primary { background: #f0d9cd; border-color: #c28577; }
+    button.on { background: #902015; border-color: #470e0a; color: #faf6ed; }
+    input[type="range"] { accent-color: #cc2f22; cursor: pointer; }
+    .slider-group { display: flex; align-items: center; gap: 9px; font-size: .85rem; }
+    .slider-group .val { min-width: 92px; font-variant-numeric: tabular-nums; color: var(--ink-strong); font-weight: 600; }
+    .switch { position: relative; display: inline-block; width: 42px; height: 23px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; cursor: pointer; inset: 0; background: #d4c5b4; border: 1px solid #b9a793; border-radius: 23px; transition: .2s; }
+    .switch .track:before { content: ""; position: absolute; height: 17px; width: 17px; left: 3px; top: 2px; background: #faf6ed; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .track { background: #6d180f; border-color: #7c2f25; }
+    .switch input:checked + .track:before { transform: translateX(19px); }
+
+    .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab { background: #ecddc5; border: 1px solid var(--controls-border); border-bottom-color: transparent;
+           color: var(--ink-strong); padding: 9px 20px; border-radius: 6px 6px 0 0; cursor: pointer;
+           font-size: .92rem; font-weight: 600; font-family: inherit; }
+    .tab.on { background: var(--panel); border-color: var(--panel-border); color: #902015; }
+    .sizes { display: flex; flex-wrap: wrap; gap: 6px; }
+    .sizes button.on { background: #902015; border-color: #470e0a; color: #faf6ed; }
+    #bigPlot { height: 480px; }
+    .bigquiz { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px; }
+    @media (max-width: 780px) { .bigquiz { grid-template-columns: 1fr; } }
+    .bigquiz button { padding: 14px 16px; font-size: 1rem; text-align: left; }
+    .bigquiz button.picked { background: #f0d9cd; border-color: #c28577; font-weight: 700; }
+    .picked-note { font-size: .88rem; color: var(--title-muted); margin-top: 10px; min-height: 20px; }
+    .hidden { display: none !important; }
+    .sim-box { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+    .sim-title { font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
+    canvas { display: block; width: 100%; background: var(--bg); border-radius: 4px; }
+    #main { height: 430px; }
+    #ratio { height: 230px; }
+    .grid2 { display: grid; grid-template-columns: minmax(0,1fr) 330px; gap: 18px; align-items: start; }
+    @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } }
+    .side { display: flex; flex-direction: column; gap: 16px; }
+
+    .verdict { font-size: .95rem; line-height: 1.5; color: var(--ink-strong); background: #ecddc5;
+               border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; min-height: 74px; }
+    .verdict b { color: #902015; }
+    .quiz button { display: block; width: 100%; text-align: left; margin-bottom: 7px; }
+    .legend { display: flex; gap: 18px; font-size: .82rem; margin-top: 10px; flex-wrap: wrap; }
+    .legend .item { display: flex; align-items: center; gap: 7px; }
+    .lswatch { width: 22px; height: 0; border-top: 3px solid; }
+    .prose { font-size: .9rem; line-height: 1.6; max-width: 900px; }
+    .prose h3 { font-size: 1rem; color: var(--ink-strong); margin: 20px 0 6px; }
+    .formula { font-size: 1.02rem; text-align: center; margin: 12px 0; color: var(--ink-strong); }
+    .hidden { display: none !important; }
+    .note { font-size: .8rem; color: var(--title-muted); line-height: 1.5; margin-top: 10px; }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<h1>How to Fool the Plot-Inspection Heuristic</h1>
+<p class="subtitle">
+    Two functions, both strictly increasing, infinitely often differentiable and convex — as well-behaved as
+    functions get. Plot them side by side and one of them clearly grows faster than the other.
+    Now drag the range slider and watch which one that is.
+</p>
+
+<div class="tabs">
+    <button class="tab on" id="tab-plot"   onclick="setTab('plot')">The plot</button>
+    <button class="tab"    id="tab-detail" onclick="setTab('detail')">Explore &amp; reveal</button>
+</div>
+
+<!-- ================================================================= TAB 1 -->
+<div id="panel-plot">
+    <div class="controls">
+        <span class="cap">Plot up to x =</span>
+        <div class="sizes" id="sizeBtns"></div>
+        <div class="slider-group">
+            <span class="cap">or</span>
+            <input type="number" id="xField" value="2000" min="10" max="500000000" step="1" style="width:150px">
+            <button onclick="applyField()">Set</button>
+        </div>
+    </div>
+
+    <div class="sim-box">
+        <canvas id="bigPlot"></canvas>
+        <div class="legend">
+            <div class="item"><span class="lswatch" style="border-color:var(--f)"></span><span id="legF2">f</span></div>
+            <div class="item"><span class="lswatch" style="border-color:var(--g)"></span><span id="legG2">g</span></div>
+        </div>
+    </div>
+
+    <div class="sim-box" style="margin-top:18px">
+        <div class="sim-title">Which of the two functions grows asymptotically faster?</div>
+        <div class="bigquiz">
+            <button onclick="guess('f')"    id="opt-f">A &nbsp; f grows faster</button>
+            <button onclick="guess('g')"    id="opt-g">B &nbsp; g grows faster</button>
+            <button onclick="guess('same')" id="opt-same">C &nbsp; Neither — same order</button>
+        </div>
+        <div class="picked-note" id="pickedNote"></div>
+    </div>
+</div>
+
+<!-- ================================================================= TAB 2 -->
+<div id="panel-detail" class="hidden">
+<div class="controls">
+    <div class="slider-group">
+        <span class="cap">Plot up to x =</span>
+        <input type="range" id="rangeSlider" min="30" max="800" value="230" style="width:280px" oninput="onSlider()">
+        <span class="val" id="rangeVal">2 000</span>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button onclick="setRange(2000)">2 000</button>
+        <button onclick="setRange(10000)">10 000</button>
+        <button onclick="setRange(200000)">200 000</button>
+        <button onclick="setRange(1e7)">10 000 000</button>
+        <button class="primary" id="crossBtn" onclick="nextCrossing()">Jump past next crossing ›</button>
+    </div>
+    <div class="slider-group">
+        <span class="cap">log–log</span>
+        <label class="switch"><input type="checkbox" id="logToggle" onchange="draw()"><span class="track"></span></label>
+    </div>
+    <div class="slider-group">
+        <span class="cap">Ratio g/f</span>
+        <label class="switch"><input type="checkbox" id="ratioToggle" checked onchange="toggleRatio()"><span class="track"></span></label>
+    </div>
+</div>
+
+<div class="grid2">
+    <div>
+        <div class="sim-box">
+            <div class="sim-title">The two functions</div>
+            <canvas id="main"></canvas>
+            <div class="legend">
+                <div class="item"><span class="lswatch" style="border-color:var(--f)"></span><span id="legF">f</span></div>
+                <div class="item"><span class="lswatch" style="border-color:var(--g)"></span><span id="legG">g</span></div>
+                <div class="item"><span class="lswatch" style="border-color:var(--accent);border-top-style:dashed"></span>crossing (f = g)</div>
+            </div>
+        </div>
+        <div class="sim-box" id="ratioBox" style="margin-top:18px">
+            <div class="sim-title">Ratio g(x) / f(x) &nbsp;·&nbsp; horizontal axis is log x</div>
+            <canvas id="ratio"></canvas>
+            <div class="note">
+                On a logarithmic x-axis the oscillation becomes a plain sine wave: the period of the wiggle is
+                constant in <code>log x</code>, which means it grows by a factor of <code>e<sup>2π</sup> ≈ 535</code>
+                in x. Each time you widen the plotting range by a factor of 535, you see exactly one more wiggle —
+                which is why a plot never gets to the point.
+            </div>
+        </div>
+    </div>
+
+    <div class="side">
+        <div class="sim-box">
+            <div class="sim-title">What the plot suggests</div>
+            <div class="verdict" id="verdict"></div>
+        </div>
+        <div class="sim-box quiz" id="quizBox">
+            <div class="sim-title">Your guess</div>
+            <div style="font-size:.9rem;margin-bottom:10px">Which function grows asymptotically faster?</div>
+            <button onclick="guess('f')">f grows faster</button>
+            <button onclick="guess('g')">g grows faster</button>
+            <button onclick="guess('same')">Neither — they are of the same order</button>
+            <button onclick="reveal()" class="primary">Show me the answer</button>
+        </div>
+        <div class="sim-box hidden" id="answerBox">
+            <div class="sim-title">The functions</div>
+            <div class="prose" id="answerText"></div>
+        </div>
+    </div>
+</div>
+
+<div class="sim-box hidden" id="discussion" style="margin-top:18px">
+    <div class="sim-title">Why this matters for algorithm analysis</div>
+    <div class="prose">
+        <p>
+            The two functions are of the same order, <b>g = Θ(f)</b>, and neither one eventually dominates the other:
+            they cross each other infinitely often, at
+            <code>x = e<sup>arctan 3 + kπ</sup></code> for every <code>k ∈ ℕ</code>, i.e. at
+            <code>3.5, 81, 1866, 42 800, 982 000, …</code> — a new crossing every factor of
+            <code>e<sup>π</sup> ≈ 23</code>.
+        </p>
+        <p>
+            Note that this also means <b>g ∼ f is false</b>: the ratio <code>g/f</code> does not converge at all,
+            it keeps oscillating between <code>1 − √(2/5) ≈ 0.368</code> and <code>1 + √(2/5) ≈ 1.632</code>.
+            So this is a pair of functions where <code>Θ</code> holds but <code>∼</code> does not — the same
+            phenomenon as in the square-and-multiply cost, only much harder to spot from a picture.
+        </p>
+        <p>
+            The moral for reading measured running times: a plot can only ever show you a bounded range, and any
+            claim about <em>asymptotic</em> behaviour is a claim about what happens beyond every bounded range.
+            A plot can therefore <em>suggest</em> a growth rate, it can <em>refute</em> a claimed one if the
+            deviation is already visible — but it can never <em>establish</em> one.
+        </p>
+    </div>
+</div>
+
+</div>
+
+<script>
+/* ------------------------------------------------------------------ math */
+// f(x) = x^2
+// g(x) = ∬ (sin(log x) + 1) dx dx  =  x^2 (1 − (3/5) cos(log x) + (1/5) sin(log x))
+function f(x) { return x * x; }
+function g(x) { const u = Math.log(x); return x*x * (1 - 0.6*Math.cos(u) + 0.2*Math.sin(u)); }
+function ratio(x) { const u = Math.log(x); return 1 - 0.6*Math.cos(u) + 0.2*Math.sin(u); }
+
+const AMP = Math.sqrt(0.36 + 0.04);           // ≈ 0.632
+const PHASE = Math.atan2(0.6, -0.2);          // ratio(x) = 1 + AMP*sin(log x − φ) … only used for crossings
+// crossings: 1 − 0.6 cos u + 0.2 sin u = 1  ⟺  tan u = 3
+const CROSS_U0 = Math.atan(3);
+
+function crossingsUpTo(X) {
+    const out = [];
+    for (let k = 0; ; k++) {
+        const x = Math.exp(CROSS_U0 + k * Math.PI);
+        if (x > X) break;
+        if (x >= 1) out.push(x);
+    }
+    return out;
+}
+function nextCrossingAfter(X) {
+    for (let k = 0; k < 200; k++) {
+        const x = Math.exp(CROSS_U0 + k * Math.PI);
+        if (x > X) return x;
+    }
+    return X * 10;
+}
+
+let revealed = false, picked = null, tab = "plot";
+
+const SIZES = [500, 2000, 10000, 200000, 1e7];
+function buildSizes() {
+    document.getElementById("sizeBtns").innerHTML = SIZES.map(v =>
+        `<button onclick="setRange(${v})" data-x="${v}">${fmt(v)}</button>`).join("");
+}
+function markSizes() {
+    const X = currentX();
+    document.querySelectorAll("#sizeBtns button").forEach(b => {
+        b.classList.toggle("on", Math.abs(+b.dataset.x - X) / X < .02);
+    });
+}
+function applyField() {
+    const v = +document.getElementById("xField").value;
+    if (Number.isFinite(v) && v >= 10) setRange(v);
+}
+function setTab(t) {
+    tab = t;
+    document.getElementById("panel-plot").classList.toggle("hidden", t !== "plot");
+    document.getElementById("panel-detail").classList.toggle("hidden", t !== "detail");
+    document.getElementById("tab-plot").classList.toggle("on", t === "plot");
+    document.getElementById("tab-detail").classList.toggle("on", t === "detail");
+    draw();
+}
+
+/* --------------------------------------------------------------- ranges */
+function sliderToX(v) { return Math.pow(10, 0.5 + v / 800 * 8.2); }   // 3 … 5e8
+function xToSlider(X)  { return Math.round((Math.log10(X) - 0.5) / 8.2 * 800); }
+let X_MAX = 2000;                       // the plotted range; the slider is only one way to set it
+function currentX() { return X_MAX; }
+function onSlider() {
+    X_MAX = sliderToX(+document.getElementById("rangeSlider").value);
+    draw();
+}
+function setRange(X) {                  // exact — a typed value is not quantised by the slider
+    X_MAX = Math.max(10, Math.min(5e8, X));
+    document.getElementById("rangeSlider").value = Math.max(30, Math.min(800, xToSlider(X_MAX)));
+    draw();
+}
+function nextCrossing() {
+    const X = currentX();
+    setRange(nextCrossingAfter(X) * 1.35);
+}
+function fmt(x) {
+    if (x >= 1e6) return (x / 1e6).toPrecision(3) + " M";
+    return Math.round(x).toLocaleString("en-US").replace(/,/g, " ");
+}
+
+/* ----------------------------------------------------------------- draw */
+function setup(canvas, padL) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h, pad: { l: padL, r: 18, t: 16, b: 32 } };
+}
+
+function draw() {
+    const X = currentX();
+    document.getElementById("rangeVal").textContent = fmt(X);
+    document.getElementById("xField").value = Math.round(X);
+    markSizes();
+    if (tab === "plot") {
+        drawCurves(document.getElementById("bigPlot"), X, false);
+    } else {
+        drawCurves(document.getElementById("main"), X, document.getElementById("logToggle").checked);
+        drawRatio(X);
+        updateVerdict(X);
+    }
+}
+
+function drawCurves(canvas, X, logMode) {
+    const { ctx, w, h, pad } = setup(canvas, 74);
+    const x0 = logMode ? 1.6 : 0;
+    const yMax = Math.max(f(X), g(X)) * 1.04;
+    const yMin = logMode ? Math.max(1e-3, Math.min(f(x0), g(x0))) : 0;
+
+    const PX = x => logMode
+        ? pad.l + (Math.log(Math.max(x, x0)) - Math.log(x0)) / (Math.log(X) - Math.log(x0)) * (w - pad.l - pad.r)
+        : pad.l + x / X * (w - pad.l - pad.r);
+    const PY = y => logMode
+        ? h - pad.b - (Math.log(Math.max(y, yMin)) - Math.log(yMin)) / (Math.log(yMax) - Math.log(yMin)) * (h - pad.t - pad.b)
+        : h - pad.b - y / yMax * (h - pad.t - pad.b);
+
+    // grid
+    ctx.strokeStyle = "#d4c5b4"; ctx.lineWidth = 1;
+    ctx.fillStyle = "#a2937a"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
+    for (let q = 0; q <= 4; q++) {
+        const y = pad.t + q * (h - pad.t - pad.b) / 4;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+        const v = logMode
+            ? Math.exp(Math.log(yMin) + (4 - q) / 4 * (Math.log(yMax) - Math.log(yMin)))
+            : yMax * (4 - q) / 4;
+        ctx.fillText(v === 0 ? "0" : v.toExponential(1), pad.l - 7, y + 4);
+    }
+    ctx.textAlign = "center";
+    for (let q = 0; q <= 5; q++) {
+        const xv = logMode
+            ? Math.exp(Math.log(x0) + q / 5 * (Math.log(X) - Math.log(x0)))
+            : X * q / 5;
+        ctx.fillText(fmt(xv), PX(xv), h - pad.b + 16);
+    }
+    ctx.strokeStyle = "#b9a793";
+    ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+
+    // crossings — shown only once the answer is out
+    if (revealed) {
+        ctx.setLineDash([5, 4]); ctx.strokeStyle = "#b07d18"; ctx.lineWidth = 1.2;
+        for (const c of crossingsUpTo(X)) {
+            if (c < x0) continue;
+            ctx.beginPath(); ctx.moveTo(PX(c), pad.t); ctx.lineTo(PX(c), h - pad.b); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+    }
+
+    // the curves
+    const N = 900;
+    for (const [fn, col, wd] of [[f, "#902015", 2.2], [g, "#3f7d86", 2.2]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.beginPath();
+        for (let q = 0; q <= N; q++) {
+            const xv = logMode
+                ? Math.exp(Math.log(x0) + q / N * (Math.log(X) - Math.log(x0)))
+                : x0 + (X - x0) * q / N;
+            const px = PX(xv), py = PY(fn(Math.max(xv, 1e-9)));
+            q === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+    }
+
+    // labels at the right edge
+    ctx.font = "13px sans-serif"; ctx.textAlign = "left";
+    ctx.fillStyle = "#902015"; ctx.fillText("f", PX(X) - 26, PY(f(X)) - 8);
+    ctx.fillStyle = "#3f7d86"; ctx.fillText("g", PX(X) - 26, PY(g(X)) + 16);
+}
+
+function drawRatio(X) {
+    const box = document.getElementById("ratioBox");
+    if (box.classList.contains("hidden")) return;
+    const { ctx, w, h, pad } = setup(document.getElementById("ratio"), 74);
+    const x0 = 1.6;
+    const lo = 1 - AMP - .12, hi = 1 + AMP + .12;
+    const PX = x => pad.l + (Math.log(x) - Math.log(x0)) / (Math.log(X) - Math.log(x0)) * (w - pad.l - pad.r);
+    const PY = v => h - pad.b - (v - lo) / (hi - lo) * (h - pad.t - pad.b);
+
+    ctx.strokeStyle = "#d4c5b4"; ctx.fillStyle = "#a2937a"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
+    for (const v of [1 - AMP, 1, 1 + AMP]) {
+        ctx.beginPath(); ctx.moveTo(pad.l, PY(v)); ctx.lineTo(w - pad.r, PY(v));
+        ctx.strokeStyle = v === 1 ? "#9c866d" : "#d4c5b4";
+        ctx.setLineDash(v === 1 ? [] : [4, 4]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillText(v.toFixed(2), pad.l - 7, PY(v) + 4);
+    }
+    ctx.textAlign = "center";
+    for (let q = 0; q <= 5; q++) {
+        const xv = Math.exp(Math.log(x0) + q / 5 * (Math.log(X) - Math.log(x0)));
+        ctx.fillText(fmt(xv), PX(xv), h - pad.b + 16);
+    }
+    ctx.strokeStyle = "#b9a793";
+    ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+
+    ctx.strokeStyle = "#b07d18"; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
+    for (const c of crossingsUpTo(X)) {
+        if (c < x0) continue;
+        ctx.beginPath(); ctx.moveTo(PX(c), pad.t); ctx.lineTo(PX(c), h - pad.b); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = "#3f7d86"; ctx.lineWidth = 2.2; ctx.beginPath();
+    const N = 1200;
+    for (let q = 0; q <= N; q++) {
+        const xv = Math.exp(Math.log(x0) + q / N * (Math.log(X) - Math.log(x0)));
+        const px = PX(xv), py = PY(ratio(xv));
+        q === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // marker at the right edge
+    ctx.fillStyle = "#cc2f22";
+    ctx.beginPath(); ctx.arc(PX(X), PY(ratio(X)), 4, 0, 7); ctx.fill();
+}
+
+function toggleRatio() {
+    document.getElementById("ratioBox").classList.toggle("hidden", !document.getElementById("ratioToggle").checked);
+    draw();
+}
+
+function updateVerdict(X) {
+    const r = ratio(X);
+    const ahead = r > 1 ? "g" : "f";
+    const col = r > 1 ? "var(--g)" : "var(--f)";
+    const pct = Math.abs(r - 1) * 100;
+    const nc = nextCrossingAfter(X);
+    document.getElementById("verdict").innerHTML =
+        `Over <code>[0, ${fmt(X)}]</code> the plot says: <b style="color:${col}">${ahead}</b> is ahead ` +
+        `— by ${pct.toFixed(0)}% at the right edge. ` +
+        (revealed
+            ? `They swap places again at <code>x ≈ ${fmt(nc)}</code>.`
+            : `Widen the range and check whether that verdict survives.`);
+}
+
+function guess(which) {
+    if (which !== "reveal") {
+        picked = which;
+        ["f", "g", "same"].forEach(k => document.getElementById("opt-" + k).classList.toggle("picked", k === which));
+        document.getElementById("pickedNote").innerHTML = revealed
+            ? verdictFor(which)
+            : "Answer noted. Widen the range a few times and see whether it survives — " +
+              "the resolution is on the <b>Explore &amp; reveal</b> tab.";
+        if (!revealed) return;
+    }
+    reveal();
+}
+
+function verdictFor(which) {
+    return {
+        f: "<b>A reasonable reading of the picture — but no.</b>",
+        g: "<b>Also a reasonable reading of the picture — but no.</b>",
+        same: "<b>Correct — and hard to see from any single plot.</b>"
+    }[which] || "";
+}
+
+function reveal() {
+    const which = picked;
+    revealed = true;
+    const msg = which ? verdictFor(which).replace(/<\/?b>/g, "") : "";
+    document.getElementById("pickedNote").innerHTML = which ? verdictFor(which) : "";
+    document.getElementById("quizBox").classList.add("hidden");
+    document.getElementById("answerBox").classList.remove("hidden");
+    document.getElementById("discussion").classList.remove("hidden");
+    document.getElementById("answerText").innerHTML =
+        (msg ? `<p><b>${msg}</b></p>` : "") +
+        `<div class="formula">f(x) = x²</div>
+         <div class="formula">g(x) = ∬ (sin(log x) + 1) dx dx<br>
+            <span style="font-size:.95em">= x²·(1 − <sup>3</sup>⁄<sub>5</sub> cos(log x)
+            + <sup>1</sup>⁄<sub>5</sub> sin(log x))</span></div>
+         <p style="margin-top:12px">
+            So g is essentially x² as well — its second derivative is not the constant 2, but oscillates
+            between 0 and 4 with a period that grows exponentially. That is enough to keep g and f swapping
+            places forever, and slow enough that no ordinary plot shows more than a couple of swaps.
+         </p>`;
+    for (const id of ["legF", "legF2"]) document.getElementById(id).innerHTML = "f(x) = x²";
+    for (const id of ["legG", "legG2"]) document.getElementById(id).innerHTML = "g(x) = ∬ (sin(log x)+1) dx dx";
+    draw();
+}
+
+window.addEventListener("resize", draw);
+buildSizes();
+draw();
+</script>
+</body>
+</html>

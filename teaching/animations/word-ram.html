@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Word-RAM — a Machine Program, Executed</title>
+<style>
+    :root {
+        --bg: #f5ebd9; --panel: #faf6ed; --panel-border: #d4c5b4;
+        --controls-bg: #ecddc5; --controls-border: #d4c5b4;
+        --ink: #6b675c; --ink-strong: #46433a; --title-muted: #8b8779;
+        --btn: #faf6ed; --btn-border: #b9a793; --btn-border-hover: #9c866d;
+        --bar: #c2b393; --bar-border: #a2937a;
+        --read: #f0d9cd; --read-border: #c28577;
+        --write: #c28577; --write-border: #902015;
+        --sorted: #dceadf; --sorted-border: #1b6b45;
+        --active: #cc2f22; --acc: #902015; --grid: #d4c5b4;
+    }
+    * { box-sizing: border-box; }
+    body { background: var(--bg); color: var(--ink);
+           font-family: var(--wi-font-body)"Segoe UI", Roboto, sans-serif;
+           margin: 0; padding: 22px 26px 60px; }
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; color: var(--ink-strong); letter-spacing: .3px; }
+    .subtitle { font-size: .92rem; color: var(--title-muted); margin: 0 0 18px; max-width: 1000px; line-height: 1.5; }
+    code, .mono { font-family: "SF Mono", var(--wi-font-mono); }
+    code { background: #ecddc5; padding: 1px 6px; border-radius: 3px; font-size: .88em; }
+
+    .controls { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; background: var(--controls-bg);
+                padding: 13px 20px; border-radius: 6px; border: 1px solid var(--controls-border); margin-bottom: 16px; }
+    .ctl-group { display: flex; align-items: center; gap: 9px; }
+    .ctl-group label, .cap { font-size: .82rem; color: var(--ink-strong); font-weight: 600;
+                             text-transform: uppercase; letter-spacing: .6px; }
+    button, select, input[type="text"] {
+        background: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+        padding: 7px 14px; font-size: .9rem; border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: 500; }
+    button:hover:not(:disabled), select:hover { background: #fcf9f3; border-color: var(--btn-border-hover); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    button.primary { background: #f0d9cd; border-color: #c28577; }
+    input[type="range"] { accent-color: #cc2f22; cursor: pointer; }
+    .slider-group { display: flex; align-items: center; gap: 8px; font-size: .85rem; }
+    .slider-group .val { min-width: 60px; font-variant-numeric: tabular-nums; }
+
+    .sim-box { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px;
+               padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+    .sim-title { font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted);
+                 margin: 0 0 12px; font-weight: 700; }
+    .stage { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(370px,1fr); gap: 18px; align-items: start; }
+    @media (max-width: 1080px) { .stage { grid-template-columns: 1fr; } }
+    .side { display: flex; flex-direction: column; gap: 16px; }
+    .left { display: flex; flex-direction: column; gap: 16px; }
+
+    svg.view { display: block; width: 100%; background: var(--bg); border-radius: 4px; }
+    .mv { transition: y .2s ease, height .2s ease, fill .2s ease, transform .2s ease, opacity .2s ease; }
+
+    .status { background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px;
+              font-size: .95rem; color: var(--ink-strong); min-height: 62px; display: flex; align-items: center; line-height: 1.45; }
+    .status b { color: #902015; }
+    .status.err { background: #f3d9d4; border-color: #6d180f; }
+
+    /* registers */
+    .regs { display: flex; flex-direction: column; gap: 5px; }
+    .reg { display: grid; grid-template-columns: 30px minmax(70px, max-content) 1fr; align-items: center; gap: 12px;
+           background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 4px; padding: 5px 10px;
+           font-variant-numeric: tabular-nums; font-size: .9rem; transition: background .2s, border-color .2s; }
+    .reg i { color: var(--title-muted); font-style: normal; font-weight: 700; }
+    .reg .num { text-align: right; font-weight: 600; }
+    .reg.changed { background: #fcf9f3; border-color: var(--active); }
+    .reg .bits { font-family: "SF Mono", var(--wi-font-mono); font-size: .66rem;
+                 letter-spacing: .4px; color: var(--ink-strong); white-space: nowrap;
+                 overflow-x: auto; text-align: right; }
+    .reg .bits .z { color: #d3c4a8; }
+    @media (max-width: 620px) { .reg { grid-template-columns: 30px 1fr; } .reg .bits { grid-column: 1 / -1; text-align: left; } }
+
+    /* code */
+    .code { font-family: "SF Mono", var(--wi-font-mono); font-size: .83rem; line-height: 1.62; }
+    .code .ln { display: flex; gap: 10px; padding: 0 6px; border-radius: 3px; white-space: pre; }
+    .code .ln .no { color: #b9a793; min-width: 18px; text-align: right; user-select: none; }
+    .code .ln.hi { background: #f0d9cd; }
+    .code .ln.hi .no { color: #6d180f; font-weight: 700; }
+    .code .ln.next { background: #f0e8d3; }
+    .code .cm { color: #a2937a; font-style: italic; }
+
+    table.cost { width: 100%; border-collapse: collapse; font-size: .87rem; font-variant-numeric: tabular-nums; }
+    table.cost td { padding: 4px 2px; border-bottom: 1px dashed #ecddc5; }
+    table.cost td:last-child { text-align: right; font-weight: 600; color: var(--ink-strong); }
+    table.cost tr:last-child td { border-bottom: none; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: .78rem; margin-top: 10px; }
+    .legend .item { display: flex; align-items: center; gap: 6px; }
+    .swatch { width: 15px; height: 15px; border-radius: 3px; border: 1.5px solid; }
+
+    details.editor { margin-top: 20px; }
+    details.editor summary { cursor: pointer; font-size: .85rem; color: var(--title-muted); font-weight: 600;
+                             text-transform: uppercase; letter-spacing: .6px; }
+    .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    textarea { font-family: "SF Mono", var(--wi-font-mono); font-size: .85rem; background: var(--panel);
+               color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px;
+               padding: 10px; width: 330px; height: 96px; resize: vertical; }
+    .editor-help { font-size: .82rem; color: var(--ink); max-width: 520px; line-height: 1.55; }
+    .err { color: #6d180f; font-weight: 600; font-size: .82rem; min-height: 18px; }
+    details.fold > summary { cursor: pointer; margin: 0; list-style: none; }
+    details.fold > summary::-webkit-details-marker { display: none; }
+    details.fold > summary::before { content: "▸ "; color: var(--btn-border); }
+    details[open].fold > summary::before { content: "▾ "; }
+    .note { font-size: .8rem; color: var(--title-muted); line-height: 1.55; margin-top: 10px; }
+    .model { font-size: .86rem; line-height: 1.6; }
+    .model ul { margin: 6px 0 0; padding-left: 18px; }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<h1>The Word-RAM</h1>
+<p class="subtitle">
+    A machine program executed instruction by instruction on a random-access machine: registers, a flat memory of
+    <i>w</i>-bit words holding values in [0 .. 2<sup>w</sup>), and a program counter. Every executed instruction costs one time unit, so the cost of a run is
+    simply the number of instructions executed. The program below sorts <code>MEM[0..N)</code> — but nothing in the
+    machine knows that.
+</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="presetSel">Input</label>
+        <select id="presetSel" onchange="onPreset()"></select>
+    </div>
+    <div class="ctl-group">
+        <label for="wSel">Word width</label>
+        <select id="wSel" onchange="rebuild()">
+            <option value="8">w = 8</option>
+            <option value="16">w = 16</option>
+            <option value="32" selected>w = 32</option>
+            <option value="64">w = 64</option>
+        </select>
+    </div>
+    <div class="btn-group" style="display:flex;gap:8px">
+        <button id="backBtn" onclick="stepBack()">‹ Back</button>
+        <button id="stepBtn" class="primary" onclick="stepFwd()">Step ›</button>
+        <button id="playBtn" onclick="togglePlay()">Play</button>
+        <button onclick="resetRun()">Reset</button>
+        <button onclick="runToEnd()">Skip to end</button>
+    </div>
+    <div class="slider-group">
+        <span class="cap">Delay</span>
+        <input type="range" id="speedSlider" min="0" max="700" value="180" oninput="updateSpeed(this.value)">
+        <span class="val" id="speedVal">180ms</span>
+    </div>
+</div>
+
+<div class="controls" style="margin-top:-6px">
+    <div class="slider-group" style="flex:1;min-width:340px">
+        <span class="cap">Instruction</span>
+        <input type="range" id="frameSlider" min="0" max="0" value="0" style="flex:1" oninput="gotoFrame(+this.value)">
+        <span class="val" id="frameVal" style="min-width:110px">0 / 0</span>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="left">
+        <div class="sim-box">
+            <div class="sim-title">Memory &nbsp;·&nbsp; MEM[0], MEM[1], MEM[2], …</div>
+            <svg id="view" class="view" viewBox="0 0 900 290" preserveAspectRatio="xMidYMid meet"></svg>
+            <div class="legend">
+                <div class="item"><span class="swatch" style="background:var(--bar);border-color:var(--bar-border)"></span>memory cell</div>
+                <div class="item"><span class="swatch" style="background:var(--read);border-color:var(--read-border)"></span>cell being read</div>
+                <div class="item"><span class="swatch" style="background:var(--write);border-color:var(--write-border)"></span>cell being written</div>
+                <div class="item"><span class="swatch" style="background:var(--sorted);border-color:var(--sorted-border)"></span>fixed by a completed pass (smallest bubble to the front)</div>
+            </div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Registers &nbsp;·&nbsp; R<sub>1</sub>, …, R<sub>r</sub></div>
+            <div class="regs" id="regsView"></div>
+            <div class="note" id="regNote"></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">The machine model</div>
+            <div class="model">
+                <ul>
+                    <li>Unlimited memory <code>MEM[0], MEM[1], MEM[2], …</code> and a fixed number of registers
+                        <code>R<sub>1</sub>, …, R<sub>r</sub></code>.</li>
+                    <li>Every cell and register holds one <i>w</i>-bit word, i.e. a number in
+                        <code>[0 .. 2<sup>w</sup>)</code>; arithmetic is modulo 2<sup>w</sup>.
+                        No register in this program ever has to leave that range.</li>
+                    <li>Instructions: load and store <code>R<sub>i</sub> := MEM[R<sub>j</sub>]</code>,
+                        <code>MEM[R<sub>j</sub>] := R<sub>i</sub></code>; arithmetic and bitwise operations on registers;
+                        conditional and unconditional jumps.</li>
+                    <li>Cost: the number of executed instructions — one time unit each.</li>
+                    <li>Execution starts at the first program line and ends when the program counter leaves the program.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="side">
+        <div class="sim-box">
+            <div class="sim-title">Status</div>
+            <div class="status" id="statusBox"><span id="statusText">Press <b>&nbsp;Step&nbsp;</b> to begin.</span></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">RAM program</div>
+            <div class="code" id="ramCode"></div>
+            <div class="note" id="progNote"></div>
+        </div>
+        <details class="sim-box fold">
+            <summary class="sim-title">The same algorithm in pseudocode</summary>
+            <div class="code" id="pseudoCode" style="margin-top:12px"></div>
+            <div class="note">
+                One pseudocode line corresponds to a small constant number of machine instructions — which is exactly
+                what licenses counting pseudocode steps instead of RAM instructions.
+            </div>
+        </details>
+        <div class="sim-box">
+            <div class="sim-title">Cost</div>
+            <table class="cost" id="costView"></table>
+        </div>
+    </div>
+</div>
+
+<details class="editor">
+    <summary>Edit / paste the memory contents</summary>
+    <div class="editor-body">
+        <textarea id="inputText" spellcheck="false"></textarea>
+        <div>
+            <button class="primary" onclick="loadFromText()">Load</button>
+            <button onclick="randomInput()">Random</button>
+            <div class="err" id="parseErr"></div>
+            <div class="editor-help" style="margin-top:10px">
+                Whitespace- or comma-separated integers; they are placed in <code>MEM[0..N)</code> and
+                <code>R<sub>1</sub></code> is set to <code>N</code>, which is what the program's two comment lines
+                assume. The program also assumes <code>N ≥ 2</code>: for <code>N = 1</code> the initialisation
+                <code>R<sub>5</sub> := R<sub>3</sub> − 1</code> already leaves the array, and the simulator will
+                say so rather than pretend otherwise. Since words are unsigned, a negative input is stored as
+                2<sup>w</sup> − |v|; try <code>w = 8</code> with values beyond 255 to watch inputs wrap.
+            </div>
+        </div>
+    </div>
+</details>
+
+<script>
+/* ====================================================================== */
+const PRESETS = {
+    "Two elements (2)":       "2 1",
+    "Three (3)":              "3 1 2",
+    "Small (5)":              "5 3 1 4 2",
+    "Random (6)":             "4 6 1 5 2 3",
+    "Random (8)":             "5 1 8 3 7 2 6 4",
+    "Reverse-sorted (8)":     "8 7 6 5 4 3 2 1",
+    "Already sorted (8)":     "1 2 3 4 5 6 7 8",
+    "Many duplicates (10)":   "3 1 3 2 1 2 3 1 2 3",
+    "One outlier (9)":        "2 3 4 5 6 7 8 9 1",
+    "Random (12)":            "7 12 3 9 1 11 5 2 10 4 8 6",
+    "Reverse-sorted (16)":    "16 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1",
+    "Random (20)":            "13 4 19 7 1 16 10 2 18 6 11 20 3 15 8 17 5 12 9 14",
+    "Overflows 8-bit words (6)": "200 20 300 130 5 260",
+    "Single element (1)":     "7"
+};
+
+const EXTRA_CELLS = 3;              // cells shown beyond MEM[0..N)
+
+/* ---------------------------------------------------------------------- */
+/* Two versions of the same machine program.                              */
+/*  · slide:   exactly as presented; R3 holds j and the inner loop ends    */
+/*             on R3 ≥ 0, which needs signed words.                        */
+/*  · shifted: R3 holds j+1 and R5 holds j, so the loop ends on R3 > 0     */
+/*             and no register ever has to go below zero.                  */
+/* Both have the same twelve instructions and the same execution counts.  */
+const PROGRAMS = {
+shifted: {
+    label: "shifted indices",
+    note: "The inner loop counts <b>R<sub>3</sub> = j + 1</b> down and stops on <code>R<sub>3</sub> > 0</code>, " +
+          "and the left index of the pair is computed into <b>R<sub>5</sub> = R<sub>3</sub> − 1</b> one line " +
+          "earlier. That way no register ever has to become negative, which a word of [0 .. 2<sup>w</sup>) " +
+          "could not represent anyway.",
+    lines: [
+        ["cm", "// Assume: R<sub>1</sub> stores number N ≥ 2"],
+        ["cm", "// Assume: MEM[0..N) contains list of N numbers"],
+        ["x",  "R<sub>2</sub> := R<sub>1</sub>;"],
+        ["x",  "R<sub>3</sub> := R<sub>1</sub> − 1;"],
+        ["x",  "R<sub>5</sub> := R<sub>3</sub> − 1;"],
+        ["x",  "R<sub>4</sub> := MEM[R<sub>5</sub>];"],
+        ["x",  "R<sub>6</sub> := MEM[R<sub>3</sub>];"],
+        ["x",  "if (R<sub>4</sub> ≤ R<sub>6</sub>) goto line 11;"],
+        ["x",  "MEM[R<sub>5</sub>] := R<sub>6</sub>;"],
+        ["x",  "MEM[R<sub>3</sub>] := R<sub>4</sub>;"],
+        ["x",  "R<sub>3</sub> := R<sub>3</sub> − 1;"],
+        ["x",  "if (R<sub>3</sub> > 0) goto line 5;"],
+        ["x",  "R<sub>2</sub> := R<sub>2</sub> − 1;"],
+        ["x",  "if (R<sub>2</sub> > 0) goto line 4;"],
+        ["cm", "// Done:  MEM[0..N) sorted"]
+    ],
+    map: { 3: 2, 4: 3, 5: 4, 6: 4, 7: 4, 8: 4, 9: 5, 10: 5, 11: 3, 12: 3, 13: 2, 14: 2 }
+}
+};
+
+const PSEUDO_LINES = [
+    "procedure bubblesort(A[0..N)):",
+    "    for i := N, N − 1, …, 1",
+    "        for j := N − 2, N − 3, …, 0",
+    "            if A[j] &gt; A[j + 1]:",
+    "                Swap A[j] and A[j + 1]",
+    "            end if",
+    "        end for",
+    "    end for"
+];
+
+/* ====================================================================== */
+let A = [], W = 32;
+const SIGNED = false;          // words are unsigned: [0 .. 2^w)
+const PROG = "shifted";
+let frames = [], cur = 0, memNow = [], timer = null, delay = 180;
+
+/* register and memory contents are exact w-bit words, so they are BigInts */
+function modulus() { return 1n << BigInt(W); }
+function mask(x) {
+    const m = modulus();
+    let v = ((BigInt(x) % m) + m) % m;
+    if (SIGNED && v >= m / 2n) v -= m;
+    return v;
+}
+/* the complete w-bit word, in bytes; leading zeros are dimmed so that the
+   handful of significant bits — and the size of the rest — are both visible */
+function bits(v) {
+    const m = modulus();
+    const u = ((v % m) + m) % m;
+    const s = u.toString(2).padStart(W, "0");
+    const firstOne = s.indexOf("1");
+    let out = "";
+    for (let i = 0; i < W; i++) {
+        if (i > 0 && i % 8 === 0) out += " ";
+        out += (firstOne < 0 || i < firstOne) ? `<span class="z">${s[i]}</span>` : s[i];
+    }
+    return out;
+}
+function asIndex(v) {                       // BigInt → array index, or null if far out
+    if (v < 0n || v > 1000000n) return null;
+    return Number(v);
+}
+
+function parseArray(txt) {
+    const clean = txt.replace(/#[^\n]*/g, " ").replace(/[,;]/g, " ").trim();
+    if (!clean) throw new Error("empty input");
+    const out = clean.split(/\s+/).map(p => {
+        const v = Number(p);
+        if (!Number.isInteger(v)) throw new Error('"' + p + '" is not an integer');
+        return v;
+    });
+    if (out.length > 40) throw new Error("please keep it to at most 40 numbers");
+    return out;
+}
+
+/* ------------------------------------------------------------ execution */
+function simulate() {
+    const N = A.length;
+    const cells = N + EXTRA_CELLS;
+    const mem = [];
+    for (let i = 0; i < cells; i++) mem.push(i < N ? mask(A[i]) : 0n);
+    const R = [0n, mask(N), 0n, 0n, 0n, 0n, 0n];     // R[1] … R[6]
+    let pc = 3, count = 0, cmps = 0, swaps = 0, passes = 0, finalized = 0;
+    const out = [];
+    const push = (extra) => out.push(Object.assign({
+        pc, regs: R.slice(), count, cmps, swaps, passes, finalized,
+        delta: null, read: null, write: null, halted: false
+    }, extra));
+
+    push({ msg: `The input sits in <b>MEM[0..${N})</b> and <b>R<sub>1</sub> = N = ${N}</b>. ` +
+                `The cells beyond it are part of the machine's memory too — the program only knows where the ` +
+                `input ends because N is in R<sub>1</sub>. Execution starts at line 3.` });
+
+    const readAt = (reg) => {
+        const i = asIndex(R[reg]);
+        if (i === null || i >= cells) return { err: memError(reg, R[reg], N) };
+        return { i, v: mem[i] };
+    };
+    const writeAt = (reg, val) => {
+        const i = asIndex(R[reg]);
+        if (i === null || i >= cells) return { err: memError(reg, R[reg], N) };
+        return { i, delta: { i, old: mem[i], now: val } };
+    };
+
+    const CAP = 200000;
+    while (true) {
+        if (count >= CAP) { push({ halted: true, msg: "Stopped after 200 000 instructions." }); break; }
+        const at = pc;
+        let delta = null, read = null, write = null, msg = "", next = pc + 1, err = null;
+
+        if (at < 3 || at > 14) {
+            push({ halted: true, msg: `Line ${at} is not an instruction — the program counter has left the ` +
+                   `program, so execution <b>terminates</b>. MEM[0..${N}) is sorted.` });
+            return out;
+        }
+
+        switch (at) {
+            case 3: R[2] = R[1];
+                msg = `<b>R<sub>2</sub> := R<sub>1</sub></b> — the outer loop counter starts at N = ${R[1]}.`; break;
+            case 4: R[3] = mask(R[1] - 1n); passes++;
+                msg = `<b>R<sub>3</sub> := R<sub>1</sub> − 1 = ${R[3]}</b> — R<sub>3</sub> is the <i>right</i> ` +
+                      `index of the pair, so it stays one above the loop bound.`; break;
+            case 5: R[5] = mask(R[3] - 1n);
+                msg = `<b>R<sub>5</sub> := R<sub>3</sub> − 1 = ${R[5]}</b> — the left index of the pair.`; break;
+            case 6: { const r = readAt(5); if (r.err) { err = r.err; break; }
+                R[4] = r.v; read = r.i;
+                msg = `<b>R<sub>4</sub> := MEM[${r.i}] = ${r.v}</b> — one memory access.`; break; }
+            case 7: { const r = readAt(3); if (r.err) { err = r.err; break; }
+                R[6] = r.v; read = r.i;
+                msg = `<b>R<sub>6</sub> := MEM[${r.i}] = ${r.v}</b>.`; break; }
+            case 8: cmps++;
+                if (R[4] <= R[6]) { next = 11;
+                    msg = `${R[4]} ≤ ${R[6]} — already in order, so <b>jump to line 11</b> and skip the swap.`; }
+                else msg = `${R[4]} &gt; ${R[6]} — out of order, so fall through and swap.`;
+                break;
+            case 9: { const wr = writeAt(5, R[6]); if (wr.err) { err = wr.err; break; }
+                delta = wr.delta; mem[wr.i] = R[6]; write = wr.i;
+                msg = `<b>MEM[${wr.i}] := R<sub>6</sub> = ${R[6]}</b> — first half of the swap. ` +
+                      `The overwritten value survives in R<sub>4</sub>.`; break; }
+            case 10: { const wr = writeAt(3, R[4]); if (wr.err) { err = wr.err; break; }
+                delta = wr.delta; mem[wr.i] = R[4]; write = wr.i; swaps++;
+                msg = `<b>MEM[${wr.i}] := R<sub>4</sub> = ${R[4]}</b> — swap complete.`; break; }
+            case 11: R[3] = mask(R[3] - 1n);
+                msg = `<b>R<sub>3</sub> := R<sub>3</sub> − 1 = ${R[3]}</b> — one position to the left.`; break;
+            case 12:
+                if (R[3] > 0n) { next = 5;
+                    msg = `R<sub>3</sub> = ${R[3]} &gt; 0 — <b>jump to line 5</b> and compare the next pair.`; }
+                else msg = `R<sub>3</sub> = 0 — the inner loop is finished, and R<sub>3</sub> never had to ` +
+                           `become negative.`;
+                break;
+            case 13: R[2] = mask(R[2] - 1n); finalized = Math.min(N, finalized + 1);
+                msg = `<b>R<sub>2</sub> := R<sub>2</sub> − 1 = ${R[2]}</b> — one pass done.`; break;
+            case 14:
+                if (R[2] > 0n) { next = 4; msg = `R<sub>2</sub> = ${R[2]} &gt; 0 — <b>jump to line 4</b> for another pass.`; }
+                else { next = 15; msg = `R<sub>2</sub> = ${R[2]} — no passes left.`; }
+                break;
+        }
+
+        count++;
+        if (err) { pc = at; push({ msg: err, executed: at, halted: true }); return out; }
+        pc = next;
+        push({ delta, read, write, msg, executed: at });
+    }
+    return out;
+}
+
+function memError(reg, idx, N) {
+    if (idx > 1000n) {
+        return `<b>MEM[${idx}] is far outside the input.</b> A word cannot be negative, so ` +
+               `<code>R<sub>${reg}</sub> := R<sub>${reg}</sub> − 1</code> at 0 wrapped around to ` +
+               `2<sup>w</sup> − 1. That only happens here for N &lt; 2, which the program does not allow.`;
+    }
+    return `<b>MEM[${idx}] is outside the shown memory.</b> The program assumes N ≥ 2 — with fewer elements, ` +
+           `line 4 already puts R<sub>${reg}</sub> outside MEM[0..${N}). Execution stops here.`;
+}
+
+/* -------------------------------------------------------------- drawing */
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, txt) {
+    const n = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (txt !== undefined) n.textContent = txt;
+    return n;
+}
+
+let cellEls = [], ptr3 = null, ptr5 = null;
+
+function geom() {
+    const cells = A.length + EXTRA_CELLS;
+    const L = 40, Rm = 46, W2 = 900;                 // room for the "…" on the right
+    const cw = (W2 - L - Rm) / Math.max(1, cells);
+    const vals = A.map(v => Number(mask(v)));
+    const lo = Math.min(0, ...vals, 0), hi = Math.max(1, ...vals, 0);
+    const span = Math.max(1, hi - lo);
+    const top = 40, h = 150;
+    return { cells, n: A.length, L, cw, span, top, h,
+             zero: top + h * (hi / span),
+             x: i => L + i * cw,
+             y: v => top + h * ((hi - v) / span) };
+}
+
+function buildMemoryDOM() {
+    const svg = document.getElementById("view");
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    cellEls = [];
+    const g = geom();
+
+    // the part of memory that holds the input, marked off
+    svg.appendChild(el("rect", { x: g.L - 6, y: g.top - 22, width: g.n * g.cw + 12, height: g.h + 46,
+        rx: 5, fill: "none", stroke: "var(--read-border)", "stroke-width": 1, "stroke-dasharray": "5 4", opacity: .8 }));
+    svg.appendChild(el("text", { x: g.L, y: g.top - 28, "font-size": 11.5, fill: "var(--read-border)",
+        "font-weight": 700 }, `MEM[0..N)  —  the input,  N = ${g.n}`));
+    svg.appendChild(el("text", { x: g.L + g.n * g.cw + 10, y: g.top - 28, "font-size": 11.5,
+        fill: "#b9a793" }, "… memory continues"));
+
+    svg.appendChild(el("line", { x1: g.L - 8, y1: g.zero, x2: g.L + g.cells * g.cw + 8, y2: g.zero,
+        stroke: "#b9a793", "stroke-width": 1.2 }));
+
+    for (let i = 0; i < g.cells; i++) {
+        const beyond = i >= g.n;
+        const grp = el("g", {});
+        const rect = el("rect", { x: g.x(i) + g.cw * 0.13, width: g.cw * 0.74, rx: 2,
+            fill: beyond ? "none" : "var(--bar)", stroke: beyond ? "#d4c5b4" : "var(--bar-border)",
+            "stroke-width": 1, "stroke-dasharray": beyond ? "3 3" : "none", class: "mv" });
+        const val = el("text", { x: g.x(i) + g.cw / 2, "text-anchor": "middle",
+            "font-size": Math.min(13, g.cw * 0.5), fill: beyond ? "#b9a793" : "var(--ink-strong)",
+            "font-weight": 600, class: "mv" });
+        const idx = el("text", { x: g.x(i) + g.cw / 2, y: g.top + g.h + 34, "text-anchor": "middle",
+            "font-size": Math.min(11.5, g.cw * 0.42), fill: "#b9a793" }, "MEM[" + i + "]");
+        grp.appendChild(rect); grp.appendChild(val); grp.appendChild(idx);
+        svg.appendChild(grp);
+        cellEls.push({ rect, val, beyond });
+    }
+    svg.appendChild(el("text", { x: g.L + g.cells * g.cw + 14, y: g.zero + 5, "font-size": 15,
+        fill: "#b9a793", "font-weight": 700 }, "…"));
+
+    const mk = (name, color) => {
+        const grp = el("g", { class: "mv", opacity: 0 });
+        grp.appendChild(el("path", { d: "M 0 0 l -7 14 l 14 0 z", fill: color }));
+        grp.appendChild(el("text", { x: 0, y: 30, "text-anchor": "middle", "font-size": 12,
+            fill: color, "font-weight": 700 }, name));
+        svg.appendChild(grp);
+        return grp;
+    };
+    ptr3 = mk("R₃", "var(--acc)");
+    ptr5 = mk("R₅", "var(--read-border)");
+    svg.setAttribute("viewBox", `0 0 900 ${g.top + g.h + 92}`);
+}
+
+function renderMemory(f) {
+    const g = geom();
+    const finalFrom = f.finalized || 0;
+    for (let i = 0; i < cellEls.length; i++) {
+        const v = memNow[i], vn = Number(v);
+        const c = cellEls[i];
+        const yTop = vn >= 0 ? g.y(vn) : g.zero;
+        const h = Math.max(vn === 0 ? 3 : 2, Math.abs(g.y(vn) - g.zero));
+        c.rect.setAttribute("y", yTop);
+        c.rect.setAttribute("height", h);
+        let fill = c.beyond ? "none" : "var(--bar)";
+        let stroke = c.beyond ? "#d4c5b4" : "var(--bar-border)", sw = 1;
+        if (!c.beyond && i < finalFrom) { fill = "var(--sorted)"; stroke = "var(--sorted-border)"; }
+        if (f.read === i)  { fill = "var(--read)";  stroke = "var(--read-border)";  sw = 2; }
+        if (f.write === i) { fill = "var(--write)"; stroke = "var(--write-border)"; sw = 2; }
+        c.rect.setAttribute("fill", fill);
+        c.rect.setAttribute("stroke", stroke);
+        c.rect.setAttribute("stroke-width", sw);
+        c.val.setAttribute("y", vn >= 0 ? g.y(vn) - 6 : g.zero + Math.abs(g.y(vn) - g.zero) + 15);
+        c.val.textContent = String(v);
+    }
+    const place = (grp, val) => {
+        const i = asIndex(val);
+        if (i !== null && i < g.cells) {
+            grp.setAttribute("opacity", 1);
+            grp.setAttribute("transform", `translate(${g.x(i) + g.cw / 2}, ${g.top + g.h + 44})`);
+        } else grp.setAttribute("opacity", 0);
+    };
+    place(ptr3, f.regs[3]);
+    place(ptr5, f.regs[5]);
+}
+
+/* ----------------------------------------------------------- side panels */
+function buildCode() {
+    document.getElementById("ramCode").innerHTML = PROGRAMS[PROG].lines.map(([k, s], i) =>
+        `<div class="ln" data-line="${i+1}"><span class="no">${i+1}</span>` +
+        `<span class="${k === 'cm' ? 'cm' : ''}">${s}</span></div>`).join("");
+    document.getElementById("progNote").innerHTML = PROGRAMS[PROG].note;
+    document.getElementById("pseudoCode").innerHTML = PSEUDO_LINES.map((s, i) =>
+        `<div class="ln" data-pline="${i+1}"><span class="no">${i+1}</span><span>${s}</span></div>`).join("");
+}
+
+function renderPanels(f) {
+    const map = PROGRAMS[PROG].map;
+    document.querySelectorAll("#ramCode .ln").forEach(e => {
+        const n = +e.dataset.line;
+        e.classList.toggle("hi", n === f.executed);
+        e.classList.toggle("next", n === f.pc && !f.halted);
+    });
+    const pl = map[f.executed];
+    document.querySelectorAll("#pseudoCode .ln").forEach(e => {
+        e.classList.toggle("hi", +e.dataset.pline === pl);
+    });
+
+    const names = ["", "R₁", "R₂", "R₃", "R₄", "R₅", "R₆"];
+    const prev = cur > 0 ? frames[cur - 1].regs : null;
+    document.getElementById("regsView").innerHTML = names.slice(1).map((nm, q) => {
+        const i = q + 1, v = f.regs[i];
+        const changed = prev && prev[i] !== v;
+        return `<div class="reg ${changed ? "changed" : ""}"><i>${nm}</i>` +
+               `<span class="num">${v}</span><span class="bits">${bits(v)}</span></div>`;
+    }).join("");
+    let rn = `Words are <i>w</i> = ${W} bits wide and hold values in [0 .. 2<sup>${W}</sup>); arithmetic is ` +
+             `modulo 2<sup>${W}</sup>. Each register is shown with its complete word — all ${W} bits, in bytes, ` +
+             `with the leading zeros greyed out. The greyed-out part is the room the model gives you for free: ` +
+             `one word holds any index into a memory of 2<sup>${W}</sup> cells, so array indices, pointers and ` +
+             `sums all count as single-cell values.`;
+    if (A.some(v => mask(v) !== BigInt(v)))
+        rn += ` Some inputs do not fit into ${W} bits and were wrapped on the way into memory — a negative input ` +
+              `becomes 2<sup>${W}</sup> − |v| and therefore sorts to the end.`;
+    document.getElementById("regNote").innerHTML = rn;
+
+    const box = document.getElementById("statusBox");
+    box.classList.toggle("err", !!f.halted && /outside|wrapped/.test(f.msg));
+    document.getElementById("statusText").innerHTML = f.msg;
+
+    const N = A.length;
+    const last = frames[frames.length - 1];
+    document.getElementById("costView").innerHTML = `
+      <tr><td>instructions executed</td><td>${f.count}</td></tr>
+      <tr><td>of these: comparisons (line 8)</td><td>${f.cmps}</td></tr>
+      <tr><td>of these: swaps (lines 9–10)</td><td>${f.swaps}</td></tr>
+      <tr><td>passes completed</td><td>${f.finalized} of ${N}</td></tr>
+      <tr><td>instructions in the whole run</td><td>${last.count}</td></tr>
+      <tr><td>comparisons in the whole run</td><td>N · (N−1) = ${N * Math.max(0, N - 1)}</td></tr>
+      <tr><td>so the cost is</td><td>Θ(N²)</td></tr>`;
+}
+
+/* ------------------------------------------------------------- stepping */
+function applyTo(target) {
+    while (cur < target) { cur++; const d = frames[cur].delta; if (d) memNow[d.i] = d.now; }
+    while (cur > target) { const d = frames[cur].delta; if (d) memNow[d.i] = d.old; cur--; }
+}
+function gotoFrame(i) {
+    const t = Math.max(0, Math.min(frames.length - 1, i));
+    applyTo(t);
+    document.getElementById("frameSlider").value = cur;
+    document.getElementById("frameVal").textContent = cur + " / " + (frames.length - 1);
+    const f = frames[cur];
+    renderMemory(f);
+    renderPanels(f);
+    document.getElementById("backBtn").disabled = cur === 0;
+    document.getElementById("stepBtn").disabled = cur === frames.length - 1;
+}
+function stepFwd() { if (cur < frames.length - 1) gotoFrame(cur + 1); else stopPlay(); }
+function stepBack() { gotoFrame(cur - 1); }
+function resetRun() { stopPlay(); gotoFrame(0); }
+function runToEnd() { stopPlay(); gotoFrame(frames.length - 1); }
+function updateSpeed(v) {
+    delay = +v; document.getElementById("speedVal").textContent = delay + "ms";
+    if (timer) { clearInterval(timer); timer = setInterval(stepFwd, Math.max(16, delay)); }
+}
+function togglePlay() {
+    if (timer) stopPlay();
+    else {
+        if (cur >= frames.length - 1) gotoFrame(0);
+        timer = setInterval(stepFwd, Math.max(16, delay));
+        document.getElementById("playBtn").textContent = "Pause";
+    }
+}
+function stopPlay() { if (timer) clearInterval(timer); timer = null; document.getElementById("playBtn").textContent = "Play"; }
+
+/* ----------------------------------------------------------------- boot */
+function rebuild() {
+    stopPlay();
+    W = +document.getElementById("wSel").value;
+    frames = simulate();
+    memNow = [];
+    for (let i = 0; i < A.length + EXTRA_CELLS; i++) memNow.push(i < A.length ? mask(A[i]) : 0n);
+    cur = 0;
+    const sl = document.getElementById("frameSlider");
+    sl.max = frames.length - 1; sl.value = 0;
+    buildCode();
+    buildMemoryDOM();
+    gotoFrame(0);
+}
+function loadFromText() {
+    try {
+        A = parseArray(document.getElementById("inputText").value);
+        document.getElementById("parseErr").textContent = "";
+    } catch (e) { document.getElementById("parseErr").textContent = e.message; return; }
+    rebuild();
+}
+function onPreset() {
+    document.getElementById("inputText").value = document.getElementById("presetSel").value;
+    loadFromText();
+}
+function randomInput() {
+    const n = 3 + Math.floor(Math.random() * 14);
+    const a = Array.from({ length: n }, () => Math.floor(Math.random() * 30) + 1);
+    document.getElementById("inputText").value = a.join(" ");
+    loadFromText();
+}
+
+function boot() {
+    const ps = document.getElementById("presetSel");
+    for (const name in PRESETS) {
+        const o = document.createElement("option");
+        o.value = PRESETS[name]; o.textContent = name;
+        ps.appendChild(o);
+    }
+    document.getElementById("inputText").value = PRESETS["Random (8)"];
+    ps.value = PRESETS["Random (8)"];
+    loadFromText();
+    document.addEventListener("keydown", e => {
+        if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+        if (e.key === "ArrowRight") { stepFwd(); e.preventDefault(); }
+        if (e.key === "ArrowLeft") { stepBack(); e.preventDefault(); }
+        if (e.key === " ") { togglePlay(); e.preventDefault(); }
+    });
+    window.addEventListener("resize", () => gotoFrame(cur));
+}
+boot();
+
+</script>
+</body>
+</html>

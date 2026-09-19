@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dijkstra's Algorithm — Strings &amp; Gravity</title>
+<style>
+    :root {
+        --bg: #f5ebd9;
+        --panel: #faf6ed;
+        --panel-border: #d4c5b4;
+        --controls-bg: #ecddc5;
+        --controls-border: #d4c5b4;
+        --ink: #6b675c;
+        --ink-strong: #46433a;
+        --title-muted: #8b8779;
+        --btn: #faf6ed;
+        --btn-border: #b9a793;
+        --btn-border-hover: #9c866d;
+
+        --node-cream: #faf6ed;
+        --node-cream-border: #b9a793;
+        --d-start: #e5c0b4;   /* near */
+        --d-end: #902015;     /* far */
+        --active: #cc2f22;
+        --taut: #902015;      /* load-bearing string (tree edge) */
+        --taut-alt: #b07d18;  /* taut, but an alternative shortest path */
+        --slack: #b9a793;     /* string hanging loose */
+        --floor: #d4c5b4;
+        --hand: #eccfae;
+        --hand-line: #a5836a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--wi-font-body)"Segoe UI", Roboto, sans-serif;
+        margin: 0; padding: 22px 26px 40px; min-height: 100vh;
+    }
+
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--ink-strong); }
+    .nav { display: flex; gap: 6px; margin-bottom: 16px; }
+    .nav a {
+        text-decoration: none; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.4px;
+        padding: 7px 15px; border-radius: 5px 5px 0 0; color: var(--title-muted);
+        background: #ecddc5; border: 1px solid var(--controls-border); border-bottom: none;
+    }
+    .nav a.active { background: var(--panel); color: var(--ink-strong); }
+    .nav a:hover:not(.active) { background: #ecddc5; color: var(--ink-strong); }
+    .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; max-width: 980px; line-height: 1.5; }
+    .subtitle code { background: #ecddc5; padding: 1px 6px; border-radius: 3px; }
+    .subtitle b { color: var(--ink-strong); }
+
+    .controls {
+        display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
+        background-color: var(--controls-bg); padding: 14px 22px; border-radius: 6px;
+        border: 1px solid var(--controls-border); margin-bottom: 22px;
+    }
+    .ctl-group { display: flex; align-items: center; gap: 9px; }
+    .ctl-group label { font-size: 0.82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .btn-group { display: flex; gap: 8px; }
+
+    button, select {
+        background-color: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+        padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit;
+    }
+    button:hover:not(:disabled), select:hover { background-color: #fcf9f3; border-color: var(--btn-border-hover); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.primary { background-color: #f0d9cd; border-color: #c28577; }
+    button.primary:hover:not(:disabled) { background-color: #fcf9f3; }
+    select { cursor: pointer; padding-right: 10px; }
+
+    input[type="range"] { accent-color: #cc2f22; cursor: pointer; vertical-align: middle; }
+    .slider-group { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--ink-strong); }
+    .slider-group label { font-size: 0.82rem; letter-spacing: .6px; text-transform: uppercase; font-weight: 600; color: var(--ink-strong); }
+    .slider-group span { min-width: 46px; font-variant-numeric: tabular-nums; }
+    .chk { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--ink-strong); cursor: pointer; }
+
+        /* ---- stage: graph | splitter | side panels (splitter column is draggable) ---- */
+        .stage { display: grid; grid-template-columns: minmax(0, var(--main-w, 1.55fr)) 20px minmax(320px, 1fr); gap: 0; align-items: start; }
+        .stage > .splitter { align-self: stretch; position: relative; cursor: col-resize; user-select: none; touch-action: none; }
+        .stage > .splitter::before { content: ""; position: absolute; left: 8px; right: 8px; top: 0; bottom: 0; border-radius: 2px; background: transparent; transition: background 0.15s; }
+        .stage > .splitter::after { content: ""; position: absolute; left: 50%; top: min(50%, 240px); width: 5px; height: 42px; margin-left: -2.5px; border-radius: 3px; background: var(--panel-border, #d4c5b4); transition: background 0.15s; }
+        .stage > .splitter:hover::before, .stage > .splitter.dragging::before { background: rgba(0,0,0,0.04); }
+        .stage > .splitter:hover::after, .stage > .splitter.dragging::after { background: var(--wi-heading, #902015); }
+        body.splitting, body.splitting * { cursor: col-resize !important; user-select: none !important; }
+        @media (max-width: 1040px) { .stage { grid-template-columns: 1fr; gap: 20px; } .stage > .splitter { display: none; } }
+        /* ---- zoomable graph canvas ---- */
+        canvas#scene { touch-action: none; cursor: grab; }
+        canvas#scene.panning { cursor: grabbing; }
+        .sim-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .sim-head .sim-title { flex: 1; }
+        .zoom-ctl { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+        .zoom-ctl button { padding: 0; width: 26px; height: 26px; line-height: 24px; font-size: 1rem; border-radius: 4px; }
+        .zoom-ctl .zoom-pct { min-width: 44px; text-align: center; font-size: 0.78rem; color: var(--title-muted, #7a6d5b); font-variant-numeric: tabular-nums; }
+
+    .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
+    canvas#scene { display: block; background-color: var(--bg); width: 100%; height: 620px; border-radius: 4px; cursor: grab; touch-action: none; }
+    canvas#scene.dragging { cursor: grabbing; }
+
+    .side { display: flex; flex-direction: column; gap: 18px; }
+
+    .status { background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.92rem; color: var(--ink-strong); min-height: 62px; line-height: 1.45; }
+    .status b { color: var(--taut); }
+    .pull-display {
+        font-family: "SF Mono", var(--wi-font-mono);
+        font-size: 1.7rem; font-weight: 700; color: var(--ink-strong); letter-spacing: 0.5px;
+        text-align: center; background: #ecddc5; border: 1px solid var(--panel-border);
+        border-radius: 5px; padding: 8px 0; margin-bottom: 12px; font-variant-numeric: tabular-nums;
+    }
+    .pull-display small { display: block; font-size: 0.62rem; letter-spacing: 1px; text-transform: uppercase; color: var(--title-muted); font-family: inherit; font-weight: 700; margin-bottom: 2px; }
+
+    /* correspondence "code" panel */
+    .corr { font-size: 0.84rem; border-collapse: collapse; width: 100%; }
+    .corr td { padding: 5px 8px; border-bottom: 1px dashed #ecddc5; vertical-align: top; line-height: 1.35; }
+    .corr tr:last-child td { border-bottom: none; }
+    .corr td.phys { color: var(--ink-strong); width: 47%; }
+    .corr td.algo { color: var(--ink); font-family: "SF Mono", var(--wi-font-mono); font-size: 0.78rem; }
+    .corr tr.on { background: #f3e7d2; }
+    .corr tr.on td { color: var(--ink-strong); font-weight: 700; }
+    .corr tr.on td.phys { box-shadow: inset 3px 0 0 var(--active); }
+
+    /* lift-off log */
+    .log { display: flex; flex-direction: column; gap: 5px; max-height: 230px; overflow-y: auto; }
+    .log-row { display: flex; align-items: center; gap: 9px; font-size: 0.84rem; padding: 4px 8px; border-radius: 4px; background: #faf6ed; border: 1px solid #ecddc5; }
+    .log-row.pending { opacity: 0.42; }
+    .log-row.next { border-color: var(--active); background: #fdf1e6; }
+    .log-row .key { width: 26px; height: 26px; min-width: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.78rem; border: 1.5px solid rgba(0,0,0,0.18); }
+    .log-row .via { color: var(--title-muted); font-size: 0.8rem; }
+    .log-row .d { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-strong); font-weight: 700; white-space: nowrap; }
+    .log .none { color: var(--title-muted); font-style: italic; font-size: 0.88rem; }
+
+    /* adjacency */
+    .adj { font-size: 0.88rem; }
+    .adj-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #ecddc5; cursor: default; }
+    .adj-row:last-child { border-bottom: none; }
+    .adj-row.hot { background: #f3e7d2; border-radius: 4px; }
+    .adj-key { width: 30px; min-width: 30px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 700; background: var(--node-cream); border: 1px solid var(--node-cream-border); color: var(--ink-strong); font-size: 0.85rem; cursor: pointer; }
+    .adj-dist { min-width: 48px; font-variant-numeric: tabular-nums; font-size: 0.78rem; color: var(--title-muted); font-weight: 700; }
+    .adj-arrow { color: var(--title-muted); }
+    .adj-cells { display: flex; gap: 5px; flex-wrap: wrap; }
+    .adj-cell { min-width: 24px; padding: 2px 6px; border-radius: 3px; text-align: center; background: #ecddc5; border: 1px solid #d4c5b4; color: var(--ink); font-variant-numeric: tabular-nums; font-size: 0.8rem; cursor: pointer; }
+    .adj-cell.taut { background: #f4e0dc; border-color: var(--taut); color: var(--taut); font-weight: 700; }
+    .adj-cell.tautalt { background: #f6ead0; border-color: var(--taut-alt); color: #7f5c19; font-weight: 700; }
+    .adj-cell.hot { outline: 2px solid var(--active); outline-offset: 1px; }
+    .adj-empty { color: var(--title-muted); font-style: italic; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 12px 20px; font-size: 0.8rem; color: var(--ink); align-items: center; margin-top: 18px; }
+    .legend .item { display: flex; align-items: center; gap: 7px; }
+    .sw-line { width: 26px; height: 0; border-top-style: solid; }
+    .sw-taut { border-top: 3.5px solid var(--taut); }
+    .sw-tautalt { border-top: 3px solid var(--taut-alt); }
+    .sw-slack { width: 26px; height: 10px; border-bottom: 2px solid var(--slack); border-radius: 0 0 60% 60%; }
+    .swatch { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid; }
+    .grad { width: 110px; height: 14px; border-radius: 7px; border: 1px solid rgba(0,0,0,.15); background: linear-gradient(90deg, #e5c0b4, #902015); }
+    .sw-cream { background: var(--node-cream); border-color: var(--node-cream-border); }
+
+    details.editor { margin-top: 22px; }
+    details.editor summary { cursor: pointer; font-size: 0.85rem; color: var(--title-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
+    .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    textarea { font-family: "SF Mono", var(--wi-font-mono); font-size: 0.85rem; background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px; padding: 10px; width: 240px; height: 250px; resize: vertical; }
+    .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 460px; line-height: 1.5; }
+    .editor-help code { background: #ecddc5; padding: 1px 5px; border-radius: 3px; }
+    .err { color: #6d180f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="nav">
+    <a href="dijkstra.html">Water &amp; Queue</a>
+    <a href="dijkstra-springs.html">Springs &amp; Rings</a>
+    <a class="active" href="dijkstra-strings.html">Strings &amp; Gravity</a>
+</div>
+
+<h1>Dijkstra's Algorithm — Strings &amp; Gravity</h1>
+<p class="subtitle">
+    Build the graph out of <b>string</b>: every edge is a thread whose length is its weight, every vertex is a
+    <b>knot</b> where the threads are tied together. The whole thing lies crumpled on the floor. Now grab the
+    source&nbsp;<code>s</code> and pull it up. Gravity does the rest: each knot sinks as far as its threads allow,
+    so the knot&nbsp;<code>v</code> ends up exactly <b>d(v)</b> below&nbsp;<code>s</code>, and the threads that end up
+    <b>taut</b> are precisely the edges on shortest paths — they carry the load. Everything else dangles loose.
+    <br><br>
+    The pull height <code>H</code> <i>is</i> Dijkstra's clock: a knot leaves the ground at the very moment
+    <code>H = d(v)</code>, so the knots take off in exactly the order the priority queue settles them.
+    Hover a knot to light up its shortest path, hover a thread to see why it is taut or slack.
+</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="presetSel">Graph</label>
+        <select id="presetSel"></select>
+    </div>
+    <div class="ctl-group">
+        <label for="startSel">Source</label>
+        <select id="startSel"></select>
+    </div>
+    <div class="btn-group">
+        <button id="backBtn" onclick="stepBack()">&lsaquo; Back</button>
+        <button id="stepBtn" class="primary" onclick="stepFwd()">Step &rsaquo;</button>
+        <button id="playBtn" onclick="togglePlay()">Play</button>
+        <button id="resetBtn" onclick="resetRun()">Reset</button>
+    </div>
+    <div class="slider-group">
+        <input type="range" id="pullSlider" aria-label="Scrub through the run" min="0" max="1000" value="0" step="1" oninput="scrubPull(this.value)">
+        <span id="pullSliderVal" style="min-width:62px">0 / 0</span>
+    </div>
+    <div class="slider-group">
+        <label for="speedSlider">Speed</label>
+        <input type="range" id="speedSlider" min="1" max="30" value="10" oninput="setSpeed(this.value)">
+    </div>
+    <div class="slider-group">
+        <label for="spreadSlider">Spread</label>
+        <input type="range" id="spreadSlider" min="0" max="100" value="40" oninput="setSpread(this.value)">
+        <span id="spreadVal">24&deg;</span>
+    </div>
+    <div class="slider-group">
+        <label for="droopSlider" title="1.00 draws every slack thread at its true length">Droop</label>
+        <input type="range" id="droopSlider" min="15" max="100" value="75" oninput="setDroop(this.value)">
+        <span id="droopVal">0.75</span>
+    </div>
+    <div class="slider-group">
+        <label for="rotSlider">Turn</label>
+        <input type="range" id="rotSlider" min="0" max="360" value="35" oninput="setRot(this.value)">
+    </div>
+    <div class="ctl-group" style="gap:14px">
+        <label class="chk"><input type="checkbox" id="chkWeights" checked onchange="draw()"> weights</label>
+        <label class="chk"><input type="checkbox" id="chkRings" checked onchange="draw()"> distance rings</label>
+        <label class="chk"><input type="checkbox" id="chkGhost" checked onchange="draw()"> floor ghost</label>
+        <label class="chk"><input type="checkbox" id="chkLoad" onchange="draw()"> thickness = load</label>
+        <label class="chk"><input type="checkbox" id="chkPause" checked> pause at lift-offs</label>
+    </div>
+</div>
+
+<div class="stage">
+    <div>
+        <div class="sim-box">
+            <div class="sim-head"><div class="sim-title">The string graph &nbsp;·&nbsp; drag to turn the view</div><div class="zoom-ctl" title="Wheel: zoom &middot; drag: turn &middot; shift+drag or middle button: pan &middot; double-click: reset"><button type="button" id="zoomOut" title="Zoom out">&minus;</button><span class="zoom-pct" id="zoomPct">100%</span><button type="button" id="zoomIn" title="Zoom in">+</button><button type="button" id="zoomFit" title="Reset view (double-click on the graph)">&#x2922;</button></div></div>
+            <canvas id="scene"></canvas>
+            <div class="legend">
+                <div class="item"><span class="sw-line sw-taut"></span> taut &amp; load-bearing (shortest-path tree)</div>
+                <div class="item"><span class="sw-line sw-tautalt"></span> taut, but a tie (alternative shortest path)</div>
+                <div class="item"><span class="sw-slack"></span> slack — hangs loose, carries nothing</div>
+                <div class="item"><span class="swatch sw-cream"></span> never lifts off (unreachable)</div>
+                <div class="item"><span class="grad"></span> &nbsp;d(v): near &rarr; far</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="splitter" id="stageSplitter" title="Drag to resize &middot; double-click to reset"></div>
+    <div class="side">
+        <div class="sim-box">
+            <div class="pull-display"><small>pull height H</small><span id="pullVal">0.00</span></div>
+            <div class="status" id="status"></div>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title">Physics &nbsp;&#8652;&nbsp; Dijkstra</div>
+            <table class="corr" id="corrTable">
+                <tr data-row="pull"><td class="phys">pull the source up to height <b>H</b></td><td class="algo">the key currently being extracted</td></tr>
+                <tr data-row="lift"><td class="phys">a knot leaves the floor</td><td class="algo">deleteMin: v is settled, dist[v] final</td></tr>
+                <tr data-row="depth"><td class="phys">depth of v below the hand</td><td class="algo">dist[v]</td></tr>
+                <tr data-row="taut"><td class="phys">thread u&ndash;v is <b>taut</b></td><td class="algo">dist[u] + w(u,v) = dist[v] &nbsp;(tight)</td></tr>
+                <tr data-row="slack"><td class="phys">thread u&ndash;v hangs <b>slack</b></td><td class="algo">dist[u] + w(u,v) &gt; dist[v] &nbsp;(no relaxation)</td></tr>
+                <tr data-row="floor"><td class="phys">knot never leaves the floor</td><td class="algo">dist[v] = &infin; (unreachable)</td></tr>
+            </table>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title">Lift-off order &nbsp;·&nbsp; the priority queue</div>
+            <div class="log" id="logView"></div>
+        </div>
+
+        <div class="sim-box">
+            <div class="sim-title">Adjacency lists &nbsp;·&nbsp; hover to highlight</div>
+            <div class="adj" id="adjView"></div>
+        </div>
+    </div>
+</div>
+
+<details class="editor">
+    <summary>Edit / paste a graph</summary>
+    <div class="editor-body">
+        <textarea id="graphText" spellcheck="false"></textarea>
+        <div>
+            <button class="primary" onclick="loadFromText()">Load this graph</button>
+            <label class="chk" style="margin-left:10px"><input type="checkbox" id="plainToggle" onchange="refreshTextarea()"> plain format (no coordinates)</label>
+            <div class="err" id="parseErr"></div>
+            <div class="editor-help" style="margin-top:10px">
+                Format (Sedgewick &amp; Wayne <code>EdgeWeightedGraph</code>): first line the number of vertices
+                <code>V</code>, second line the number of edges <code>E</code>, then <code>E</code> lines
+                <code>v w weight</code> with weight&nbsp;&ge;&nbsp;0. Vertices are <code>0 … V−1</code>.
+                <br><br>
+                Strings have no direction, so <b>every edge is read as undirected</b> here; a digraph file
+                (<code>EdgeWeightedDigraph</code>) still loads &mdash; the two directions of a pair are merged into one
+                thread, keeping the smaller weight.
+                <br><br>
+                <b>Optional fixed layout:</b> after the edges, add exactly <code>V</code> more lines of <code>x y</code>
+                &mdash; one pair per vertex, in order &mdash; to pin down how the graph lies on the floor. This is the
+                same augmented format the graph editor writes, so prepared graphs carry over. Any numeric scale works;
+                it is auto-centred and scaled, preserving relative position and aspect ratio.
+                <br><br>
+                <b>Mixed-format tolerant:</b> each edge occupies exactly one line; a missing weight defaults to&nbsp;1.
+            </div>
+        </div>
+    </div>
+</details>
+
+<script>
+/* ============================ preset graphs ============================ */
+const PRESETS = {
+"tinyEWG  (algs4, 8 V, 16 E)":
+`8
+16
+4 5 0.35
+4 7 0.37
+5 7 0.28
+0 7 0.16
+1 5 0.32
+0 4 0.38
+2 3 0.17
+1 7 0.19
+0 2 0.26
+1 2 0.36
+1 3 0.29
+2 7 0.34
+6 2 0.40
+3 6 0.52
+6 0 0.58
+6 4 0.93
+0.30 0.55
+0.78 0.22
+0.55 0.74
+0.86 0.80
+0.13 0.18
+0.50 0.08
+0.04 0.88
+0.48 0.44`,
+
+"Road map  (7 V, 9 E)":
+`7
+9
+0 1 4
+0 2 3
+1 2 2
+1 3 5
+2 4 6
+3 4 1
+3 5 3
+4 5 2
+5 6 4
+0.04 0.50
+0.32 0.20
+0.32 0.80
+0.60 0.30
+0.60 0.76
+0.82 0.52
+1.00 0.90`,
+
+"Grid 4x3  (12 V, 17 E)":
+`12
+17
+0 1 2
+1 2 3
+2 3 1
+4 5 4
+5 6 2
+6 7 3
+8 9 3
+9 10 1
+10 11 2
+0 4 3
+4 8 2
+1 5 5
+5 9 2
+2 6 2
+6 10 4
+3 7 1
+7 11 3
+0.00 0.00
+0.33 0.00
+0.67 0.00
+1.00 0.00
+0.00 0.50
+0.33 0.50
+0.67 0.50
+1.00 0.50
+0.00 1.00
+0.33 1.00
+0.67 1.00
+1.00 1.00`,
+
+"Chain with a shortcut  (6 V, 7 E)":
+`6
+7
+0 1 2
+1 2 2
+2 3 2
+3 4 2
+4 5 2
+0 5 3
+1 4 9
+0.02 0.46
+0.20 0.12
+0.46 0.02
+0.72 0.14
+0.92 0.46
+0.50 0.86`,
+
+"Two clusters, long bridge  (9 V, 11 E)":
+`9
+11
+0 1 1
+1 2 1
+2 0 1
+2 3 8
+3 4 1
+4 5 1
+5 3 1
+4 6 1
+6 7 1
+7 8 1
+8 6 1
+0.02 0.34
+0.02 0.68
+0.16 0.50
+0.56 0.50
+0.72 0.28
+0.72 0.72
+0.90 0.16
+1.00 0.38
+0.88 0.52`,
+
+"With an unreachable piece  (8 V, 8 E)":
+`8
+8
+0 1 3
+1 2 2
+2 0 4
+0 3 5
+3 4 2
+5 6 3
+6 7 2
+7 5 4
+0.06 0.50
+0.26 0.20
+0.26 0.80
+0.50 0.50
+0.66 0.22
+0.86 0.62
+1.00 0.36
+1.00 0.88`
+};
+
+/* ============================ small helpers ============================ */
+const clamp = (x, a, b) => x < a ? a : (x > b ? b : x);
+const lerp  = (a, b, t) => a + (b - a) * t;
+const smoothstep = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+function fmt(x, k = 2) {
+    if (!isFinite(x)) return "\u221e";
+    const r = Math.round(x * 1000) / 1000;
+    return Number.isInteger(r) ? String(r) : r.toFixed(k).replace(/0+$/, '').replace(/\.$/, '');
+}
+function mixHex(c1, c2, t) {
+    const p = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+    const a = p(c1), b = p(c2);
+    const c = a.map((v,i) => clamp(Math.round(lerp(v, b[i], clamp(t,0,1))), 0, 255));
+    return '#' + c.map(v => v.toString(16).padStart(2,'0')).join('');
+}
+const NEAR = '#e5c0b4', FAR = '#902015';
+function distColor(d) { return isFinite(d) ? mixHex(NEAR, FAR, Dmax > 0 ? d / Dmax : 0) : '#faf6ed'; }   // always hex, so it can be mixed again
+function distTextColor(d) { return (!isFinite(d) || (Dmax > 0 && d / Dmax < 0.42)) ? '#46433a' : '#fdf5ea'; }
+
+/* ============================ parsing (algs4 + optional coordinates) ============================ */
+function normalizePositions(raw) {
+    let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
+    for (const p of raw) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+    const w = Math.max(maxx-minx, 1e-6), h = Math.max(maxy-miny, 1e-6);
+    const pad = 0.08, avail = 1 - 2*pad;
+    const s = avail / Math.max(w, h);
+    const usedW = w*s, usedH = h*s;
+    const offX = pad + (avail-usedW)/2, offY = pad + (avail-usedH)/2;
+    return raw.map(p => ({ x: offX + (p.x-minx)*s, y: offY + (p.y-miny)*s }));
+}
+function fmtCoord(x) { return (Math.round(x*1000)/1000).toString(); }
+function tokenizeLines(text) {
+    return text.split('\n').map(l => l.trim().split(/\s+/).filter(s => s.length)).filter(t => t.length > 0);
+}
+function readVE(lines) {
+    if (lines.length === 0) throw new Error("Empty input.");
+    if (lines[0].length >= 2) return { v: parseInt(lines[0][0],10), e: parseInt(lines[0][1],10), li: 1 };
+    if (lines.length < 2) throw new Error("Need E on the second line.");
+    return { v: parseInt(lines[0][0],10), e: parseInt(lines[1][0],10), li: 2 };
+}
+function readTrailingPositions(lines, li, v) {
+    const remaining = lines.length - li;
+    if (remaining === 0) return null;
+    if (remaining !== v) throw new Error(`After the edges, expected either nothing or exactly ${v} coordinate line(s) ("x y" each), but found ${remaining}.`);
+    const raw = [];
+    for (let i = 0; i < v; i++) {
+        const toks = lines[li++];
+        const x = parseFloat(toks[0]), y = parseFloat(toks[1]);
+        if (toks.length < 2 || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Vertex ${i}: expected two coordinate numbers "x y".`);
+        raw.push({ x, y });
+    }
+    return normalizePositions(raw);
+}
+function parseGraph(text) {
+    const lines = tokenizeLines(text);
+    const { v, e, li: li0 } = readVE(lines);
+    let li = li0;
+    if (!Number.isFinite(v) || v <= 0) throw new Error("V (number of vertices) must be a positive integer.");
+    if (!Number.isFinite(e) || e < 0)  throw new Error("E (number of edges) must be a non-negative integer.");
+    const key = new Map(), list = [];
+    for (let k = 0; k < e; k++) {
+        if (li >= lines.length) throw new Error(`Expected ${e} edge line(s), only found ${k}.`);
+        const toks = lines[li++];
+        if (toks.length < 2) throw new Error(`Edge ${k+1}: expected at least two vertex integers.`);
+        const x = parseInt(toks[0],10), y = parseInt(toks[1],10);
+        const wt = toks.length >= 3 ? parseFloat(toks[2]) : 1;
+        if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Edge ${k+1}: expected two vertex integers.`);
+        if (!Number.isFinite(wt)) throw new Error(`Edge ${k+1}: expected a numeric weight.`);
+        if (wt < 0) throw new Error(`Edge ${k+1}: a string cannot have negative length.`);
+        if (x < 0 || x >= v || y < 0 || y >= v) throw new Error(`Edge ${k+1}: vertex out of range 0…${v-1}.`);
+        if (x === y) throw new Error(`Edge ${k+1}: self-loops are not supported in this visualizer.`);
+        const a = Math.min(x,y), b = Math.max(x,y), kk = a + '_' + b;
+        if (key.has(kk)) { const id = key.get(kk); list[id].w = Math.min(list[id].w, wt); }   // undirected: merge the pair
+        else { key.set(kk, list.length); list.push({ u: x, v: y, w: wt }); }
+    }
+    const pos = readTrailingPositions(lines, li, v);
+    return { v, edges: list, pos };
+}
+
+/* ============================ automatic floor layout (no coordinates given) ============================ */
+function autoLayout(n, edges) {
+    if (n === 1) return [{ x: 0.5, y: 0.5 }];
+    let p = [];
+    for (let i = 0; i < n; i++) {
+        const a = 2*Math.PI*i/n;
+        p.push({ x: 0.5 + 0.35*Math.cos(a), y: 0.5 + 0.35*Math.sin(a) });
+    }
+    const wAvg = edges.length ? edges.reduce((s,e) => s+e.w, 0)/edges.length : 1;
+    for (let it = 0; it < 500; it++) {
+        const fx = new Array(n).fill(0), fy = new Array(n).fill(0);
+        for (const e of edges) {                                  // springs at natural length ~ weight
+            const dx = p[e.v].x-p[e.u].x, dy = p[e.v].y-p[e.u].y;
+            const d = Math.max(Math.hypot(dx,dy), 1e-6);
+            const target = 0.30 * e.w / wAvg;
+            const f = 0.12 * (d - target) / d;
+            fx[e.u] += f*dx; fy[e.u] += f*dy; fx[e.v] -= f*dx; fy[e.v] -= f*dy;
+        }
+        for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) {  // repulsion
+            const dx = p[j].x-p[i].x, dy = p[j].y-p[i].y;
+            const d2 = Math.max(dx*dx+dy*dy, 1e-4);
+            const f = 0.0025 / d2;
+            fx[i] -= f*dx; fy[i] -= f*dy; fx[j] += f*dx; fy[j] += f*dy;
+        }
+        for (let i = 0; i < n; i++) { p[i].x += clamp(fx[i],-0.05,0.05); p[i].y += clamp(fy[i],-0.05,0.05); }
+    }
+    return normalizePositions(p);
+}
+
+/* ============================ state ============================ */
+const canvas = document.getElementById('scene');
+const ctx = canvas.getContext('2d');
+
+let V = 0, edges = [], adj = [], pos01 = [];
+let src = 0, dist = [], par = [], parEdge = [], order = [], Dmax = 1;
+let floorPos = [], floorCenter = { x: 0, y: 0 }, floorRadius = 1, worldScale = 1;
+let phi = [], subtreeMass = [];
+let H = 0, Hend = 1, playing = false, speed = 10, spread = 0.40, droop = 0.75, viewRot = 35 * Math.PI/180;
+let hoverV = -1, hoverE = -1, flashRow = null, flashUntil = 0;
+let lastFrame = 0, holdUntil = 0;
+
+const CONE = 1.5;              // widest slope the spread slider can fan the cone to
+const EPS = 1e-9;
+
+/* ============================ Dijkstra ============================ */
+function runDijkstra() {
+    dist = new Array(V).fill(Infinity);
+    par = new Array(V).fill(-1);
+    parEdge = new Array(V).fill(-1);
+    order = [];
+    const done = new Array(V).fill(false);
+    dist[src] = 0;
+    for (;;) {
+        let best = -1;
+        for (let v = 0; v < V; v++) if (!done[v] && isFinite(dist[v]) && (best < 0 || dist[v] < dist[best])) best = v;
+        if (best < 0) break;
+        done[best] = true;
+        order.push(best);
+        for (const { to, w, id } of adj[best]) {
+            if (dist[best] + w < dist[to] - 1e-12) { dist[to] = dist[best] + w; par[to] = best; parEdge[to] = id; }
+        }
+    }
+    Dmax = 0;
+    for (let v = 0; v < V; v++) if (isFinite(dist[v])) Dmax = Math.max(Dmax, dist[v]);
+    if (Dmax <= 0) Dmax = 1;
+    Hend = Dmax * 1.45;      // keep pulling after the last knot leaves the floor, so it all hangs clear
+
+    // load carried by each tree edge = number of knots hanging below it
+    subtreeMass = new Array(V).fill(1);
+    for (let i = order.length - 1; i >= 1; i--) {
+        const v = order[i];
+        if (par[v] >= 0) subtreeMass[par[v]] += subtreeMass[v];
+    }
+    computeAngles();
+}
+
+/* ------- classification of every thread in the final hanging state ------- */
+function edgeState(e) {                       // 'taut' | 'alt' | 'slack' | 'ground'
+    const du = dist[e.u], dv = dist[e.v];
+    if (!isFinite(du) || !isFinite(dv)) return 'ground';
+    if (par[e.v] === e.u || par[e.u] === e.v) return 'taut';
+    return Math.abs(Math.abs(du - dv) - e.w) < 1e-9 ? 'alt' : 'slack';
+}
+function edgeSlack(e) {
+    const du = dist[e.u], dv = dist[e.v];
+    if (!isFinite(du) || !isFinite(dv)) return 0;
+    return Math.max(0, e.w - Math.abs(du - dv));
+}
+
+/* ============================ hanging layout: fan the tree out by angle ============================ */
+function computeAngles() {
+    const children = Array.from({ length: V }, () => []);
+    for (let v = 0; v < V; v++) if (v !== src && par[v] >= 0) children[par[v]].push(v);
+    const az = v => Math.atan2(floorPos[v].y - floorPos[src].y, floorPos[v].x - floorPos[src].x);
+    for (const c of children) c.sort((a, b) => az(a) - az(b));
+
+    const leaves = new Array(V).fill(0);
+    const cnt = v => { if (!children[v].length) return leaves[v] = 1; let s = 0; for (const c of children[v]) s += cnt(c); return leaves[v] = s; };
+    cnt(src);
+
+    phi = new Array(V).fill(0);
+    const assign = (v, a0, a1) => {
+        phi[v] = (a0 + a1) / 2;
+        let a = a0;
+        for (const c of children[v]) { const span = (a1 - a0) * leaves[c] / leaves[v]; assign(c, a, a + span); a += span; }
+    };
+    assign(src, 0, 2 * Math.PI);
+    phi[src] = 0;
+
+    // rotate the whole fan so it lines up as well as possible with how the graph lay on the floor
+    let sx = 0, sy = 0;
+    for (let v = 0; v < V; v++) if (v !== src && isFinite(dist[v])) { const d = az(v) - phi[v]; sx += Math.cos(d); sy += Math.sin(d); }
+    const off = (sx === 0 && sy === 0) ? 0 : Math.atan2(sy, sx);
+    for (let v = 0; v < V; v++) phi[v] += off;
+}
+
+/* ============================ world positions at pull height H ============================ */
+function blendSpan() { return Math.max(0.30 * Dmax, 1e-6); }
+function worldPos(v, h, sp) {
+    const d = dist[v];
+    if (!isFinite(d) || h <= d) return { x: floorPos[v].x, y: floorPos[v].y, z: 0, air: false };
+    const z = h - d;
+    const t = smoothstep(z / blendSpan());
+    const r = sp * CONE * d;
+    const hx = floorPos[src].x + r * Math.cos(phi[v]);
+    const hy = floorPos[src].y + r * Math.sin(phi[v]);
+    return { x: lerp(floorPos[v].x, hx, t), y: lerp(floorPos[v].y, hy, t), z, air: true };
+}
+
+/* ============================ isometric projection ============================ */
+const C30 = Math.cos(Math.PI / 6);
+let view = { S: 1, ox: 0, oy: 0 };
+function projRaw(p) {
+    const ca = Math.cos(viewRot), sa = Math.sin(viewRot);
+    const X = p.x * ca - p.y * sa, Y = p.x * sa + p.y * ca;
+    return { x: (X - Y) * C30 * view.S, y: ((X + Y) * 0.5 - p.z) * view.S, depth: X + Y };
+}
+function proj(p) { const q = projRaw(p); q.x += view.ox; q.y += view.oy; return q; }
+
+/* how far below the deepest knot the loosest thread dangles (world units) */
+function sagAllowance() {
+    let room = 0.10 * Dmax;
+    for (const e of edges) {
+        const sl = edgeSlack(e);
+        if (sl <= 1e-9) continue;
+        const ru = spread * CONE * dist[e.u], rv = spread * CONE * dist[e.v];
+        const h = Math.hypot(ru*Math.cos(phi[e.u]) - rv*Math.cos(phi[e.v]), ru*Math.sin(phi[e.u]) - rv*Math.sin(phi[e.v]));
+        const sd = sl * droop;
+        const depth = Math.min(sd / 2, Math.sqrt(3 * h * sd / 8) + 0.02 * Dmax);   // catenary sag, both regimes
+        room = Math.max(room, Math.max(dist[e.u], dist[e.v]) + depth - Dmax);
+    }
+    return clamp(room, 0.10 * Dmax, 0.60 * Dmax);
+}
+
+let dpr = 1, cw = 0, ch = 0, radius = 15;
+/* ============================ viewport (zoom & pan) ============================
+   World coordinates are the canvas layout at zoom 1; the camera is a single canvas transform, so all
+   drawing code is zoom-agnostic. view.dx/dy: world offset of the point shown at the canvas centre. */
+const view2 = { z: 1, dx: 0, dy: 0 };
+let cam = { z: 1, tx: 0, ty: 0 }, camW = 0, camH = 0;
+function preferredHeight(w) {
+    const hMax = Math.max(560, Math.round(window.innerHeight * 0.78));
+    return Math.round(Math.max(560, Math.min(hMax, w * 0.65)));
+}
+function camFit() {   // size the canvas (height follows width, bounded), apply the camera transform; returns { cw, ch }
+    dpr = window.devicePixelRatio || 1;
+    let rect = canvas.getBoundingClientRect();
+    const h = preferredHeight(rect.width);
+    if (Math.abs(h - rect.height) > 0.5) { canvas.style.height = h + 'px'; rect = canvas.getBoundingClientRect(); }
+    camW = rect.width; camH = rect.height;
+    canvas.width = Math.round(camW*dpr); canvas.height = Math.round(camH*dpr);
+    const z = view2.z;
+    cam = { z, tx: camW/2 - z*(camW/2 + view2.dx), ty: camH/2 - z*(camH/2 + view2.dy) };
+    ctx.setTransform(dpr*z, 0, 0, dpr*z, dpr*cam.tx, dpr*cam.ty);
+    const pct = document.getElementById('zoomPct'); if (pct) pct.textContent = Math.round(z*100) + '%';
+    return { cw: camW, ch: camH };
+}
+function toWorld(sx, sy) { return { x: (sx - cam.tx)/cam.z, y: (sy - cam.ty)/cam.z }; }
+function screenFill(style) {   // fill the whole visible canvas regardless of the camera
+    ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = style; ctx.fillRect(0, 0, camW, camH); ctx.restore();
+}
+function zoomAt(factor, sx, sy) {    // zoom keeping the world point under (sx, sy) fixed
+    const z = Math.max(0.3, Math.min(12, view2.z*factor));
+    const a = toWorld(sx, sy);
+    const tx = sx - z*a.x, ty = sy - z*a.y;
+    view2.z = z; view2.dx = (camW/2 - tx)/z - camW/2; view2.dy = (camH/2 - ty)/z - camH/2;
+    redrawCanvas();
+}
+function panBy(dx, dy) { view2.dx -= dx/cam.z; view2.dy -= dy/cam.z; redrawCanvas(); }
+function resetView() { view2.z = 1; view2.dx = view2.dy = 0; redrawCanvas(); }
+function redrawCanvas() { draw(); }
+function fitCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    ({ cw, ch } = camFit());
+
+    const handRoom = 68;                             // the hand reaches above the source
+    const availW = cw - 44, availH = ch - 44 - handRoom;
+    // state A: everything still on the floor (the slab is a square, so use its circumradius)
+    const Rc0 = floorRadius * 1.22 * Math.SQRT2;
+    const S0 = Math.min(availW / (2 * Rc0 * Math.SQRT2 * C30), availH / (2 * Rc0 * Math.SQRT2 * 0.5));
+    // state B: fully hanging — a cone of radius CONE*spread*Dmax and height Dmax, plus the deepest sag
+    const Rh = Math.max(spread * CONE * Dmax, 0.10 * Dmax);
+    const sagRoom = sagAllowance();
+    const S1 = Math.min(availW / (2 * Rh * Math.SQRT2 * C30),
+                        availH / (Dmax + sagRoom + Rh * Math.SQRT2 * 0.5));
+    const u = smoothstep(Hend > 0 ? H / Hend : 0);
+    view.S = lerp(S0, S1, u) * 0.97;                 // the camera closes in as the graph leaves the floor
+    if (!isFinite(view.S) || view.S <= 0) view.S = 100;
+
+    // camera: pan from the floor scene up to the middle of the hanging cone
+    view.ox = 0; view.oy = 0;
+    const a = projRaw({ x: floorCenter.x, y: floorCenter.y, z: 0 });
+    const b = projRaw({ x: floorPos[src].x, y: floorPos[src].y, z: H - (Dmax + sagRoom) / 2 });
+    view.ox = cw / 2 - lerp(a.x, b.x, u);
+    view.oy = ch / 2 - lerp(a.y, b.y, u) + (handRoom / 2) * u;
+
+    // knot size: the tightest spot in either scene, each measured at its own zoom
+    const keep = view.S;
+    let minD = Infinity;
+    for (const [SS, hh] of [[S0 * 0.97, 0], [S1 * 0.97, Hend]]) {
+        view.S = SS;
+        const Q = [];
+        for (let v = 0; v < V; v++) Q.push(projRaw(worldPos(v, hh, spread)));
+        for (let i = 0; i < V; i++) for (let j = i + 1; j < V; j++) minD = Math.min(minD, Math.hypot(Q[i].x-Q[j].x, Q[i].y-Q[j].y));
+    }
+    view.S = keep;
+    if (!isFinite(minD)) minD = 90;
+    radius = clamp(minD * 0.44, 9, 19);
+}
+
+/* ============================ catenary ============================ */
+/* sampled hanging chain in screen space between A and B with total rope length L */
+function catenary(ax, ay, bx, by, L, N) {
+    N = N || 26;
+    const dx = bx - ax, dy = by - ay;
+    const chord = Math.hypot(dx, dy);
+    if (L <= chord + 0.6) return [[ax, ay], [bx, by]];
+    const h = Math.abs(dx);
+    if (h < 2.5) {                                     // (near-)vertical: a narrow hairpin
+        const yTop = Math.min(ay, by), yBot = Math.max(ay, by);
+        const drop = (L - (yBot - yTop)) / 2;
+        const lowY = yBot + drop;
+        const bul = clamp(drop * 0.42, 5, 26);
+        const pts = [];
+        const p0 = [ax, ay], p1 = [ax - bul, lowY], p2 = [bx + bul, lowY], p3 = [bx, by];
+        for (let i = 0; i <= N; i++) {
+            const t = i / N, mt = 1 - t;
+            pts.push([
+                mt*mt*mt*p0[0] + 3*mt*mt*t*p1[0] + 3*mt*t*t*p2[0] + t*t*t*p3[0],
+                mt*mt*mt*p0[1] + 3*mt*mt*t*p1[1] + 3*mt*t*t*p2[1] + t*t*t*p3[1]
+            ]);
+        }
+        return pts;
+    }
+    const v = dy;                                       // screen-y difference (down positive)
+    const K = Math.sqrt(Math.max(L*L - v*v, 1e-9));
+    // solve  2a sinh(h/2a) = K   (left side decreases in a, from +inf down to h)
+    let lo = 1e-4, hi = 1e7;
+    for (let i = 0; i < 90; i++) {
+        const a = 0.5 * (lo + hi);
+        if (2*a*Math.sinh(h/(2*a)) > K) lo = a; else hi = a;
+    }
+    const a = 0.5 * (lo + hi);
+    const x0 = h/2 - a * Math.asinh(-v / K);
+    const c  = -a * Math.cosh(x0 / a);
+    const sgn = dx >= 0 ? 1 : -1;
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+        const x = h * i / N;
+        const Y = a * Math.cosh((x - x0) / a) + c;
+        pts.push([ax + sgn * x, ay - Y]);
+    }
+    return pts;
+}
+
+/* an edge lying loose on the floor: a gentle in-plane meander */
+function floorString(ax, ay, bx, by, excess, sign) {
+    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const amp = sign * clamp(Math.sqrt(Math.max(excess, 0) * len) * 0.45, 0, len * 0.28);
+    const pts = [];
+    for (let i = 0; i <= 20; i++) {
+        const t = i / 20;
+        const off = amp * Math.sin(Math.PI * t);
+        pts.push([ax + dx * t + nx * off, ay + dy * t + ny * off]);
+    }
+    return pts;
+}
+
+/* ============================ drawing helpers ============================ */
+function strokePts(pts, width, color, dash) {
+    ctx.save();
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.lineWidth = width; ctx.strokeStyle = color; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+}
+function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function label(x, y, text, opts) {
+    opts = opts || {};
+    ctx.font = `700 ${opts.size || 11}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    const w = ctx.measureText(text).width, pad = 4;
+    roundRect(x - w/2 - pad, y - 8, w + 2*pad, 16, 4);
+    ctx.fillStyle = opts.bg || 'rgba(250,246,237,0.92)';
+    ctx.strokeStyle = opts.border || '#b9a793'; ctx.lineWidth = 1;
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = opts.color || '#46433a';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y + 0.5);
+}
+
+/* the hand that does the pulling */
+function drawHand(x, y, alpha) {
+    const s = clamp(radius / 15, 0.85, 1.5);
+    const R = radius / s;                       // knot radius in hand-local units
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y); ctx.scale(s, s);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // forearm
+    ctx.strokeStyle = '#d9b48f'; ctx.lineWidth = 15;
+    ctx.beginPath(); ctx.moveTo(9, -(radius/s) - 28); ctx.lineTo(24, -(radius/s) - 78); ctx.stroke();
+    // palm
+    ctx.fillStyle = '#f0d5b5'; ctx.strokeStyle = '#a5836a'; ctx.lineWidth = 1.4;
+    ctx.save(); ctx.translate(4, -(radius/s) - 20); ctx.rotate(-0.26);
+    roundRect(-14, -14, 28, 27, 11); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    // fingers curling round the knot
+    const grip = R + 4;
+    for (let pass = 0; pass < 2; pass++) {
+        ctx.strokeStyle = pass ? '#f0d5b5' : '#a5836a';
+        ctx.lineWidth = pass ? 6.4 : 8.6;
+        for (let i = 0; i < 4; i++) {
+            const a0 = -Math.PI * 0.98 + i * 0.31, a1 = a0 + 0.66;
+            ctx.beginPath(); ctx.arc(0, -2, grip + i * 1.1, a0, a1); ctx.stroke();
+        }
+        // thumb, coming round the other side
+        ctx.lineWidth = pass ? 7 : 9.2;
+        ctx.beginPath(); ctx.arc(1, -4, grip + 1, 0.10, 0.92); ctx.stroke();
+    }
+    ctx.restore();
+}
+
+/* ============================ the scene ============================ */
+let hitEdges = [], hitVerts = [];
+
+function draw() {
+    if (!V) return;
+    fitCanvas();
+    ctx.clearRect(0, 0, cw, ch);
+
+    const P = [], PP = [];
+    for (let v = 0; v < V; v++) { P.push(worldPos(v, H, spread)); PP.push(worldPos(v, H, 0)); }
+    const S = P.map(p => proj(p));
+
+    const showRings   = document.getElementById('chkRings').checked;
+    const showGhost   = document.getElementById('chkGhost').checked;
+    const showWeights = document.getElementById('chkWeights').checked;
+    const byLoad      = document.getElementById('chkLoad').checked;
+
+    /* ---- the floor ---- */
+    const uu = smoothstep(Hend > 0 ? H / Hend : 0);
+    ctx.save(); ctx.globalAlpha = 1 - 0.6 * uu;
+    const Rf = floorRadius * 1.18;
+    const corners = [[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b]) => proj({ x: floorCenter.x + a*Rf, y: floorCenter.y + b*Rf, z: 0 }));
+    ctx.beginPath(); ctx.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < 4; i++) ctx.lineTo(corners[i].x, corners[i].y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(205,191,157,0.16)'; ctx.fill();
+    ctx.strokeStyle = '#c3b48f'; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.save(); ctx.globalAlpha = 0.35; ctx.strokeStyle = '#d4c5b4'; ctx.lineWidth = 0.8;
+    for (let i = 1; i < 6; i++) {
+        const t = -1 + 2*i/6;
+        const p1 = proj({ x: floorCenter.x + t*Rf, y: floorCenter.y - Rf, z: 0 });
+        const p2 = proj({ x: floorCenter.x + t*Rf, y: floorCenter.y + Rf, z: 0 });
+        const q1 = proj({ x: floorCenter.x - Rf, y: floorCenter.y + t*Rf, z: 0 });
+        const q2 = proj({ x: floorCenter.x + Rf, y: floorCenter.y + t*Rf, z: 0 });
+        ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.moveTo(q1.x,q1.y); ctx.lineTo(q2.x,q2.y); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.restore();
+
+    /* ---- ghost of the original floor layout ---- */
+    if (showGhost && H > 0) {
+        ctx.save(); ctx.globalAlpha = 0.30 * (1 - 0.6 * uu);
+        for (const e of edges) {
+            const a = proj({ x: floorPos[e.u].x, y: floorPos[e.u].y, z: 0 });
+            const b = proj({ x: floorPos[e.v].x, y: floorPos[e.v].y, z: 0 });
+            strokePts([[a.x,a.y],[b.x,b.y]], 1, '#c3b48f', [3,4]);
+        }
+        for (let v = 0; v < V; v++) {
+            const a = proj({ x: floorPos[v].x, y: floorPos[v].y, z: 0 });
+            ctx.beginPath(); ctx.ellipse(a.x, a.y, radius*0.55, radius*0.30, 0, 0, 2*Math.PI);
+            ctx.fillStyle = 'rgba(150,135,105,0.22)'; ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    /* ---- distance rings around the plumb line ---- */
+    if (showRings && H > 0.02 * Hend) {
+        const stepD = niceStep(Dmax);
+        ctx.save();
+        ctx.globalAlpha = clamp(H / (0.25 * Hend), 0, 1) * 0.55;
+        const Rwide = (Math.max(spread * CONE * Dmax, 0.05 * Dmax) + 0.06 * Dmax) * Math.SQRT2 * C30 * view.S;
+        for (let d = 0; d <= Dmax + 1e-9; d += stepD) {
+            const z = H - d;
+            if (z < -0.02) continue;
+            const R = Math.max(spread * CONE * d, 0.05 * Dmax) + 0.06 * Dmax;
+            const cpt = proj({ x: floorPos[src].x, y: floorPos[src].y, z });
+            ctx.beginPath();
+            ctx.ellipse(cpt.x, cpt.y, R*Math.SQRT2*C30*view.S, R*Math.SQRT2*0.5*view.S, 0, 0, 2*Math.PI);
+            ctx.strokeStyle = '#c9b58f'; ctx.lineWidth = d === 0 ? 1.2 : 0.9;
+            ctx.setLineDash(d === 0 ? [] : [4,5]); ctx.stroke(); ctx.setLineDash([]);
+            ctx.font = '700 10px -apple-system, "Segoe UI", Roboto, sans-serif';
+            ctx.fillStyle = '#a3927a'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+            ctx.fillText(d === 0 ? 'd = 0' : fmt(d), cpt.x - Rwide - 8, cpt.y);
+        }
+        ctx.restore();
+        // plumb line from the hand straight down
+        const top = proj({ x: floorPos[src].x, y: floorPos[src].y, z: H });
+        const bot = proj({ x: floorPos[src].x, y: floorPos[src].y, z: Math.max(H - Dmax, 0) });
+        ctx.save(); ctx.globalAlpha = 0.5; ctx.setLineDash([2,5]);
+        strokePts([[top.x,top.y],[bot.x,bot.y]], 1, '#b5a487');
+        ctx.restore();
+    }
+
+    /* ---- threads ---- */
+    const pathEdges = hoverV >= 0 ? shortestPathEdges(hoverV, P) : null;
+    const dimming = (hoverV >= 0 || hoverE >= 0);
+    hitEdges = [];
+    const drawn = edges.map((e, i) => {
+        const a = S[e.u], b = S[e.v];
+        const top = a.y <= b.y ? a : b, bot = a.y <= b.y ? b : a;
+        const chord = Math.hypot(b.x - a.x, b.y - a.y);
+        const both = !P[e.u].air && !P[e.v].air;
+        let pts, sign = (i % 2 ? 1 : -1);
+        const physLen = Math.hypot(PP[e.u].x - PP[e.v].x, PP[e.u].y - PP[e.v].y, PP[e.u].z - PP[e.v].z);
+        const slackW = Math.max(0, e.w - physLen);
+        if (both) {
+            pts = floorString(a.x, a.y, b.x, b.y, slackW * view.S * droop, sign);
+        } else {
+            const extra = Math.min(slackW * droop * view.S, 400);
+            pts = catenary(top.x, top.y, bot.x, bot.y, chord + extra);
+        }
+        return { e, i, pts, depth: (P[e.u].x + P[e.u].y + P[e.v].x + P[e.v].y) / 2 };
+    });
+    drawn.sort((p, q) => p.depth - q.depth);
+
+    for (const d of drawn) {
+        const e = d.e, st = edgeState(e);
+        const inPath = pathEdges && pathEdges.has(d.i);
+        const isHot = hoverE === d.i;
+        let color, width;
+        if (st === 'taut')      { color = '#902015'; width = byLoad ? clamp(1.6 + 0.9*Math.min(subtreeMass[par[e.v] === e.u ? e.v : e.u], 9), 2.4, 9) : 3.4; }
+        else if (st === 'alt')  { color = '#b07d18'; width = 2.4; }
+        else                    { color = '#b9a793'; width = 1.7; }
+        if (!P[e.u].air && !P[e.v].air) { color = '#b9a793'; width = 1.7; }
+        let alpha = 1;
+        if (dimming && !inPath && !isHot) alpha = 0.22;
+        ctx.save(); ctx.globalAlpha = alpha;
+        if (inPath) { strokePts(d.pts, width + 4.5, 'rgba(255,255,255,0.65)'); }
+        strokePts(d.pts, isHot ? width + 2 : width, isHot ? '#cc2f22' : color);
+        ctx.restore();
+        hitEdges.push({ i: d.i, pts: d.pts });
+    }
+
+    /* weight labels — after the threads so they sit on top */
+    if (showWeights) {
+        for (const d of drawn) {
+            const e = d.e;
+            const airborne = P[e.u].air || P[e.v].air;
+            const st = airborne ? edgeState(e) : 'ground';
+            const inPath = pathEdges && pathEdges.has(d.i);
+            const isHot = hoverE === d.i;
+            if (dimming && !inPath && !isHot) continue;
+            const m = midOfPts(d.pts);
+            if (d.pts.length === 2) {                       // taut: shift the label clear of the thread
+                const ex = d.pts[1][0]-d.pts[0][0], ey = d.pts[1][1]-d.pts[0][1], eL = Math.hypot(ex,ey) || 1;
+                m[0] += -ey/eL * 11; m[1] += ex/eL * 11;
+            }
+            const col = isHot ? { bg:'#fcf9f3', border:'#cc2f22', color:'#86241c' }
+                     : st === 'taut' ? { bg:'rgba(250,246,237,0.95)', border:'#902015', color:'#902015' }
+                     : st === 'alt'  ? { bg:'rgba(250,246,237,0.95)', border:'#b07d18', color:'#7f5c19' }
+                     : {};
+            label(m[0], m[1], fmt(e.w), col);
+        }
+    }
+
+    /* ---- shadows of airborne knots ---- */
+    ctx.save();
+    for (let v = 0; v < V; v++) {
+        if (!P[v].air) continue;
+        const sh = proj({ x: P[v].x, y: P[v].y, z: 0 });
+        const fade = clamp(1 - P[v].z / (Dmax * 1.4), 0.12, 0.5);
+        ctx.globalAlpha = fade * 0.55;
+        ctx.beginPath(); ctx.ellipse(sh.x, sh.y, radius*0.72, radius*0.38, 0, 0, 2*Math.PI);
+        ctx.fillStyle = '#8b7a5f'; ctx.fill();
+    }
+    ctx.restore();
+
+    /* ---- knots ---- */
+    hitVerts = [];
+    const vorder = [...Array(V).keys()].sort((a, b) => (P[a].x + P[a].y) - (P[b].x + P[b].y));
+    for (const v of vorder) {
+        const p = S[v];
+        const onPath = pathEdges && pathHasVertex(hoverV, v, P);
+        let alpha = 1;
+        if (dimming && !onPath && !(hoverE >= 0 && (edges[hoverE].u === v || edges[hoverE].v === v))) alpha = 0.3;
+        ctx.save(); ctx.globalAlpha = alpha;
+        ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, 2*Math.PI);
+        ctx.fillStyle = P[v].air || !isFinite(dist[v]) ? distColor(dist[v]) : mixHex('#faf6ed', distColor(dist[v]), 0.35);
+        ctx.fill();
+        ctx.lineWidth = v === src ? 3.2 : 1.6;
+        ctx.strokeStyle = v === src ? '#cc2f22' : (hoverV === v ? '#cc2f22' : '#8d7a5e');
+        ctx.stroke();
+        ctx.font = `700 ${Math.round(radius*0.92)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+        ctx.fillStyle = P[v].air ? distTextColor(dist[v]) : '#46433a';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(v), p.x, p.y + 0.5);
+        ctx.restore();
+        hitVerts.push({ v, x: p.x, y: p.y });
+        if (P[v].air && hoverV === v) {
+            label(p.x, p.y - radius - 12, 'd = ' + fmt(dist[v]), { bg:'#fcf9f3', border:'#902015', color:'#902015' });
+        }
+    }
+
+    /* ---- the hand ---- */
+    if (H > 0) drawHand(S[src].x, S[src].y, clamp(H / (0.06 * Hend), 0, 1));
+}
+
+function midOfPts(pts) {
+    if (pts.length === 2) return [(pts[0][0]+pts[1][0])/2, (pts[0][1]+pts[1][1])/2];
+    let tot = 0;
+    for (let i = 1; i < pts.length; i++) tot += Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
+    let acc = 0;
+    for (let i = 1; i < pts.length; i++) {
+        const seg = Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
+        if (acc + seg >= tot/2) {
+            const t = seg > 0 ? (tot/2 - acc) / seg : 0;
+            return [lerp(pts[i-1][0], pts[i][0], t), lerp(pts[i-1][1], pts[i][1], t)];
+        }
+        acc += seg;
+    }
+    return pts[pts.length-1];
+}
+function niceStep(D) {
+    const raw = D / 6;
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const c = raw / p;
+    return (c < 1.5 ? 1 : c < 3.5 ? 2 : c < 7.5 ? 5 : 10) * p;
+}
+function shortestPathEdges(v, P) {   // the chain holding v — only once the hand has actually lifted v off the floor
+    const set = new Set();
+    if (!isFinite(dist[v]) || (P && !P[v].air)) return set;
+    let x = v;
+    while (par[x] >= 0) { set.add(parEdge[x]); x = par[x]; }
+    return set;
+}
+function pathHasVertex(from, v, P) {
+    if (from < 0 || !isFinite(dist[from]) || (P && !P[from].air)) return from === v;
+    let x = from;
+    while (x >= 0) { if (x === v) return true; x = par[x]; }
+    return false;
+}
+
+/* ============================ hit testing ============================ */
+function pickAt(mx, my) {
+    for (const h of hitVerts) if (Math.hypot(h.x - mx, h.y - my) <= radius + 4) return { v: h.v, e: -1 };
+    let best = -1, bestD = 9;
+    for (const h of hitEdges) {
+        for (let i = 1; i < h.pts.length; i++) {
+            const d = segDist(mx, my, h.pts[i-1][0], h.pts[i-1][1], h.pts[i][0], h.pts[i][1]);
+            if (d < bestD) { bestD = d; best = h.i; }
+        }
+    }
+    return { v: -1, e: best };
+}
+function segDist(px, py, x1, y1, x2, y2) {
+    const dx = x2-x1, dy = y2-y1, L2 = dx*dx + dy*dy;
+    let t = L2 > 0 ? ((px-x1)*dx + (py-y1)*dy) / L2 : 0;
+    t = clamp(t, 0, 1);
+    return Math.hypot(px - (x1 + t*dx), py - (y1 + t*dy));
+}
+
+/* ============================ side panels ============================ */
+let lastLogKey = null;
+function renderLog(force) {
+    const box = document.getElementById('logView');
+    const key = order.filter(v => H > dist[v]).join(',') + '|' + V + '|' + src;
+    if (!force && key === lastLogKey) return;
+    lastLogKey = key;
+    if (!order.length) { box.innerHTML = '<div class="none">nothing reachable</div>'; return; }
+    let html = '';
+    let nextSeen = false;
+    for (const v of order) {
+        const lifted = H > dist[v];
+        const isNext = !lifted && !nextSeen; if (isNext) nextSeen = true;
+        html += `<div class="log-row ${lifted ? '' : 'pending'} ${isNext ? 'next' : ''}" data-v="${v}">
+            <div class="key" style="background:${distColor(dist[v])};color:${distTextColor(dist[v])}">${v}</div>
+            <div class="via">${par[v] < 0 ? 'source — held by the hand' : 'hangs from ' + par[v]}</div>
+            <div class="d">d = ${fmt(dist[v])}</div></div>`;
+    }
+    const unreach = [...Array(V).keys()].filter(v => !isFinite(dist[v]));
+    if (unreach.length) html += `<div class="log-row pending"><div class="via">still on the floor: ${unreach.join(', ')} (unreachable)</div></div>`;
+    box.innerHTML = html;
+    box.querySelectorAll('.log-row[data-v]').forEach(r => {
+        r.onmouseenter = () => { hoverV = +r.dataset.v; hoverE = -1; draw(); };
+        r.onmouseleave = () => { hoverV = -1; draw(); };
+    });
+}
+function renderAdj() {
+    const box = document.getElementById('adjView');
+    let html = '';
+    for (let v = 0; v < V; v++) {
+        const cells = adj[v].map(({ to, w, id }) =>
+            `<span class="adj-cell ${hoverE === id ? 'hot' : ''}" data-e="${id}">${to}<span style="opacity:.6"> · ${fmt(w)}</span></span>`
+        ).join('');
+        html += `<div class="adj-row ${hoverV === v ? 'hot' : ''}" data-v="${v}">
+            <div class="adj-key" style="background:${distColor(dist[v])};color:${distTextColor(dist[v])};border-color:${v===src?'#cc2f22':'#b9a793'}">${v}</div>
+            <div class="adj-dist">${fmt(dist[v])}</div>
+            <span class="adj-arrow">&rarr;</span>
+            <div class="adj-cells">${cells || '<span class="adj-empty">—</span>'}</div></div>`;
+    }
+    box.innerHTML = html;
+    box.querySelectorAll('.adj-row').forEach(r => {
+        const v = +r.dataset.v;
+        const k = r.querySelector('.adj-key');
+        k.onmouseenter = () => { hoverV = v; hoverE = -1; draw(); renderStatus(); syncAdjHighlight(); };
+        k.onmouseleave = () => { hoverV = -1; draw(); renderStatus(); syncAdjHighlight(); };
+    });
+    box.querySelectorAll('.adj-cell').forEach(c => {
+        const id = +c.dataset.e;
+        c.onmouseenter = () => { hoverE = id; hoverV = -1; draw(); renderStatus(); syncAdjHighlight(); };
+        c.onmouseleave = () => { hoverE = -1; draw(); renderStatus(); syncAdjHighlight(); };
+    });
+    syncAdjHighlight();
+}
+/* a thread is tinted in the list only once both its knots are actually in the air —
+   before that nothing is load-bearing yet, so nothing should look load-bearing */
+function syncAdjState() {
+    const box = document.getElementById('adjView');
+    if (!box) return;
+    box.querySelectorAll('.adj-cell').forEach(c => {
+        const e = edges[+c.dataset.e];
+        const up = e && isFinite(dist[e.u]) && isFinite(dist[e.v]) && H > dist[e.u] && H > dist[e.v];
+        const st = up ? edgeState(e) : 'ground';
+        c.classList.toggle('taut', st === 'taut');
+        c.classList.toggle('tautalt', st === 'alt');
+    });
+    const sl = document.getElementById('pullSliderVal');
+    if (sl) sl.textContent = `${order.filter(v => H > dist[v]).length} / ${order.length}`;
+}
+
+/* toggle highlight classes in place — never rebuild the list while the pointer is on it */
+function syncAdjHighlight() {
+    const box = document.getElementById('adjView');
+    box.querySelectorAll('.adj-row').forEach(r => r.classList.toggle('hot', +r.dataset.v === hoverV));
+    box.querySelectorAll('.adj-cell').forEach(c => c.classList.toggle('hot', +c.dataset.e === hoverE));
+}
+function renderStatus() {
+    const el = document.getElementById('status');
+    document.getElementById('pullVal').textContent = fmt(H, 2);
+    document.getElementById('pullSlider').value = Math.round(1000 * (Hend > 0 ? H / Hend : 0));
+
+    let row = 'pull';
+    if (hoverE >= 0) {
+        const e = edges[hoverE], st = edgeState(e);
+        const du = dist[e.u], dv = dist[e.v];
+        const lo = du <= dv ? e.u : e.v, hi = du <= dv ? e.v : e.u;
+        if (st === 'ground') {
+            row = 'floor';
+            el.innerHTML = `Thread <b>${e.u}–${e.v}</b>, length ${fmt(e.w)}. At least one end never leaves the floor.`;
+        } else if (st === 'slack') {
+            row = 'slack';
+            el.innerHTML = `Thread <b>${e.u}–${e.v}</b>, length ${fmt(e.w)}. Going through it would cost
+                d(${lo}) + w = ${fmt(dist[lo])} + ${fmt(e.w)} = <b>${fmt(dist[lo]+e.w)}</b>, but ${hi} already hangs at
+                d(${hi}) = <b>${fmt(dist[hi])}</b>. The <b>${fmt(edgeSlack(e))}</b> difference is exactly the slack you see dangling.`;
+        } else {
+            row = 'taut';
+            el.innerHTML = `Thread <b>${e.u}–${e.v}</b>, length ${fmt(e.w)}, pulled <b>taut</b>:
+                d(${lo}) + w = ${fmt(dist[lo])} + ${fmt(e.w)} = ${fmt(dist[hi])} = d(${hi}).
+                ${st === 'alt' ? 'It is a tie — a second shortest path of the same length, so it is taut but not in the tree.' : 'It carries the load of everything hanging below ' + hi + '.'}`;
+        }
+    } else if (hoverV >= 0) {
+        row = 'depth';
+        if (!isFinite(dist[hoverV])) el.innerHTML = `Knot <b>${hoverV}</b> is not connected to ${src}: no thread ever pulls it up, it stays on the floor.`;
+        else if (H <= dist[hoverV] && hoverV !== src) el.innerHTML = `Knot <b>${hoverV}</b> still lies on the floor: it will leave the ground at height <b>${fmt(dist[hoverV])}</b>, and only then does a taut chain show which threads hold it.`;
+        else {
+            const path = [];
+            let x = hoverV; while (x >= 0) { path.push(x); x = par[x]; }
+            path.reverse();
+            el.innerHTML = `Knot <b>${hoverV}</b> hangs <b>${fmt(dist[hoverV])}</b> below the hand, held by the taut chain
+                <b>${path.join(' – ')}</b>. Cut any one of those threads and ${hoverV} drops.`;
+        }
+    } else {
+        const lifted = order.filter(v => H > dist[v]);
+        const next = order.find(v => H <= dist[v]);
+        if (H <= 0) el.innerHTML = `The string graph lies crumpled on the floor. Pull the source <b>${src}</b> up and watch which threads take up the load.`;
+        else if (next !== undefined) {
+            row = flashRow === 'lift' && performance.now() < flashUntil ? 'lift' : 'pull';
+            el.innerHTML = `Pulled to <b>H = ${fmt(H)}</b>. Airborne: <b>${lifted.join(', ') || '—'}</b>.
+                Next to leave the floor: <b>${next}</b> at H = ${fmt(dist[next])}.`;
+        } else {
+            row = 'depth';
+            const un = [...Array(V).keys()].filter(v => !isFinite(dist[v]));
+            el.innerHTML = `Fully hung. Every knot sits exactly d(v) below the hand and the taut threads form the shortest-path tree.
+                ${un.length ? 'Knots ' + un.join(', ') + ' never lifted: unreachable.' : ''}`;
+        }
+    }
+    if (flashRow && hoverV < 0 && hoverE < 0 && performance.now() < flashUntil) row = flashRow;
+    document.querySelectorAll('#corrTable tr').forEach(tr => tr.classList.toggle('on', tr.dataset.row === row));
+}
+
+/* ============================ animation ============================ */
+function setH(h, flash) {
+    const prev = H;
+    H = clamp(h, 0, Hend);
+    if (flash) for (const v of order) if (dist[v] > 0 && prev <= dist[v] && H > dist[v]) { flashRow = 'lift'; flashUntil = performance.now() + 900; }
+    draw(); renderStatus(); renderLog(); syncAdjState();
+}
+function frame(now) {
+    if (!playing) return;
+    const dt = Math.min((now - lastFrame) / 1000, 0.05);
+    lastFrame = now;
+    if (now >= holdUntil) {
+        const rate = Hend / (34 - speed);                 // full pull in (34-speed) seconds
+        const nextH = H + rate * dt;
+        if (document.getElementById('chkPause').checked) {
+            const ev = order.find(v => H <= dist[v] && nextH > dist[v] && dist[v] > 0);
+            if (ev !== undefined) { setH(dist[ev] + 1e-6, true); holdUntil = now + 700; requestAnimationFrame(frame); return; }
+        }
+        setH(nextH, true);
+        if (H >= Hend - 1e-9) { playing = false; document.getElementById('playBtn').textContent = 'Play'; return; }
+    }
+    requestAnimationFrame(frame);
+}
+function togglePlay() {
+    playing = !playing;
+    document.getElementById('playBtn').textContent = playing ? 'Pause' : 'Play';
+    if (playing) { if (H >= Hend - 1e-9) H = 0; lastFrame = performance.now(); holdUntil = 0; requestAnimationFrame(frame); }
+}
+function stepFwd() {
+    playing = false; document.getElementById('playBtn').textContent = 'Play';
+    const next = order.find(v => H < dist[v] - 1e-9);
+    setH(next === undefined ? Hend : dist[next] + 1e-6, true);
+}
+function stepBack() {
+    playing = false; document.getElementById('playBtn').textContent = 'Play';
+    const prev = [...order].reverse().find(v => dist[v] < H - 1e-6);
+    setH(prev === undefined ? 0 : Math.max(0, dist[prev] - 1e-6), false);
+}
+function resetRun() { playing = false; document.getElementById('playBtn').textContent = 'Play'; flashRow = null; setH(0, false); }
+function scrubPull(val) { playing = false; document.getElementById('playBtn').textContent = 'Play'; setH(Hend * val / 1000, false); }
+function setSpeed(v) { speed = +v; }
+function setSpread(v) { spread = +v / 100; document.getElementById('spreadVal').textContent = Math.round(Math.atan(spread*CONE)*180/Math.PI) + '\u00b0'; draw(); }
+function setDroop(v) { droop = +v / 100; document.getElementById('droopVal').textContent = droop.toFixed(2); draw(); }
+function setRot(v) { viewRot = (+v) * Math.PI / 180; draw(); }
+
+/* ============================ loading a graph ============================ */
+function applyGraph(v, edgeList, customPos) {
+    V = v; edges = edgeList;
+    adj = Array.from({ length: V }, () => []);
+    edges.forEach((e, id) => { adj[e.u].push({ to: e.v, w: e.w, id }); adj[e.v].push({ to: e.u, w: e.w, id }); });
+    pos01 = customPos || autoLayout(V, edges);
+
+    // world scale: make the floor drawing roughly agree with the string lengths
+    const ratios = edges.map(e => {
+        const d = Math.hypot(pos01[e.u].x - pos01[e.v].x, pos01[e.u].y - pos01[e.v].y);
+        return d > 1e-6 ? e.w / d : null;
+    }).filter(r => r !== null).sort((a,b) => a-b);
+    worldScale = ratios.length ? ratios[Math.floor(ratios.length/2)] : 1;
+    if (!isFinite(worldScale) || worldScale <= 0) worldScale = 1;
+    floorPos = pos01.map(p => ({ x: p.x * worldScale, y: p.y * worldScale }));
+    floorCenter = { x: 0, y: 0 };
+    for (const p of floorPos) { floorCenter.x += p.x / V; floorCenter.y += p.y / V; }
+    floorRadius = Math.max(...floorPos.map(p => Math.hypot(p.x - floorCenter.x, p.y - floorCenter.y)), 1e-3);
+
+    if (src >= V) src = 0;
+    runDijkstra();
+
+    const sel = document.getElementById('startSel');
+    sel.innerHTML = '';
+    for (let i = 0; i < V; i++) { const o = document.createElement('option'); o.value = i; o.textContent = i; sel.appendChild(o); }
+    sel.value = src;
+
+    refreshTextarea();
+    lastLogKey = null;
+    resetRun();
+    renderAdj();
+    syncAdjState();
+}
+function graphToText(withPos) {
+    let t = V + '\n' + edges.length + '\n';
+    for (const e of edges) t += `${e.u} ${e.v} ${fmt(e.w)}\n`;
+    if (withPos) for (let i = 0; i < V; i++) t += `${fmtCoord(pos01[i].x)} ${fmtCoord(pos01[i].y)}\n`;
+    return t.trim();
+}
+function refreshTextarea() {
+    document.getElementById('graphText').value = graphToText(!document.getElementById('plainToggle').checked);
+}
+function loadPreset(name) {
+    try { const g = parseGraph(PRESETS[name]); src = 0; applyGraph(g.v, g.edges, g.pos); document.getElementById('parseErr').textContent = ''; }
+    catch (err) { document.getElementById('parseErr').textContent = err.message; }
+}
+function loadFromText() {
+    try { const g = parseGraph(document.getElementById('graphText').value); if (src >= g.v) src = 0; applyGraph(g.v, g.edges, g.pos); document.getElementById('parseErr').textContent = ''; }
+    catch (err) { document.getElementById('parseErr').textContent = err.message; }
+}
+
+/* ============================ external graphs (graphs/ folder) ============================ */
+function prettyGraphName(filename) {
+    return decodeURIComponent(filename).replace(/\.[^./]+$/, '').replace(/[_-]+/g, ' ');
+}
+async function discoverExternalGraphs() {
+    try {
+        const r = await fetch('graphs/index.json', { cache: 'no-store' });
+        if (r.ok) {
+            const data = await r.json();
+            if (Array.isArray(data)) return data.map(item => {
+                const file = typeof item === 'string' ? item : item.file;
+                const lab = (typeof item === 'object' && (item.label || item.name)) || prettyGraphName(file);
+                return { label: lab, path: 'graphs/' + encodeURIComponent(file) };
+            });
+        }
+    } catch (e) { /* no manifest */ }
+    try {
+        const r = await fetch('graphs/', { cache: 'no-store' });
+        if (r.ok) {
+            const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+            const hrefs = [...doc.querySelectorAll('a')].map(a => a.getAttribute('href') || '')
+                .filter(h => h && h !== '../' && h !== './' && !h.startsWith('?') && !h.startsWith('/') && !h.endsWith('/'));
+            const uniq = [...new Set(hrefs)];
+            if (uniq.length) return uniq.map(h => ({ label: prettyGraphName(decodeURIComponent(h)), path: 'graphs/' + h }));
+        }
+    } catch (e) { /* no listing */ }
+    return [];
+}
+function loadExternalGraph(path) {
+    const errEl = document.getElementById('parseErr');
+    errEl.textContent = `Loading ${path}…`;
+    fetch(path, { cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(text => { const g = parseGraph(text); src = 0; applyGraph(g.v, g.edges, g.pos); errEl.textContent = ''; })
+        .catch(err => { errEl.textContent = `Could not load ${path}: ${err.message}`; });
+}
+function populateExternalGraphs(presetSel) {
+    discoverExternalGraphs().then(list => {
+        if (!list.length) return;
+        const grp = document.createElement('optgroup');
+        grp.label = 'From graphs/ folder';
+        list.forEach(({ label, path }) => { const o = document.createElement('option'); o.value = path; o.textContent = label; o.dataset.external = '1'; grp.appendChild(o); });
+        presetSel.appendChild(grp);
+    });
+}
+
+/* ============================ pointer interaction ============================ */
+let dragging = false, dragX = 0, dragRot0 = 0, dragged = false, panPrev = null;
+canvas.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    const d = ev.deltaMode === 1 ? ev.deltaY*16 : ev.deltaY;
+    zoomAt(Math.max(0.5, Math.min(2, Math.exp(-d*0.0015))), ev.offsetX, ev.offsetY);
+}, { passive: false });
+canvas.addEventListener('pointerdown', ev => {
+    canvas.setPointerCapture(ev.pointerId); canvas.classList.add('dragging');
+    if (ev.shiftKey || ev.button === 1) { panPrev = { x: ev.offsetX, y: ev.offsetY }; canvas.classList.add('panning'); ev.preventDefault(); return; }
+    dragging = true; dragged = false; dragX = ev.offsetX; dragRot0 = viewRot;
+});
+canvas.addEventListener('pointermove', ev => {
+    if (panPrev) { panBy(ev.offsetX - panPrev.x, ev.offsetY - panPrev.y); panPrev = { x: ev.offsetX, y: ev.offsetY }; return; }
+    if (dragging) {
+        const dx = ev.offsetX - dragX;
+        if (Math.abs(dx) > 2) dragged = true;
+        viewRot = dragRot0 + dx * 0.008;
+        document.getElementById('rotSlider').value = ((viewRot * 180 / Math.PI) % 360 + 360) % 360;
+        draw();
+        return;
+    }
+    const m = toWorld(ev.offsetX, ev.offsetY);
+    const hit = pickAt(m.x, m.y);
+    if (hit.v !== hoverV || hit.e !== hoverE) {
+        hoverV = hit.v; hoverE = hit.e;
+        canvas.style.cursor = (hoverV >= 0 || hoverE >= 0) ? 'pointer' : 'grab';
+        draw(); renderStatus(); syncAdjHighlight();
+    }
+});
+canvas.addEventListener('pointerup', ev => {
+    canvas.classList.remove('dragging'); canvas.classList.remove('panning');
+    if (panPrev) { panPrev = null; return; }
+    dragging = false;
+    if (!dragged) { const m = toWorld(ev.offsetX, ev.offsetY); const hit = pickAt(m.x, m.y); if (hit.v >= 0) { src = hit.v; document.getElementById('startSel').value = src; runDijkstra(); resetRun(); renderAdj(); } }
+});
+canvas.addEventListener('pointerleave', () => { hoverV = -1; hoverE = -1; dragging = false; panPrev = null; canvas.classList.remove('dragging'); canvas.classList.remove('panning'); draw(); renderStatus(); syncAdjHighlight(); });
+canvas.addEventListener('dblclick', ev => { ev.preventDefault(); resetView(); });
+(function setupZoomButtons() {
+    const zi = document.getElementById('zoomIn'), zo = document.getElementById('zoomOut'), zf = document.getElementById('zoomFit');
+    if (zi) zi.addEventListener('click', () => zoomAt(1.25, camW/2, camH/2));
+    if (zo) zo.addEventListener('click', () => zoomAt(1/1.25, camW/2, camH/2));
+    if (zf) zf.addEventListener('click', resetView);
+    if (window.ResizeObserver) new ResizeObserver(() => draw()).observe(canvas);
+})();
+/* ============================ draggable stage splitter ============================ */
+(function setupSplitter() {
+    const sp = document.getElementById('stageSplitter'); if (!sp) return;
+    const stage = sp.parentElement, KEY = 'wi-stage-main-w:' + location.pathname;
+    const clampW = w => { const total = stage.getBoundingClientRect().width; return Math.max(260, Math.min(total - 20 - 330, w)); };
+    const apply = w => { stage.style.setProperty('--main-w', clampW(w) + 'px'); };
+    try { const s = localStorage.getItem(KEY); if (s) apply(parseFloat(s)); } catch (_) {}
+    let dragging = false;
+    sp.addEventListener('pointerdown', e => {
+        dragging = true; sp.setPointerCapture(e.pointerId); sp.classList.add('dragging'); document.body.classList.add('splitting'); e.preventDefault();
+    });
+    sp.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        apply(e.clientX - stage.getBoundingClientRect().left - 10);
+    });
+    const end = () => {
+        if (!dragging) return; dragging = false; sp.classList.remove('dragging'); document.body.classList.remove('splitting');
+        try { localStorage.setItem(KEY, parseFloat(stage.style.getPropertyValue('--main-w'))); } catch (_) {}
+    };
+    sp.addEventListener('pointerup', end); sp.addEventListener('pointercancel', end);
+    sp.addEventListener('dblclick', () => { stage.style.removeProperty('--main-w'); try { localStorage.removeItem(KEY); } catch (_) {} });
+    window.addEventListener('resize', () => { const w = parseFloat(stage.style.getPropertyValue('--main-w')); if (w) apply(w); });
+})();
+
+/* ============================ init ============================ */
+function init() {
+    const presetSel = document.getElementById('presetSel');
+    Object.keys(PRESETS).forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; presetSel.appendChild(o); });
+    presetSel.addEventListener('change', () => {
+        const opt = presetSel.selectedOptions[0];
+        if (opt && opt.dataset.external) loadExternalGraph(opt.value); else loadPreset(opt.value);
+    });
+    document.getElementById('startSel').addEventListener('change', e => { src = parseInt(e.target.value, 10); runDijkstra(); resetRun(); renderAdj(); });
+    window.addEventListener('resize', () => { draw(); });
+    loadPreset(Object.keys(PRESETS)[0]);
+    populateExternalGraphs(presetSel);
+}
+init();
+</script>
+</body>
+</html>

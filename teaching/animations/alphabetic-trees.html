@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Optimal alphabetic trees · dynamic programming, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1; --wi-cycle:#2f5c9e;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", serif;
+    --wi-font-head:epigrafica, Optima, "URW Classico", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,.sim-title { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:94ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+  .controls, .opbar { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center;
+              border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg);
+              padding:11px 17px; margin-bottom:14px; }
+  .controls { background:var(--wi-controls); }
+  .opbar { background:var(--wi-panel); }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer; transition:background .15s,border-color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  /* the selected/primary buttons carry light text, so the generic hover above
+     must not be allowed to lighten their background out from under it */
+  button.pri:hover:not(:disabled), .seg button.on:hover:not(:disabled) {
+    background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); color:var(--wi-panel-2); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.icon { font-variant-emoji:text; font-family:var(--wi-font-body); font-size:1.02rem;
+                padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text] { font-family:var(--wi-font-body); background:var(--wi-panel); color:var(--wi-ink);
+           border:1px solid var(--wi-border); border-radius:var(--wi-radius); padding:4px 7px; font-size:.85rem; }
+  input.wts { font-family:var(--wi-font-mono); font-size:.8rem; width:20em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0; width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden; flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px;
+              font-size:.68rem; line-height:1.3; font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-left-width:0;
+              border-radius:0; color:var(--wi-ink-faint); cursor:pointer; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+
+  .stage { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(300px,1fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; color:var(--wi-ink-faint);
+               margin:0 0 9px; display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius);
+            padding:10px 13px; font-size:.9rem; color:var(--wi-ink-strong); min-height:96px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status code { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-panel-2);
+                 padding:1px 4px; border-radius:3px; }
+  .status .g { color:var(--wi-relax); font-weight:bold; }
+  .status .a { color:var(--wi-examine); font-weight:bold; }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem; color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  table.cmp { width:100%; border-collapse:collapse; font-size:.84rem; }
+  table.cmp td, table.cmp th { padding:4px 7px; border-bottom:1px solid var(--wi-border-soft); }
+  table.cmp th { font-family:var(--wi-font-head); font-size:.64rem; letter-spacing:.08em;
+                 text-transform:uppercase; color:var(--wi-ink-faint); text-align:left; }
+  table.cmp td.n { text-align:right; font-family:var(--wi-font-mono); white-space:nowrap; }
+  table.cmp tr.best td { background:#e8f0e2; }
+  table.cmp tr.sel td { background:#f6e6df; }
+  table.cmp tr.pick { cursor:pointer; }
+  table.cmp tr.pick:hover td { background:var(--wi-panel-2); }
+  .barwrap { display:block; width:100%; min-width:80px; height:.75em; background:var(--wi-bg);
+             border:1px solid var(--wi-border-soft); border-radius:2px; overflow:hidden; }
+  .barfill { display:block; height:100%; background:var(--wi-accent-soft); }
+  tr.best .barfill { background:var(--wi-relax); }
+
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); margin-top:18px; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent; white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em; text-transform:uppercase;
+              color:var(--wi-ink-faint); padding:10px 12px 3px; border-top:1px solid var(--wi-border-soft); margin-top:6px; }
+  .sublabel:first-child { border-top:0; margin-top:0; padding-top:2px; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr; gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:120px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); border:1px solid var(--wi-border); border-radius:var(--wi-radius); padding:8px; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius); padding:6px 9px;
+             font-size:.76rem; box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:280px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+  .mobile-note { display:none; background:var(--wi-controls); border:1px solid var(--wi-accent-soft);
+                 border-radius:var(--wi-radius-lg); padding:11px 15px; font-size:.82rem; margin-bottom:14px; }
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    h1 { font-size:1.3rem; } .titlebar { flex-direction:column; align-items:flex-start; }
+    .seg { flex-wrap:wrap; } .seg button { padding:5px 9px; font-size:.74rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .mobile-note { display:block; } .desk-only { display:none !important; }
+  }
+
+  /* SVG */
+  .cellbg { fill:var(--wi-panel-2); stroke:var(--wi-border-soft); stroke-width:1; }
+  .cellbg.base { fill:var(--wi-controls); }
+  .cellbg.unused { fill:var(--wi-bg); stroke:none; }
+  .cellbg.empty { fill:var(--wi-bg); stroke:var(--wi-border-soft); stroke-dasharray:2 3; }
+  .cellbg.read { fill:#f7edd9; stroke:var(--wi-examine); stroke-width:1.6; }
+  .cellbg.best { fill:#e8f0e2; stroke:var(--wi-relax); stroke-width:1.8; }
+  .cellbg.cur  { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2.2; }
+  .cellbg.path { fill:#f0d7cd; stroke:var(--wi-accent); stroke-width:1.8; }
+  .cellbg.skip { fill:var(--wi-bg); stroke:var(--wi-border-soft); }
+  .cellval { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-ink-strong);
+             text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .cellval.big { font-weight:bold; fill:var(--wi-accent-dark); }
+  .cellval.dash { fill:var(--wi-ink-faint); }
+  .cellr { font-family:var(--wi-font-mono); font-size:9px; fill:var(--wi-queue);
+           text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .cellr.mono { fill:var(--wi-cycle); font-weight:bold; }
+  .hdrix { font-family:var(--wi-font-mono); font-size:11.5px; fill:var(--wi-ink-faint);
+           text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .hdrix.hot { fill:var(--wi-accent); font-weight:bold; }
+  .hdrname { font-family:var(--wi-font-body); font-size:12.5px; fill:var(--wi-ink-soft); font-style:italic;
+             pointer-events:none; }
+  .arr { fill:none; stroke-width:2.4; pointer-events:none; }
+  .arr.read { stroke:var(--wi-examine); }
+  .arr.best { stroke:var(--wi-relax); stroke-width:3; }
+  .arr.taken { stroke:var(--wi-accent); stroke-width:3.2; }
+  /* one dot per root actually examined: the ink in a cell is the work done in
+     it, so the total ink is the running time */
+  .rdot { fill:var(--wi-cycle); }
+  .rdot.skip { fill:none; stroke:var(--wi-border-soft); stroke-width:1; }
+  .hit { fill:transparent; cursor:pointer; }
+
+  .tnode { fill:var(--wi-panel-2); stroke:var(--wi-border-strong); stroke-width:1.3; }
+  .tnode.leaf { fill:#efe6d6; stroke:var(--wi-ink-strong); }
+  .tnode.hot { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2.4; }
+  .tedge { stroke:var(--wi-border-strong); stroke-width:1.6; fill:none; }
+  .tlab { font-family:var(--wi-font-mono); font-size:11px; text-anchor:middle; dominant-baseline:central;
+          fill:var(--wi-ink-strong); pointer-events:none; }
+  .tpill { fill:var(--wi-bg); stroke:none; pointer-events:none; }
+  .seg-r { fill:#efe6d6; stroke:var(--wi-ink-strong); stroke-width:1; }
+  .prevaxis { stroke:var(--wi-border-strong); stroke-width:1.4; }
+  .prevtick { stroke:var(--wi-border-soft); stroke-width:1; }
+  .prevtick.hot { stroke:var(--wi-accent); stroke-width:1.8; }
+  .prevseg { fill:#f6e6df; stroke:var(--wi-active); stroke-width:1.6; }
+  .prevtri.left  { fill:#e6efe0; stroke:var(--wi-relax); stroke-width:1.4; }
+  .prevtri.right { fill:#dfeae4; stroke:var(--wi-queue); stroke-width:1.4; }
+  .prevtri.neutral { fill:#efe6d6; stroke:var(--wi-ink-strong); stroke-width:1.2; }
+  .prevlab { font-family:var(--wi-font-mono); font-size:10px; text-anchor:middle; fill:var(--wi-ink-strong);
+             pointer-events:none; }
+  .prevlab.range { font-family:var(--wi-font-body); font-style:italic; fill:var(--wi-ink-soft); font-size:11px; }
+  .seg-m { fill:#f0dcd2; stroke:var(--wi-accent-soft); stroke-width:1; }
+  .seg-m.hot { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2; }
+  .seg-m.done { fill:#e8f0e2; stroke:var(--wi-relax); }
+  .segtxt { font-family:var(--wi-font-mono); font-size:10px; text-anchor:middle; dominant-baseline:central;
+            fill:var(--wi-ink-soft); pointer-events:none; }
+  @keyframes cellpop { from { opacity:0; transform:translateY(-7px) scale(.7); } to { opacity:1; transform:none; } }
+  .pop { animation:cellpop .32s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box; transform-origin:center; }
+  @media (prefers-reduced-motion:reduce) { * { animation-duration:.001ms !important; } }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar"><a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a></div>
+
+<div class="titlebar">
+  <h1>Optimal alphabetic trees</h1>
+  <span class="seg" id="modeSeg">
+    <button id="mDP" class="on">Cubic DP</button>
+    <button id="mMerge">Merge cost</button>
+    <button id="mKnuth">Knuth's optimisation</button>
+  </span>
+</div>
+
+<p class="subtitle" id="subDP">
+  Given leaf weights <i>ℓ</i><sub>0</sub>,…,<i>ℓ</i><sub><i>n</i></sub>, find the binary search tree whose
+  null pointers <i>L</i><sub>0</sub>,…,<i>L</i><sub><i>n</i></sub> minimise
+  <i>c</i>(<i>T</i>) = Σ <i>ℓ</i><sub><i>i</i></sub>·depth(<i>L</i><sub><i>i</i></sub>).
+  The guess is the <b>root</b> <i>r</i>, which splits the leaves into <code>[i..r)</code> and
+  <code>[r..j)</code>; the subproblems are the ranges. Every leaf in a subtree pays 1 at its root, so a range
+  costs its total weight plus what the two halves cost. Hover a cell for its range; click one to build the
+  optimal tree for it alone.
+</p>
+<p class="subtitle" id="subMerge" style="display:none">
+  The same tree read as a <b>merge tree</b> for run-adaptive sorting: the leaves are runs, every internal node
+  is one merge, and a merge costs the total length of what it merges. So the merge cost of the whole sort is
+  Σ over internal nodes of the subtree weight — which is exactly <i>c</i>(<i>T</i>) again. The picture below
+  is that sum as an <b>area</b>: one bar per merge, as wide as the range it covers. Compare the optimum with
+  what <b>Peeksort</b> and <b>Powersort</b> build, and with the entropy bounds
+  <i>H</i> ≤ <i>c</i>(<i>T</i>*) and <i>c</i> ≤ <i>H</i>+2.
+</p>
+<p class="subtitle" id="subKnuth" style="display:none">
+  The same DP, but the root is not guessed from the whole range. Write <i>R</i>(<i>i</i>,<i>j</i>) for an
+  optimal root of <code>[i..j)</code>. Empirically — and provably, via the quadrangle inequality — the
+  optimal root never moves backwards when the range grows:
+  <i>R</i>(<i>i</i>,<i>j</i>−1) ≤ <i>R</i>(<i>i</i>,<i>j</i>) ≤ <i>R</i>(<i>i</i>+1,<i>j</i>). Restricting the
+  <i>r</i>-loop to that window costs nothing and turns Θ(<i>n</i>³) into Θ(<i>n</i>²) — the windows along one
+  diagonal telescope. The blue band in each cell is the window actually searched.
+</p>
+
+<div class="mobile-note"><b>Small screen:</b> compact demo — table, tree and scrubber. The pseudocode with
+live highlighting is on the desktop version.</div>
+
+<div class="controls">
+  <div class="ctl"><label for="presetSel">Example</label><select id="presetSel"></select></div>
+  <div class="ctl">
+    <label for="inW">Weights</label>
+    <input type="text" id="inW" class="wts" spellcheck="false">
+    <button id="applyBtn" class="pri">Set</button>
+    <button id="randBtn">Random</button>
+  </div>
+  <div class="ctl" id="granWrap">
+    <span class="lbl">Detail</span>
+    <span class="seg" id="granSeg">
+      <button id="granCoarse" class="on">One step per cell</button>
+      <button id="granFine">Every root r</button>
+    </span>
+  </div>
+  <div class="ctl" id="treeWrap" style="display:none">
+    <span class="lbl">Tree</span>
+    <span class="seg" id="treeSeg">
+      <button id="tOpt" class="on">Optimal</button>
+      <button id="tPeek">Peeksort</button>
+      <button id="tPow">Powersort</button>
+    </span>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="opNote"></span>
+  <button id="wholeBtn" style="display:none">Back to the whole range</button>
+  <span class="opnote" style="margin-left:auto">Arrow keys step.</span>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">— / —</span>
+    <span class="ctl" style="gap:6px"><span class="lbl">Speed</span>
+      <input type="range" id="speed" min="60" max="1400" value="420" style="width:88px">
+      <span class="stepno" id="speedVal">420ms</span></span>
+  </div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box" id="tabBox">
+      <div class="sim-title"><span>The table C(i,j)</span><span class="rhs" id="tabMeta"></span></div>
+      <div class="svgscroll"><svg id="tabSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> current range</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> read for this r</span>
+        <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> best root so far</span>
+        <span class="item" id="legKnuth" style="display:none"><span class="sw" style="background:#dfe6f2;border-color:var(--wi-cycle)"></span> one dot per root examined</span>
+      </div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span id="numTitle">Cost</span><span class="rhs" id="numMeta"></span></div>
+      <div id="numBox"></div>
+    </div>
+  </div>
+</div>
+
+<div class="sim-box" style="margin-top:18px">
+  <div class="sim-title"><span id="treeTitle">The tree</span><span class="rhs" id="treeMeta"></span></div>
+  <div class="svgscroll"><svg id="treeSvg" class="stagesvg"></svg></div>
+</div>
+
+<details class="code desk-only" id="codeBox" open>
+  <summary>Recurrence &amp; pseudocode</summary>
+  <div class="codebody" id="codeBody"></div>
+  <div class="codenote" id="codeNote"></div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      One line of positive numbers: the leaf weights <code>ℓ₀ ℓ₁ … ℓₙ</code>, whitespace or comma separated.
+      Lines starting with <code>#</code> are ignored. They need not sum to 1 — everything is normalised, and
+      both the raw values and the normalised ones are shown. In the merge-cost reading they are
+      <b>run lengths</b>, so integers are the natural input there. Between 2 and 12 weights.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+/* ==========================================================================
+   Optimal alphabetic trees.
+
+     C(i,j) =  0                                                   if j-i = 1
+               (l_i + ... + l_{j-1})
+                 + min{ C(i,r) + C(r,j) : r in [i+1..j-1] }        otherwise
+
+   Ranges are half-open: [i..j) holds the leaves l_i ... l_{j-1}, so with L
+   leaves the table runs over 0 <= i < j <= L and the original problem is
+   C(0,L).  The guess r is the first leaf of the RIGHT subtree.
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const key = (i, j) => i + "," + j;
+const rng = (i, j) => "[" + i + ".." + j + ")";
+function f3(x) { return (Math.round(x * 1000) / 1000).toString(); }
+function f2(x) { return (Math.round(x * 100) / 100).toFixed(2); }
+
+const PRESETS = {
+  uniform:  { name: "uniform (4 leaves)",        w: [1, 1, 1, 1] },
+  skewed:   { name: "one heavy leaf",            w: [1, 1, 1, 12] },
+  runs:     { name: "run lengths 8 3 1 12 4",    w: [8, 3, 1, 12, 4] },
+  zipf:     { name: "Zipf-ish 12 6 4 3 2 2",     w: [12, 6, 4, 3, 2, 2] },
+  greedy:   { name: "greedy bisection fails",    w: [1, 5, 1, 1, 5, 1] },
+  powers:   { name: "powers of two",             w: [16, 8, 4, 2, 1, 1] },
+  seven:    { name: "seven runs",                w: [5, 2, 9, 1, 3, 7, 2] }
+};
+
+let w = [1, 1, 1, 1], L = 4, tot = 1, p = [];        /* raw, count, total, normalised */
+let W = [], C = [], R = [];
+let mode = "dp", gran = 0, whichTree = "opt";
+let steps = [], phases = [], cur = 0, timer = null;
+let traceFrom = null, selCell = null, hoverCell = null;
+
+/* ---------- the DP -------------------------------------------------------- */
+
+function compute() {
+  L = w.length;
+  tot = w.reduce((a, b) => a + b, 0);
+  p = w.map(x => x / tot);
+  W = []; C = []; R = [];
+  for (let i = 0; i <= L; i++) { W.push(new Array(L + 1).fill(0)); C.push(new Array(L + 1).fill(0)); R.push(new Array(L + 1).fill(-1)); }
+  for (let i = 0; i <= L; i++) { let s = 0; for (let j = i; j <= L; j++) { W[i][j] = s; if (j < L) s += p[j]; } }
+  for (let len = 2; len <= L; len++)
+    for (let i = 0; i + len <= L; i++) {
+      const j = i + len;
+      let best = Infinity, br = -1;
+      for (let r = i + 1; r < j; r++) {
+        const q = C[i][r] + C[r][j];
+        if (q < best - 1e-15) { best = q; br = r; }
+      }
+      C[i][j] = W[i][j] + best; R[i][j] = br;
+    }
+}
+const cost = (i, j) => C[i][j];
+function bestRoots(i, j) {
+  const out = [];
+  let best = Infinity;
+  for (let r = i + 1; r < j; r++) best = Math.min(best, C[i][r] + C[r][j]);
+  for (let r = i + 1; r < j; r++) if (Math.abs(C[i][r] + C[r][j] - best) < 1e-12) out.push(r);
+  return out;
+}
+/* the window Knuth's optimisation searches */
+function knuthLo(i, j) { return (j - i <= 2) ? i + 1 : Math.max(i + 1, R[i][j - 1]); }
+function knuthHi(i, j) { return (j - i <= 2) ? j - 1 : Math.min(j - 1, R[i + 1][j]); }
+
+/* ---------- trees --------------------------------------------------------- */
+/* a tree is a list of nodes {i,j,r,d}; leaves have r = null */
+
+function treeFrom(rootOf, i, j, d, acc) {
+  acc = acc || [];
+  if (j - i === 1) { acc.push({ i: i, j: j, r: null, d: d, leaf: true }); return acc; }
+  const r = rootOf(i, j);
+  acc.push({ i: i, j: j, r: r, d: d });
+  treeFrom(rootOf, i, r, d + 1, acc);
+  treeFrom(rootOf, r, j, d + 1, acc);
+  return acc;
+}
+const optTree = (i, j) => treeFrom((a, b) => R[a][b], i, j, 0);
+/* Peeksort: split at the run boundary closest to the middle of the range */
+function peekRoot(i, j) {
+  let br = i + 1, bd = Infinity;
+  for (let r = i + 1; r < j; r++) {
+    const d = Math.abs(W[i][r] - W[r][j]);
+    if (d < bd - 1e-15) { bd = d; br = r; }
+  }
+  return br;
+}
+/* Powersort: the boundary of least "power" becomes the root. The power of the
+   boundary between runs [a..b) and [b..c) of an array of total weight 1 is the
+   first level at which the midpoints of the two runs fall into different
+   dyadic intervals. */
+let POW = [];
+function computePowers() {
+  POW = new Array(L + 1).fill(0);
+  for (let b = 1; b < L; b++) {
+    /* the two runs adjacent to boundary b, in the WHOLE array */
+    const a = b - 1, c = b + 1;
+    const m1 = (W[0][a] + W[0][b]) / 2, m2 = (W[0][b] + W[0][c]) / 2;
+    let l = 1;
+    while (l < 60 && Math.floor(m1 * Math.pow(2, l)) === Math.floor(m2 * Math.pow(2, l))) l++;
+    POW[b] = l;
+  }
+}
+function powRoot(i, j) {
+  let br = i + 1, bp = Infinity;
+  for (let r = i + 1; r < j; r++) if (POW[r] < bp) { bp = POW[r]; br = r; }
+  return br;
+}
+const treeCost = t => t.filter(x => !x.leaf).reduce((a, x) => a + W[x.i][x.j], 0);
+function entropy() {
+  let h = 0;
+  p.forEach(x => { if (x > 0) h += x * Math.log2(1 / x); });
+  return h;
+}
+function treeOf(kind, i, j) {
+  if (kind === "peek") return treeFrom(peekRoot, i, j, 0);
+  if (kind === "pow") return treeFrom(powRoot, i, j, 0);
+  return optTree(i, j);
+}
+
+/* ---------- steps --------------------------------------------------------- */
+
+function mkPhase(name) { phases.push({ name: name, from: steps.length, to: steps.length }); }
+function add(o) {
+  o.ph = phases.length - 1; o.hl = o.hl || []; o.hlp = o.hlp || [];
+  steps.push(o); phases[phases.length - 1].to = steps.length - 1;
+}
+const cellsOf = (list, cls) => { const o = {}; list.forEach(x => o[key(x[0], x[1])] = cls); return o; };
+
+function buildDP(knuth) {
+  const ti = traceFrom ? traceFrom[0] : 0, tj = traceFrom ? traceFrom[1] : L;
+  let tried = 0, full = 0;
+  mkPhase("Base cases");
+  add({ fillTo: 0, txt: "<b>Subproblem " + rng("i", "j") + "</b>: the cheapest tree over the leaves " +
+        "<code>\u2113<sub>i</sub>\u2026\u2113<sub>j\u22121</sub></code>. The original problem is " +
+        "<code>" + rng(0, L) + "</code>, the top-right corner.", hl: ["r_head"], hlp: ["c_head"] });
+  const base = [];
+  for (let i = 0; i < L; i++) base.push([i, i + 1]);
+  add({ fillTo: L, write: base, cells: cellsOf(base, "cur"),
+        txt: "<b>Base cases</b>: a range of one leaf is a bare null pointer at depth 0 \u2014 nothing to " +
+             "pay, <code>C(i,i+1) = 0</code>.", hl: ["r_base"], hlp: ["c_init"] });
+
+  let filled = L;
+  for (let len = 2; len <= L; len++) {
+    mkPhase("\u2113 = " + len);
+    for (let i = 0; i + len <= L; i++) {
+      const j = i + len;
+      const lo = knuth ? knuthLo(i, j) : i + 1, hi = knuth ? knuthHi(i, j) : j - 1;
+      full += (j - 1) - (i + 1) + 1; tried += hi - lo + 1;
+      const wins = bestRoots(i, j).filter(r => r >= lo && r <= hi);
+      if (gran === 1) {
+        let best = Infinity;
+        for (let r = lo; r <= hi; r++) {
+          const q = C[i][r] + C[r][j];
+          best = Math.min(best, q);
+          add({ fillTo: filled, cell: [i, j], r: r, lo: lo, hi: hi, knuth: knuth,
+                cells: Object.assign(cellsOf([[i, r], [r, j]], "read"), cellsOf([[i, j]], "cur")),
+                arrows: [{ from: [i, r], to: [i, j] }, { from: [r, j], to: [i, j] }],
+                txt: "<b>" + rng(i, j) + ", root r = " + r + "</b>: left subtree over " + rng(i, r) +
+                     " costs <code>" + f3(C[i][r]) + "</code>, right subtree over " + rng(r, j) +
+                     " costs <code>" + f3(C[r][j]) + "</code> \u21d2 <code>" + f3(q) + "</code>. " +
+                     "Best so far <code>" + f3(best) + "</code>.",
+                hl: ["r_min"], hlp: ["c_r", "c_q", "c_min"] });
+        }
+      }
+      filled++;
+      add({ fillTo: filled, cell: [i, j], write: [[i, j]], lo: lo, hi: hi, knuth: knuth,
+            cells: Object.assign(cellsOf([].concat.apply([], wins.map(r => [[i, r], [r, j]])), "best"),
+                                 cellsOf([[i, j]], "cur")),
+            arrows: [].concat.apply([], wins.map(r => [{ from: [i, r], to: [i, j], best: true },
+                                                       { from: [r, j], to: [i, j], best: true }])),
+            txt: "<b>C" + rng(i, j) + " = " + f3(C[i][j]) + "</b> = weight <code>" + f3(W[i][j]) +
+                 "</code> + <code>" + f3(C[i][j] - W[i][j]) + "</code> from the two subtrees, at " +
+                 "<b>r = " + wins.join(" and ") + "</b>" +
+                 (wins.length > 1 ? " <i>(a tie: several trees are optimal)</i>" : "") +
+                 (knuth ? " \u2014 searched only <span class='a'>r \u2208 [" + lo + ".." + hi + "]</span>, " +
+                          (hi - lo + 1) + " of " + ((j - 1) - (i + 1) + 1) + " candidates." : ""),
+            hl: ["r_min"], hlp: ["c_q", "c_min"] });
+    }
+  }
+
+  mkPhase("Backtrace");
+  const nodes = [];
+  add({ nodes: [], cells: cellsOf([[ti, tj]], "path"), cell: [ti, tj], trace: true,
+        txt: "The table holds the cost. Reading <code>R</code> back from " + rng(ti, tj) +
+             " gives the tree itself: the root splits the leaves, and each half is solved the same way.",
+        hl: ["r_head"], hlp: ["c_ret"] });
+  (function tb(i, j, d, path) {
+    const p2 = path.concat([[i, j]]);
+    if (j - i === 1) {
+      nodes.push({ i: i, j: j, r: null, d: d, leaf: true });
+      add({ nodes: nodes.slice(), cell: [i, j], cells: cellsOf(p2, "path"), trace: true, hot: key(i, j),
+            txt: "<code>" + rng(i, j) + "</code> is a single leaf: <code>L<sub>" + i + "</sub></code> at " +
+                 "depth " + d + ", contributing <code>" + f3(p[i]) + "\u00b7" + d + " = " + f3(p[i] * d) +
+                 "</code>.", hl: ["r_base"], hlp: ["c_ret"] });
+      return;
+    }
+    const r = R[i][j];
+    nodes.push({ i: i, j: j, r: r, d: d });
+    add({ nodes: nodes.slice(), cell: [i, j], cells: Object.assign(cellsOf(p2, "path"),
+            cellsOf([[i, r], [r, j]], "best")),
+          arrows: [{ from: [i, r], to: [i, j], taken: true }, { from: [r, j], to: [i, j], taken: true }],
+          trace: true, hot: key(i, j),
+          txt: "<code>" + rng(i, j) + "</code> has optimal root <b>r = " + r + "</b>: leaves " +
+               rng(i, r) + " go left, " + rng(r, j) + " right. All " + (j - i) + " leaves below pay 1 " +
+               "here, i.e. <code>" + f3(W[i][j]) + "</code>.",
+          hl: ["r_min"], hlp: ["c_ret"] });
+    tb(i, r, d + 1, p2); tb(r, j, d + 1, p2);
+  })(ti, tj, 0, []);
+  add({ nodes: nodes.slice(), cells: cellsOf([[ti, tj]], "path"), trace: true, done: true,
+        txt: "Done. Every leaf sits at its depth, and the weighted depths sum to <code>C" + rng(ti, tj) +
+             "</code>." + (knuth ? " Candidates examined: <b>" + tried + "</b> instead of <b>" + full +
+             "</b> \u2014 and that gap grows like n\u00b3 vs n\u00b2." : ""),
+        ans: "c(T) = " + f3(C[ti][tj]) + (ti === 0 && tj === L ? "   ·   H = " + f3(entropy()) : ""),
+        hl: ["r_head"], hlp: ["c_ret"] });
+}
+
+/* merge mode: one step per merge, in the order a bottom-up merge would do them */
+function buildMerge() {
+  const t = treeOf(whichTree, 0, L);
+  const inner = t.filter(x => !x.leaf).slice().sort((a, b) => (b.d - a.d) || (a.i - b.i));
+  mkPhase("The runs");
+  add({ nodes: t, merged: [], txt: "The leaves are the <b>runs</b>: " + w.join(", ") +
+        " elements, " + tot + " in total. Sorting means merging them back together, and every merge " +
+        "costs the total length of what it merges. The tree says in which order.",
+        hl: ["m_head"] });
+  mkPhase("Merging");
+  let acc = 0;
+  inner.forEach((nd, k) => {
+    acc += W[nd.i][nd.j];
+    add({ nodes: t, merged: inner.slice(0, k + 1), hot: key(nd.i, nd.j), cell: [nd.i, nd.j],
+          txt: "Merge " + (k + 1) + " of " + inner.length + ": join " + rng(nd.i, nd.r) + " and " +
+               rng(nd.r, nd.j) + " \u2014 <code>" + f3(W[nd.i][nd.j] * tot) + "</code> elements moved, " +
+               "<code>" + f3(W[nd.i][nd.j]) + "</code> per element. Running total <code>" + f3(acc) +
+               "</code>.", hl: ["m_min"] });
+  });
+  mkPhase("Total");
+  const h = entropy(), co = treeCost(optTree(0, L));
+  add({ nodes: t, merged: inner, done: true,
+        txt: "Total merge cost <b>" + f3(acc) + "</b> per element, i.e. <code>" + f3(acc * tot) +
+             "</code> element moves. That is exactly \u03a3 \u2113<sub>i</sub>\u00b7depth(L<sub>i</sub>) " +
+             "\u2014 the same number the DP minimises. Entropy <code>H = " + f3(h) + "</code> is a lower " +
+             "bound for every tree; Peeksort and Powersort stay below <code>H+2 = " + f3(h + 2) +
+             "</code> without solving any DP.",
+        ans: "c(T) = " + f3(acc) + "   ·   optimum " + f3(co) + "   ·   H = " + f3(h),
+        hl: ["m_head"] });
+}
+
+function build() {
+  compute(); computePowers();
+  steps = []; phases = []; cur = 0;
+  if (mode === "merge") buildMerge(); else buildDP(mode === "knuth");
+}
+
+/* ---------- table drawing ------------------------------------------------- */
+
+let CW = 62, CHt = 38; const X0 = 46, Y0 = 40;
+const cx = j => X0 + j * CW + CW / 2, cy = i => Y0 + i * CHt + CHt / 2;
+
+function drawTable() {
+  const st = steps[cur] || {};
+  const svg = el("tabSvg");
+  CW = Math.max(46, Math.min(74, Math.round(720 / (L + 1))));
+  CHt = (mode === "knuth") ? 44 : 38;
+  const Wd = X0 + (L + 1) * CW + 18, H = Y0 + (L + 1) * CHt + 18;
+  svg.setAttribute("width", Wd); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + Wd + " " + H);
+  const cells = st.cells || {}, wrote = {};
+  (st.write || []).forEach(x => wrote[key(x[0], x[1])] = 1);
+  const out = ['<defs>'];
+  [["read", "var(--wi-examine)"], ["best", "var(--wi-relax)"], ["taken", "var(--wi-accent)"]].forEach(k =>
+    out.push('<marker id="ah-' + k[0] + '" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" ' +
+             'markerHeight="5.5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="' + k[1] + '"/></marker>'));
+  out.push("</defs>");
+  out.push('<text class="hdrname" x="6" y="' + (Y0 - 20) + '">j \u2192</text>');
+  out.push('<text class="hdrname" x="6" y="' + (Y0 - 6) + '">i \u2193</text>');
+  for (let j = 0; j <= L; j++)
+    out.push('<text class="hdrix' + (st.cell && st.cell[1] === j ? " hot" : "") + '" x="' + cx(j) +
+             '" y="' + (Y0 - 12) + '">' + j + "</text>");
+  for (let i = 0; i <= L; i++)
+    out.push('<text class="hdrix' + (st.cell && st.cell[0] === i ? " hot" : "") + '" x="' + (X0 - 20) +
+             '" y="' + cy(i) + '">' + i + "</text>");
+
+  for (let i = 0; i <= L; i++) for (let j = 0; j <= L; j++) {
+    const x = X0 + j * CW, y = Y0 + i * CHt, kk = key(i, j);
+    if (j <= i) {
+      out.push('<rect class="cellbg unused" x="' + x + '" y="' + y + '" width="' + CW + '" height="' + CHt + '"/>');
+      if (j === i) out.push('<text class="cellval dash" x="' + cx(j) + '" y="' + cy(i) + '">\u2014</text>');
+      continue;
+    }
+    const ord = (j - i === 1) ? i : L + rank(i, j);
+    const shown = ord < (st.fillTo === undefined ? 1e9 : st.fillTo);
+    let k = "cellbg";
+    if (!shown) k += " empty"; else if (j - i === 1) k += " base";
+    if (cells[kk]) k += " " + cells[kk];
+    if (hoverCell && hoverCell[0] === i && hoverCell[1] === j) k += " path";
+    if (selCell && selCell[0] === i && selCell[1] === j) k += " cur";
+    out.push('<rect class="' + k + '" x="' + x + '" y="' + y + '" width="' + CW + '" height="' + CHt + '" rx="3"/>');
+    /* one dot per root this cell examines -- filled when it is really tried,
+       hollow when Knuth's window skips it. A short range can never earn many
+       dots, so the ink piles up only towards the top right. */
+    if (shown && j - i >= 2 && mode !== "merge") {
+      const lo = (mode === "knuth") ? knuthLo(i, j) : i + 1;
+      const hi = (mode === "knuth") ? knuthHi(i, j) : j - 1;
+      const all = (j - 1) - (i + 1) + 1;
+      const gap = Math.min(7, (CW - 10) / Math.max(1, all));
+      const x0 = cx(j) - (all - 1) * gap / 2, yd = y + CHt - 8;
+      for (let r = i + 1; r <= j - 1; r++) {
+        const on = r >= lo && r <= hi;
+        out.push('<circle class="rdot' + (on ? "" : " skip") + '" cx="' +
+                 (x0 + (r - (i + 1)) * gap) + '" cy="' + yd + '" r="' + (on ? 2.1 : 1.7) + '"/>');
+      }
+    }
+    if (shown) {
+      const big = (cells[kk] === "cur" || cells[kk] === "path") ? " big" : "";
+      out.push('<text class="cellval' + (wrote[kk] ? " pop" : "") + big + '" x="' + cx(j) + '" y="' +
+               (cy(i) - (j - i >= 2 ? (mode === "knuth" ? 9 : 5) : 0)) + '">' + f3(C[i][j]) + "</text>");
+      if (mode === "knuth" && j - i >= 2 && R[i][j] >= 0)
+        out.push('<text class="cellr mono" x="' + cx(j) + '" y="' + (cy(i) + 3) + '">r=' + R[i][j] + "</text>");
+    }
+    out.push('<rect class="hit" data-i="' + i + '" data-j="' + j + '" x="' + x + '" y="' + y +
+             '" width="' + CW + '" height="' + CHt + '"/>');
+  }
+  (st.arrows || []).forEach(a => {
+    const horiz = a.from[0] === a.to[0];
+    const off = horiz ? -CHt * 0.30 : -CW * 0.32;
+    const x1 = cx(a.from[1]) + (horiz ? 0 : off), y1 = cy(a.from[0]) + (horiz ? off : 0);
+    const x2 = cx(a.to[1]) + (horiz ? 0 : off), y2 = cy(a.to[0]) + (horiz ? off : 0);
+    const dx = x2 - x1, dy = y2 - y1, Lp = Math.hypot(dx, dy) || 1;
+    const p1 = horiz ? CW * 0.34 : CHt * 0.34, p2 = horiz ? CW * 0.36 : CHt * 0.38;
+    const cl = a.taken ? "taken" : (a.best ? "best" : "read");
+    out.push('<line class="arr ' + cl + '" x1="' + (x1 + dx / Lp * p1) + '" y1="' + (y1 + dy / Lp * p1) +
+             '" x2="' + (x2 - dx / Lp * p2) + '" y2="' + (y2 - dy / Lp * p2) +
+             '" marker-end="url(#ah-' + cl + ')"/>');
+  });
+  svg.innerHTML = out.join("");
+  el("tabMeta").textContent = "0 \u2264 i < j \u2264 " + L + " \u00b7 C(0," + L + ") = " + f3(C[0][L]);
+}
+/* fill order: base cells first, then by increasing length */
+function rank(i, j) {
+  let c = 0;
+  for (let len = 2; len < j - i; len++) c += L - len + 1;
+  return c + i;
+}
+
+/* ---------- tree / area drawing ------------------------------------------- */
+
+function drawTree() {
+  const st = steps[cur] || {};
+  const svg = el("treeSvg");
+
+  /* hovering a table cell always wins: show what that cell's optimum looks
+     like, regardless of where the animation currently is. That's also what
+     makes Knuth's window legible -- hover the cells the window points at. */
+  if (hoverCell && mode !== "merge") {
+    const hi = hoverCell[0], hj = hoverCell[1];
+    if (hj - hi >= 2 && R[hi][hj] >= 0) { drawPreview({ i: hi, j: hj, r: R[hi][hj] }, { hover: true }); return; }
+  }
+
+  const nodes = st.nodes || [];
+  if (mode === "merge") { drawArea(nodes, st); return; }
+  if (st.trace) { drawBacktrace(nodes, st); return; }
+  const sp = currentPreviewSplit(st);
+  if (sp) { drawPreview(sp, st); return; }
+  svg.setAttribute("width", 400); svg.setAttribute("height", 44);
+  svg.setAttribute("viewBox", "0 0 400 44");
+  svg.innerHTML = '<text class="hdrname" x="12" y="26">the tree is built during the backtrace</text>';
+  el("treeMeta").textContent = "";
+}
+
+/* The backtrace tree, drawn as it is actually discovered: it starts as one
+   giant, undifferentiated triangle over the traced range and is refined one
+   root at a time. Any child of a resolved node that hasn't been decided yet
+   is drawn as a triangle of its own -- same idiom as the filling-phase
+   preview, so "not yet known" always looks the same on this page. */
+function drawBacktrace(nodes, st) {
+  const svg = el("treeSvg");
+  const LWd = Math.max(52, Math.min(96, Math.round(660 / L)));
+  const DY = 62, TOP = 28, pad = 18, TRIH = 44;
+  const xOf = k => pad + k * LWd;
+  const find = (i, j) => nodes.find(x => x.i === i && x.j === j);
+  const ti = traceFrom ? traceFrom[0] : 0, tj = traceFrom ? traceFrom[1] : L;
+
+  const edges = [], shapes = [];
+  let maxD = 0;
+  /* anchor of a range: the split point once resolved as an internal node,
+     the leaf's own position once resolved as a leaf, or the range's midpoint
+     while it is still just a triangle -- chosen so a leaf's final position
+     and its triangle's apex coincide exactly, and only an internal node's
+     anchor moves (from midpoint to its split point) once it is resolved */
+  const anchorOf = (i, j) => {
+    const nd = find(i, j);
+    return (nd && !nd.leaf) ? xOf(nd.r) : xOf((i + j) / 2);
+  };
+  (function walk(i, j, d) {
+    maxD = Math.max(maxD, d);
+    const nd = find(i, j), x = anchorOf(i, j), y = TOP + d * DY;
+    if (!nd) { shapes.push({ t: "tri", i: i, j: j, x: x, y: y }); return; }
+    if (nd.leaf) { shapes.push({ t: "leaf", i: i, x: x, y: y }); return; }
+    shapes.push({ t: "root", i: i, j: j, r: nd.r, x: x, y: y });
+    [[i, nd.r, "left"], [nd.r, j, "right"]].forEach(ch => {
+      const cx = anchorOf(ch[0], ch[1]), cy = TOP + (d + 1) * DY;
+      edges.push({ x1: x, y1: y, x2: cx, y2: cy });
+      walk(ch[0], ch[1], d + 1);
+    });
+  })(ti, tj, 0);
+
+  const Wd = Math.max(340, pad * 2 + L * LWd), H = TOP + maxD * DY + TRIH + 30;
+  svg.setAttribute("width", Wd); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + Wd + " " + H);
+  const out = [];
+  edges.forEach(e => out.push('<path class="tedge" d="M' + e.x1 + " " + e.y1 + "L" + e.x2 + " " + e.y2 + '"/>'));
+  shapes.forEach(s => {
+    if (s.t === "tri") {
+      const x1 = xOf(s.i), x2 = xOf(s.j), baseY = s.y + TRIH, w2 = x2 - x1;
+      out.push('<path class="prevtri neutral" d="M' + x1 + " " + baseY + "L" + x2 + " " + baseY +
+               "L" + s.x + " " + s.y + 'Z"/>');
+      if (w2 > 46) {
+        out.push('<text class="prevlab" x="' + s.x + '" y="' + (baseY - 20) + '">' + rng(s.i, s.j) + "</text>");
+        out.push('<text class="prevlab" x="' + s.x + '" y="' + (baseY - 8) + '" style="fill:var(--wi-accent)">C=' +
+                 f3(C[s.i][s.j]) + "</text>");
+      } else if (w2 > 22) {
+        out.push('<text class="prevlab" x="' + s.x + '" y="' + (baseY - 12) + '" style="fill:var(--wi-accent)">' +
+                 f3(C[s.i][s.j]) + "</text>");
+      }
+      out.push('<rect class="hit" data-ni="' + s.i + '" data-nj="' + s.j + '" x="' + x1 + '" y="' + s.y +
+               '" width="' + (x2 - x1) + '" height="' + (baseY - s.y) + '"/>');
+    } else if (s.t === "leaf") {
+      const hh = Math.max(9, 34 * p[s.i] / Math.max.apply(null, p));
+      const hot = st.hot === key(s.i, s.i + 1) ? " hot pop" : "";
+      out.push('<rect class="tnode leaf' + hot + '" x="' + (s.x - 17) + '" y="' + (s.y - hh / 2) +
+               '" width="34" height="' + hh + '" rx="2"/>');
+      out.push('<text class="tlab" x="' + s.x + '" y="' + (s.y + hh / 2 + 12) + '">' + f3(w[s.i]) + "</text>");
+      out.push('<rect class="hit" data-ni="' + s.i + '" data-nj="' + (s.i + 1) + '" x="' + (s.x - 20) +
+               '" y="' + (s.y - 18) + '" width="40" height="38"/>');
+    } else {
+      const hot = st.hot === key(s.i, s.j) ? " hot pop" : "";
+      out.push('<circle class="tnode' + hot + '" cx="' + s.x + '" cy="' + s.y + '" r="13"/>');
+      out.push('<text class="tlab" x="' + s.x + '" y="' + s.y + '" style="font-size:9.5px">' + s.r + "</text>");
+      out.push('<rect class="tpill" x="' + (s.x - 18) + '" y="' + (s.y + 15) + '" width="36" height="12" rx="3"/>');
+      out.push('<text class="tlab" x="' + s.x + '" y="' + (s.y + 21) +
+               '" style="font-size:9px;fill:var(--wi-accent)">+' + f3(W[s.i][s.j]) + "</text>");
+      out.push('<rect class="hit" data-ni="' + s.i + '" data-nj="' + s.j + '" x="' + (s.x - 20) + '" y="' +
+               (s.y - 18) + '" width="40" height="38"/>');
+    }
+  });
+  svg.innerHTML = out.join("");
+  const resolved = shapes.filter(s => s.t !== "tri").length, pending = shapes.filter(s => s.t === "tri").length;
+  el("treeMeta").textContent = pending
+    ? resolved + " node" + (resolved === 1 ? "" : "s") + " resolved \u00b7 " + pending + " still to go"
+    : "cost " + f3(C[ti][tj]) + " \u00b7 depth " + maxD;
+}
+
+/* the merge-cost picture: one bar per merge, as wide as the range it covers.
+   The shaded area IS the cost. */
+/* During table filling there is no tree yet -- only the split being tried
+   right now. Show it schematically: the root guess r, and its two subtrees
+   drawn as triangles (we don't know their shape, only their extent and their
+   already-known cost), against the full leaf range so the viewer can see
+   which subproblem this is inside the whole problem. */
+function currentPreviewSplit(st) {
+  if (!st.cell) return null;
+  const i = st.cell[0], j = st.cell[1];
+  if (j - i < 2) return null;                 /* a single leaf has no split to show */
+  const r = (st.r !== undefined) ? st.r : R[i][j];
+  if (r === undefined || r < 0) return null;
+  return { i: i, j: j, r: r };
+}
+function drawPreview(sp, st) {
+  const svg = el("treeSvg");
+  const i = sp.i, j = sp.j, r = sp.r;
+  const pad = 26, axisW = 660;
+  const Wd = pad * 2 + axisW, baseY = 150, apexY = 78, rootY = 34;
+  const H = baseY + 34;
+  svg.setAttribute("width", Wd); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + Wd + " " + H);
+  const xOf = k => pad + (k / L) * axisW;
+  const out = [];
+
+  /* the full leaf range, for context: which subproblem is [i..j) inside it */
+  out.push('<line class="prevaxis" x1="' + xOf(0) + '" y1="' + baseY + '" x2="' + xOf(L) + '" y2="' + baseY + '"/>');
+  for (let k = 0; k <= L; k++)
+    out.push('<line class="prevtick' + (k === r ? " hot" : "") + '" x1="' + xOf(k) + '" y1="' + (baseY - 4) +
+             '" x2="' + xOf(k) + '" y2="' + (baseY + 4) + '"/>');
+  out.push('<rect class="prevseg" x="' + xOf(i) + '" y="' + (baseY - 5) + '" width="' + (xOf(j) - xOf(i)) +
+           '" height="10" rx="2"/>');
+  [0, i, j, L].filter((v, idx, a) => a.indexOf(v) === idx).forEach(k =>
+    out.push('<text class="hdrix' + (k === i || k === j ? " hot" : "") + '" x="' + xOf(k) + '" y="' +
+             (baseY + 18) + '">' + k + "</text>"));
+  out.push('<text class="prevlab range" x="' + ((xOf(i) + xOf(j)) / 2) + '" y="' + (baseY + 30) + '">' +
+           rng(i, j) + "</text>");
+
+  /* the two subtrees, drawn only as triangles -- their real shape is not yet
+     known (or not shown), only their leaf range and already-computed cost */
+  const tri = (a, b, cls) => {
+    const x1 = xOf(a), x2 = xOf(b), apx = (x1 + x2) / 2;
+    const t = ['<path class="prevtri ' + cls + '" d="M' + x1 + " " + baseY + "L" + x2 + " " + baseY +
+               "L" + apx + " " + apexY + 'Z"/>'];
+    const w2 = x2 - x1;
+    if (w2 > 46) {
+      t.push('<text class="prevlab" x="' + apx + '" y="' + (baseY - 20) + '">' + rng(a, b) + "</text>");
+      t.push('<text class="prevlab" x="' + apx + '" y="' + (baseY - 8) + '" style="fill:var(--wi-accent)">C=' +
+             f3(C[a][b]) + "</text>");
+    } else if (w2 > 22) {
+      t.push('<text class="prevlab" x="' + apx + '" y="' + (baseY - 12) + '" style="fill:var(--wi-accent)">' +
+             f3(C[a][b]) + "</text>");
+    }
+    return t.join("");
+  };
+  out.push(tri(i, r, "left"));
+  out.push(tri(r, j, "right"));
+
+  /* the root: same visual language as a real internal tree node, so this
+     reads as "the node we are about to place", not a different kind of thing */
+  const rx = xOf(r);
+  out.push('<path class="tedge" d="M' + rx + " " + (rootY + 13) + "L" + ((xOf(i) + xOf(r)) / 2) + " " + apexY + '"/>');
+  out.push('<path class="tedge" d="M' + rx + " " + (rootY + 13) + "L" + ((xOf(r) + xOf(j)) / 2) + " " + apexY + '"/>');
+  out.push('<circle class="tnode hot" cx="' + rx + '" cy="' + rootY + '" r="13"/>');
+  out.push('<text class="tlab" x="' + rx + '" y="' + rootY + '" style="font-size:9.5px">' + r + "</text>");
+  out.push('<rect class="tpill" x="' + (rx - 18) + '" y="' + (rootY + 15) + '" width="36" height="12" rx="3"/>');
+  out.push('<text class="tlab" x="' + rx + '" y="' + (rootY + 21) + '" style="font-size:9px;fill:var(--wi-accent)">+' +
+           f3(W[i][j]) + "</text>");
+
+  svg.innerHTML = out.join("");
+  el("treeMeta").textContent = st.hover
+    ? "hovering C" + rng(i, j) + " \u2014 optimal root r = " + r
+    : "previewing root r = " + r + " of " + rng(i, j) +
+      (st.r !== undefined ? " (candidate)" : " (best so far)");
+}
+
+/* the merge-cost picture: one bar per merge, as wide as the range it covers.
+   The shaded area IS the cost. */
+function drawArea(nodes, st) {
+  const svg = el("treeSvg");
+  const maxD = nodes.reduce((a, x) => Math.max(a, x.d), 0);
+  const pad = 20, BW = 720, RH = 26, TOP = 26;
+  const Wd = BW + 2 * pad + 80, H = TOP + (maxD + 1) * RH + 56;
+  svg.setAttribute("width", Wd); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + Wd + " " + H);
+  const xw = t => pad + t * BW;
+  const done = {}; (st.merged || []).forEach(nd => done[key(nd.i, nd.j)] = 1);
+  const out = [];
+  nodes.forEach(nd => {
+    const x1 = xw(W[0][nd.i]), x2 = xw(W[0][nd.j]), y = TOP + nd.d * RH;
+    if (nd.leaf) {
+      out.push('<rect class="seg-r" x="' + x1 + '" y="' + y + '" width="' + (x2 - x1) + '" height="' + (RH - 6) + '" rx="2"/>');
+      if (x2 - x1 > 22) out.push('<text class="segtxt" x="' + ((x1 + x2) / 2) + '" y="' + (y + (RH - 6) / 2) + '">' + w[nd.i] + "</text>");
+    } else {
+      const hot = st.hot === key(nd.i, nd.j) ? " hot" : (done[key(nd.i, nd.j)] ? " done" : "");
+      out.push('<rect class="seg-m' + hot + '" x="' + x1 + '" y="' + y + '" width="' + (x2 - x1) + '" height="' + (RH - 6) + '" rx="2"/>');
+      if (x2 - x1 > 34)
+        out.push('<text class="segtxt" x="' + ((x1 + x2) / 2) + '" y="' + (y + (RH - 6) / 2) + '">' +
+                 f3(W[nd.i][nd.j] * tot) + "</text>");
+    }
+    out.push('<rect class="hit" data-ni="' + nd.i + '" data-nj="' + nd.j + '" x="' + x1 + '" y="' + y +
+             '" width="' + Math.max(3, x2 - x1) + '" height="' + (RH - 6) + '"/>');
+  });
+  for (let d = 0; d <= maxD; d++)
+    out.push('<text class="hdrname" x="' + (pad + BW + 10) + '" y="' + (TOP + d * RH + (RH - 6) / 2 + 4) +
+             '">depth ' + d + "</text>");
+  const acc = (st.merged || []).reduce((a, nd) => a + W[nd.i][nd.j], 0);
+  out.push('<text class="hdrname" x="' + pad + '" y="' + (H - 16) +
+           '">shaded area so far = ' + f3(acc) + " per element  (" + f3(acc * tot) + " moves)</text>");
+  svg.innerHTML = out.join("");
+  el("treeMeta").textContent = "cost " + f3(treeCost(nodes)) + " \u00b7 " +
+    nodes.filter(x => !x.leaf).length + " merges";
+}
+
+/* ---------- side panel ---------------------------------------------------- */
+
+function renderNums() {
+  const st = steps[cur] || {};
+  const h = entropy();
+  if (mode !== "merge") {
+    const ti = traceFrom ? traceFrom[0] : 0, tj = traceFrom ? traceFrom[1] : L;
+    el("numTitle").textContent = "Weights";
+    const rows = w.map((x, i) => "<tr><td>\u2113<sub>" + i + "</sub></td><td class='n'>" + f3(x) +
+      "</td><td class='n'>" + f3(p[i]) + "</td><td><span class='barwrap'><span class='barfill' style='width:" +
+      (100 * p[i] / Math.max.apply(null, p)).toFixed(1) + "%'></span></span></td></tr>").join("");
+    el("numBox").innerHTML = "<table class='cmp'><tr><th>leaf</th><th>raw</th><th>normalised</th><th></th></tr>" +
+      rows + "</table><div class='hint' style='margin-top:8px'>C" + rng(ti, tj) + " = <b>" + f3(C[ti][tj]) +
+      "</b> &nbsp;·&nbsp; H = " + f3(h) + " &nbsp;·&nbsp; H+2 = " + f3(h + 2) + "</div>";
+    el("numMeta").textContent = L + " leaves";
+    return;
+  }
+  el("numTitle").textContent = "Trees compared";
+  const kinds = [["opt", "Optimal (DP)"], ["peek", "Peeksort"], ["pow", "Powersort"]];
+  const costs = kinds.map(k => treeCost(treeOf(k[0], 0, L)));
+  const mx = Math.max.apply(null, costs.concat([h + 2]));
+  const best = Math.min.apply(null, costs);
+  const rows = kinds.map((k, idx) => "<tr class='pick" + (Math.abs(costs[idx] - best) < 1e-12 ? " best" : "") +
+    (whichTree === k[0] ? " sel" : "") + "' data-k='" + k[0] + "'><td>" + k[1] + "</td><td class='n'>" +
+    f3(costs[idx]) + "</td><td><span class='barwrap'><span class='barfill' style='width:" +
+    (100 * costs[idx] / mx).toFixed(1) + "%'></span></span></td></tr>").join("");
+  el("numBox").innerHTML = "<table class='cmp'><tr><th>tree</th><th>c(T)</th><th></th></tr>" + rows +
+    "<tr><td style='color:var(--wi-ink-faint)'>H (lower bound)</td><td class='n'>" + f3(h) +
+    "</td><td><span class='barwrap'><span class='barfill' style='width:" + (100 * h / mx).toFixed(1) +
+    "%;background:var(--wi-inert)'></span></span></td></tr>" +
+    "<tr><td style='color:var(--wi-ink-faint)'>H + 2</td><td class='n'>" + f3(h + 2) +
+    "</td><td><span class='barwrap'><span class='barfill' style='width:" + (100 * (h + 2) / mx).toFixed(1) +
+    "%;background:var(--wi-inert)'></span></span></td></tr></table>" +
+    "<div class='hint' style='margin-top:8px'>Peeksort and Powersort never solve a DP, yet both stay within " +
+    "H+2. Neither is optimal in general \u2014 click a row to step through its merges.</div>";
+  el("numMeta").textContent = tot + " elements";
+  [].forEach.call(el("numBox").querySelectorAll("tr[data-k]"), tr =>
+    tr.addEventListener("click", () => setTree(tr.dataset.k)));
+}
+
+/* ---------- pseudocode ----------------------------------------------------- */
+
+const K = x => '<span class="kw">' + x + "</span>", Cm = x => '<span class="cm">' + x + "</span>";
+const REC = [
+  { k: "r_head", t: "C(i,j) =" },
+  { k: "r_base", t: "    0                                                        if j\u2212i = 1" },
+  { k: "r_min",  t: "    (\u2113\u1d62 + \u22ef + \u2113\u2c7c\u208b\u2081) + min{ C(i,r) + C(r,j) : r \u2208 [i+1..j\u22121] }    otherwise" }
+];
+const CODE = [
+  { k: "c_head", t: K("procedure") + " optAlphabeticTree(\u2113[0..L)):" },
+  { k: "c_init", t: "    C[i][i+1] := 0 " + Cm("for all i;   W[i][j] := \u2113\u1d62 + \u22ef + \u2113\u2c7c\u208b\u2081") },
+  { k: "c_l",    t: "    " + K("for") + " len := 2,\u2026,L" },
+  { k: "c_i",    t: "        " + K("for") + " i := 0,\u2026,L\u2212len" },
+  { k: "c_j",    t: "            j := i+len;   C[i][j] := +\u221e" },
+  { k: "c_r",    t: "            " + K("for") + " r := i+1,\u2026,j\u22121" },
+  { k: "c_q",    t: "                q := C[i][r] + C[r][j]" },
+  { k: "c_min",  t: "                " + K("if") + " q < C[i][j]:  C[i][j] := q;  R[i][j] := r" },
+  { k: "c_add",  t: "            C[i][j] := C[i][j] + W[i][j]" },
+  { k: "c_ret",  t: "    " + K("return") + " (C, R)" }
+];
+const KCODE = [
+  { k: "c_head", t: K("procedure") + " optAlphabeticTreeKnuth(\u2113[0..L)):" },
+  { k: "c_init", t: "    C[i][i+1] := 0;  R[i][i+1] := i " + Cm("// same as before") },
+  { k: "c_l",    t: "    " + K("for") + " len := 2,\u2026,L" },
+  { k: "c_i",    t: "        " + K("for") + " i := 0,\u2026,L\u2212len" },
+  { k: "c_j",    t: "            j := i+len;   C[i][j] := +\u221e" },
+  { k: "c_r",    t: "            " + K("for") + " r := max(i+1, R[i][j\u22121]), \u2026, min(j\u22121, R[i+1][j])" },
+  { k: "c_q",    t: "                q := C[i][r] + C[r][j]" },
+  { k: "c_min",  t: "                " + K("if") + " q < C[i][j]:  C[i][j] := q;  R[i][j] := r" },
+  { k: "c_add",  t: "            C[i][j] := C[i][j] + W[i][j]" },
+  { k: "c_ret",  t: "    " + K("return") + " (C, R)" }
+];
+const MCODE = [
+  { k: "m_head", t: Cm("// merge cost of a merge tree T over runs of lengths \u2113\u1d62") },
+  { k: "m_min",  t: "cost(T) = \u03a3 { W(v) : v an internal node of T }" },
+  { k: "m_min",  t: "        = \u03a3 { \u2113\u1d62 \u00b7 depth(L\u1d62) : i }        " + Cm("// the same number") }
+];
+function renderCode() {
+  const st = steps[cur] || {};
+  const hl = new Set(st.hl), hlp = new Set(st.hlp);
+  const blk = (lab, lines, act, num) => '<div class="sublabel">' + lab + "</div>" +
+    lines.map((l, i) => '<div class="cline' + (act.has(l.k) ? " on" : "") + '">' +
+      (num ? '<span class="ln">' + (i + 1) + "</span>" : '<span class="ln"></span>') +
+      "<span>" + l.t + "</span></div>").join("");
+  el("codeBody").innerHTML = blk("Step 3 \u00b7 recurrence", REC, hl, false) +
+    (mode === "merge" ? blk("The same cost, read as merges", MCODE, hl, false)
+     : blk(mode === "knuth" ? "Step 5 \u00b7 with Knuth's window" : "Step 5 \u00b7 table filling",
+           mode === "knuth" ? KCODE : CODE, hlp, true));
+  el("codeNote").innerHTML = mode === "knuth"
+    ? "Only line 6 differs. The windows along one diagonal <b>telescope</b>: summing " +
+      "(R[i+1][j] \u2212 R[i][j\u22121] + 1) over one diagonal is O(L), so the whole table costs " +
+      "\u0398(L\u00b2). The monotonicity itself follows from the quadrangle inequality; the picture " +
+      "shows it holding, which is the part worth seeing."
+    : mode === "merge"
+    ? "Nothing to run here \u2014 the point is that the merge cost of a merge tree and the weighted depth " +
+      "of an alphabetic tree are the same sum, read two ways. So the DP that finds the best alphabetic " +
+      "tree also finds the best possible merge order for a given run decomposition."
+    : "\u0398(L\u00b3) time, \u0398(L\u00b2) space: L\u00b2/2 subproblems, each scanning up to L roots. " +
+      "The lecture states the recurrence; this procedure is the cookie-cutter steps 5 and 6 spelled out " +
+      "for it, with R[i][j] remembered so the backtrace does not have to re-derive the root.";
+}
+
+/* ---------- transport ------------------------------------------------------ */
+
+function renderPhases() {
+  const bar = el("phaseBar"); bar.innerHTML = "";
+  phases.forEach(ph => {
+    const span = ph.to - ph.from + 1;
+    const pct = cur > ph.to ? 100 : cur < ph.from ? 0 : ((cur - ph.from + 1) / span) * 100;
+    const b = document.createElement("button");
+    b.className = "phasebtn" + (cur >= ph.from && cur <= ph.to ? " on" : (cur > ph.to ? " past" : ""));
+    b.style.flexGrow = String(Math.max(1, span));
+    b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' + pct.toFixed(2) +
+                  '%"></span><span class="lab">' + esc(ph.name) + "</span>";
+    b.title = ph.name;
+    b.addEventListener("click", () => { stopPlay(); cur = ph.from; render(); });
+    bar.appendChild(b);
+  });
+}
+function render() {
+  const st = steps[cur] || {};
+  drawTable(); drawTree(); renderNums(); renderPhases();
+  if (window.innerWidth > 760) renderCode();
+  el("statusBox").innerHTML = (st.txt || "") + (st.ans ? '<b class="ans">' + esc(st.ans) + "</b>" : "");
+  el("phaseName").textContent = phases[st.ph] ? phases[st.ph].name : "";
+  el("scrubber").max = String(Math.max(0, steps.length - 1));
+  el("scrubber").value = String(cur);
+  el("stepNo").textContent = steps.length ? (cur + 1) + " / " + steps.length : "\u2014 / \u2014";
+  el("backBtn").disabled = cur <= 0; el("stepBtn").disabled = cur >= steps.length - 1;
+  const whole = !traceFrom || (traceFrom[0] === 0 && traceFrom[1] === L);
+  el("wholeBtn").style.display = (whole || mode === "merge") ? "none" : "";
+  el("opNote").innerHTML = mode === "merge"
+    ? "Showing the <b>" + (whichTree === "opt" ? "optimal" : whichTree === "peek" ? "Peeksort" : "Powersort") +
+      "</b> merge tree."
+    : whole ? "Backtracing from <b>" + rng(0, L) + "</b> \u2014 all " + L + " leaves."
+            : "Backtracing from <b>" + rng(traceFrom[0], traceFrom[1]) + "</b>.";
+}
+const PLAY = "\u25B6\uFE0E", PAUSE = "\u23F8\uFE0E";
+function stepFwd() { if (cur < steps.length - 1) { cur++; render(); } else stopPlay(); }
+function stepBack() { if (cur > 0) { cur--; render(); } }
+function stopPlay() { if (timer) { clearInterval(timer); timer = null; el("playBtn").textContent = PLAY; } }
+function togglePlay() {
+  if (timer) { stopPlay(); return; }
+  el("playBtn").textContent = PAUSE;
+  timer = setInterval(stepFwd, Number(el("speed").value));
+}
+
+/* ---------- input / modes --------------------------------------------------- */
+
+function setWeights(list, keep) {
+  const err = el("parseErr");
+  if (!list.length || list.some(x => !(x > 0)) || list.some(isNaN)) { err.textContent = "All weights must be positive numbers."; return false; }
+  if (list.length < 2 || list.length > 12) { err.textContent = "Between 2 and 12 weights."; return false; }
+  err.textContent = "";
+  w = list.slice(); traceFrom = null; selCell = null; hoverCell = null;
+  el("inW").value = w.join(" ");
+  el("inputText").value = "# leaf weights\n" + w.join(" ");
+  stopPlay(); build(); render();
+  return true;
+}
+const nums = s => s.split(/[\s,;]+/).filter(x => x.length).map(Number);
+function setMode(m) {
+  mode = m;
+  el("mDP").classList.toggle("on", m === "dp");
+  el("mMerge").classList.toggle("on", m === "merge");
+  el("mKnuth").classList.toggle("on", m === "knuth");
+  el("subDP").style.display = m === "dp" ? "" : "none";
+  el("subMerge").style.display = m === "merge" ? "" : "none";
+  el("subKnuth").style.display = m === "knuth" ? "" : "none";
+  el("granWrap").style.display = m === "merge" ? "none" : "";
+  el("treeWrap").style.display = m === "merge" ? "" : "none";
+  el("tabBox").style.display = m === "merge" ? "none" : "";
+  el("legKnuth").style.display = m === "knuth" ? "" : "none";
+  el("treeTitle").textContent = m === "merge" ? "Merge cost as area" : "The tree";
+  traceFrom = null; stopPlay(); build(); render();
+}
+function setTree(k) {
+  whichTree = k;
+  ["opt", "peek", "pow"].forEach(x => el(x === "opt" ? "tOpt" : x === "peek" ? "tPeek" : "tPow")
+    .classList.toggle("on", x === k));
+  stopPlay(); build(); render();
+}
+function setGran(g) {
+  gran = g;
+  el("granCoarse").classList.toggle("on", g === 0);
+  el("granFine").classList.toggle("on", g === 1);
+  const ph = (steps[cur] || {}).ph || 0;
+  stopPlay(); build();
+  cur = phases[Math.min(ph, phases.length - 1)].from;
+  render();
+}
+function moveTip(ev) {
+  const t = el("tooltip");
+  t.style.left = Math.min(ev.clientX + 14, window.innerWidth - t.offsetWidth - 10) + "px";
+  t.style.top = Math.min(ev.clientY + 16, window.innerHeight - t.offsetHeight - 10) + "px";
+}
+const hideTip = () => { el("tooltip").style.display = "none"; };
+function showTip(ev, html) {
+  if (!html) { hideTip(); return; }
+  const t = el("tooltip"); t.innerHTML = html; t.style.display = "block"; moveTip(ev);
+}
+
+function init() {
+  const sel = el("presetSel");
+  Object.keys(PRESETS).forEach(k => {
+    const o = document.createElement("option"); o.value = k; o.textContent = PRESETS[k].name; sel.appendChild(o);
+  });
+  sel.addEventListener("change", e => { if (PRESETS[e.target.value]) setWeights(PRESETS[e.target.value].w, false); });
+  el("applyBtn").addEventListener("click", () => setWeights(nums(el("inW").value), false));
+  el("inW").addEventListener("keydown", ev => { if (ev.key === "Enter") setWeights(nums(el("inW").value), false); });
+  el("loadBtn").addEventListener("click", () => {
+    const lines = el("inputText").value.split(/\r?\n/).filter(l => !/^\s*#/.test(l) && l.trim().length);
+    if (!lines.length) { el("parseErr").textContent = "Nothing to read."; return; }
+    setWeights(nums(lines[0]), false);
+  });
+  el("randBtn").addEventListener("click", () => {
+    const k = 4 + Math.floor(Math.random() * 4), a = [];
+    for (let i = 0; i < k; i++) a.push(1 + Math.floor(Math.random() * 15));
+    setWeights(a, false);
+  });
+  el("mDP").addEventListener("click", () => setMode("dp"));
+  el("mMerge").addEventListener("click", () => setMode("merge"));
+  el("mKnuth").addEventListener("click", () => setMode("knuth"));
+  el("tOpt").addEventListener("click", () => setTree("opt"));
+  el("tPeek").addEventListener("click", () => setTree("peek"));
+  el("tPow").addEventListener("click", () => setTree("pow"));
+  el("granCoarse").addEventListener("click", () => setGran(0));
+  el("granFine").addEventListener("click", () => setGran(1));
+  el("stepBtn").addEventListener("click", () => { stopPlay(); stepFwd(); });
+  el("backBtn").addEventListener("click", () => { stopPlay(); stepBack(); });
+  el("playBtn").addEventListener("click", togglePlay);
+  el("resetBtn").addEventListener("click", () => { stopPlay(); cur = 0; render(); });
+  el("scrubber").addEventListener("input", e => { stopPlay(); cur = Number(e.target.value); render(); });
+  el("speed").addEventListener("input", e => {
+    el("speedVal").textContent = e.target.value + "ms";
+    if (timer) { stopPlay(); togglePlay(); }
+  });
+  el("wholeBtn").addEventListener("click", () => {
+    traceFrom = null; selCell = null; stopPlay(); build();
+    cur = phases[phases.length - 1].from; render();
+  });
+
+  const tab = el("tabSvg");
+  tab.addEventListener("mousemove", ev => {
+    const t = ev.target;
+    if (t && t.classList.contains("hit") && t.dataset.i !== undefined) {
+      const i = Number(t.dataset.i), j = Number(t.dataset.j);
+      if (j <= i) { hideTip(); return; }
+      if (!hoverCell || hoverCell[0] !== i || hoverCell[1] !== j) {
+        hoverCell = [i, j]; drawTable(); drawTree();
+      }
+      const bk = j - i >= 2 ? bestRoots(i, j) : [];
+      showTip(ev, '<span class="tt-h">C' + rng(i, j) + " = " + f3(C[i][j]) + "</span><br>leaves " +
+        (j - i) + ", weight <code>" + f3(W[i][j]) + "</code>" +
+        (bk.length ? "<br>optimal root r = " + bk.join(", ") : "<br>a single leaf: cost 0") +
+        (j - i >= 2
+          ? '<br><span class="tt-s">roots examined: ' +
+            (mode === "knuth" ? (knuthHi(i, j) - knuthLo(i, j) + 1) + " of " + (j - i - 1) +
+                                " (window [" + knuthLo(i, j) + ".." + knuthHi(i, j) + "])"
+                              : (j - i - 1) + " (all of them)") + "</span>" : "") +
+        '<br><span class="tt-s">click: build the tree for this range</span>');
+    } else { if (hoverCell) { hoverCell = null; drawTable(); drawTree(); } hideTip(); }
+  });
+  tab.addEventListener("mouseleave", () => { if (hoverCell) { hoverCell = null; drawTable(); drawTree(); } hideTip(); });
+  tab.addEventListener("click", ev => {
+    const t = ev.target;
+    if (!t || !t.classList.contains("hit") || t.dataset.i === undefined) return;
+    const i = Number(t.dataset.i), j = Number(t.dataset.j);
+    if (j - i < 2) return;
+    stopPlay(); selCell = [i, j];
+    traceFrom = (i === 0 && j === L) ? null : [i, j];
+    build(); cur = phases[phases.length - 1].from; render();
+  });
+
+  const tsvg = el("treeSvg");
+  tsvg.addEventListener("mousemove", ev => {
+    const t = ev.target;
+    if (t && t.classList.contains("hit") && t.dataset.ni !== undefined) {
+      const i = Number(t.dataset.ni), j = Number(t.dataset.nj);
+      showTip(ev, j - i === 1
+        ? '<span class="tt-h">leaf L<sub>' + i + "</sub></span><br>weight <code>" + f3(w[i]) +
+          "</code> (" + f3(p[i]) + " normalised)"
+        : '<span class="tt-h">' + rng(i, j) + "</span><br>" + (j - i) + " leaves, weight <code>" +
+          f3(W[i][j]) + "</code><br>subtree cost <code>" + f3(C[i][j]) + "</code>" +
+          (mode === "merge" ? "<br>this merge moves <code>" + f3(W[i][j] * tot) + "</code> elements" : ""));
+    } else hideTip();
+  });
+  tsvg.addEventListener("mouseleave", hideTip);
+
+  window.addEventListener("resize", () => render());
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT") return;
+    if (ev.key === "ArrowRight") { stopPlay(); stepFwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft") { stopPlay(); stepBack(); ev.preventDefault(); }
+  });
+  sel.value = "runs";
+  setWeights(PRESETS.runs.w, false);
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

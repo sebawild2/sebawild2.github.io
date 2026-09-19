@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lempel–Ziv–Welch — Animated</title>
+<style>
+:root{
+  --bg:#f5ebd9; --panel:#faf6ed; --panel-border:#d4c5b4;
+  --ink:#6b675c; --ink-strong:#46433a; --muted:#8b8779; --dim:#a89880;
+  --btn:#faf6ed; --btn-border:#b9a793; --btn-border-hover:#9c866d;
+  --accent:#cc2f22;              /* alert / current */
+  --xcol:#cc2f22;                /* the phrase x        (red on the slide)  */
+  --xdark:#6d180f;               /* previously coded x  (dark red)          */
+  --ccol:#2f5f8a;                /* the character c     (blue on the slide) */
+  --new:#2f6b3a;                 /* newly created entry                     */
+  --shade:#d4c5b4;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;
+     margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+.container{width:100%;max-width:1600px;display:flex;flex-direction:column}
+h1{font-size:1.5rem;font-weight:500;margin:0 0 4px;letter-spacing:.5px;color:var(--ink-strong);text-transform:uppercase}
+.subtitle{font-size:.9rem;color:var(--muted);margin:0 0 18px;line-height:1.5}
+.subtitle code{background:#ecddc5;padding:1px 6px;border-radius:3px}
+
+.card{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:14px 18px;
+      margin-bottom:14px;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lbl{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.sep{width:1px;height:22px;background:#d4c5b4;margin:0 4px}
+button,select{background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);
+  padding:7px 14px;font-size:.85rem;border-radius:5px;cursor:pointer;font-weight:500;font-family:inherit;
+  transition:background .15s,border-color .15s;white-space:nowrap}
+button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--btn-border-hover)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:#46433a;color:#faf6ed;border-color:#46433a}
+button.primary:hover:not(:disabled){background:#5c5043;border-color:#5c5043}
+button.mode{font-size:.85rem}
+button.mode.on{background:#f7e6e0;border-color:var(--accent);color:var(--accent);font-weight:600}
+input[type=text]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;height:34px;
+  background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);border-radius:5px;
+  padding:0 10px;font-size:.85rem}
+input.wide{flex:1;min-width:280px}
+input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+#stepSlider{flex:1;min-width:220px}
+label.chk{font-size:.78rem;color:var(--muted);display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.steplabel{font-size:.78rem;color:var(--muted);min-width:150px;font-variant-numeric:tabular-nums}
+.err{color:var(--accent);font-weight:600;font-size:.8rem;min-height:17px;margin-top:6px}
+
+.box{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:12px 16px;
+     box-shadow:0 2px 8px rgba(0,0,0,.04);margin-bottom:14px}
+.box-title{font-size:.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin:0 0 10px}
+.status{background:#ecddc5;border:1px solid var(--panel-border);border-radius:5px;padding:11px 13px;
+        font-size:.9rem;color:var(--ink-strong);min-height:44px;line-height:1.55;
+        display:block;text-align:left;word-spacing:normal}
+.status code{background:#e4d5bb;padding:0 4px;border-radius:3px;
+        font-family:var(--wi-font-mono);font-size:.86em}
+.status b{color:var(--accent)}
+.status .boot{color:#fcf9f3;background:var(--accent);border-radius:3px;padding:1px 6px;font-size:.78rem;
+  text-transform:uppercase;letter-spacing:.5px;margin-right:6px}
+.svg-wrap{background:var(--bg);border-radius:5px;overflow-x:auto;overflow-y:hidden}
+svg{display:block;margin:0 auto}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,1fr);gap:14px;align-items:start}
+@media(max-width:1050px){.stage{grid-template-columns:1fr}}
+
+/* dictionary tables */
+table.tbl{border-collapse:collapse;font-size:.82rem;width:100%}
+table.tbl th{font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+  text-align:left;font-weight:700;padding:3px 7px;border-bottom:1px solid var(--panel-border)}
+table.tbl td{padding:2px 7px;border-bottom:1px dashed #ecddc5;font-variant-numeric:tabular-nums}
+table.tbl tr:last-child td{border-bottom:none}
+table.tbl td.mono{font-family:var(--wi-font-mono);color:var(--ink-strong)}
+table.tbl tr.gap td{text-align:center;color:var(--dim);padding:0;font-size:.7rem;letter-spacing:2px}
+table.tbl tr.fresh td{background:#e7f0e4}
+table.tbl tr.fresh td.mono{color:var(--new);font-weight:700}
+table.tbl tr.hot td{background:#f7e6e0}
+table.tbl tr.hot td.mono{color:var(--accent);font-weight:700}
+table.tbl tr.boot td{background:#f7d9d4;outline:1px solid var(--accent)}
+table.tbl tr.pending td{opacity:.28}
+.dict-cols{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start}
+.scroller{max-height:330px;overflow-y:auto}
+
+/* codeword output */
+.codes{display:flex;flex-wrap:wrap;gap:5px;font-family:var(--wi-font-mono);font-size:.85rem}
+.codes .code{min-width:32px;padding:4px 7px;text-align:center;border-radius:4px;background:#ecddc5;
+  border:1px solid #d4c5b4;color:var(--ink);transition:.15s}
+.codes .code.done{opacity:.5}
+.codes .code.cur{background:#fcf9f3;border:2px solid var(--accent);color:var(--accent);font-weight:700}
+.codes .code.fresh{background:#e7f0e4;border-color:var(--new);color:var(--new);font-weight:700}
+.codes .code.boot{background:#f7d9d4;border:2px solid var(--accent);color:var(--accent);font-weight:700}
+.codes .code .sub{display:block;font-size:.62rem;color:var(--muted);font-weight:400}
+
+/* pseudocode */
+details.panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;width:100%;
+  margin-top:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+details.panel>summary{cursor:pointer;padding:13px 18px;font-size:.88rem;font-weight:600;color:var(--ink-strong);
+  list-style:none;user-select:none}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::before{content:"▶ ";font-size:.72rem;color:var(--btn-border-hover)}
+details.panel[open]>summary::before{content:"▼ "}
+.panel-body{padding:0 18px 16px}
+.code-section{border:1px solid var(--panel-border);border-radius:6px;overflow:hidden;background:#fbf8f0;margin-bottom:12px}
+.code-section.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(196,51,51,.18)}
+.code-head{font-size:.72rem;font-weight:600;color:var(--muted);padding:6px 10px;background:#f0e7d0;border-bottom:1px solid var(--panel-border)}
+.code-section.active .code-head{color:var(--accent);background:#f7e6e0}
+pre.code{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.75rem;
+  line-height:1.6;color:var(--ink-strong);overflow-x:auto;
+  text-align:left;background:none;border:none;padding:6px 0}
+pre.code .ln{display:block;padding:0 10px;white-space:pre;border-left:3px solid transparent}
+pre.code .ln.hot{background:#f6dfd8;border-left-color:var(--accent)}
+pre.code .ln.boothot{background:#f7d9d4;border-left-color:var(--accent);font-weight:700}
+.help{font-size:.82rem;line-height:1.6;color:var(--ink)}
+.help code{background:#ecddc5;padding:1px 5px;border-radius:3px}
+.help pre{background:#faf6ed;border:1px solid var(--panel-border);border-radius:5px;padding:9px 12px;font-size:.78rem;overflow-x:auto;margin:8px 0}
+#test-out{font-family:var(--wi-font-mono);font-size:.75rem;line-height:1.6;white-space:pre-wrap;
+  margin-top:10px;color:#46433a;max-height:360px;overflow-y:auto;background:#faf6ed;border:1px solid var(--panel-border);
+  border-radius:6px;padding:12px}
+.t-pass{color:#2f6b3a;font-weight:600}.t-fail{color:var(--accent);font-weight:700}.t-head{color:var(--ink-strong);font-weight:700}
+
+/* bootstrap explainer */
+.boot-box{border:1px solid var(--panel-border);border-radius:8px;background:#fbf8f0;padding:12px 16px}
+.boot-box.armed{border-color:var(--accent);box-shadow:0 0 0 2px rgba(196,51,51,.18);background:#fdf3f0}
+.boot-steps{font-size:.84rem;line-height:1.85;margin-top:8px}
+.boot-steps b{color:var(--ink-strong)}
+.boot-steps .xx{color:var(--xcol);font-weight:700;font-family:var(--wi-font-mono)}
+.boot-steps .cc{color:var(--ccol);font-weight:700;font-family:var(--wi-font-mono)}
+
+/* side-by-side */
+.sbs{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.sbs{grid-template-columns:1fr}}
+.lagnote{font-size:.8rem;color:var(--ink-strong);background:#f7e6e0;border:1px solid #e0bdb4;
+  border-radius:5px;padding:8px 12px;margin-top:10px;line-height:1.5}
+.lagnote b{color:var(--accent)}
+.legend{display:flex;flex-wrap:wrap;gap:12px 20px;font-size:.78rem;color:var(--ink);margin-top:10px}
+.legend .item{display:flex;align-items:center;gap:6px}
+.sw{width:15px;height:15px;border-radius:3px;border:2px solid}
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Lempel–Ziv–Welch</h1>
+<p class="subtitle">
+  A <b>variable-to-fixed</b> code: every codeword is an index into a dictionary <code>D</code> that both sides
+  grow as they go. Encoding extends the current phrase <span style="color:var(--xcol);font-weight:600">x</span>
+  as long as <code>D</code> knows it; decoding replays the same growth, one step behind — which is exactly why
+  the bootstrap case exists.
+</p>
+
+<!-- ─────────── mode ─────────── -->
+<div class="card">
+  <div class="row">
+    <span class="lbl">View</span>
+    <button class="mode" id="mode-enc"  onclick="setMode('enc')">Encoding</button>
+    <button class="mode" id="mode-dec"  onclick="setMode('dec')">Decoding</button>
+    <button class="mode" id="mode-sync" onclick="setMode('sync')">Encoder &amp; decoder side by side</button>
+    <div class="sep"></div>
+    <span class="lbl">Preset</span>
+    <select id="presetSel" onchange="loadPreset(this.value)"></select>
+  </div>
+</div>
+
+<!-- ─────────── input ─────────── -->
+<div class="card">
+  <div class="row">
+    <span class="lbl" id="inLabel">Source text S</span>
+    <input type="text" class="wide" id="mainInput" spellcheck="false">
+    <button class="primary" onclick="loadFromInput()">Load</button>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <span class="lbl">Alphabet Σ<sub>S</sub></span>
+    <select id="alphaSel" onchange="onAlphaChange()">
+      <option value="ascii">ASCII 0–127 (as on the slides) — first free codeword 128</option>
+      <option value="auto">only the characters occurring in S — codes 0…σ−1</option>
+      <option value="custom">custom list of characters…</option>
+    </select>
+    <input type="text" id="alphaCustom" style="display:none;width:220px" spellcheck="false" placeholder="e.g. ABNS_">
+    <span class="lbl" id="alphaInfo" style="text-transform:none;font-weight:400"></span>
+  </div>
+  <div class="err" id="inputErr"></div>
+</div>
+
+<!-- ─────────── steps ─────────── -->
+<div class="card">
+  <div class="row" style="margin-bottom:9px">
+    <button id="btnFirst" onclick="goto(0)">⏮</button>
+    <button id="btnPrev" onclick="stepBy(-1)">← Prev</button>
+    <button id="btnNext" class="primary" onclick="stepBy(1)">Next →</button>
+    <button id="btnLast" onclick="goto(steps.length-1)">⏭</button>
+    <button id="btnPlay" onclick="togglePlay()">▶ Play</button>
+    <div class="sep"></div>
+    <input type="range" id="stepSlider" min="0" max="0" value="0" oninput="goto(+this.value)">
+    <span class="steplabel" id="stepLabel"></span>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <input type="range" id="speedSlider" min="1" max="10" value="6" oninput="setSpeed(this.value)" style="width:110px">
+    <span class="steplabel" id="speedLabel" style="min-width:34px">1×</span>
+    <div class="sep"></div>
+    <label class="chk"><input type="checkbox" id="trieToggle" checked onchange="render()"> show the dictionary trie</label>
+    <div class="sep"></div>
+    <button id="btnBoot" onclick="jumpBootstrap()">Jump to the bootstrap case</button>
+  </div>
+</div>
+
+<!-- ─────────── status ─────────── -->
+<div class="box">
+  <div class="box-title">Status</div>
+  <div class="status" id="statusText">Press <b>&nbsp;Next&nbsp;</b> to begin.</div>
+</div>
+
+<!-- ─────────── ENCODE / DECODE stage ─────────── -->
+<div id="stageMain">
+  <div class="box">
+    <div class="box-title" id="stripTitle">Source text S</div>
+    <div class="svg-wrap"><svg id="strip" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div class="legend" id="stripLegend"></div>
+  </div>
+
+  <div class="stage">
+    <div>
+      <div class="box" id="outBox">
+        <div class="box-title" id="outTitle">Coded text C</div>
+        <div class="codes" id="outView"></div>
+      </div>
+      <div class="box" id="trieBox">
+        <div class="box-title">Dictionary D, stored as a trie — edge labels are characters, node labels are codewords</div>
+        <div class="svg-wrap"><svg id="trie" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      </div>
+      <div class="box" id="bootBox" style="display:none">
+        <div class="box-title">Bootstrapping — using a codeword we are just about to build</div>
+        <div class="boot-box" id="bootInner">
+          <div class="svg-wrap"><svg id="bootSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+          <div class="boot-steps" id="bootText"></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="box">
+        <div class="box-title" id="dictTitle">Dictionary D</div>
+        <div class="dict-cols">
+          <div><div class="lbl" style="margin-bottom:5px">Σ<sub>S</sub></div><div class="scroller" id="dictBase"></div></div>
+          <div><div class="lbl" style="margin-bottom:5px">new entries</div><div class="scroller" id="dictNew"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────── SIDE BY SIDE stage ─────────── -->
+<div id="stageSync" style="display:none">
+  <div class="box">
+    <div class="box-title">Codewords C — the encoder writes them, the decoder reads them</div>
+    <div class="codes" id="syncCodes"></div>
+    <div class="lagnote" id="syncLag"></div>
+  </div>
+  <div class="sbs">
+    <div class="box">
+      <div class="box-title">Encoder — after writing this codeword</div>
+      <div style="font-size:.82rem;margin-bottom:8px">S consumed: <span class="mono" id="syncEncS" style="font-family:var(--wi-font-mono);color:var(--ink-strong)"></span></div>
+      <div class="scroller" id="syncEncD"></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Decoder — after reading the same codeword</div>
+      <div style="font-size:.82rem;margin-bottom:8px">S produced: <span class="mono" id="syncDecS" style="font-family:var(--wi-font-mono);color:var(--ink-strong)"></span></div>
+      <div class="scroller" id="syncDecD"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────── pseudocode ─────────── -->
+<details class="panel" open>
+  <summary>Pseudocode — the active line is highlighted</summary>
+  <div class="panel-body"><div id="codeGrid"></div></div>
+</details>
+
+<!-- ─────────── format ─────────── -->
+<details class="panel">
+  <summary>Input format</summary>
+  <div class="panel-body help">
+    <p><b>Encoding.</b> The input box holds the source text <code>S</code>. Type <code>_</code> to get a space if
+      you prefer, or just press the space bar; spaces are drawn as <code>␣</code> and are ordinary characters.</p>
+    <p><b>Decoding.</b> The input box holds the codewords, separated by spaces:</p>
+    <pre>67 65 78 32 66 129 133 83</pre>
+    <p><b>Side by side.</b> The input box holds a source text; it is encoded, and the resulting codewords are fed
+      straight back into the decoder.</p>
+    <p><b>Alphabet.</b> Three choices. <code>ASCII 0–127</code> is the setting used on the slides: every character
+      is its own ASCII code and the first free codeword is 128. <code>auto</code> uses only the characters that
+      occur in <code>S</code>, numbered 0…σ−1, which keeps the numbers small for hand-checking. <code>custom</code>
+      takes a list of characters, numbered by position. Only the entries of <code>D</code> that are actually
+      reachable are drawn — the ASCII table is not shown in full, exactly as on the slides, where the unused
+      stretches are replaced by <code>…</code>.</p>
+    <p><b>Dictionary trie.</b> The encoding pseudocode stores <code>D</code> as a trie, so that
+      <code>containsKey(xc)</code> is one step down from the node for <code>x</code>. The decoder does not need a
+      trie: it looks up <code>D[q]</code> in an array. That asymmetry is visible in the two views.</p>
+  </div>
+</details>
+
+<!-- ─────────── tests ─────────── -->
+<details class="panel">
+  <summary>Self-tests — against the lecture examples and a round-trip fuzzer</summary>
+  <div class="panel-body">
+    <button class="primary" onclick="runTests()">Run all tests</button>
+    <div id="test-out">Not run yet.</div>
+  </div>
+</details>
+
+</div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   0.  Helpers
+   ══════════════════════════════════════════════════════════════════════════ */
+function disp(ch){ if(ch===' ')return '␣'; if(ch==='\n')return '↵'; if(ch==='\t')return '⇥'; return ch; }
+function dstr(s){ return [...s].map(disp).join(''); }
+const SVGNS='http://www.w3.org/2000/svg';
+function el(tag,a){ const e=document.createElementNS(SVGNS,tag); for(const k in a) e.setAttribute(k,a[k]); return e; }
+/* Size an svg so that it is never blown up beyond its natural size — a short
+   string in a wide panel would otherwise be drawn at three times the size of
+   the surrounding text.  Too wide to fit stays at 1:1 and the wrapper scrolls. */
+const MAX_SCALE=1.0;
+function fitSvg(svg,W,H){
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  const avail=(svg.parentElement&&svg.parentElement.clientWidth)||0;
+  const scale=avail>0 ? Math.min(MAX_SCALE,Math.max(1,avail/W)) : 1;
+  svg.style.width=(W*scale)+'px';
+  svg.style.height=(H*scale)+'px';
+}
+function txt(x,y,s,a){ const t=el('text',Object.assign({x,y,'text-anchor':'middle'},a||{})); t.textContent=s; return t; }
+
+/* curly brace from x1 to x2 at height y; dir = +1 below, -1 above */
+function bracePath(x1,x2,y,dir,amp){
+  const h=dir*amp, m=(x1+x2)/2, r=Math.min(amp,(x2-x1)/4);
+  return 'M '+x1+' '+y+
+         ' Q '+x1+' '+(y+h)+' '+(x1+r)+' '+(y+h)+
+         ' L '+(m-r)+' '+(y+h)+
+         ' Q '+m+' '+(y+h)+' '+m+' '+(y+2*h)+
+         ' Q '+m+' '+(y+h)+' '+(m+r)+' '+(y+h)+
+         ' L '+(x2-r)+' '+(y+h)+
+         ' Q '+x2+' '+(y+h)+' '+x2+' '+y;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1.  Alphabets
+   ══════════════════════════════════════════════════════════════════════════ */
+function alphabetFor(kind,S,custom){
+  if(kind==='ascii'){
+    const code=new Map();
+    for(let i=0;i<128;i++) code.set(String.fromCharCode(i),i);
+    return {kind,code,k0:128,size:128,name:'ASCII 0–127',
+            charOf:q=>q<128?String.fromCharCode(q):null};
+  }
+  let chars;
+  if(kind==='auto'){
+    if(S===null) throw new Error('the "auto" alphabet needs a source text; pick ASCII or a custom alphabet');
+    chars=[...new Set(S)].sort();
+  } else {
+    chars=[...new Set(custom||'')];
+    if(!chars.length) throw new Error('the custom alphabet is empty');
+  }
+  const code=new Map();
+  chars.forEach((c,i)=>code.set(c,i));
+  return {kind,code,k0:chars.length,size:chars.length,
+          name:'{'+chars.map(disp).join('')+'}',
+          charOf:q=>q<chars.length?chars[q]:null};
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2.  LZW encoding   (verbatim from the lecture pseudocode)
+   ──────────────────────────────────────────────────────────────────────────
+        x ← ε ;  C ← ε ;  D ← codes for c ∈ Σ_S  (trie) ;  k ← |Σ_S|
+        for i ← 0..n−1:
+            c ← S[i]
+            if D.containsKey(xc) then  x ← xc
+            else  C ← C·D.get(x) ;  D.put(xc,k) ;  k ← k+1 ;  x ← c
+        C ← C·D.get(x) ;  return C
+   ══════════════════════════════════════════════════════════════════════════ */
+function lzwEncode(S,A){
+  let nid=0;
+  const root={id:++nid,ch:null,code:null,children:new Map(),parent:null,depth:0};
+  const mk=(ch,code,parent)=>{
+    const n={id:++nid,ch,code,children:new Map(),parent,depth:parent.depth+1};
+    parent.children.set(ch,n); return n;
+  };
+  /* the single characters of Σ_S; only those occurring in S are drawn, but all
+     of Σ_S is present in D — that is what "initialized with codes for c ∈ Σ_S"
+     means, and the unused ones can never be reached anyway.                  */
+  const used=[...new Set(S)].sort((a,b)=>A.code.get(a)-A.code.get(b));
+  for(const ch of used){
+    if(!A.code.has(ch)) throw new Error('character "'+disp(ch)+'" is not in the alphabet');
+    mk(ch,A.code.get(ch),root);
+  }
+  const base=used.map(ch=>({code:A.code.get(ch),str:ch}));
+  const entries=[];              // new dictionary entries, in creation order
+  const steps=[];
+  const out=[];                  // C
+  let x=root, xStart=0, k=A.k0;
+
+  const push=o=>steps.push(Object.assign({mode:'enc',i:-1,xStart:0,xLen:0,c:null,
+      found:null,k,out:out.slice(),entryCount:entries.length,emit:null,fresh:null,
+      lookup:null,bootstrap:false},o));
+
+  push({sub:'init',msg:'Initialise: <i>x</i> = ε, <i>C</i> = ε, <i>D</i> holds one entry per character of Σ<sub>S</sub>, '+
+        'and the next free codeword is <i>k</i> = '+A.k0+'.',hi:[1,2,3,4]});
+
+  for(let i=0;i<S.length;i++){
+    const c=S[i];
+    const child=x.children.get(c);
+    const xs=x===root?'ε':S.slice(xStart,i);
+    push({sub:'test',i,xStart,xLen:i-xStart,c,found:!!child,k,
+          lookup:{node:x,ch:c,hit:!!child},
+          msg:'<i>c</i> = <code>'+disp(c)+'</code>. Is <code>'+(x===root?'':dstr(xs))+disp(c)+
+              '</code> in <i>D</i>? '+(child?'<b>yes</b> — extend the phrase.'
+                                            :'<b>no</b> — the phrase ends here.'),
+          hi:[6,7]});
+    if(child){
+      x=child;
+      push({sub:'extend',i,xStart,xLen:i-xStart+1,c,found:true,k,
+            msg:'<i>x</i> ← <i>xc</i> = <code>'+dstr(S.slice(xStart,i+1))+'</code>. Nothing is written yet.',
+            hi:[8]});
+    } else {
+      const q=x.code, phrase=S.slice(xStart,i);
+      out.push(q);
+      const nn=mk(c,k,x);
+      entries.push({code:k,str:phrase+c,xcode:q,xstr:phrase,c,
+                    srcStart:xStart,srcEnd:i,node:nn});
+      push({sub:'emit',i,xStart,xLen:i-xStart,c,found:false,k:k+1,
+            out:out.slice(),entryCount:entries.length,emit:q,fresh:k,
+            msg:'Write the codeword <b>'+q+'</b> for <i>x</i> = <code>'+dstr(phrase)+'</code>, '+
+                'then store <code>'+dstr(phrase+c)+'</code> as codeword <b>'+k+'</b> and restart with '+
+                '<i>x</i> = <code>'+disp(c)+'</code>.',
+            hi:[10,11,12]});
+      k++;
+      x=root.children.get(c);
+      xStart=i;
+    }
+  }
+  const q=x.code, phrase=S.slice(xStart);
+  out.push(q);
+  push({sub:'final',i:S.length,xStart,xLen:S.length-xStart,c:null,k,
+        out:out.slice(),entryCount:entries.length,emit:q,
+        msg:'The loop is over; write the codeword <b>'+q+'</b> for the last phrase '+
+            '<code>'+dstr(phrase)+'</code>.',hi:[14]});
+  push({sub:'done',i:S.length,xStart,xLen:S.length-xStart,k,out:out.slice(),
+        entryCount:entries.length,
+        msg:'Done. '+S.length+' characters became '+out.length+' codewords.',hi:[15]});
+
+  return {steps,C:out,entries,base,root,A,S};
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3.  LZW decoding   (verbatim from the lecture pseudocode)
+   ──────────────────────────────────────────────────────────────────────────
+        D ← codes for c ∈ Σ_S (array) ;  k ← |Σ_S|
+        q ← C[0] ;  y ← D[q] ;  S ← y
+        for j ← 1..m−1:
+            x ← y ;  q ← C[j]
+            if q = k then  y ← x·x[0]        (bootstrap)
+            else           y ← D[q]
+            S ← S·y ;  D[k] ← x·y[0] ;  k ← k+1
+        return S
+   ══════════════════════════════════════════════════════════════════════════ */
+function lzwDecode(C,A){
+  if(!C.length) throw new Error('the codeword list is empty');
+  const D=new Map();                        // code -> string
+  const entries=[], steps=[], baseSeen=new Map();
+  let k=A.k0;
+  const need=q=>{
+    if(D.has(q)) return D.get(q);
+    const c=A.charOf(q);
+    if(c===null) throw new Error('codeword '+q+' is outside the alphabet and not yet in D');
+    baseSeen.set(q,c); D.set(q,c); return c;
+  };
+  const push=o=>steps.push(Object.assign({mode:'dec',j:-1,q:null,x:'',y:'',S:'',
+      k,entryCount:entries.length,fresh:null,bootstrap:false,
+      base:[...baseSeen.entries()].map(([code,str])=>({code,str})).sort((a,b)=>a.code-b.code)},o));
+
+  push({sub:'init',msg:'Initialise: <i>D</i> holds one entry per character of Σ<sub>S</sub>, and the next '+
+        'unused codeword is <i>k</i> = '+A.k0+'.',hi:[1,2]});
+
+  let q=C[0], y=need(q), Sout=y, qPrev=q;
+  push({sub:'first',j:0,q,y,S:Sout,k,
+        base:[...baseSeen.entries()].map(([code,str])=>({code,str})).sort((a,b)=>a.code-b.code),
+        msg:'First codeword <b>'+q+'</b> decodes to <code>'+dstr(y)+'</code>. Nothing is added to <i>D</i> yet — '+
+            'a new entry needs two consecutive phrases.',hi:[3,4,5]});
+
+  for(let j=1;j<C.length;j++){
+    const x=y;
+    q=C[j];
+    const boot = q===k;
+    push({sub:'read',j,q,x,y:'',S:Sout,k,bootstrap:boot,
+          msg:(boot?'<span class="boot">bootstrap</span>':'')+
+              'Next codeword is <b>'+q+'</b>; the previous phrase is <i>x</i> = <code>'+dstr(x)+'</code>. '+
+              (boot?'But <i>q</i> = <i>k</i> = '+k+' — this codeword is the one we are about to define!'
+                   :'Look it up: <i>D</i>['+q+'].'),
+          hi:[7,8,9]});
+    if(boot){
+      y=x+x[0];
+      push({sub:'boot',j,q,x,y,S:Sout,k,bootstrap:true,
+            msg:'<span class="boot">bootstrap</span>The entry about to be written is <i>D</i>[<i>k</i>] = '+
+                '<i>x</i>·<i>c</i>, and its first character <i>c</i> must be <i>y</i>[0] = <i>x</i>[0]. '+
+                'So <i>y</i> = <i>x</i>·<i>x</i>[0] = <code>'+dstr(y)+'</code>.',hi:[10]});
+    } else {
+      if(!D.has(q)){
+        const c=A.charOf(q);
+        if(c===null) throw new Error('codeword '+q+' is not in D and is not a single character '+
+                                     '(only q = k is allowed to be missing)');
+        need(q);
+      }
+      y=D.get(q);
+      push({sub:'lookup',j,q,x,y,S:Sout,k,
+            msg:'<i>D</i>['+q+'] = <code>'+dstr(y)+'</code>.',hi:[12]});
+    }
+    Sout+=y;
+    D.set(k,x+y[0]);
+    entries.push({code:k,str:x+y[0],xstr:x,xcode:qPrev,c:y[0],bootstrap:boot,
+                  outStart:Sout.length-y.length-x.length,outEnd:Sout.length-y.length});
+    qPrev=q;
+    push({sub:'store',j,q,x,y,S:Sout,k:k+1,entryCount:entries.length,fresh:k,bootstrap:boot,
+          msg:'Append <code>'+dstr(y)+'</code> to <i>S</i>, then store <i>D</i>['+k+'] = <i>x</i>·<i>y</i>[0] = '+
+              '<code>'+dstr(x+y[0])+'</code>.',hi:[13,14,15]});
+    k++;
+  }
+  push({sub:'done',j:C.length,q,x:'',y,S:Sout,k,entryCount:entries.length,
+        msg:'Done. '+C.length+' codewords became '+Sout.length+' characters: <code>'+dstr(Sout)+'</code>.',
+        hi:[17]});
+  return {steps,S:Sout,entries,C,A,
+          base:[...baseSeen.entries()].map(([code,str])=>({code,str})).sort((a,b)=>a.code-b.code)};
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   4.  Pseudocode panels
+   ══════════════════════════════════════════════════════════════════════════ */
+const CODE={
+ enc:{head:'procedure LZWencode(S[0..n))',lines:[
+  'procedure LZWencode(S[0..n)):',
+  '    x ← ε                      // previous phrase, initially empty',
+  '    C ← ε                      // output, initially empty',
+  '    D ← dictionary, initialized with codes for c ∈ Σ_S   // stored as trie',
+  '    k ← |Σ_S|                  // next free codeword',
+  '    for i ← 0,…,n−1 do',
+  '        c ← S[i]',
+  '        if D.containsKey(xc) then',
+  '            x ← xc',
+  '        else',
+  '            C ← C · D.get(x)   // append codeword for x',
+  '            D.put(xc, k)       // add xc to D, assigning next free codeword',
+  '            k ← k+1;  x ← c',
+  '    end for',
+  '    C ← C · D.get(x)',
+  '    return C'
+ ]},
+ dec:{head:'procedure LZWdecode(C[0..m))',lines:[
+  'procedure LZWdecode(C[0..m)):',
+  '    D ← dictionary [0..2^d) → Σ_S⁺, initialized with codes for c ∈ Σ_S   // stored as array',
+  '    k ← |Σ_S|                  // next unused codeword',
+  '    q ← C[0]                   // first codeword',
+  '    y ← D[q]                   // lookup meaning of q in D',
+  '    S ← y                      // output, initially first phrase',
+  '    for j ← 1,…,m−1 do',
+  '        x ← y                  // remember last decoded phrase',
+  '        q ← C[j]               // next codeword',
+  '        if q = k then',
+  '            y ← x · x[0]       // bootstrap case',
+  '        else',
+  '            y ← D[q]',
+  '        S ← S · y              // append decoded phrase',
+  '        D[k] ← x · y[0]        // store new phrase',
+  '        k ← k+1',
+  '    end for',
+  '    return S'
+ ]}
+};
+const codeEls={};
+function buildCodePanel(){
+  const g=document.getElementById('codeGrid'); g.innerHTML='';
+  for(const key of ['enc','dec']){
+    const box=document.createElement('div'); box.className='code-section'; box.id='cs-'+key;
+    const h=document.createElement('div'); h.className='code-head'; h.textContent=CODE[key].head;
+    const pre=document.createElement('pre'); pre.className='code'; codeEls[key]=[];
+    CODE[key].lines.forEach(l=>{
+      const s=document.createElement('span'); s.className='ln'; s.textContent=l;
+      pre.appendChild(s); codeEls[key].push(s);
+    });
+    box.appendChild(h); box.appendChild(pre); g.appendChild(box);
+  }
+}
+function highlightCode(key,lines,boot){
+  for(const k in codeEls){
+    document.getElementById('cs-'+k).classList.remove('active');
+    codeEls[k].forEach(s=>{s.classList.remove('hot');s.classList.remove('boothot');});
+  }
+  if(!key||!lines) return;
+  document.getElementById('cs-'+key).classList.add('active');
+  lines.forEach(i=>{ if(codeEls[key][i]) codeEls[key][i].classList.add(boot&&(i===9||i===10)?'boothot':'hot'); });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   5.  Strip drawing (the tikz picture from the slides, generalised)
+   ══════════════════════════════════════════════════════════════════════════ */
+const CW=27, CH=30, TOPPAD=70, BOTPAD=64;
+/* vertical bands, measured from the top edge Y of the string box:
+       Y−58  back arrow
+       Y−28  brace above (curve), its text at Y−48
+       Y−10  box label, when placed above (the nested c box)
+       Y     string box, height CH
+       Y+CH+18  box labels and the "already encoded" note
+       Y+CH+26  brace below (curve), its text at Y+CH+52          */
+
+function drawStrip(svg,o){
+  svg.innerHTML='';
+  const n=o.chars.length, W=Math.max(240,n*CW+64), H=TOPPAD+CH+BOTPAD;
+  fitSvg(svg,W,H);
+  const X=i=>32+i*CW, Y=TOPPAD;
+  const defs=el('defs',{});
+  ['arrowRed'].forEach(id=>{
+    const m=el('marker',{id,markerWidth:8,markerHeight:8,refX:6,refY:3,orient:'auto'});
+    m.appendChild(el('path',{d:'M0,0 L6,3 L0,6 Z',fill:'var(--xcol)'}));
+    defs.appendChild(m);
+  });
+  svg.appendChild(defs);
+
+  /* shaded prefix; the note only fits when the shaded part is wide enough,
+     otherwise it would run underneath the x box                            */
+  if(o.shade>0){
+    svg.appendChild(el('rect',{x:X(0),y:Y-7,width:o.shade*CW,height:CH+14,rx:3,
+      fill:'var(--shade)',opacity:.45}));
+    if(o.shadeLabel && o.shade*CW>=112)
+      svg.appendChild(txt(X(0)+o.shade*CW/2,Y+CH+18,o.shadeLabel,
+        {'font-size':10,fill:'var(--ink)',opacity:.75}));
+  }
+  /* the string box + characters */
+  svg.appendChild(el('rect',{x:X(0),y:Y,width:n*CW,height:CH,rx:2,
+    fill:'none',stroke:'var(--btn-border)','stroke-width':1.2}));
+  for(let i=1;i<n;i++)
+    svg.appendChild(el('line',{x1:X(i),y1:Y,x2:X(i),y2:Y+CH,stroke:'#d4c5b4','stroke-width':.7}));
+  const nm = o.name===undefined ? 'S' : o.name;
+  if(nm) svg.appendChild(txt(16,Y+CH/2+5,nm,{'font-size':13,fill:'var(--ink-strong)','font-style':'italic'}));
+  const pf = o.pendingFrom===undefined ? n : o.pendingFrom;
+  if(pf<n)
+    svg.appendChild(el('rect',{x:X(pf),y:Y,width:(n-pf)*CW,height:CH,
+      fill:'var(--bg)',opacity:.55}));
+  o.chars.forEach((c,i)=>{
+    svg.appendChild(txt(X(i)+CW/2,Y+CH/2+5,disp(c),
+      {'font-size':13,'font-family':'var(--wi-font-mono)',
+       fill:i>=pf?'var(--dim)':'var(--ink-strong)'}));
+  });
+  /* boxes; `inset` is for a box nested inside another one (c inside y) */
+  (o.boxes||[]).forEach(b=>{
+    if(b.to<=b.from) return;
+    const d=b.inset?1.5:0;
+    svg.appendChild(el('rect',{x:X(b.from)-1+d,y:Y-4+d,width:(b.to-b.from)*CW+2-2*d,
+      height:CH+8-2*d,rx:5,fill:'none',stroke:b.color,'stroke-width':b.thick?2.4:1.6}));
+    if(b.label)
+      svg.appendChild(txt(X(b.from)+(b.to-b.from)*CW/2,
+        b.labelAbove?Y-10:Y+CH+18,b.label,
+        {'font-size':12,fill:b.color,'font-style':'italic','font-weight':600}));
+  });
+  /* braces */
+  (o.braces||[]).forEach(b=>{
+    const y = b.below ? Y+CH+26 : Y-28;
+    svg.appendChild(el('path',{d:bracePath(X(b.from),X(b.to),y,b.below?1:-1,6),
+      fill:'none',stroke:b.color||'var(--ink)','stroke-width':1.3}));
+    svg.appendChild(txt(X(b.from)+(b.to-b.from)*CW/2,y+(b.below?26:-20),b.text,
+      {'font-size':11,fill:b.color||'var(--ink)'}));
+  });
+  /* back arrow from a range to an earlier range */
+  if(o.arrow){
+    const a=o.arrow;
+    const sx=X(a.from)+(a.to-a.from)*CW/2, tx=X(a.tfrom)+(a.tto-a.tfrom)*CW/2;
+    const top=Y-58;
+    svg.appendChild(el('path',{d:'M '+sx+' '+(Y-8)+' L '+sx+' '+top+' L '+tx+' '+top+' L '+tx+' '+(Y-10),
+      fill:'none',stroke:'var(--xcol)','stroke-width':1.6,'stroke-linejoin':'round',
+      'marker-end':'url(#arrowRed)',opacity:.85}));
+    svg.appendChild(el('rect',{x:X(a.tfrom)-1,y:Y-4,width:(a.tto-a.tfrom)*CW+2,height:CH+8,rx:5,
+      fill:'none',stroke:'var(--xcol)','stroke-width':1.4,'stroke-dasharray':'4 3',opacity:.8}));
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   6.  Trie drawing
+   ══════════════════════════════════════════════════════════════════════════ */
+const TLEAF=46, TLEVEL=52;
+function drawTrie(svg,root,visible,hot){
+  const pos={}; let slot=0, maxD=0;
+  const vis=n=>n===root||visible.has(n.code);
+  (function go(n,d){
+    maxD=Math.max(maxD,d);
+    const kids=[...n.children.values()].filter(vis);
+    if(!kids.length){ pos[n.id]={x:slot*TLEAF+TLEAF/2,y:34+d*TLEVEL}; slot++; return; }
+    kids.forEach(c=>go(c,d+1));
+    const xs=kids.map(c=>pos[c.id].x);
+    pos[n.id]={x:(Math.min(...xs)+Math.max(...xs))/2,y:34+d*TLEVEL};
+  })(root,0);
+  const W=Math.max(260,slot*TLEAF+40), H=34+maxD*TLEVEL+34;
+  svg.innerHTML='';
+  fitSvg(svg,W,H);
+  (function go(n){
+    const p=pos[n.id];
+    for(const c of n.children.values()){
+      if(!vis(c)) continue;
+      const q=pos[c.id];
+      const isHot = hot && hot.path && hot.path.has(c.id);
+      svg.appendChild(el('line',{x1:p.x,y1:p.y,x2:q.x,y2:q.y,
+        stroke:isHot?'var(--accent)':'#b9a793','stroke-width':isHot?2.6:1.4}));
+      const mx=(p.x+q.x)/2, my=(p.y+q.y)/2;
+      svg.appendChild(el('rect',{x:mx-8,y:my-9,width:16,height:15,rx:3,fill:'var(--bg)',opacity:.95}));
+      svg.appendChild(txt(mx,my+3,disp(c.ch),
+        {'font-size':12,'font-family':'var(--wi-font-mono)',
+         fill:isHot?'var(--accent)':'var(--ink)','font-weight':isHot?700:400}));
+      go(c);
+    }
+  })(root);
+  (function go(n){
+    const p=pos[n.id];
+    const isRoot=n===root;
+    const isCur = hot && hot.cur===n.id;
+    const isFresh = hot && hot.fresh===n.code;
+    const isMiss = hot && hot.miss===n.id;
+    svg.appendChild(el('circle',{cx:p.x,cy:p.y,r:isRoot?7:15,
+      fill:isRoot?'var(--muted)':isFresh?'#e7f0e4':isCur?'#f7e6e0':'var(--panel)',
+      stroke:isFresh?'var(--new)':isCur?'var(--accent)':'var(--btn-border)',
+      'stroke-width':(isCur||isFresh)?2.6:1.4}));
+    if(!isRoot)
+      svg.appendChild(txt(p.x,p.y+4,String(n.code),
+        {'font-size':11,'font-family':'var(--wi-font-mono)',
+         fill:isFresh?'var(--new)':isCur?'var(--accent)':'var(--ink-strong)',
+         'font-weight':(isCur||isFresh)?700:500}));
+    if(isMiss){
+      svg.appendChild(el('line',{x1:p.x,y1:p.y+18,x2:p.x,y2:p.y+38,
+        stroke:'var(--accent)','stroke-width':1.6,'stroke-dasharray':'3 3'}));
+      svg.appendChild(txt(p.x,p.y+50,'✗ no child '+disp(hot.missCh),
+        {'font-size':11,fill:'var(--accent)','font-weight':600}));
+    }
+    for(const c of n.children.values()) if(vis(c)) go(c);
+  })(root);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7.  Dictionary tables
+   ══════════════════════════════════════════════════════════════════════════ */
+function baseTable(base,hot){
+  if(!base.length) return '<div style="font-size:.8rem;color:var(--dim)">—</div>';
+  let rows='', prev=null;
+  for(const e of base){
+    if(prev!==null && e.code>prev+1) rows+='<tr class="gap"><td colspan="2">…</td></tr>';
+    if(prev===null && e.code>0)      rows+='<tr class="gap"><td colspan="2">…</td></tr>';
+    rows+='<tr class="'+(hot===e.code?'hot':'')+'"><td class="mono">'+e.code+'</td>'+
+          '<td class="mono">'+disp(e.str)+'</td></tr>';
+    prev=e.code;
+  }
+  rows+='<tr class="gap"><td colspan="2">…</td></tr>';
+  return '<table class="tbl"><thead><tr><th>code</th><th>string</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+function newTable(entries,count,opts){
+  opts=opts||{};
+  if(!entries.length) return '<div style="font-size:.8rem;color:var(--dim)">no entries yet</div>';
+  let rows='';
+  entries.forEach((e,i)=>{
+    const cls=[];
+    if(i>=count) cls.push('pending');
+    else if(opts.fresh===e.code) cls.push(e.bootstrap?'boot':'fresh');
+    else if(opts.hot===e.code) cls.push('hot');
+    rows+='<tr class="'+cls.join(' ')+'"><td class="mono">'+e.code+'</td>'+
+          '<td class="mono">'+(i<count?dstr(e.str):'')+'</td>'+
+          '<td class="mono" style="color:var(--muted)">'+
+            (i<count?(e.xcode!==undefined?e.xcode:'“'+dstr(e.xstr)+'”')+', '+disp(e.c):'')+'</td></tr>';
+  });
+  return '<table class="tbl"><thead><tr><th>code</th><th>string</th><th>stored as</th></tr></thead>'+
+         '<tbody>'+rows+'</tbody></table>';
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   8.  Rendering a step
+   ══════════════════════════════════════════════════════════════════════════ */
+let steps=[], cur=0, model=null, mode='enc';
+
+function render(){
+  if(!model) return;
+  const st=steps[cur];
+  document.getElementById('statusText').innerHTML=st.msg;
+  document.getElementById('stepLabel').textContent='step '+(cur+1)+' / '+steps.length;
+  document.getElementById('stepSlider').value=cur;
+  document.getElementById('btnPrev').disabled=document.getElementById('btnFirst').disabled=(cur===0);
+  document.getElementById('btnNext').disabled=document.getElementById('btnLast').disabled=(cur===steps.length-1);
+  if(mode==='sync'){ renderSync(st); return; }
+  if(mode==='enc') renderEnc(st); else renderDec(st);
+}
+
+function renderEnc(st){
+  const M=model.enc, S=M.S;
+  highlightCode('enc',st.hi,false);
+  document.getElementById('stripTitle').textContent='Source text S';
+  document.getElementById('outTitle').textContent='Coded text C';
+  document.getElementById('dictTitle').textContent='Dictionary D — the encoder stores the codeword of x and the character c, not the expanded string';
+
+  /* --- strip --- */
+  const xa=st.xStart, xb=st.xStart+st.xLen;
+  const boxes=[], braces=[];
+  if(st.xLen>0) boxes.push({from:xa,to:xb,color:'var(--xcol)',thick:true,label:'x'});
+  /* after x ← xc there is no separate c any more: it has become the last
+     character of x, so drawing both boxes would put them on top of each other */
+  if(st.c!==null && st.i>=0 && st.i<S.length && st.sub!=='extend')
+    boxes.push({from:st.i,to:st.i+1,color:'var(--ccol)',thick:true,label:'c'});
+  /* On the emit step the two braces of the slide; while the phrase is still
+     growing, instead the arrow back to the occurrence that created D[x].     */
+  if(st.sub==='emit'){
+    if(st.xLen>0) braces.push({from:xa,to:xb,text:'encode x = '+dstr(S.slice(xa,xb)),color:'var(--xcol)'});
+    braces.push({from:xa,to:st.i+1,below:true,color:'var(--new)',
+                 text:'add xc = '+dstr(S.slice(xa,st.i+1))+' to D'});
+  }
+  let arrow=null;
+  if(st.xLen>1 && (st.sub==='test'||st.sub==='extend')){
+    const e=M.entries.slice(0,st.entryCount).find(en=>en.str===S.slice(xa,xb)&&en.srcEnd<xa);
+    if(e) arrow={from:xa,to:xb,tfrom:e.srcStart,tto:e.srcEnd+1};
+  }
+  drawStrip(document.getElementById('strip'),
+    {chars:[...S],name:'S',shade:xa,shadeLabel:xa>0?'already encoded':null,boxes,braces,arrow});
+  document.getElementById('stripLegend').innerHTML=
+    '<div class="item"><span class="sw" style="border-color:var(--xcol)"></span>current phrase x</div>'+
+    '<div class="item"><span class="sw" style="border-color:var(--ccol)"></span>next character c</div>'+
+    '<div class="item"><span class="sw" style="border-color:var(--xcol);border-style:dashed"></span>earlier occurrence that put x into D</div>';
+
+  /* --- output --- */
+  const ov=document.getElementById('outView'); ov.innerHTML='';
+  st.out.forEach((q,idx)=>{
+    const d=document.createElement('span');
+    d.className='code'+(idx===st.out.length-1&&(st.sub==='emit'||st.sub==='final')?' cur':' done');
+    d.innerHTML=q;
+    ov.appendChild(d);
+  });
+  if(!st.out.length) ov.innerHTML='<span style="font-size:.8rem;color:var(--dim)">C = ε</span>';
+
+  /* --- dictionary --- */
+  document.getElementById('dictBase').innerHTML=baseTable(M.base,
+      (st.sub==='emit'&&st.emit<M.A.k0)?st.emit:(st.sub==='final'&&st.emit<M.A.k0?st.emit:null));
+  document.getElementById('dictNew').innerHTML=newTable(M.entries,st.entryCount,
+      {fresh:st.fresh,hot:(st.emit!==null&&st.emit>=M.A.k0)?st.emit:null});
+
+  /* --- trie --- */
+  const tb=document.getElementById('trieBox');
+  tb.style.display=document.getElementById('trieToggle').checked?'':'none';
+  if(document.getElementById('trieToggle').checked){
+    const visible=new Set();
+    M.base.forEach(e=>visible.add(e.code));
+    M.entries.slice(0,st.entryCount).forEach(e=>visible.add(e.code));
+    const hot={};
+    if(st.lookup){
+      const path=new Set();
+      let n=st.lookup.node;
+      hot.cur=n.id;
+      if(st.lookup.hit){ const ch=n.children.get(st.lookup.ch); if(ch) path.add(ch.id); }
+      else { hot.miss=n.id; hot.missCh=st.lookup.ch; }
+      hot.path=path;
+    }
+    if(st.fresh!==null) hot.fresh=st.fresh;
+    drawTrie(document.getElementById('trie'),M.root,visible,hot);
+  }
+  document.getElementById('bootBox').style.display='none';
+}
+
+function renderDec(st){
+  const M=model.dec;
+  highlightCode('dec',st.hi,st.bootstrap);
+  document.getElementById('stripTitle').textContent='Decoded text S — built phrase by phrase';
+  document.getElementById('outTitle').textContent='Coded text C — the input';
+  document.getElementById('dictTitle').textContent='Dictionary D — stored as an array, code ↦ string';
+
+  /* --- strip: S so far, with x, y and c marked --- */
+  /* On a lookup/bootstrap step y is known but not yet appended to S, so it is
+     drawn as a preview beyond the end of the output.                        */
+  const preview = (st.sub==='lookup'||st.sub==='boot');
+  const chars=[...(st.S + (preview?st.y:''))];
+  const done  = st.sub==='done';
+  const yLen  = done ? 0 : ((st.sub==='store'||st.sub==='first'||preview) ? (st.y||'').length : 0);
+  const xLen  = done ? 0 : (st.x||'').length;
+  const yb = chars.length, ya = yb-yLen, xa = ya-xLen, xb = ya;
+  const hasY = yLen>0;
+  const boxes=[], braces=[];
+  if(xLen>0 && xa>=0) boxes.push({from:xa,to:xb,color:'var(--xdark)',thick:true,label:'x'});
+  if(hasY && ya>=0){
+    boxes.push({from:ya,to:yb,color:'var(--xcol)',thick:true,label:'y'});
+    boxes.push({from:ya,to:ya+1,color:'var(--ccol)',thick:true,label:'c',labelAbove:true,inset:true});
+    braces.push({from:ya,to:yb,text:'decode y = '+dstr(st.y),color:'var(--xcol)'});
+    if(st.sub==='store'&&xLen>0)
+      braces.push({from:xa,to:ya+1,below:true,color:st.bootstrap?'var(--accent)':'var(--new)',
+                   text:'D['+(st.k-1)+'] ← x·y[0] = '+dstr(st.x+st.y[0])});
+  }
+  drawStrip(document.getElementById('strip'),
+    {chars,name:'S',shade:Math.max(0,xa),shadeLabel:xa>0?'already decoded':null,boxes,braces,
+     pendingFrom:preview?st.S.length:undefined});
+  document.getElementById('stripLegend').innerHTML=
+    '<div class="item"><span class="sw" style="border-color:var(--xdark)"></span>previous phrase x</div>'+
+    '<div class="item"><span class="sw" style="border-color:var(--xcol)"></span>current phrase y</div>'+
+    '<div class="item"><span class="sw" style="border-color:var(--ccol)"></span>c = y[0]</div>';
+
+  /* --- input codewords --- */
+  const ov=document.getElementById('outView'); ov.innerHTML='';
+  M.C.forEach((q,idx)=>{
+    const isCur = idx===st.j;
+    const d=document.createElement('span');
+    d.className='code'+(isCur?(st.bootstrap?' boot':' cur'):(idx<st.j?' done':''));
+    if(idx>st.j) d.style.opacity=.35;
+    d.innerHTML=q;
+    ov.appendChild(d);
+  });
+
+  /* --- dictionary --- */
+  document.getElementById('dictBase').innerHTML=baseTable(st.base||M.base,
+    (st.q!==null&&st.q<M.A.k0&&(st.sub==='lookup'||st.sub==='first'))?st.q:null);
+  document.getElementById('dictNew').innerHTML=newTable(M.entries,st.entryCount,
+    {fresh:st.fresh,hot:(st.q!==null&&st.q>=M.A.k0&&st.sub==='lookup')?st.q:null});
+
+  /* --- bootstrap explainer --- */
+  document.getElementById('trieBox').style.display='none';
+  const bb=document.getElementById('bootBox');
+  bb.style.display='';
+  renderBoot(st);
+}
+
+/* the diagram from the "LZW decoding — Bootstrapping" slide */
+function renderBoot(st){
+  const armed=!!st.bootstrap;
+  document.getElementById('bootInner').classList.toggle('armed',armed);
+  const M=model.dec;
+  /* pick the situation to draw: the live one if armed, otherwise the first one
+     that occurs in this input, otherwise a neutral illustration              */
+  let x=st.x, y=st.y, k=st.k;
+  if(!armed){
+    const b=M.entries.find(e=>e.bootstrap);
+    if(b){ x=b.xstr; y=b.str; k=b.code; }
+    else { x=null; }
+  }
+  const svg=document.getElementById('bootSvg');
+  if(x===null||!x.length){
+    svg.innerHTML=''; svg.setAttribute('viewBox','0 0 10 10'); svg.style.height='0';
+    document.getElementById('bootText').innerHTML=
+      '<span style="color:var(--dim)">This input never uses a codeword that is still being built, so the '+
+      'bootstrap branch <code>if q = k</code> is never taken. Load the preset '+
+      '<i>CAN␣BANANAS</i> to see it fire.</span>';
+    return;
+  }
+  const yy = y && y.length ? y : x+x[0];
+  const chars=[...(x+yy)];
+  const boxes=[
+    {from:0,to:x.length,color:'var(--xcol)',thick:true,label:'x'},
+    {from:x.length,to:x.length+yy.length,color:'var(--xcol)',thick:true,label:'y'},
+    {from:x.length,to:x.length+1,color:'var(--ccol)',thick:true,label:'c',labelAbove:true,inset:true}
+  ];
+  const braces=[
+    {from:0,to:x.length,text:'last step',color:'var(--ink)'},
+    {from:x.length,to:x.length+yy.length,text:'y = D['+k+']',color:'var(--xcol)'},
+    {from:0,to:x.length+1,below:true,color:'var(--new)',text:'D['+k+'] ← x·c'}
+  ];
+  drawStrip(svg,{chars,name:'',shade:0,boxes,braces});
+  document.getElementById('bootText').innerHTML=
+    '<b>1.</b> en/decode <span class="xx">x</span> = <span class="xx">'+dstr(x)+'</span>.<br>'+
+    '<b>2.</b> store <i>D</i>['+k+'] ← <span class="xx">x</span><span class="cc">c</span>, where '+
+      '<span class="cc">c</span> is the character that follows <span class="xx">x</span>.<br>'+
+    '<b>3.</b> the next phrase <i>y</i> is <i>D</i>['+k+'] itself, so <i>y</i> starts with '+
+      '<span class="xx">x</span> — hence <span class="cc">c</span> = <i>y</i>[0] = <i>x</i>[0] = '+
+      '<span class="cc">'+disp(x[0])+'</span>, and '+
+      '<i>D</i>['+k+'] = <span class="xx">x</span>·<i>x</i>[0] = <code>'+dstr(yy)+'</code>. Everything is known.';
+}
+
+/* ── side by side ─────────────────────────────────────────────────────────
+   After codeword j has been written / read, the encoder has created j+1 new
+   entries and the decoder only j: the decoder is exactly one entry behind.  */
+function renderSync(st){
+  highlightCode(null,null,false);
+  const E=model.enc, Dm=model.dec, j=st.j;
+  const C=E.C;
+  const cv=document.getElementById('syncCodes'); cv.innerHTML='';
+  C.forEach((q,idx)=>{
+    const d=document.createElement('span');
+    const boot = Dm.entries[idx-1] && Dm.entries[idx-1].bootstrap && idx===st.j;
+    d.className='code'+(idx===j?(boot?' boot':' cur'):(idx<j?' done':''));
+    if(idx>j) d.style.opacity=.35;
+    d.innerHTML=q;
+    cv.appendChild(d);
+  });
+  const encCount=Math.min(E.entries.length,j+1);
+  const decCount=Math.min(Dm.entries.length,j);
+  document.getElementById('syncEncD').innerHTML=newTable(E.entries,encCount,{fresh:st.encFresh});
+  document.getElementById('syncDecD').innerHTML=newTable(Dm.entries,decCount,{fresh:st.decFresh});
+  document.getElementById('syncEncS').textContent=dstr(st.encS);
+  document.getElementById('syncDecS').textContent=dstr(st.decS);
+  const gap=E.entries[decCount];
+  let note;
+  if(encCount>decCount && gap){
+    note='The encoder has already created <b>'+gap.code+' = '+dstr(gap.str)+'</b>; the decoder has not. '+
+         'That single missing entry is the whole lag.';
+    if(C[j+1]!==undefined && C[j+1]===gap.code)
+      note+=' <b>And the very next codeword is '+gap.code+'</b> — the bootstrap case is about to fire.';
+  } else {
+    note='Encoder and decoder hold the same dictionary.';
+  }
+  document.getElementById('syncLag').innerHTML=note;
+  document.getElementById('statusText').innerHTML=st.msg;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   9.  Driver
+   ══════════════════════════════════════════════════════════════════════════ */
+function goto(i){ cur=Math.max(0,Math.min(steps.length-1,i)); render(); }
+function stepBy(d){ stopPlay(); goto(cur+d); }
+let playTimer=null, speedFactor=1;
+function togglePlay(){ playTimer?stopPlay():startPlay(); }
+function startPlay(){
+  if(cur>=steps.length-1) cur=0;
+  document.getElementById('btnPlay').textContent='⏸ Pause';
+  const tick=()=>{ if(cur>=steps.length-1){stopPlay();return;} goto(cur+1); playTimer=setTimeout(tick,700/speedFactor); };
+  playTimer=setTimeout(tick,10);
+}
+function stopPlay(){ if(playTimer){clearTimeout(playTimer);playTimer=null;} document.getElementById('btnPlay').textContent='▶ Play'; }
+function setSpeed(v){ speedFactor=Math.pow(1.35,v-6);
+  document.getElementById('speedLabel').textContent=(Math.round(speedFactor*10)/10)+'×'; }
+function jumpBootstrap(){
+  stopPlay();
+  for(let i=0;i<steps.length;i++) if(steps[i].bootstrap){ goto(i); return; }
+  document.getElementById('statusText').innerHTML=
+    'This input never takes the bootstrap branch — try the preset <i>CAN␣BANANAS</i>.';
+}
+
+function setMode(m){
+  const was=mode;
+  const text=currentText(was);
+  mode=m;
+  ['enc','dec','sync'].forEach(x=>document.getElementById('mode-'+x).classList.toggle('on',x===m));
+  document.getElementById('stageMain').style.display = m==='sync'?'none':'';
+  document.getElementById('stageSync').style.display = m==='sync'?'':'none';
+  document.getElementById('inLabel').textContent = m==='dec' ? 'Codewords C' : 'Source text S';
+  document.getElementById('btnBoot').style.display = m==='enc'?'none':'';
+  if(text===null){ loadPreset(firstPreset()); return; }
+  putText(text,null);
+}
+function onAlphaChange(){
+  const k=document.getElementById('alphaSel').value;
+  document.getElementById('alphaCustom').style.display = k==='custom'?'':'none';
+  const autoOpt=document.querySelector('#alphaSel option[value=auto]');
+  autoOpt.disabled = (mode==='dec');
+  if(mode==='dec'&&k==='auto') document.getElementById('alphaSel').value='ascii';
+}
+
+const PRESETS={
+  'YO!␣YOU!␣YOUR␣YOYO!  (encoding slide)':{v:'YO! YOU! YOUR YOYO!',alpha:'ascii'},
+  'CAN␣BANANAS  (decoding slide — the bootstrap case)':{v:'CAN BANANAS',alpha:'ascii'},
+  'hannahbansbananas':{v:'hannahbansbananas',alpha:'ascii'},
+  'aaaaaaaaaaaaaaaaaaaaa  (Θ(√n) phrases)':{v:'aaaaaaaaaaaaaaaaaaaaa',alpha:'auto'},
+  'ABABABABABABAB  (bootstrap fires early)':{v:'ABABABABABABAB',alpha:'auto'},
+  'to be or not to be that is the question':{v:'to be or not to be that is the question',alpha:'ascii'}
+};
+function initPresets(){
+  const s=document.getElementById('presetSel');
+  for(const k in PRESETS){ const o=document.createElement('option'); o.value=k; o.textContent=k; s.appendChild(o); }
+}
+function firstPreset(){ return Object.keys(PRESETS)[0]; }
+
+/* ── input-format conversion ───────────────────────────────────────────────
+   A preset is just an example *text*.  The decoding view needs codewords, so
+   the text is encoded first with whatever alphabet is currently selected.
+   Nothing here should ever leave the input box in a state that cannot be
+   parsed, so every conversion has a fallback.                              */
+function alphaSettings(){
+  return {kind:document.getElementById('alphaSel').value,
+          custom:document.getElementById('alphaCustom').value};
+}
+function setAlphaUI(kind,custom){
+  document.getElementById('alphaSel').value=kind;
+  if(custom!==undefined) document.getElementById('alphaCustom').value=custom;
+}
+function alphaWorksFor(text){
+  const {kind,custom}=alphaSettings();
+  try{ lzwEncode(text,alphabetFor(kind,text,custom)); return true; }catch(e){ return false; }
+}
+/* Decoding has no text from which to derive Σ_S, so an "auto" alphabet is
+   pinned down to the concrete character list of the example.                */
+function ensureUsableAlpha(text,presetAlpha){
+  const {kind}=alphaSettings();
+  const sorted=[...new Set(text)].sort().join('');
+  if(mode==='dec'&&kind==='auto'){ setAlphaUI('custom',sorted); return; }
+  if(alphaWorksFor(text)) return;
+  if(presetAlpha==='auto') setAlphaUI('custom',sorted);
+  else setAlphaUI(presetAlpha||'ascii');
+  if(!alphaWorksFor(text)) setAlphaUI('ascii');
+}
+/* Write `text` into the input box in the form the current view expects. */
+function putText(text,presetAlpha){
+  ensureUsableAlpha(text,presetAlpha);
+  onAlphaChange();
+  const box=document.getElementById('mainInput');
+  if(mode==='dec'){
+    const {kind,custom}=alphaSettings();
+    box.value=lzwEncode(text,alphabetFor(kind,text,custom)).C.join(' ');
+  } else {
+    box.value=text;
+  }
+  loadFromInput();
+}
+/* Read the input box back as a source text, whichever view we are in. */
+function currentText(fromMode){
+  const raw=document.getElementById('mainInput').value;
+  if(fromMode!=='dec') return raw.length?raw:null;
+  try{
+    const C=raw.trim().split(/\s+/).filter(t=>t.length).map(t=>parseInt(t,10));
+    const {kind,custom}=alphaSettings();
+    return lzwDecode(C,alphabetFor(kind,null,custom)).S;
+  }catch(e){ return null; }
+}
+function loadPreset(k){
+  const p=PRESETS[k]; if(!p) return;
+  document.getElementById('presetSel').value=k;
+  putText(p.v,p.alpha);
+}
+
+function loadFromInput(){
+  const err=document.getElementById('inputErr'); err.textContent='';
+  stopPlay();
+  try{
+    const raw=document.getElementById('mainInput').value;
+    const akind=document.getElementById('alphaSel').value;
+    const custom=document.getElementById('alphaCustom').value;
+    if(mode==='dec'){
+      const C=raw.trim().split(/\s+/).filter(t=>t.length).map(t=>{
+        if(!/^\d+$/.test(t)) throw new Error('"'+t+'" is not a codeword; give whitespace-separated integers');
+        return parseInt(t,10);
+      });
+      if(!C.length) throw new Error('no codewords given');
+      const A=alphabetFor(akind,null,custom);
+      const dec=lzwDecode(C,A);
+      model={dec,A}; steps=dec.steps;
+    } else {
+      const S=raw;
+      if(!S.length) throw new Error('the source text is empty');
+      const A=alphabetFor(akind,S,custom);
+      const enc=lzwEncode(S,A);
+      if(mode==='enc'){ model={enc,A}; steps=enc.steps; }
+      else {
+        const dec=lzwDecode(enc.C,A);
+        if(dec.S!==S) throw new Error('internal error: the round trip did not reproduce S');
+        model={enc,dec,A};
+        steps=enc.C.map((q,j)=>{
+          const encS=S.slice(0,encConsumedAfter(enc,j));
+          const decS=decProducedAfter(dec,j);
+          const boot=dec.entries[j-1]&&dec.entries[j-1].bootstrap;
+          return {mode:'sync',j,bootstrap:!!boot,
+            encS,decS,
+            encFresh:enc.entries[j]?enc.entries[j].code:null,
+            decFresh:j>0&&dec.entries[j-1]?dec.entries[j-1].code:null,
+            msg:'Codeword <b>'+q+'</b> (number '+(j+1)+' of '+enc.C.length+'). '+
+                (boot?'<span class="boot">bootstrap</span>The decoder had to reconstruct this phrase '+
+                      'from x·x[0], because the encoder created the entry in the very same step.'
+                     :'The decoder reproduces the encoder\'s dictionary, one entry behind.')};
+        });
+      }
+    }
+    document.getElementById('alphaInfo').textContent=
+      'Σ_S = '+model.A.name+', first free codeword k = '+model.A.k0;
+    document.getElementById('stepSlider').max=steps.length-1;
+    cur=0; render();
+  }catch(e){
+    err.textContent=e.message;
+  }
+}
+/* how much of S the encoder has consumed once codeword j has been written */
+function encConsumedAfter(enc,j){
+  let seen=-1;
+  for(const st of enc.steps){
+    if((st.sub==='emit'||st.sub==='final')){
+      seen++;
+      if(seen===j) return st.sub==='final'?enc.S.length:st.i;
+    }
+  }
+  return enc.S.length;
+}
+function decProducedAfter(dec,j){
+  let last='';
+  for(const st of dec.steps){
+    if(st.sub==='first'&&j===0) return st.S;
+    if(st.sub==='store'&&st.j===j) return st.S;
+    if(st.S) last=st.S;
+  }
+  return last;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   10.  Self-tests
+   ══════════════════════════════════════════════════════════════════════════ */
+function runTests(){
+  const out=[]; let pass=0,fail=0;
+  const ok=(n,c,d)=>{ if(c){pass++;out.push('<span class="t-pass">PASS</span>  '+n);}
+                      else{fail++;out.push('<span class="t-fail">FAIL</span>  '+n+(d?'\n         '+d:''));} };
+  const head=t=>out.push('<span class="t-head">'+t+'</span>');
+  const ascii=alphabetFor('ascii',null,null);
+
+  head('1 — Encoding example from the slides');
+  {
+    const S='YO! YOU! YOUR YOYO!';
+    const e=lzwEncode(S,ascii);
+    const want=[89,79,33,32,128,85,130,132,82,131,79,128,33];
+    ok('C = 89 79 33 32 128 85 130 132 82 131 79 128 33',
+       e.C.join(' ')===want.join(' '), 'got '+e.C.join(' '));
+    const wantD=['YO','O!','! ',' Y','YOU','U!','! Y','YOUR','R ',' YO','OY','YO!'];
+    ok('D gains YO, O!, !␣, ␣Y, YOU, U!, !␣Y, YOUR, R␣, ␣YO, OY, YO!',
+       e.entries.map(x=>x.str).join('|')===wantD.join('|'),
+       e.entries.map(x=>dstr(x.str)).join('|'));
+    ok('codes run 128…139', e.entries.map(x=>x.code).join(',')===
+       [128,129,130,131,132,133,134,135,136,137,138,139].join(','));
+    ok('13 codewords for 19 characters', e.C.length===13&&S.length===19);
+  }
+
+  head('2 — Decoding example from the slides');
+  {
+    const C=[67,65,78,32,66,129,133,83];
+    const d=lzwDecode(C,ascii);
+    ok('decodes to CAN␣BANANAS', d.S==='CAN BANANAS', 'got '+dstr(d.S));
+    const wantD=['CA','AN','N ',' B','BA','ANA','ANAS'];
+    ok('D gains CA, AN, N␣, ␣B, BA, ANA, ANAS',
+       d.entries.map(x=>x.str).join('|')===wantD.join('|'), d.entries.map(x=>dstr(x.str)).join('|'));
+    ok('codes run 128…134', d.entries.map(x=>x.code).join(',')===[128,129,130,131,132,133,134].join(','));
+    const boot=d.entries.filter(x=>x.bootstrap);
+    ok('exactly one bootstrap, at code 133', boot.length===1&&boot[0].code===133,
+       JSON.stringify(boot.map(b=>b.code)));
+    ok('bootstrap phrase is ANA', boot[0].str==='ANA', boot[0].str);
+    ok('encoding CAN␣BANANAS reproduces exactly this C',
+       lzwEncode('CAN BANANAS',ascii).C.join(' ')===C.join(' '),
+       lzwEncode('CAN BANANAS',ascii).C.join(' '));
+  }
+
+  head('3 — Round trip on 400 random inputs');
+  {
+    let rt=true,lag=true,bootOK=true,bad='';
+    let bootSeen=0;
+    for(let t=0;t<400;t++){
+      const sig=1+Math.floor(Math.random()*4);
+      const alpha='ABCD'.slice(0,sig);
+      let S='';
+      const n=1+Math.floor(Math.random()*40);
+      for(let i=0;i<n;i++) S+=alpha[Math.floor(Math.random()*sig)];
+      const A=alphabetFor('auto',S,null);
+      const e=lzwEncode(S,A);
+      let d;
+      try{ d=lzwDecode(e.C,A); }catch(ex){ rt=false; bad=S+' -> '+ex.message; break; }
+      if(d.S!==S){ rt=false; bad='S='+S+' decoded='+d.S; break; }
+      /* the decoder is exactly one dictionary entry behind */
+      if(d.entries.length!==Math.max(0,e.C.length-1)){ lag=false; bad='entries '+d.entries.length+' vs '+(e.C.length-1); }
+      for(let i=0;i<d.entries.length;i++)
+        if(d.entries[i].str!==e.entries[i].str){ lag=false; bad='entry '+i+': '+d.entries[i].str+' vs '+e.entries[i].str; }
+      bootSeen+=d.entries.filter(x=>x.bootstrap).length;
+    }
+    ok('decode(encode(S)) = S',rt,bad);
+    ok('decoder rebuilds the same dictionary, one entry behind',lag,bad);
+    ok('the bootstrap branch was exercised ('+bootSeen+' times)',bootSeen>0);
+  }
+
+  head('4 — Bootstrap characterisation');
+  {
+    /* q = k can only happen when the phrase repeats immediately: y = x·x[0] */
+    let charOK=true,bad='';
+    for(let t=0;t<200;t++){
+      let S=''; const n=2+Math.floor(Math.random()*30);
+      for(let i=0;i<n;i++) S+='AB'[Math.floor(Math.random()*2)];
+      const A=alphabetFor('auto',S,null);
+      const d=lzwDecode(lzwEncode(S,A).C,A);
+      for(const e of d.entries)
+        if(e.bootstrap && e.str!==e.xstr+e.xstr[0]){ charOK=false; bad=e.str+' vs '+e.xstr; }
+    }
+    ok('every bootstrap entry equals x·x[0]',charOK,bad);
+    /* ABABAB… fires the bootstrap at the third codeword */
+    const A=alphabetFor('auto','ABABABAB',null);
+    const e=lzwEncode('ABABABAB',A);
+    const d=lzwDecode(e.C,A);
+    ok('ABABABAB: bootstrap occurs', d.entries.some(x=>x.bootstrap));
+    ok('ABABABAB round-trips', d.S==='ABABABAB', d.S);
+    /* a^n: number of phrases grows like sqrt(n) */
+    const p=[];
+    for(const n of [10,100,1000]){
+      const S='a'.repeat(n), AA=alphabetFor('auto',S,null);
+      p.push(lzwEncode(S,AA).C.length);
+    }
+    ok('a^n uses Θ(√n) codewords: '+p.join(', ')+' for n = 10, 100, 1000',
+       p[0]<=5&&p[1]<=15&&p[2]<=46, p.join(','));
+  }
+
+  head('5 — Alphabets and errors');
+  {
+    const A=alphabetFor('auto','CAN BANANAS',null);
+    ok('auto alphabet has σ = 6 and k0 = 6', A.size===6&&A.k0===6, 'σ='+A.size);
+    ok('auto alphabet round-trips', lzwDecode(lzwEncode('CAN BANANAS',A).C,A).S==='CAN BANANAS');
+    let threw=false;
+    try{ lzwEncode('Ünicode',alphabetFor('custom',null,'abc')); }catch(e){ threw=true; }
+    ok('a character outside Σ_S is rejected',threw);
+    threw=false;
+    try{ lzwDecode([200],ascii); }catch(e){ threw=true; }
+    ok('an out-of-range codeword is rejected',threw);
+    threw=false;
+    try{ lzwDecode([65,200],ascii); }catch(e){ threw=true; }
+    ok('a codeword beyond k (not the bootstrap case) is rejected',threw);
+    ok('single character input works', lzwEncode('A',ascii).C.join('')==='65');
+    ok('single codeword input works', lzwDecode([65],ascii).S==='A');
+  }
+
+  head('6 — Step sequences');
+  {
+    const e=lzwEncode('CAN BANANAS',ascii);
+    ok('every encoding step has a message and a code line',
+       e.steps.every(s=>s.msg&&s.hi&&s.hi.length));
+    ok('emit steps match the codewords written',
+       e.steps.filter(s=>s.sub==='emit'||s.sub==='final').length===e.C.length);
+    ok('k only ever increases',
+       e.steps.every((s,i)=>i===0||s.k>=e.steps[i-1].k));
+    const d=lzwDecode(e.C,ascii);
+    ok('every decoding step has a message and a code line',
+       d.steps.every(s=>s.msg&&s.hi&&s.hi.length));
+    ok('one store step per codeword after the first',
+       d.steps.filter(s=>s.sub==='store').length===e.C.length-1);
+    ok('bootstrap steps are flagged in both the read and the boot step',
+       d.steps.filter(s=>s.sub==='boot').every(s=>s.bootstrap));
+    ok('the final decoding step carries the full S',
+       d.steps[d.steps.length-1].S==='CAN BANANAS');
+  }
+
+  out.push('');
+  out.push('<span class="'+(fail===0?'t-pass':'t-fail')+'">'+pass+' passed, '+fail+' failed</span>');
+  document.getElementById('test-out').innerHTML=out.join('\n');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   11.  Boot
+   ══════════════════════════════════════════════════════════════════════════ */
+initPresets();
+buildCodePanel();
+setSpeed(6);
+document.getElementById('mode-enc').classList.add('on');
+document.getElementById('mainInput').value='YO! YOU! YOUR YOYO!';
+onAlphaChange();
+loadFromInput();
+window.addEventListener('resize',()=>{ if(model) render(); });
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if(e.key==='ArrowRight'){e.preventDefault();stepBy(1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stepBy(-1);}
+  else if(e.key===' '){e.preventDefault();togglePlay();}
+});
+</script>
+</body>
+</html>

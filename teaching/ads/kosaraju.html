@@ -10,37 +10,66 @@
 <title>Strong Components — Kosaraju–Sharir</title>
 <style>
     :root {
-        --bg: #f1eed9; --panel: #f8f6ec; --panel-border: #cdc9bb;
-        --controls-bg: #e7e3ca; --controls-border: #cdc9bb;
+        --bg: #f5ebd9; --panel: #faf6ed; --panel-border: #d4c5b4;
+        --controls-bg: #ecddc5; --controls-border: #d4c5b4;
         --ink: #6b675c; --ink-strong: #46433a; --title-muted: #8b8779; --title-red: #902015;
-        --btn: #f8f6ec; --btn-border: #aeaa9e; --btn-border-hover: #8d897c;
+        --btn: #faf6ed; --btn-border: #b9a793; --btn-border-hover: #9c866d;
         --unseen: #b6b1a1; --unseen-bd: #8d897c; --unseen-tx: #38362e;
         --active: #cc2f22; --active-bd: #6d180f;
         --done: #5c9150; --done-bd: #4a7c3f;
-        --edge-unseen: #cdc9bb; --tree: #38362e; --examine: #d29e50;
+        --edge-unseen: #d4c5b4; --tree: #38362e; --examine: #d29e50;
     }
     * { box-sizing: border-box; }
     body { background-color: var(--bg); color: var(--ink); font-family: var(--wi-font-body)"Segoe UI", Roboto, sans-serif; margin: 0; padding: 22px 26px 40px; min-height: 100vh; }
     h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--title-red); }
     .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; max-width: 72ch; line-height: 1.5; }
-    .subtitle code { background: #e7e3ca; padding: 1px 6px; border-radius: 3px; }
+    .subtitle code { background: #ecddc5; padding: 1px 6px; border-radius: 3px; }
 
     .controls { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; background-color: var(--controls-bg); padding: 14px 22px; border-radius: 6px; border: 1px solid var(--controls-border); margin-bottom: 22px; }
     .ctl-group { display: flex; align-items: center; gap: 9px; }
     .ctl-group label { font-size: 0.82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
     .btn-group { display: flex; gap: 8px; }
     button, select { background-color: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border); padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer; transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit; }
-    button:hover:not(:disabled), select:hover { background-color: #fbfaf4; border-color: var(--btn-border-hover); }
+    button:hover:not(:disabled), select:hover { background-color: #fcf9f3; border-color: var(--btn-border-hover); }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
-    button.primary { background-color: #f0d9cd; border-color: #c08777; }
-    button.primary:hover:not(:disabled) { background-color: #fbfaf4; }
+    button.primary { background-color: #f0d9cd; border-color: #c28577; }
+    button.primary:hover:not(:disabled) { background-color: #fcf9f3; }
     select { cursor: pointer; padding-right: 10px; }
     input[type="range"] { accent-color: #cc2f22; cursor: pointer; vertical-align: middle; }
+    /* ---- transport: scrubber + phase strip (full-width row inside the controls bar) ---- */
+    .controls .transport { flex: 1 1 100%; display: grid; grid-template-columns: minmax(0,1fr) auto; column-gap: 12px; row-gap: 5px; align-items: center; --thumb: 8px; margin-top: 2px; }
+    .transport input[type="range"] { width: 100%; margin: 0; display: block; }
+    .transport .stepno { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: #46433a; min-width: 72px; text-align: right; white-space: nowrap; }
+    /* the thumb's centre stops half a thumb short of each end of the track: inset the strip the same amount */
+    .transport .phasebar { grid-column: 1; display: flex; margin: 0 var(--thumb); min-height: 20px; }
+    .phasebar .phasebtn { position: relative; overflow: hidden; min-width: 0; padding: 2px 5px; font-size: 0.68rem; line-height: 1.35; font-family: var(--wi-font-head, inherit); font-weight: 500; letter-spacing: .03em; background: var(--panel, #faf6ed); border: 1px solid var(--panel-border, #d4c5b4); border-left-width: 0; border-radius: 0; color: var(--title-muted, #7a6d5b); cursor: pointer; text-overflow: ellipsis; white-space: nowrap; }
+    .phasebar .phasebtn:first-child { border-left-width: 1px; border-radius: 4px 0 0 4px; }
+    .phasebar .phasebtn:last-child { border-radius: 0 4px 4px 0; }
+    .phasebar .phasebtn:hover { background: #f3e7d2; }
+    .phasebar .phasebtn .fill { position: absolute; left: 0; top: 0; bottom: 0; background: #eedcd3; border-right: 1px solid #c9a79d; transition: width .08s linear; }
+    .phasebar .phasebtn .fill.empty { border-right: 0; }
+    .phasebar .phasebtn .lab { position: relative; }
+    .phasebar .phasebtn.on { color: var(--ink-strong, #46433a); font-weight: 700; }
     .slider-group { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #46433a; }
     .slider-group span { min-width: 42px; }
 
-    .stage { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(330px,1fr); gap: 20px; align-items: start; }
-    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+    /* ---- stage: graph | splitter | side panels (splitter column is draggable) ---- */
+    .stage { display: grid; grid-template-columns: minmax(0, var(--main-w, 1.55fr)) 20px minmax(330px, 1fr); gap: 0; align-items: start; }
+    .stage > .splitter { align-self: stretch; position: relative; cursor: col-resize; user-select: none; touch-action: none; }
+    .stage > .splitter::before { content: ""; position: absolute; left: 8px; right: 8px; top: 0; bottom: 0; border-radius: 2px; background: transparent; transition: background 0.15s; }
+    .stage > .splitter::after { content: ""; position: absolute; left: 50%; top: min(50%, 240px); width: 5px; height: 42px; margin-left: -2.5px; border-radius: 3px; background: var(--panel-border, #d4c5b4); transition: background 0.15s; }
+    .stage > .splitter:hover::before, .stage > .splitter.dragging::before { background: rgba(0,0,0,0.04); }
+    .stage > .splitter:hover::after, .stage > .splitter.dragging::after { background: var(--wi-heading, #902015); }
+    body.splitting, body.splitting * { cursor: col-resize !important; user-select: none !important; }
+    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; gap: 20px; } .stage > .splitter { display: none; } }
+    /* ---- zoomable graph canvas ---- */
+    canvas#graph { touch-action: none; cursor: grab; }
+    canvas#graph.panning { cursor: grabbing; }
+    .sim-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .sim-head .sim-title { flex: 1; }
+    .zoom-ctl { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+    .zoom-ctl button { padding: 0; width: 26px; height: 26px; line-height: 24px; font-size: 1rem; border-radius: 4px; }
+    .zoom-ctl .zoom-pct { min-width: 44px; text-align: center; font-size: 0.78rem; color: var(--title-muted, #7a6d5b); font-variant-numeric: tabular-nums; }
     .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
     .sim-box + .sim-box { margin-top: 18px; }
     .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
@@ -49,17 +78,17 @@
 
     /* phase stepper */
     .phases { display: flex; gap: 10px; }
-    .phase-pill { flex: 1; border: 1px solid var(--panel-border); border-radius: 6px; padding: 9px 11px; background: #e7e3ca; opacity: 0.55; transition: 0.2s; }
-    .phase-pill.on { opacity: 1; border-color: #c08777; background: #fbfaf4; }
+    .phase-pill { flex: 1; border: 1px solid var(--panel-border); border-radius: 6px; padding: 9px 11px; background: #ecddc5; opacity: 0.55; transition: 0.2s; }
+    .phase-pill.on { opacity: 1; border-color: #c28577; background: #fcf9f3; }
     .phase-pill .pn { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; color: var(--title-muted); }
     .phase-pill .pd { font-size: 0.84rem; color: var(--ink-strong); margin-top: 2px; line-height: 1.35; }
 
-    .status { background: #e7e3ca; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px; display: flex; align-items: center; }
+    .status { background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 5px; padding: 11px 14px; font-size: 0.95rem; color: var(--ink-strong); min-height: 46px; display: flex; align-items: center; }
     .status .stepcount { color: var(--title-muted); font-size: 0.8rem; margin-left: auto; padding-left: 12px; white-space: nowrap; }
 
     .chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-height: 34px; }
-    .chip { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: #fbfaf4; background: #b9ad92; border: 1.5px solid #8d897c; font-variant-numeric: tabular-nums; }
-    .chip.ghost { background: #e7e3ca; color: var(--ink); border-color: #d8d2a8; }
+    .chip { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: #fcf9f3; background: #b9ad92; border: 1.5px solid #9c866d; font-variant-numeric: tabular-nums; }
+    .chip.ghost { background: #ecddc5; color: var(--ink); border-color: #d8c7a8; }
     .chip.cursor { outline: 3px solid var(--examine); outline-offset: 1px; }
     .chip.skip { opacity: 0.5; }
     .chips .empty { color: var(--title-muted); font-style: italic; font-size: 0.9rem; }
@@ -67,16 +96,16 @@
 
     .thread { display: flex; align-items: center; flex-wrap: wrap; gap: 0; min-height: 38px; }
     .thread .empty { color: var(--title-muted); font-style: italic; font-size: 0.9rem; }
-    .thread-node { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.92rem; background: var(--active); border: 2px solid var(--active-bd); color: #fbfaf4; }
+    .thread-node { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.92rem; background: var(--active); border: 2px solid var(--active-bd); color: #fcf9f3; }
     .thread-node.top { box-shadow: 0 0 0 3px rgba(204,47,34,0.22); }
     .thread-link { width: 20px; height: 3px; background: var(--active-bd); }
 
-    .comp-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; border-bottom: 1px dashed #e7e3ca; }
+    .comp-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; border-bottom: 1px dashed #ecddc5; }
     .comp-row:last-child { border-bottom: none; }
     .comp-dot { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.25); flex: none; }
     .comp-label { font-size: 0.8rem; font-weight: 700; color: var(--ink-strong); min-width: 34px; }
     .comp-members { display: flex; gap: 4px; flex-wrap: wrap; }
-    .comp-members .m { font-size: 0.8rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; color: #fbfaf4; }
+    .comp-members .m { font-size: 0.8rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; color: #fcf9f3; }
     .comp-none { color: var(--title-muted); font-style: italic; font-size: 0.84rem; }
 
     .legend { display: flex; flex-wrap: wrap; gap: 12px 18px; font-size: 0.8rem; color: var(--ink); margin-top: 12px; }
@@ -92,7 +121,7 @@
     .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
     textarea { font-family: "SF Mono", var(--wi-font-mono); font-size: 0.85rem; background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border); border-radius: 5px; padding: 10px; width: 230px; height: 230px; resize: vertical; }
     .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 430px; line-height: 1.5; }
-    .editor-help code { background: #e7e3ca; padding: 1px 5px; border-radius: 3px; }
+    .editor-help code { background: #ecddc5; padding: 1px 5px; border-radius: 3px; }
     .err { color: #6d180f; font-weight: 600; font-size: 0.82rem; min-height: 18px; }
 </style>
 <style>
@@ -126,12 +155,17 @@ body { font-family: var(--wi-font-body); }
         <input type="range" id="speedSlider" min="40" max="1400" value="650" oninput="updateSpeed(this.value)">
         <span id="speedVal">650ms</span>
     </div>
+    <div class="transport" title="Drag to scrub through the run; click a phase to jump to its start">
+        <input type="range" id="stepSlider" min="0" max="1000" value="0" step="1" aria-label="Scrub through the run">
+        <span class="stepno" id="stepSliderVal">0 / 0</span>
+        <div class="phasebar" id="phaseBar"></div>
+    </div>
 </div>
 
 <div class="stage">
     <div class="col-main">
         <div class="sim-box">
-            <div class="sim-title" id="canvasTitle">Reverse graph Gᴿ</div>
+            <div class="sim-head"><div class="sim-title" id="canvasTitle">Reverse graph Gᴿ</div><div class="zoom-ctl" title="Wheel: zoom &middot; drag: pan &middot; double-click: reset"><button type="button" id="zoomOut" title="Zoom out">&minus;</button><span class="zoom-pct" id="zoomPct">100%</span><button type="button" id="zoomIn" title="Zoom in">+</button><button type="button" id="zoomFit" title="Reset view (double-click on the graph)">&#x2922;</button></div></div>
             <canvas id="graph"></canvas>
             <div class="legend" id="legend">
                 <div class="item"><span class="swatch sw-unseen"></span>unseen</div>
@@ -143,6 +177,7 @@ body { font-family: var(--wi-font-body); }
         </div>
     </div>
 
+    <div class="splitter" id="stageSplitter" title="Drag to resize &middot; double-click to reset"></div>
     <div class="side">
         <div class="sim-box">
             <div class="sim-title">Algorithm</div>
@@ -489,20 +524,160 @@ function buildSCC(aG) {
 
 /* ============================ canvas ============================ */
 let dpr = 1, cw = 0, ch = 0, radius = 16;
+/* ============================ canvas fit + viewport (zoom & pan) ============================
+   World coordinates are the canvas layout at zoom 1 (as before). Nodes are sized so that they stay
+   clearly separated (radius <= SEP x nearest-neighbour distance); if that would make them too small
+   to read, the default zoom is raised instead (and the canvas grows in height, up to a limit), so the
+   graph may extend beyond the viewport and can be panned. Everything is drawn in world coordinates;
+   the camera is a single canvas transform, so all drawing code is zoom-agnostic. */
+const M = 40;   // canvas margin around the graph
+const R_SCREEN_MIN = 13, R_MAX = 22, SEP = 0.34;
+const H_DEFAULT = 450, H_MIN = 400;
+const view = { zRel: 1, cx: null, cy: null };   // zoom relative to the default zoom; normalised point at the canvas centre
+let world = null, cam = { z: 1, tx: 0, ty: 0 }, posCustom = false, normCache = null;
+
+function normStats() {
+    if (normCache && normCache.ref === pos) return normCache;
+    let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity, minD=Infinity;
+    for (const p of pos) { minx=Math.min(minx,p.x); miny=Math.min(miny,p.y); maxx=Math.max(maxx,p.x); maxy=Math.max(maxy,p.y); }
+    for (let i = 0; i < pos.length; i++) for (let j = i+1; j < pos.length; j++) {
+        const d = Math.hypot(pos[i].x-pos[j].x, pos[i].y-pos[j].y); if (d < minD) minD = d;
+    }
+    if (!pos.length) { minx = miny = 0; maxx = maxy = 1; }
+    normCache = { ref: pos, minx, miny, bw: Math.max(maxx-minx, 1e-6), bh: Math.max(maxy-miny, 1e-6), minD: Number.isFinite(minD) ? minD : 1 };
+    return normCache;
+}
+function worldMap(w, h) {   // normalised -> world px:  x = ox + sx*nx,  y = oy + sy*ny
+    const st = normStats();
+    if (posCustom) {        // drawn coordinates: uniform scale, centred (no distortion)
+        const s = Math.min((w-2*M)/st.bw, (h-2*M)/st.bh);
+        return { ox: M + ((w-2*M) - s*st.bw)/2 - s*st.minx, sx: s, oy: M + ((h-2*M) - s*st.bh)/2 - s*st.miny, sy: s };
+    }
+    return { ox: M, sx: w-2*M, oy: M, sy: h-2*M };   // automatic layout fills the canvas
+}
+function buildWorld(w, h) {
+    const map = worldMap(w, h);
+    const px = pos.map(p => ({ x: map.ox + map.sx*p.x, y: map.oy + map.sy*p.y }));
+    let minD = Infinity;
+    for (let i = 0; i < px.length; i++) for (let j = i+1; j < px.length; j++) {
+        const d = Math.hypot(px[i].x-px[j].x, px[i].y-px[j].y); if (d < minD) minD = d;
+    }
+    if (!Number.isFinite(minD)) minD = 80;
+    const r = Math.min(R_MAX, minD*SEP);
+    return { px, radius: r, z0: Math.max(1, R_SCREEN_MIN / r), map };
+}
+function preferredHeight(w) {
+    const hMax = Math.max(H_MIN, Math.round(window.innerHeight * 0.78));
+    const st = normStats();
+    let h;
+    if (posCustom) {
+        const sFill = (w-2*M)/st.bw;                    // fill the width at uniform scale...
+        const sNeed = (R_MAX/SEP)/st.minD;              // ...but no taller than needed for full-size nodes
+        h = st.bh*Math.min(sFill, sNeed) + 2*M;
+    } else {
+        h = H_DEFAULT;                                  // grow until nodes are properly separated
+        const t = buildWorld(w, h); if (t.z0 > 1) h *= t.z0;
+    }
+    return Math.round(Math.max(H_MIN, Math.min(hMax, h)));
+}
 function fitCanvas() {
     dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+    let rect = canvas.getBoundingClientRect();
+    if (!world || world.posRef !== pos || Math.abs(rect.width - world.cw) > 0.5) {
+        const h = preferredHeight(rect.width);
+        if (Math.abs(h - rect.height) > 0.5) { canvas.style.height = h + 'px'; rect = canvas.getBoundingClientRect(); }
+    }
     cw = rect.width; ch = rect.height;
-    canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const M = 40;
-    const px = pos.map(p => ({ x: M + p.x * (cw - 2*M), y: M + p.y * (ch - 2*M) }));
-    let minD = Infinity;
-    for (let i = 0; i < px.length; i++) for (let j = i+1; j < px.length; j++) { const d = Math.hypot(px[i].x - px[j].x, px[i].y - px[j].y); if (d < minD) minD = d; }
-    if (!Number.isFinite(minD)) minD = 80;
-    radius = Math.max(13, Math.min(24, minD * 0.38));
-    return px;
+    canvas.width = Math.round(cw*dpr); canvas.height = Math.round(ch*dpr);
+    if (!world || world.posRef !== pos || world.cw !== cw || world.ch !== ch) {
+        if (!world || world.posRef !== pos) { view.zRel = 1; view.cx = view.cy = null; }
+        world = Object.assign(buildWorld(cw, ch), { posRef: pos, cw, ch });
+    }
+    radius = world.radius;
+    const st = normStats(), map = world.map;
+    if (view.cx === null) { view.cx = st.minx + st.bw/2; view.cy = st.miny + st.bh/2; }
+    const z = world.z0 * view.zRel;
+    cam = { z, tx: cw/2 - z*(map.ox + map.sx*view.cx), ty: ch/2 - z*(map.oy + map.sy*view.cy) };
+    ctx.setTransform(dpr*z, 0, 0, dpr*z, dpr*cam.tx, dpr*cam.ty);
+    const pct = document.getElementById('zoomPct'); if (pct) pct.textContent = Math.round(view.zRel*100) + '%';
+    return world.px;
 }
+function screenToNorm(sx, sy) {
+    const map = world.map, wx = (sx - cam.tx)/cam.z, wy = (sy - cam.ty)/cam.z;
+    return { x: (wx - map.ox)/map.sx, y: (wy - map.oy)/map.sy };
+}
+function zoomAt(factor, sx, sy) {    // zoom keeping the graph point under (sx, sy) fixed
+    if (!world) return;
+    const zRel = Math.max(0.3, Math.min(12, view.zRel*factor));
+    const a = screenToNorm(sx, sy), map = world.map, z = world.z0*zRel;
+    const tx = sx - z*(map.ox + map.sx*a.x), ty = sy - z*(map.oy + map.sy*a.y);
+    view.zRel = zRel;
+    view.cx = ((cw/2 - tx)/z - map.ox)/map.sx; view.cy = ((ch/2 - ty)/z - map.oy)/map.sy;
+    redrawCanvas();
+}
+function panBy(dx, dy) {
+    if (!world) return;
+    view.cx -= dx/(cam.z*world.map.sx); view.cy -= dy/(cam.z*world.map.sy);
+    redrawCanvas();
+}
+function resetView() { view.zRel = 1; view.cx = view.cy = null; redrawCanvas(); }
+(function setupViewport() {
+    const ptrs = new Map(); let panning = false, pinchD = 0;
+    const local = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        const d = e.deltaMode === 1 ? e.deltaY*16 : e.deltaY;
+        const p = local(e); zoomAt(Math.max(0.5, Math.min(2, Math.exp(-d*0.0015))), p.x, p.y);
+    }, { passive: false });
+    canvas.addEventListener('pointerdown', e => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        ptrs.set(e.pointerId, local(e)); canvas.setPointerCapture(e.pointerId);
+        if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinchD = Math.hypot(a.x-b.x, a.y-b.y); }
+        panning = true; canvas.classList.add('panning');
+    });
+    canvas.addEventListener('pointermove', e => {
+        if (!ptrs.has(e.pointerId)) return;
+        const prev = ptrs.get(e.pointerId), cur = local(e); ptrs.set(e.pointerId, cur);
+        if (ptrs.size === 2) {
+            const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x-b.x, a.y-b.y);
+            if (pinchD > 0) zoomAt(d/pinchD, (a.x+b.x)/2, (a.y+b.y)/2); pinchD = d;
+        } else panBy(cur.x - prev.x, cur.y - prev.y);
+    });
+    const up = e => { ptrs.delete(e.pointerId); pinchD = 0; if (!ptrs.size) { panning = false; canvas.classList.remove('panning'); } };
+    canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+    canvas.addEventListener('dblclick', e => { e.preventDefault(); resetView(); });
+    const zi = document.getElementById('zoomIn'), zo = document.getElementById('zoomOut'), zf = document.getElementById('zoomFit');
+    if (zi) zi.addEventListener('click', () => zoomAt(1.25, cw/2, ch/2));
+    if (zo) zo.addEventListener('click', () => zoomAt(1/1.25, cw/2, ch/2));
+    if (zf) zf.addEventListener('click', resetView);
+    if (window.ResizeObserver) new ResizeObserver(() => { if (world) redrawCanvas(); }).observe(canvas);
+})();
+
+/* ============================ draggable stage splitter ============================ */
+(function setupSplitter() {
+    const sp = document.getElementById('stageSplitter'); if (!sp) return;
+    const stage = sp.parentElement, KEY = 'wi-stage-main-w:' + location.pathname;
+    const clampW = w => { const total = stage.getBoundingClientRect().width; return Math.max(260, Math.min(total - 20 - 330, w)); };
+    const apply = w => { stage.style.setProperty('--main-w', clampW(w) + 'px'); };
+    try { const s = localStorage.getItem(KEY); if (s) apply(parseFloat(s)); } catch (_) {}
+    let dragging = false;
+    sp.addEventListener('pointerdown', e => {
+        dragging = true; sp.setPointerCapture(e.pointerId); sp.classList.add('dragging'); document.body.classList.add('splitting'); e.preventDefault();
+    });
+    sp.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        apply(e.clientX - stage.getBoundingClientRect().left - 10);
+    });
+    const end = () => {
+        if (!dragging) return; dragging = false; sp.classList.remove('dragging'); document.body.classList.remove('splitting');
+        try { localStorage.setItem(KEY, parseFloat(stage.style.getPropertyValue('--main-w'))); } catch (_) {}
+    };
+    sp.addEventListener('pointerup', end); sp.addEventListener('pointercancel', end);
+    sp.addEventListener('dblclick', () => { stage.style.removeProperty('--main-w'); try { localStorage.removeItem(KEY); } catch (_) {} });
+    window.addEventListener('resize', () => { const w = parseFloat(stage.style.getPropertyValue('--main-w')); if (w) apply(w); });
+})();
+
+function redrawCanvas() { render(); }
 function drawArrow(A, B, opts) {
     const { color, width, dash, bowVec } = opts;
     const mid = { x: (A.x + B.x) / 2 + (bowVec ? bowVec.x : 0), y: (A.y + B.y) / 2 + (bowVec ? bowVec.y : 0) };
@@ -551,7 +726,7 @@ function render() {
     const curEdge = state && state.treeEdge ? state.treeEdge[0] + '>' + state.treeEdge[1] : null;
 
     // Gᴿ gets a cool slate-blue palette so it reads as visually distinct from G's warm tan/black
-    const UNSEEN_G = '#cdc9bb', UNSEEN_R = '#b1bdc9';
+    const UNSEEN_G = '#d4c5b4', UNSEEN_R = '#b1bdc9';
     const TREE_G   = '#38362e', TREE_R   = '#3d5468';
 
     // edges of the currently shown graph
@@ -573,7 +748,7 @@ function render() {
     // vertices
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (let v = 0; v < V; v++) {
-        let fill, bd, tx = '#fbfaf4';
+        let fill, bd, tx = '#fcf9f3';
         if (phase === 2 && comp[v] >= 0) { fill = compColor(comp[v]); bd = 'rgba(0,0,0,0.32)'; }
         else if (mark[v] === 2) { fill = '#5c9150'; bd = '#4a7c3f'; }
         else if (mark[v] === 1) { fill = '#cc2f22'; bd = '#6d180f'; }
@@ -597,9 +772,11 @@ function render() {
     }
 
     renderPanels(state);
+    syncTransport();
 }
 function drawBadge(text, fg, bg, x, y, quiet) {
     ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // screen space: the badge stays put while zooming/panning
     ctx.font = `700 ${quiet ? 11.5 : 13}px -apple-system, "Segoe UI", sans-serif`;
     const tw = ctx.measureText(text).width, padX = 9, h = quiet ? 22 : 26;
     ctx.fillStyle = bg; ctx.globalAlpha = quiet ? 0.85 : 0.95;
@@ -696,7 +873,7 @@ function refreshTextarea() {
     document.getElementById('graphText').value = graphToText(lastV, lastEdges, pos, sedgewick);
 }
 function applyGraph(v, a, edgeList, customPos) {
-    V = v; adj = a; adjRev = reverseGraph(a); pos = customPos || layoutAll(V, a);
+    V = v; adj = a; adjRev = reverseGraph(a); pos = customPos || layoutAll(V, a); posCustom = !!customPos;
     lastV = v; lastEdges = edgeList;
     refreshTextarea();
     rebuildSteps();
@@ -772,6 +949,87 @@ function populateExternalGraphs(presetSel) {
         presetSel.appendChild(grp);
     });
 }
+/* ============================ transport: scrubber + phase strip ============================
+   One slider for the whole run (fraction 0..1). transportState() reports the current position, a
+   short label and the phases (as fractions); scrubTo(f) moves the run there. The phase strip sits
+   flush under the slider, each segment as wide as the share of the run it covers, so the fill inside
+   it is a second reading of the slider position: which phase, and how far into it. */
+let phaseBarKey = '';
+function syncTransport() {
+    const sl = document.getElementById('stepSlider'), out = document.getElementById('stepSliderVal'), bar = document.getElementById('phaseBar');
+    if (!sl || typeof transportState !== 'function') return;
+    const ts = transportState();
+    const f = Math.max(0, Math.min(1, ts.frac || 0));
+    sl.value = Math.round(1000 * f);
+    out.textContent = ts.label;
+    const phases = ts.phases || [];
+    const key = phases.map(p => p.name + '@' + p.from.toFixed(5) + '-' + p.to.toFixed(5)).join('|');
+    if (key !== phaseBarKey) {
+        phaseBarKey = key; bar.innerHTML = '';
+        phases.forEach(p => {
+            const b = document.createElement('button'); b.type = 'button'; b.className = 'phasebtn';
+            b.style.flex = `${Math.max(0.002, p.to - p.from)} 1 0`;
+            b.title = p.title || p.name;
+            b.innerHTML = '<span class="fill empty" style="width:0%"></span><span class="lab"></span>';
+            b.querySelector('.lab').textContent = p.name;
+            b.addEventListener('click', () => { scrubTo(p.jump); b.blur(); });
+            bar.appendChild(b);
+        });
+    }
+    Array.from(bar.children).forEach((b, i) => {
+        const p = phases[i]; if (!p) return;
+        const pct = f >= p.to - 1e-9 ? 100 : f <= p.from + 1e-9 ? 0 : (f - p.from) / (p.to - p.from) * 100;
+        const fill = b.firstChild; fill.style.width = pct.toFixed(2) + '%'; fill.classList.toggle('empty', pct === 0);
+        b.classList.toggle('on', f > p.from + 1e-9 && f <= p.to + 1e-9);
+    });
+}
+/* consecutive steps with the same key form one phase; span/jump map step indices to fractions */
+function groupPhases(keys, labelOf, spanFrom, spanTo, jumpOf) {
+    const out = [];
+    for (let i = 0; i < keys.length; ) {
+        let j = i; while (j + 1 < keys.length && keys[j+1] === keys[i]) j++;
+        out.push({ name: labelOf(keys[i], i, j), from: spanFrom(i), to: spanTo(j), jump: jumpOf(i) });
+        i = j + 1;
+    }
+    return out;
+}
+const stepSpan = N => ({ from: a => a / N, to: b => (b + 1) / N, jump: a => (a + 1) / N });
+(function setupTransport() {
+    const sl = document.getElementById('stepSlider'); if (!sl) return;
+    sl.addEventListener('input', () => scrubTo(sl.value / 1000));
+    sl.addEventListener('change', () => sl.blur());   // give the arrow keys back to step navigation
+})();
+
+let phaseCache = { steps: null, phases: null };
+/* phases: building Gᴿ · one per DFS tree of phase 1 · the reverse postorder hand-over · one per strong component */
+function sccPhases() {
+    if (phaseCache.steps === steps) return phaseCache.phases;
+    const N = steps.length, sp = stepSpan(N);
+    let key = 'intro';
+    const keys = steps.map(s => {
+        if (s.phase === 1 && s.rootStart !== undefined) key = 'R' + s.rootStart;
+        else if (s.rpoReady || s.phaseStart === 2) key = 'rpo';
+        else if (s.phase === 2 && s.newComp !== undefined) key = 'C' + s.newComp;
+        return key;
+    });
+    const label = k => k === 'intro' ? 'G → Gᴿ' : k === 'rpo' ? 'rev. postorder' : k[0] === 'R' ? `Gᴿ tree ${k.slice(1)}` : `#${+k.slice(1) + 1}`;
+    const title = k => k === 'intro' ? 'Phase 1 begins: reverse all edges' : k === 'rpo' ? 'Phase 1 done: reverse postorder of Gᴿ hands over to phase 2'
+                     : k[0] === 'R' ? `Phase 1: DFS tree of Gᴿ rooted at ${k.slice(1)}` : `Phase 2: DFS tree in G = strong component #${+k.slice(1) + 1}`;
+    const ph = groupPhases(keys, label, sp.from, sp.to, sp.jump);
+    ph.forEach(p => { p.title = title(keys[Math.round(p.from * N)]); });
+    phaseCache = { steps, phases: ph }; return ph;
+}
+function transportState() {
+    const N = steps.length;
+    return { frac: N ? (ptr + 1) / N : 0, label: `${ptr + 1} / ${N}`, phases: N ? sccPhases() : [] };
+}
+function scrubTo(f) {
+    f = Math.max(0, Math.min(1, f));
+    stopPlay();
+    ptr = Math.max(-1, Math.min(steps.length - 1, Math.round(f * steps.length) - 1));
+    render(); syncButtons();
+}
+
 function init() {
     const presetSel = document.getElementById('presetSel');
     Object.keys(PRESETS).forEach(name => { const o = document.createElement('option'); o.value = name; o.textContent = name; presetSel.appendChild(o); });

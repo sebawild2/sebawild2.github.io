@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Move to Front — Animated</title>
+<style>
+:root{
+  --bg:#f5ebd9; --panel:#faf6ed; --panel-border:#d4c5b4;
+  --ink:#6b675c; --ink-strong:#46433a; --muted:#8b8779; --dim:#a89880;
+  --btn:#faf6ed; --btn-border:#b9a793; --btn-border-hover:#9c866d;
+  --accent:#cc2f22; --deep:#902015; --sel:#e6c9bd; --new:#2f6b3a; --ccol:#2f5f8a;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;
+     margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+.container{width:100%;max-width:1500px;display:flex;flex-direction:column}
+h1{font-size:1.5rem;font-weight:500;margin:0 0 4px;letter-spacing:.5px;color:var(--ink-strong);text-transform:uppercase}
+.subtitle{font-size:.9rem;color:var(--muted);margin:0 0 18px;line-height:1.5}
+.subtitle code{background:#ecddc5;padding:1px 6px;border-radius:3px}
+
+.card{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:14px 18px;
+      margin-bottom:14px;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lbl{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.sep{width:1px;height:22px;background:#d4c5b4;margin:0 4px}
+button,select{background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);
+  padding:7px 14px;font-size:.85rem;border-radius:5px;cursor:pointer;font-weight:500;font-family:inherit;
+  transition:background .15s,border-color .15s;white-space:nowrap}
+button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--btn-border-hover)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:#46433a;color:#faf6ed;border-color:#46433a}
+button.primary:hover:not(:disabled){background:#5c5043;border-color:#5c5043}
+button.mode.on{background:#f7e6e0;border-color:var(--accent);color:var(--accent);font-weight:600}
+input[type=text]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;height:34px;
+  background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);border-radius:5px;
+  padding:0 10px;font-size:.85rem}
+input.wide{flex:1;min-width:260px}
+input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+#stepSlider{flex:1;min-width:200px}
+label.chk{font-size:.78rem;color:var(--muted);display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.steplabel{font-size:.78rem;color:var(--muted);min-width:150px;font-variant-numeric:tabular-nums}
+.err{color:var(--accent);font-weight:600;font-size:.8rem;min-height:17px;margin-top:6px}
+
+.box{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:12px 16px;
+     box-shadow:0 2px 8px rgba(0,0,0,.04);margin-bottom:14px}
+.box-title{font-size:.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin:0 0 10px}
+.status{background:#ecddc5;border:1px solid var(--panel-border);border-radius:5px;padding:11px 13px;
+        font-size:.9rem;color:var(--ink-strong);min-height:44px;line-height:1.55;display:block;text-align:left}
+.status b{color:var(--accent)}
+.status code{background:#e4d5bb;padding:0 4px;border-radius:3px;
+        font-family:var(--wi-font-mono);font-size:.86em}
+.svg-wrap{background:var(--bg);border-radius:5px;overflow-x:auto;overflow-y:hidden}
+svg{display:block;margin:0 auto}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:14px;align-items:start}
+@media(max-width:1000px){.stage{grid-template-columns:1fr}}
+
+/* the aligned S / C table, as on the slide */
+.tape{display:flex;flex-wrap:wrap;gap:3px}
+.col{display:flex;flex-direction:column;gap:2px;align-items:stretch}
+.col .ch,.col .num{font-family:var(--wi-font-mono);text-align:center;
+  border:1px solid #d4c5b4;background:#ecddc5;border-radius:3px;padding:3px 5px;min-width:28px;
+  font-size:.85rem;color:var(--ink);transition:.15s}
+.col .num{background:#f4ece0;font-variant-numeric:tabular-nums}
+.col.done .ch,.col.done .num{opacity:.5}
+.col.cur .ch{background:#fcf9f3;border:2px solid var(--accent);color:var(--accent);font-weight:700}
+.col.cur .num{background:#fcf9f3;border:2px solid var(--accent);color:var(--accent);font-weight:700}
+.col .num.empty{color:transparent}
+.tape-key{font-size:.78rem;color:var(--muted);display:flex;flex-direction:column;gap:2px;
+  justify-content:center;margin-right:6px;font-style:italic}
+.tape-key span{padding:3px 0;min-height:26px;display:flex;align-items:center}
+
+/* stats */
+.stats{font-size:.82rem;line-height:1.8}
+.stats .k{color:var(--muted)} .stats .v{color:var(--ink-strong);font-weight:600;font-variant-numeric:tabular-nums}
+.stats .note{font-size:.75rem;color:var(--dim);font-style:italic}
+.stats hr{border:none;border-top:1px dashed #ecddc5;margin:7px 0}
+.hist{margin-top:8px}
+.hist .hrow{display:flex;align-items:center;gap:6px;font-size:.75rem;font-variant-numeric:tabular-nums;
+  color:var(--muted);line-height:1.5}
+.hist .hlab{min-width:20px;text-align:right;font-family:var(--wi-font-mono)}
+.hist .hbar{height:9px;background:#e5c0b4;border:1px solid #6d180f;border-radius:2px}
+
+/* pseudocode */
+details.panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;width:100%;
+  margin-top:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+details.panel>summary{cursor:pointer;padding:13px 18px;font-size:.88rem;font-weight:600;color:var(--ink-strong);
+  list-style:none;user-select:none}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::before{content:"▶ ";font-size:.72rem;color:var(--btn-border-hover)}
+details.panel[open]>summary::before{content:"▼ "}
+.panel-body{padding:0 18px 16px}
+.code-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}
+.code-section{border:1px solid var(--panel-border);border-radius:6px;overflow:hidden;background:#fbf8f0}
+.code-section.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(196,51,51,.18)}
+.code-head{font-size:.72rem;font-weight:600;color:var(--muted);padding:6px 10px;background:#f0e7d0;border-bottom:1px solid var(--panel-border)}
+.code-section.active .code-head{color:var(--accent);background:#f7e6e0}
+pre.pcode{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.75rem;
+  line-height:1.6;color:var(--ink-strong);overflow-x:auto;text-align:left;padding:6px 0}
+pre.pcode .ln{display:block;padding:0 10px;white-space:pre;border-left:3px solid transparent}
+pre.pcode .ln.hot{background:#f6dfd8;border-left-color:var(--accent)}
+.help{font-size:.82rem;line-height:1.6}
+.help code{background:#ecddc5;padding:1px 5px;border-radius:3px}
+.help pre{background:#faf6ed;border:1px solid var(--panel-border);border-radius:5px;padding:9px 12px;font-size:.78rem;overflow-x:auto;margin:8px 0}
+#test-out{font-family:var(--wi-font-mono);font-size:.75rem;line-height:1.6;white-space:pre-wrap;
+  margin-top:10px;color:#46433a;max-height:360px;overflow-y:auto;background:#faf6ed;border:1px solid var(--panel-border);
+  border-radius:6px;padding:12px}
+.t-pass{color:#2f6b3a;font-weight:600}.t-fail{color:var(--accent);font-weight:700}.t-head{color:var(--ink-strong);font-weight:700}
+.match{font-size:.8rem;padding:7px 12px;border-radius:5px;margin-top:8px}
+.match.ok{background:#e7f0e4;border:1px solid #a9c8a0;color:#2f6b3a}
+.match.bad{background:#f7d9d4;border:1px solid var(--accent);color:var(--accent);font-weight:700}
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Move to Front</h1>
+<p class="subtitle">
+  The source alphabet lives in a self-adjusting list. A character is encoded by its <b>old position</b> in that
+  list, and is then moved to the front. Clusters of few characters therefore turn into many small numbers —
+  which is what makes the following compressor's job easy. MTF alone compresses nothing.
+</p>
+
+<div class="card">
+  <div class="row">
+    <span class="lbl">View</span>
+    <button class="mode" id="mode-enc"  onclick="setMode('enc')">Encode</button>
+    <button class="mode" id="mode-dec"  onclick="setMode('dec')">Decode</button>
+    <button class="mode" id="mode-both" onclick="setMode('both')">Both lists at once</button>
+    <div class="sep"></div>
+    <span class="lbl">Preset</span>
+    <select id="presetSel" onchange="loadPreset(this.value)"></select>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row">
+    <span class="lbl" id="inLabel">Source text S</span>
+    <input type="text" class="wide" id="mainInput" spellcheck="false">
+    <button class="primary" onclick="loadFromInput()">Load</button>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <span class="lbl">Alphabet Σ<sub>S</sub></span>
+    <select id="alphaSel" onchange="onAlphaChange()">
+      <option value="AZ">A–Z, 26 letters (as in the lecture example)</option>
+      <option value="auto">only the characters occurring in S, sorted</option>
+      <option value="custom">custom list of characters…</option>
+    </select>
+    <input type="text" id="alphaCustom" style="display:none;width:220px" spellcheck="false" placeholder="e.g. ABNS_">
+    <span class="lbl" id="alphaInfo" style="text-transform:none;font-weight:400"></span>
+  </div>
+  <div class="err" id="inputErr"></div>
+</div>
+
+<div class="card">
+  <div class="row" style="margin-bottom:9px">
+    <button id="btnFirst" onclick="goto(0)">⏮</button>
+    <button id="btnPrev" onclick="stepBy(-1)">← Prev</button>
+    <button id="btnNext" class="primary" onclick="stepBy(1)">Next →</button>
+    <button id="btnLast" onclick="goto(steps.length-1)">⏭</button>
+    <button id="btnPlay" onclick="togglePlay()">▶ Play</button>
+    <div class="sep"></div>
+    <input type="range" id="stepSlider" min="0" max="0" value="0" oninput="goto(+this.value)">
+    <span class="steplabel" id="stepLabel"></span>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <input type="range" id="speedSlider" min="1" max="10" value="6" oninput="setSpeed(this.value)" style="width:110px">
+    <span class="steplabel" id="speedLabel" style="min-width:34px">1×</span>
+    <div class="sep"></div>
+    <label class="chk"><input type="checkbox" id="animToggle" checked> animate motion</label>
+    <div class="sep"></div>
+    <button onclick="nextChar()">Skip to next character</button>
+  </div>
+</div>
+
+<div class="box">
+  <div class="box-title">Status</div>
+  <div class="status" id="statusText">Press <b>&nbsp;Next&nbsp;</b> to begin.</div>
+</div>
+
+<div class="box">
+  <div class="box-title" id="listTitle">The list L — positions above, characters below</div>
+  <div class="svg-wrap"><svg id="listSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div id="matchNote"></div>
+</div>
+
+<div class="stage">
+  <div class="box">
+    <div class="box-title">Source text S and coded text C</div>
+    <div style="display:flex">
+      <div class="tape-key"><span>S =</span><span>C =</span></div>
+      <div class="tape" id="tape"></div>
+    </div>
+  </div>
+  <div class="box">
+    <div class="box-title">Numbers</div>
+    <div class="stats" id="statsView"></div>
+  </div>
+</div>
+
+<details class="panel" open>
+  <summary>Pseudocode — the active line is highlighted</summary>
+  <div class="panel-body"><div class="code-grid" id="codeGrid"></div></div>
+</details>
+
+<details class="panel">
+  <summary>Input format</summary>
+  <div class="panel-body help">
+    <p><b>Encoding.</b> The input box holds the source text <code>S</code>. Spaces are drawn as <code>␣</code>
+      and are ordinary characters of the alphabet — but note that <code>A–Z</code> does not contain a space, so
+      use the <code>auto</code> or <code>custom</code> alphabet if your text has one.</p>
+    <p><b>Decoding.</b> The input box holds the positions, separated by spaces:</p>
+    <pre>8 13 6 7 0 3 6 1 3 4 3 3 3 18</pre>
+    <p><b>Alphabet.</b> <code>A–Z</code> reproduces the lecture example: the list starts as
+      <code>A B C … Z</code> and codewords are positions in <code>[0..26)</code>. <code>auto</code> uses only the
+      characters occurring in <code>S</code>, in sorted order, which keeps σ small and the picture readable.
+      <code>custom</code> takes the characters in the order you give them — note that the pseudocode says
+      <i>sorted order</i>, so a custom list that is not sorted departs from the lecture convention, and is only
+      offered for experimenting.</p>
+    <p><b>The four sub-steps.</b> Each character is handled in four snapshots: read its position, lift it out of
+      the list leaving a gap, slide it to the front, and finally close the gap and re-space the list. Only the
+      last of these is a state the algorithm itself ever sees; the middle two exist to make the motion visible.</p>
+  </div>
+</details>
+
+<details class="panel">
+  <summary>Self-tests — against the lecture example and an inverse-transform fuzzer</summary>
+  <div class="panel-body">
+    <button class="primary" onclick="runTests()">Run all tests</button>
+    <div id="test-out">Not run yet.</div>
+  </div>
+</details>
+
+</div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   0.  Helpers
+   ══════════════════════════════════════════════════════════════════════════ */
+function disp(ch){ if(ch===' ')return '␣'; if(ch==='\n')return '↵'; if(ch==='\t')return '⇥'; return ch; }
+function lg(x){ return Math.log(x)/Math.LN2; }
+function fmt(x,d){ return (Math.round(x*Math.pow(10,d))/Math.pow(10,d)).toFixed(d); }
+const SVGNS='http://www.w3.org/2000/svg';
+function el(t,a){ const e=document.createElementNS(SVGNS,t); for(const k in a) e.setAttribute(k,a[k]); return e; }
+function txt(x,y,s,a){ const e=el('text',Object.assign({x,y,'text-anchor':'middle'},a||{})); e.textContent=s; return e; }
+/* never blow a diagram up beyond its natural size; if it does not fit, keep
+   1:1 and let the wrapper scroll                                            */
+const MAX_SCALE=1.0;
+function fitSvg(svg,W,H){
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  const avail=(svg.parentElement&&svg.parentElement.clientWidth)||0;
+  const scale=avail>0 ? Math.min(MAX_SCALE,Math.max(1,avail/W)) : 1;
+  svg.style.width=(W*scale)+'px'; svg.style.height=(H*scale)+'px';
+}
+function entropy0(arr){
+  const m=new Map();
+  for(const v of arr) m.set(v,(m.get(v)||0)+1);
+  let H=0; const n=arr.length;
+  for(const c of m.values()){ const p=c/n; H-=p*lg(p); }
+  return H;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1.  Alphabets
+   ══════════════════════════════════════════════════════════════════════════ */
+function alphabetFor(kind,S,custom){
+  let chars;
+  if(kind==='AZ') chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  else if(kind==='auto'){
+    if(S===null) throw new Error('the "auto" alphabet needs a source text; pick A–Z or a custom alphabet');
+    chars=[...new Set(S)].sort();
+  } else {
+    chars=[...new Set(custom||'')];
+    if(!chars.length) throw new Error('the custom alphabet is empty');
+  }
+  return {chars,size:chars.length,
+          name:chars.length>12 ? disp(chars[0])+'…'+disp(chars[chars.length-1])+' ('+chars.length+' characters)'
+                               : '{'+chars.map(disp).join('')+'}'};
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2.  MTF, exactly as in the lecture pseudocode
+   ──────────────────────────────────────────────────────────────────────────
+     encode:  p ← position of S[i] in L ;  C ← C·p ;  move S[i] to front
+     decode:  c ← character at position C[j] in L ;  S ← S·c ;  move c to front
+   Each character produces four snapshots so that the list surgery is visible:
+     access → lift (gap left behind) → front (slid to the head) → settle.
+   ══════════════════════════════════════════════════════════════════════════ */
+function mtfRun(input,alpha,dir){
+  /* dir = 'enc': input is the text S.  dir = 'dec': input is the array C.   */
+  const L=alpha.chars.slice();
+  const steps=[], C=[], out=[];
+  const listSnapshots=[];              // the list after each completed character
+  const n = dir==='enc' ? input.length : input.length;
+
+  const push=o=>steps.push(Object.assign(
+    {i:-1,p:null,c:null,order:L.slice(),lifted:null,gapAt:null,lane:null,
+     C:C.slice(),S:out.join(''),hi:[]},o));
+
+  push({sub:'init',order:L.slice(),
+        msg:'The list <i>L</i> starts as Σ<sub>S</sub> in sorted order; positions run from 0 to '+
+            (alpha.size-1)+'.',hi:[1,2]});
+
+  for(let i=0;i<n;i++){
+    let c,p;
+    if(dir==='enc'){
+      c=input[i];
+      p=L.indexOf(c);
+      if(p<0) throw new Error('character "'+disp(c)+'" is not in the alphabet');
+      C.push(p);
+    } else {
+      p=input[i];
+      if(!(p>=0&&p<L.length)) throw new Error('position '+p+' is outside [0.. '+L.length+')');
+      c=L[p];
+      C.push(p);
+    }
+    out.push(c);
+    const before=L.slice();
+
+    push({sub:'access',i,p,c,order:before,C:C.slice(),S:out.join(''),
+          msg: dir==='enc'
+            ? 'Read <i>c</i> = <code>'+disp(c)+'</code>. Its position in <i>L</i> is <b>'+p+
+              '</b>, so append <b>'+p+'</b> to <i>C</i>.'
+            : 'Read <i>p</i> = <b>'+p+'</b>. The character at position '+p+' of <i>L</i> is '+
+              '<code>'+disp(c)+'</code>, so append it to <i>S</i>.',
+          hi:[4,5,6]});
+    push({sub:'lift',i,p,c,order:before,lifted:c,gapAt:p,lane:p,C:C.slice(),S:out.join(''),
+          msg:'Take <code>'+disp(c)+'</code> out of the list. Position '+p+' is now a gap; nothing else '+
+              'has moved yet.',hi:[7]});
+    push({sub:'front',i,p,c,order:before,lifted:c,gapAt:p,lane:0,C:C.slice(),S:out.join(''),
+          msg:'Slide <code>'+disp(c)+'</code> all the way to the front of the list.',hi:[7]});
+
+    L.splice(p,1); L.unshift(c);
+    listSnapshots.push(L.slice());
+    push({sub:'settle',i,p,c,order:L.slice(),C:C.slice(),S:out.join(''),
+          msg:'Close the gap: everything that was in front of <code>'+disp(c)+'</code> shifts one place to '+
+              'the right, and the list is re-spaced. '+
+              (p===0?'It was already at the front, so nothing changed.'
+                    :'<code>'+disp(c)+'</code> now has position 0.'),
+          hi:[7]});
+  }
+  push({sub:'done',order:L.slice(),C:C.slice(),S:out.join(''),
+        msg: dir==='enc'
+          ? 'Done. <i>C</i> = '+C.join(' ')+'.'
+          : 'Done. <i>S</i> = <code>'+out.map(disp).join('')+'</code>.',
+        hi:[9]});
+  return {steps,C,S:out.join(''),alpha,listSnapshots};
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3.  Pseudocode
+   ══════════════════════════════════════════════════════════════════════════ */
+const CODE={
+ enc:{head:'Transform (encode)',lines:[
+  'procedure MTF-encode(S[0..n)):',
+  '    L ← list containing Σ_S (sorted order)',
+  '    C ← ε',
+  '    for i ← 0,…,n−1 do',
+  '        c ← S[i]',
+  '        p ← position of c in L',
+  '        C ← C · p',
+  '        Move c to front of L',
+  '    end for',
+  '    return C'
+ ]},
+ dec:{head:'Inverse transform (decode)',lines:[
+  'procedure MTF-decode(C[0..m)):',
+  '    L ← list containing Σ_S (sorted order)',
+  '    S ← ε',
+  '    for j ← 0,…,m−1 do',
+  '        p ← C[j]',
+  '        c ← character at position p in L',
+  '        S ← S · c',
+  '        Move c to front of L',
+  '    end for',
+  '    return S'
+ ]}
+};
+const codeEls={};
+function buildCodePanel(){
+  const g=document.getElementById('codeGrid'); g.innerHTML='';
+  for(const key of ['enc','dec']){
+    const box=document.createElement('div'); box.className='code-section'; box.id='cs-'+key;
+    const h=document.createElement('div'); h.className='code-head'; h.textContent=CODE[key].head;
+    const pre=document.createElement('pre'); pre.className='pcode'; codeEls[key]=[];
+    CODE[key].lines.forEach(l=>{
+      const s=document.createElement('span'); s.className='ln'; s.textContent=l;
+      pre.appendChild(s); codeEls[key].push(s);
+    });
+    box.appendChild(h); box.appendChild(pre); g.appendChild(box);
+  }
+}
+function highlightCode(keys,lines){
+  for(const k in codeEls){
+    document.getElementById('cs-'+k).classList.remove('active');
+    codeEls[k].forEach(s=>s.classList.remove('hot'));
+  }
+  (keys||[]).forEach(k=>{
+    if(!codeEls[k]) return;
+    document.getElementById('cs-'+k).classList.add('active');
+    (lines||[]).forEach(i=>{ if(codeEls[k][i]) codeEls[k][i].classList.add('hot'); });
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   4.  The list picture, with interpolated motion
+   ══════════════════════════════════════════════════════════════════════════ */
+const SLOT=32, BOXW=28, BOXH=28, LANE_Y=10, ROW_Y=56, LEFTPAD=34;
+function slotX(i){ return LEFTPAD+i*SLOT+SLOT/2; }
+
+/* target position of every character for a given snapshot */
+function layout(step){
+  const pos={};
+  step.order.forEach((ch,idx)=>{ pos[ch]={x:slotX(idx),y:ROW_Y}; });
+  if(step.lifted!==null&&step.lifted!==undefined)
+    pos[step.lifted]={x:slotX(step.lane),y:LANE_Y};
+  return pos;
+}
+
+const livePos={};                  // per svg id: char -> {x,y}
+const animHandle={};
+function drawList(svgId,step,sigma,animate,speed){
+  const svg=document.getElementById(svgId);
+  const target=layout(step);
+  const live=livePos[svgId]||(livePos[svgId]={});
+  const from={};
+  for(const ch in target) from[ch]= live[ch] || target[ch];
+  if(animHandle[svgId]){ cancelAnimationFrame(animHandle[svgId]); animHandle[svgId]=null; }
+  const dur=animate?420/speed:0, t0=performance.now();
+  const frame=now=>{
+    const t=dur===0?1:Math.min(1,(now-t0)/dur);
+    const e=t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    const p={};
+    for(const ch in target)
+      p[ch]={x:from[ch].x+(target[ch].x-from[ch].x)*e, y:from[ch].y+(target[ch].y-from[ch].y)*e};
+    paintList(svg,step,p,sigma);
+    if(t<1) animHandle[svgId]=requestAnimationFrame(frame);
+    else { livePos[svgId]=p; animHandle[svgId]=null; }
+  };
+  animHandle[svgId]=requestAnimationFrame(frame);
+}
+
+function paintList(svg,step,pos,sigma){
+  const W=LEFTPAD+sigma*SLOT+16, H=ROW_Y+BOXH+26;
+  svg.innerHTML='';
+  fitSvg(svg,W,H);
+
+  /* position ruler */
+  for(let i=0;i<sigma;i++){
+    const isHot = step.p===i && (step.sub==='access'||step.sub==='lift');
+    const isFront = i===0 && (step.sub==='front'||step.sub==='settle');
+    svg.appendChild(txt(slotX(i),ROW_Y-8,String(i),
+      {'font-size':10,'font-family':'var(--wi-font-mono)',
+       fill:isHot?'var(--accent)':isFront?'var(--new)':'var(--muted)',
+       'font-weight':(isHot||isFront)?700:400}));
+  }
+  svg.appendChild(txt(14,ROW_Y+BOXH/2+5,'L',{'font-size':13,fill:'var(--ink-strong)','font-style':'italic'}));
+
+  /* the gap left behind, drawn as a dashed empty slot */
+  if(step.gapAt!==null&&step.gapAt!==undefined){
+    svg.appendChild(el('rect',{x:slotX(step.gapAt)-BOXW/2,y:ROW_Y,width:BOXW,height:BOXH,rx:4,
+      fill:'none',stroke:'var(--accent)','stroke-width':1.3,'stroke-dasharray':'4 3',opacity:.75}));
+  }
+  /* the characters */
+  for(const ch in pos){
+    const p=pos[ch];
+    const isMoving = step.lifted===ch;
+    const isAccess = step.c===ch && step.sub==='access';
+    const g=el('g',{});
+    g.appendChild(el('rect',{x:p.x-BOXW/2,y:p.y,width:BOXW,height:BOXH,rx:4,
+      fill:isMoving?'#f7e6e0':isAccess?'#f7e6e0':'var(--panel)',
+      stroke:(isMoving||isAccess)?'var(--accent)':'var(--btn-border)',
+      'stroke-width':(isMoving||isAccess)?2.4:1.2}));
+    g.appendChild(txt(p.x,p.y+BOXH/2+5,disp(ch),
+      {'font-size':14,'font-family':'var(--wi-font-mono)',
+       fill:(isMoving||isAccess)?'var(--accent)':'var(--ink-strong)',
+       'font-weight':(isMoving||isAccess)?700:500}));
+    svg.appendChild(g);
+  }
+  /* an arrow showing where the lifted character is heading */
+  if(step.lifted!==null&&step.lifted!==undefined&&step.sub==='lift'&&step.p>0){
+    svg.appendChild(el('path',{d:'M '+(slotX(step.p)-BOXW/2-4)+' '+(LANE_Y+BOXH/2)+
+      ' L '+(slotX(0)+BOXW/2+6)+' '+(LANE_Y+BOXH/2),
+      stroke:'var(--accent)','stroke-width':1.3,'stroke-dasharray':'3 3',opacity:.6,
+      'marker-end':'url(#mtfArrow)'}));
+    const defs=el('defs',{});
+    const m=el('marker',{id:'mtfArrow',markerWidth:8,markerHeight:8,refX:6,refY:3,orient:'auto'});
+    m.appendChild(el('path',{d:'M0,0 L6,3 L0,6 Z',fill:'var(--accent)'}));
+    defs.appendChild(m); svg.appendChild(defs);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   5.  Panels
+   ══════════════════════════════════════════════════════════════════════════ */
+function renderTape(step){
+  const t=document.getElementById('tape'); t.innerHTML='';
+  const chars=[...model.S], C=model.C;
+  const shown = mode==='dec' ? C.length : chars.length;
+  for(let i=0;i<shown;i++){
+    const col=document.createElement('div');
+    const state = step.i===i ? 'cur' : (step.i>i||step.sub==='done' ? 'done' : '');
+    col.className='col '+state;
+    const ch=document.createElement('div'); ch.className='ch';
+    const nu=document.createElement('div'); nu.className='num';
+    const reached = step.sub==='done' || i<step.i || (i===step.i);
+    ch.textContent = reached ? disp(chars[i]) : '·';
+    nu.textContent = reached ? C[i] : '·';
+    if(!reached){ ch.style.opacity=.3; nu.style.opacity=.3; }
+    col.appendChild(ch); col.appendChild(nu); t.appendChild(col);
+  }
+}
+
+function renderStats(step){
+  const v=document.getElementById('statsView');
+  const C=model.C, S=model.S, sigma=model.alpha.size;
+  const upto = step.sub==='done' ? C.length : Math.max(0,step.i+(step.i>=0?1:0));
+  const seen=C.slice(0,upto);
+  let html='<span class="k">σ =</span> <span class="v">'+sigma+'</span>'+
+           ' &nbsp;·&nbsp; <span class="k">n =</span> <span class="v">'+S.length+'</span>'+
+           '<br><span class="k">codewords written =</span> <span class="v">'+seen.length+'</span>';
+  html+='<hr>';
+  if(!seen.length){ html+='<span class="note">nothing encoded yet</span>'; v.innerHTML=html; return; }
+  const zeros=seen.filter(x=>x===0).length;
+  const small=seen.filter(x=>x<=3).length;
+  html+='<span class="k">mean codeword =</span> <span class="v">'+fmt(seen.reduce((a,b)=>a+b,0)/seen.length,2)+'</span>';
+  html+='<br><span class="k">zeros (repeat of the last character) =</span> <span class="v">'+zeros+'</span>';
+  html+='<br><span class="k">at most 3 =</span> <span class="v">'+small+' of '+seen.length+'</span>';
+  if(step.sub==='done'){
+    html+='<hr><span class="k">H<sub>0</sub>(S) =</span> <span class="v">'+fmt(entropy0([...S]),3)+'</span>'+
+          '<br><span class="k">H<sub>0</sub>(C) =</span> <span class="v">'+fmt(entropy0(C),3)+'</span>'+
+          '<br><span class="note">MTF does not shorten anything by itself — both texts have '+C.length+
+          ' symbols. It rewrites the text so that a following Huffman or Elias coder has less entropy '+
+          'to work with.</span>';
+  }
+  /* histogram of the codewords seen so far */
+  const counts=new Map();
+  seen.forEach(x=>counts.set(x,(counts.get(x)||0)+1));
+  const keys=[...counts.keys()].sort((a,b)=>a-b).slice(0,12);
+  const maxc=Math.max(...counts.values());
+  let hist='<div class="hist">';
+  keys.forEach(k=>{
+    hist+='<div class="hrow"><span class="hlab">'+k+'</span>'+
+          '<span class="hbar" style="width:'+(counts.get(k)/maxc*100)+'px"></span>'+
+          '<span>'+counts.get(k)+'</span></div>';
+  });
+  hist+='</div>';
+  v.innerHTML=html+hist;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   6.  Driver
+   ══════════════════════════════════════════════════════════════════════════ */
+let steps=[], cur=0, model=null, mode='enc', speedFactor=1;
+
+function render(animate){
+  if(!model) return;
+  const st=steps[cur];
+  document.getElementById('statusText').innerHTML=st.msg;
+  document.getElementById('stepLabel').textContent='step '+(cur+1)+' / '+steps.length;
+  document.getElementById('stepSlider').value=cur;
+  document.getElementById('btnPrev').disabled=document.getElementById('btnFirst').disabled=(cur===0);
+  document.getElementById('btnNext').disabled=document.getElementById('btnLast').disabled=(cur===steps.length-1);
+  highlightCode(mode==='both'?['enc','dec']:[mode],st.hi);
+
+  const doAnim = animate && document.getElementById('animToggle').checked;
+  drawList('listSvg',st,model.alpha.size,doAnim,speedFactor);
+  if(mode==='both'){
+    const st2=model.other.steps[cur];
+    drawList('listSvg2',st2,model.alpha.size,doAnim,speedFactor);
+    const same=st.order.join('')===st2.order.join('');
+    document.getElementById('matchNote').innerHTML=
+      '<div class="match '+(same?'ok':'bad')+'">'+
+      (same?'Both lists hold '+st.order.slice(0,8).map(disp).join(' ')+
+            (st.order.length>8?' …':'')+' — the encoder and the decoder make exactly the same accesses, '+
+            'so their lists never diverge.'
+           :'The two lists differ — this should never happen.')+'</div>';
+  } else {
+    document.getElementById('matchNote').innerHTML='';
+  }
+  renderTape(st); renderStats(st);
+}
+function goto(i,animate){ cur=Math.max(0,Math.min(steps.length-1,i));
+  render(animate===undefined?true:animate); }
+function stepBy(d){ stopPlay(); goto(cur+d,true); }
+function nextChar(){
+  stopPlay();
+  const here=steps[cur].i;
+  for(let i=cur+1;i<steps.length;i++)
+    if(steps[i].sub==='access'&&steps[i].i>here){ goto(i,false); return; }
+  goto(steps.length-1,false);
+}
+let playTimer=null;
+function togglePlay(){ playTimer?stopPlay():startPlay(); }
+function startPlay(){
+  if(cur>=steps.length-1) cur=0;
+  document.getElementById('btnPlay').textContent='⏸ Pause';
+  const tick=()=>{ if(cur>=steps.length-1){stopPlay();return;} goto(cur+1,true);
+                   playTimer=setTimeout(tick,620/speedFactor); };
+  playTimer=setTimeout(tick,10);
+}
+function stopPlay(){ if(playTimer){clearTimeout(playTimer);playTimer=null;}
+  document.getElementById('btnPlay').textContent='▶ Play'; }
+function setSpeed(v){ speedFactor=Math.pow(1.35,v-6);
+  document.getElementById('speedLabel').textContent=fmt(speedFactor,1)+'×'; }
+
+function setMode(m){
+  const was=mode;
+  const text=currentText(was);
+  setModeQuiet(m);
+  if(text===null){ loadPreset(firstPreset()); return; }
+  putText(text,null);
+}
+function onAlphaChange(){
+  const k=document.getElementById('alphaSel').value;
+  document.getElementById('alphaCustom').style.display = k==='custom'?'':'none';
+  document.querySelector('#alphaSel option[value=auto]').disabled = (mode==='dec');
+  if(mode==='dec'&&k==='auto') document.getElementById('alphaSel').value='AZ';
+}
+
+const PRESETS={
+  'INEFFICIENCIES  (the lecture example)':{v:'INEFFICIENCIES',alpha:'AZ'},
+  'MISSISSIPPI  (small alphabet)':{v:'MISSISSIPPI',alpha:'auto'},
+  'AAAABBBBCCCCAAAA  (clusters → many zeros)':{v:'AAAABBBBCCCCAAAA',alpha:'auto'},
+  'ABABABABABAB  (alternating pair, invisible to RLE)':{v:'ABABABABABAB',alpha:'auto'},
+  'BANANA':{v:'BANANA',alpha:'auto'},
+  'the quick brown fox':{v:'the quick brown fox',alpha:'auto'}
+};
+function initPresets(){
+  const s=document.getElementById('presetSel');
+  for(const k in PRESETS){ const o=document.createElement('option'); o.value=k; o.textContent=k; s.appendChild(o); }
+}
+function firstPreset(){ return Object.keys(PRESETS)[0]; }
+
+function setModeQuiet(m){
+  mode=m;
+  ['enc','dec','both'].forEach(x=>document.getElementById('mode-'+x).classList.toggle('on',x===m));
+  document.getElementById('inLabel').textContent = m==='dec' ? 'Codewords C' : 'Source text S';
+  document.getElementById('listTitle').textContent = m==='both'
+    ? 'The list L — the encoder\'s above, the decoder\'s below'
+    : 'The list L — positions above, characters below';
+  const wrap=document.getElementById('listSvg').parentElement;
+  let s2=document.getElementById('listSvg2');
+  if(m==='both'&&!s2){
+    const w2=document.createElement('div'); w2.className='svg-wrap'; w2.style.marginTop='10px';
+    s2=document.createElementNS(SVGNS,'svg'); s2.setAttribute('id','listSvg2');
+    w2.appendChild(s2); wrap.parentElement.insertBefore(w2,document.getElementById('matchNote'));
+  } else if(m!=='both'&&s2){ s2.parentElement.remove(); }
+}
+
+
+/* ── input-format conversion ───────────────────────────────────────────────
+   A preset is an example text; the decoding view needs positions, so the text
+   is transformed first with whatever alphabet is currently selected.  Nothing
+   here may leave the input box in a state that cannot be parsed.           */
+function alphaSettings(){
+  return {kind:document.getElementById('alphaSel').value,
+          custom:document.getElementById('alphaCustom').value};
+}
+function setAlphaUI(kind,custom){
+  document.getElementById('alphaSel').value=kind;
+  if(custom!==undefined) document.getElementById('alphaCustom').value=custom;
+}
+function alphaWorksFor(text){
+  const {kind,custom}=alphaSettings();
+  try{ mtfRun(text,alphabetFor(kind,text,custom),'enc'); return true; }catch(e){ return false; }
+}
+/* Decoding has no text from which to derive Σ_S, so an "auto" alphabet is
+   pinned down to the concrete character list of the example.               */
+function ensureUsableAlpha(text,presetAlpha){
+  const {kind}=alphaSettings();
+  const sorted=[...new Set(text)].sort().join('');
+  if(mode==='dec'&&kind==='auto'){ setAlphaUI('custom',sorted); return; }
+  if(alphaWorksFor(text)) return;
+  if(presetAlpha==='auto') setAlphaUI('custom',sorted);
+  else setAlphaUI(presetAlpha||'AZ');
+  if(!alphaWorksFor(text)) setAlphaUI('custom',sorted);
+}
+function putText(text,presetAlpha){
+  ensureUsableAlpha(text,presetAlpha);
+  onAlphaChange();
+  const box=document.getElementById('mainInput');
+  if(mode==='dec'){
+    const {kind,custom}=alphaSettings();
+    box.value=mtfRun(text,alphabetFor(kind,text,custom),'enc').C.join(' ');
+  } else box.value=text;
+  loadFromInput();
+}
+function currentText(fromMode){
+  const raw=document.getElementById('mainInput').value;
+  if(fromMode!=='dec') return raw.length?raw:null;
+  try{
+    const C=raw.trim().split(/\s+/).filter(t=>t.length).map(t=>parseInt(t,10));
+    const {kind,custom}=alphaSettings();
+    return mtfRun(C,alphabetFor(kind,null,custom),'dec').S;
+  }catch(e){ return null; }
+}
+function loadPreset(k){
+  const p=PRESETS[k]; if(!p) return;
+  document.getElementById('presetSel').value=k;
+  putText(p.v,p.alpha);
+}
+
+function loadFromInput(){
+  const err=document.getElementById('inputErr'); err.textContent='';
+  stopPlay();
+  for(const k in livePos) delete livePos[k];
+  try{
+    const raw=document.getElementById('mainInput').value;
+    const akind=document.getElementById('alphaSel').value;
+    const custom=document.getElementById('alphaCustom').value;
+    if(mode==='dec'){
+      const C=raw.trim().split(/\s+/).filter(t=>t.length).map(t=>{
+        if(!/^\d+$/.test(t)) throw new Error('"'+t+'" is not a position; give whitespace-separated integers');
+        return parseInt(t,10);
+      });
+      if(!C.length) throw new Error('no positions given');
+      const A=alphabetFor(akind,null,custom);
+      model=mtfRun(C,A,'dec');
+    } else {
+      const S=raw;
+      if(!S.length) throw new Error('the source text is empty');
+      const A=alphabetFor(akind,S,custom);
+      model=mtfRun(S,A,'enc');
+      if(mode==='both'){
+        const back=mtfRun(model.C,A,'dec');
+        if(back.S!==S) throw new Error('internal error: the inverse transform did not reproduce S');
+        model.other=back;
+      }
+    }
+    steps=model.steps;
+    document.getElementById('alphaInfo').textContent='Σ_S = '+model.alpha.name;
+    document.getElementById('stepSlider').max=steps.length-1;
+    cur=0; render(false);
+  }catch(e){ err.textContent=e.message; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7.  Self-tests
+   ══════════════════════════════════════════════════════════════════════════ */
+function runTests(){
+  const out=[]; let pass=0,fail=0;
+  const ok=(n,c,d)=>{ if(c){pass++;out.push('<span class="t-pass">PASS</span>  '+n);}
+                      else{fail++;out.push('<span class="t-fail">FAIL</span>  '+n+(d?'\n         '+d:''));} };
+  const head=t=>out.push('<span class="t-head">'+t+'</span>');
+  const AZ=alphabetFor('AZ',null,null);
+
+  head('1 — The lecture example');
+  {
+    const r=mtfRun('INEFFICIENCIES',AZ,'enc');
+    ok('C = 8 13 6 7 0 3 6 1 3 4 3 3 3 18',
+       r.C.join(' ')==='8 13 6 7 0 3 6 1 3 4 3 3 3 18', 'got '+r.C.join(' '));
+    ok('the first access of I gives 8', r.C[0]===8);
+    ok('the repeated F gives 0', r.C[4]===0);
+    ok('the never-seen S at the end gives 18', r.C[13]===18);
+    const d=mtfRun(r.C,AZ,'dec');
+    ok('decoding returns INEFFICIENCIES', d.S==='INEFFICIENCIES', d.S);
+    ok('list after the first character starts with I',
+       r.listSnapshots[0][0]==='I'&&r.listSnapshots[0][1]==='A', r.listSnapshots[0].slice(0,3).join(''));
+  }
+
+  head('2 — Encoder and decoder make the same accesses');
+  {
+    let same=true, bad='';
+    for(let t=0;t<300;t++){
+      const sig=1+Math.floor(Math.random()*6);
+      const alpha=alphabetFor('custom',null,'ABCDEF'.slice(0,sig));
+      let S=''; const n=1+Math.floor(Math.random()*30);
+      for(let i=0;i<n;i++) S+=alpha.chars[Math.floor(Math.random()*sig)];
+      const e=mtfRun(S,alpha,'enc'), d=mtfRun(e.C,alpha,'dec');
+      if(d.S!==S){ same=false; bad='S='+S+' back='+d.S; break; }
+      for(let i=0;i<e.listSnapshots.length;i++)
+        if(e.listSnapshots[i].join('')!==d.listSnapshots[i].join('')){
+          same=false; bad='list diverged at '+i; break;
+        }
+    }
+    ok('MTF-decode(MTF-encode(S)) = S and the lists stay identical',same,bad);
+  }
+
+  head('3 — Properties of the transform');
+  {
+    const A=alphabetFor('custom',null,'ABC');
+    ok('a repeated character encodes to 0', mtfRun('AAAA',A,'enc').C.join(' ')==='0 0 0 0',
+       mtfRun('AAAA',A,'enc').C.join(' '));
+    ok('a run of length k gives one position then k−1 zeros',
+       mtfRun('BBBB',A,'enc').C.join(' ')==='1 0 0 0', mtfRun('BBBB',A,'enc').C.join(' '));
+    ok('an alternating pair gives 1s after the start',
+       mtfRun('ABABAB',A,'enc').C.join(' ')==='0 1 1 1 1 1', mtfRun('ABABAB',A,'enc').C.join(' '));
+    ok('every codeword is a valid position',
+       mtfRun('CABCAB',A,'enc').C.every(p=>p>=0&&p<3));
+    ok('the number of codewords equals |S|', mtfRun('CABCAB',A,'enc').C.length===6);
+    /* MTF is a permutation-free transform: it does not change the length */
+    let lenOK=true;
+    for(let t=0;t<100;t++){
+      let S=''; const n=1+Math.floor(Math.random()*20);
+      for(let i=0;i<n;i++) S+='ABC'[Math.floor(Math.random()*3)];
+      if(mtfRun(S,A,'enc').C.length!==S.length) lenOK=false;
+    }
+    ok('MTF never changes the number of symbols',lenOK);
+    /* the entropy claim that motivates the whole thing */
+    const clustered='AAAAAAAABBBBBBBBCCCCCCCC';
+    const rc=mtfRun(clustered,A,'enc');
+    ok('clustered text: H0(C) < H0(S)  ('+fmt(entropy0(rc.C),3)+' < '+fmt(entropy0([...clustered]),3)+')',
+       entropy0(rc.C)<entropy0([...clustered]));
+  }
+
+  head('4 — Step sequence and the four sub-steps');
+  {
+    const r=mtfRun('BANANA',alphabetFor('custom',null,'ABN'),'enc');
+    ok('4 sub-steps per character plus init and done',
+       r.steps.length===4*6+2, String(r.steps.length));
+    ok('the sub-steps come in the order access, lift, front, settle',
+       r.steps.filter(s=>s.i===0).map(s=>s.sub).join(',')==='access,lift,front,settle',
+       r.steps.filter(s=>s.i===0).map(s=>s.sub).join(','));
+    ok('only lift and front leave a gap',
+       r.steps.every(s=>(s.gapAt!==null)===(s.sub==='lift'||s.sub==='front')));
+    ok('the lifted character is the accessed one',
+       r.steps.filter(s=>s.lifted).every(s=>s.lifted===s.c));
+    ok('the list is a permutation of Σ_S at every step',
+       r.steps.every(s=>s.order.slice().sort().join('')==='ABN'));
+    ok('during lift and front the list order is still the old one',
+       r.steps.filter(s=>s.sub==='lift').every((s,i)=>
+         s.order.join('')===r.steps.filter(x=>x.sub==='access')[i].order.join('')));
+    ok('after settle the accessed character is at the front',
+       r.steps.filter(s=>s.sub==='settle').every(s=>s.order[0]===s.c));
+    ok('every step has a message and a highlighted line',
+       r.steps.every(s=>s.msg&&s.hi&&s.hi.length));
+    /* the layout must never place two characters on the same spot */
+    let layoutOK=true;
+    for(const s of r.steps){
+      const P=layout(s), seen=new Set();
+      for(const ch in P){ const key=P[ch].x+'|'+P[ch].y; if(seen.has(key)) layoutOK=false; seen.add(key); }
+    }
+    ok('no two characters ever share a position',layoutOK);
+  }
+
+  head('5 — Alphabets and errors');
+  {
+    ok('A–Z has 26 characters', alphabetFor('AZ',null,null).size===26);
+    const au=alphabetFor('auto','MISSISSIPPI',null);
+    ok('auto alphabet of MISSISSIPPI is I M P S', au.chars.join('')==='IMPS', au.chars.join(''));
+    ok('auto alphabet is sorted',
+       au.chars.slice().sort().join('')===au.chars.join(''));
+    let threw=false;
+    try{ mtfRun('X',alphabetFor('custom',null,'AB'),'enc'); }catch(e){ threw=true; }
+    ok('a character outside Σ_S is rejected',threw);
+    threw=false;
+    try{ mtfRun([9],alphabetFor('custom',null,'AB'),'dec'); }catch(e){ threw=true; }
+    ok('a position outside [0..σ) is rejected',threw);
+    ok('a one-character alphabet works',
+       mtfRun('AAA',alphabetFor('custom',null,'A'),'enc').C.join(' ')==='0 0 0');
+    ok('a space is an ordinary character',
+       mtfRun('a b',alphabetFor('auto','a b',null),'enc').C.length===3);
+  }
+
+  out.push('');
+  out.push('<span class="'+(fail===0?'t-pass':'t-fail')+'">'+pass+' passed, '+fail+' failed</span>');
+  document.getElementById('test-out').innerHTML=out.join('\n');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   8.  Boot
+   ══════════════════════════════════════════════════════════════════════════ */
+initPresets();
+buildCodePanel();
+setSpeed(6);
+document.getElementById('mode-enc').classList.add('on');
+document.getElementById('mainInput').value='INEFFICIENCIES';
+onAlphaChange();
+loadFromInput();
+window.addEventListener('resize',()=>{ if(model) render(false); });
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if(e.key==='ArrowRight'){e.preventDefault();stepBy(1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stepBy(-1);}
+  else if(e.key===' '){e.preventDefault();togglePlay();}
+});
+</script>
+</body>
+</html>

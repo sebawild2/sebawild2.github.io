@@ -1,0 +1,1807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shortest paths as dynamic programming · Bellman-Ford, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1; --wi-cycle:#2f5c9e;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  .opbar { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:10px 18px;
+           background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+           border-radius:var(--wi-radius-lg); margin-bottom:14px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0;
+              width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden;
+              flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  .stage { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(320px,1fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-box + .sim-box { margin-top:14px; }
+  .col-side .sim-box + .sim-box { margin-top:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:96px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status .bad { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-active); font-weight:bold; }
+  .status code { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-panel-2);
+                 padding:1px 4px; border-radius:3px; }
+  .status .imp { color:var(--wi-relax); font-weight:bold; }
+  .status .no { color:var(--wi-ink-faint); }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem;
+            color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  table.dist { width:100%; border-collapse:collapse; font-size:.82rem; font-family:var(--wi-font-mono); }
+  table.dist th, table.dist td { padding:3px 6px; border-bottom:1px solid var(--wi-border-soft); text-align:right; }
+  table.dist th { font-family:var(--wi-font-head); font-size:.64rem; letter-spacing:.08em;
+                  text-transform:uppercase; color:var(--wi-ink-faint); }
+  table.dist td.v { text-align:left; color:var(--wi-ink-strong); }
+  table.dist tr.src td { color:var(--wi-accent); font-weight:bold; }
+  table.dist tr.hot td { background:#f6e6df; }
+  table.dist tr:hover td { background:var(--wi-panel-2); cursor:pointer; }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent;
+           white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .cline .fix { color:var(--wi-relax); }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em;
+              text-transform:uppercase; color:var(--wi-ink-faint); padding:10px 12px 3px;
+              border-top:1px solid var(--wi-border-soft); margin-top:6px; }
+  .sublabel:first-child { border-top:0; margin-top:0; padding-top:2px; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:210px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:280px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+
+  .mobile-note { display:none; background:var(--wi-controls); border:1px solid var(--wi-accent-soft);
+                 border-radius:var(--wi-radius-lg); padding:11px 15px; font-size:.82rem;
+                 color:var(--wi-ink-strong); margin-bottom:14px; }
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls, .opbar { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; border-radius:var(--wi-radius); }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .mobile-note { display:block; }
+    .desk-only { display:none !important; }
+  }
+
+  /* --- SVG --- */
+  .vtx { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:2; }
+  .vtx.src { stroke:var(--wi-accent); stroke-width:3; fill:#f6e6df; }
+  .vtx.cur { stroke:var(--wi-active); stroke-width:3.2; fill:#f6e6df; }
+  .vtx.from { stroke:var(--wi-examine); stroke-width:3; fill:#f7edd9; }
+  .vtx.upd { stroke:var(--wi-relax); stroke-width:3.2; fill:#e8f0e2; }
+  .vtx.cyc { stroke:var(--wi-active); stroke-width:3.4; fill:#f4d9d4; }
+  .vtx.onpath { stroke:var(--wi-queue); stroke-width:3; fill:#dfeae4; }
+  .vtx.neginf { stroke:var(--wi-active); stroke-width:2.4; fill:#f7e4e0; stroke-dasharray:5 3; }
+  .vlab { font-family:var(--wi-font-body); font-size:15px; text-anchor:middle; dominant-baseline:central;
+          fill:var(--wi-ink-strong); pointer-events:none; }
+  .dpill { fill:var(--wi-panel-2); stroke:var(--wi-border-soft); stroke-width:1; pointer-events:none; }
+  .dpill.upd { fill:#e8f0e2; stroke:var(--wi-relax); }
+  .dpill.inf { fill:var(--wi-bg); stroke-dasharray:2 2; }
+  .dtxt { font-family:var(--wi-font-mono); font-size:11px; text-anchor:middle; dominant-baseline:central;
+          fill:var(--wi-ink-strong); pointer-events:none; }
+  .dtxt.inf { fill:var(--wi-ink-faint); }
+  .edge { fill:none; stroke:var(--wi-border-strong); stroke-width:1.7; }
+  .edge.tree { stroke:var(--wi-accent); stroke-width:3; }
+  .edge.look { stroke:var(--wi-examine); stroke-width:3.2; }
+  .edge.good { stroke:var(--wi-relax); stroke-width:3.4; }
+  .edge.cyc  { stroke:var(--wi-active); stroke-width:3.6; }
+  /* the negative cycle is drawn behind everything else and is never dimmed or
+     overwritten by a hover highlight -- it is the conclusion, not a transient */
+  .cycunder { fill:none; stroke:var(--wi-cycle); stroke-width:8; stroke-linecap:round; opacity:.42; }
+  .cycring  { fill:none; stroke:var(--wi-cycle); stroke-width:5; opacity:.42; }
+  .edge.path { stroke:var(--wi-queue); stroke-width:3.4; }
+  .edge.dim  { opacity:.28; }
+  .wpill { fill:var(--wi-bg); stroke:none; pointer-events:none; }
+  .wtxt { font-family:var(--wi-font-mono); font-size:10.5px; text-anchor:middle; dominant-baseline:central;
+          fill:var(--wi-ink-soft); pointer-events:none; }
+  .wtxt.neg { fill:var(--wi-active); }
+  .hit { fill:transparent; cursor:pointer; }
+
+  .cellbg { fill:var(--wi-panel-2); stroke:var(--wi-border-soft); stroke-width:1; }
+  .cellbg.empty { fill:var(--wi-bg); stroke:var(--wi-border-soft); stroke-dasharray:2 3; }
+  .cellbg.cur { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2.2; }
+  .cellbg.from { fill:#f7edd9; stroke:var(--wi-examine); stroke-width:1.7; }
+  .cellbg.upd { fill:#e8f0e2; stroke:var(--wi-relax); stroke-width:1.8; }
+  .cellbg.path { fill:#dfeae4; stroke:var(--wi-queue); stroke-width:2; }
+  .cellbg.ans { stroke:var(--wi-accent); stroke-width:2.2; }
+  .cellval { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-ink-strong);
+             text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .cellval.inf { fill:var(--wi-ink-faint); }
+  .cellval.big { font-weight:bold; fill:var(--wi-accent-dark); }
+  .cellsub { font-family:var(--wi-font-mono); font-size:9px; fill:var(--wi-examine);
+             text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .hdrix { font-family:var(--wi-font-mono); font-size:11.5px; fill:var(--wi-ink-faint);
+           text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .hdrix.hot { fill:var(--wi-accent); font-weight:bold; }
+  .hdrname { font-family:var(--wi-font-body); font-size:12.5px; fill:var(--wi-ink-soft); font-style:italic;
+             pointer-events:none; }
+  .larr { fill:none; stroke-width:2.2; pointer-events:none; }
+  .larr.look { stroke:var(--wi-examine); }
+  .larr.good { stroke:var(--wi-relax); stroke-width:3; }
+  .larr.keep { stroke:var(--wi-border-strong); stroke-width:1.6; stroke-dasharray:3 3; }
+  .larr.path { stroke:var(--wi-queue); stroke-width:3; }
+  .larr.faintedge { stroke:var(--wi-inert); stroke-width:1.4; }
+  .darc { fill:none; stroke:var(--wi-ink-strong); stroke-width:2.6; }
+  .dagval { font-family:var(--wi-font-mono); font-size:12px; text-anchor:middle; dominant-baseline:central;
+            fill:var(--wi-ink-strong); pointer-events:none; }
+  .vtx.ghost { stroke-dasharray:3 3; opacity:.55; }
+  .laylab { font-family:var(--wi-font-body); font-size:13px; dominant-baseline:central;
+            fill:var(--wi-ink-soft); font-style:italic; pointer-events:none; }
+  .wtxt.strong { fill:var(--wi-ink-strong); font-size:11.5px; }
+  @keyframes slidedown { from { transform:translateY(-74px); opacity:0; } to { transform:none; opacity:1; } }
+  .slidein { animation:slidedown .45s cubic-bezier(.25,.9,.35,1) both; }
+
+  @keyframes cellpop { from { opacity:0; transform:translateY(-7px) scale(.7); } to { opacity:1; transform:none; } }
+  .pop { animation:cellpop .32s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box; transform-origin:center; }
+  @keyframes arrdraw { from { stroke-dashoffset:var(--len); } to { stroke-dashoffset:0; } }
+  .drawin { stroke-dasharray:var(--len); animation:arrdraw .36s ease-out both; }
+  @media (prefers-reduced-motion:reduce) { * { animation-duration:.001ms !important; } }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1 id="h1t">Shortest paths as dynamic programming</h1>
+  <span class="seg" id="modeSeg">
+    <button id="modeTpl" class="on">Template DP (length layers)</button>
+    <button id="modeBF">Bellman-Ford (in place)</button>
+  </span>
+</div>
+
+<p class="subtitle" id="subTpl">
+  Every nontrivial shortest path has a <b>last edge</b> — but guessing it makes the subproblems depend on
+  each other cyclically. The cure is a second index: <i>δ</i><sub>≤ℓ</sub>(<i>s</i>,<i>w</i>), the cheapest
+  <i>s</i>-<i>w</i>-walk using <b>at most ℓ edges</b>. Now every subproblem depends only on layer ℓ−1, so the
+  dependency graph is a DAG — the cycles of <i>G</i> have been unrolled into a helix. The grid below
+  <i>is</i> that layered graph: row ℓ, column <i>w</i> holds <i>δ</i><sub>≤ℓ</sub>(<i>s</i>,<i>w</i>), and every
+  edge <i>vw</i> of <i>G</i> appears once per layer, from (ℓ−1,<i>v</i>) to (ℓ,<i>w</i>).
+</p>
+<p class="subtitle" id="subBF" style="display:none">
+  The same computation, done in place. One <code>dist</code> array instead of <i>n</i>+1 layers, and edges
+  scanned <b>forwards</b> out of each vertex rather than backwards into it. The subproblems (ℓ,<i>v</i>) are
+  then no longer solved exactly — after pass ℓ, <code>dist[w]</code> can already be <i>better</i> than
+  <i>δ</i><sub>≤ℓ</sub>(<i>s</i>,<i>w</i>), because an update earlier in the same pass may already have helped.
+  That is harmless: it is never worse, and after <i>n</i>−1 passes it is exact. Switch on the comparison
+  below to watch it run ahead.
+</p>
+
+<div class="mobile-note">
+  <b>Small screen:</b> compact demo — graph, layers and scrubber. The pseudocode with live line
+  highlighting is on the desktop version.
+</div>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <label for="fileSel">graphs/</label>
+    <select id="fileSel"><option value="">— none found —</option></select>
+  </div>
+  <div class="ctl">
+    <label for="srcSel">Source s</label>
+    <select id="srcSel"></select>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Detail</span>
+    <span class="seg" id="granSeg">
+      <button id="granCoarse" class="on">One step per vertex</button>
+      <button id="granFine">Every edge</button>
+    </span>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Layers as</span>
+    <span class="seg" id="viewSeg">
+      <button id="viewTab" class="on">Table</button>
+      <button id="viewDag">Unfolded DAG</button>
+    </span>
+  </div>
+  <div class="ctl">
+    <label class="chk" id="cmpWrap" style="display:none"><input type="checkbox" id="cmpChk"> compare with δ≤ℓ</label>
+    <label class="chk"><input type="checkbox" id="allArrChk"> all layer edges</label>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="srcNote"></span>
+  <span class="opnote" style="margin-left:auto">Click a vertex to make it the source; hover one for its
+  current path from <i>s</i>.</span>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">— / —</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="60" max="1400" value="420" style="width:88px">
+      <span class="stepno" id="speedVal">420ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The graph</span><span class="rhs" id="graphMeta"></span></div>
+      <div class="svgscroll"><svg id="graphSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-accent)"></span> source</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> edge under test</span>
+        <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> improvement</span>
+        <span class="item"><span class="sw" style="background:var(--wi-panel-2);border-color:var(--wi-accent)"></span> tree edge (pred)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Distances</span><span class="rhs" id="distMeta"></span></div>
+      <div id="distBox"></div>
+    </div>
+  </div>
+</div>
+
+<div class="sim-box" style="margin-top:18px">
+  <div class="sim-title"><span id="layTitle">Length layers · δ≤ℓ(s,·)</span><span class="rhs" id="layMeta"></span></div>
+  <div class="svgscroll"><svg id="laySvg" class="stagesvg"></svg></div>
+</div>
+
+<details class="code desk-only" id="codeBox" open style="margin-top:18px">
+  <summary>Recurrence &amp; pseudocode</summary>
+  <div class="codebody" id="codeBody"></div>
+  <div class="codenote" id="codeNote"></div>
+</details>
+
+<details class="code desk-only" id="extBox" style="margin-top:14px">
+  <summary>Extension: reporting the cycle, not just detecting it</summary>
+  <div class="codebody" id="extBody"></div>
+  <div class="codenote">
+    The pseudocode of the lecture stops at <code>HAS_NEGATIVE_CYCLE</code>. Two more passes turn that
+    verdict into a witness, and neither costs more than O(n+m): <code>pred</code> already points backwards
+    along edges that were improved, so walking it from the improving vertex must eventually re-enter a
+    vertex it has seen — and it can only cycle inside a negative cycle. Everything reachable from that
+    cycle then has no shortest path at all, since one more lap is always cheaper.
+    <b>This is what the page draws in blue; it is not part of the algorithm you were asked to know.</b>
+  </div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button>
+        <button id="copyBtn">Copy</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      The augmented <code>algs4</code> format, exactly as the graph editor writes it: <code>V</code> on the
+      first line, <code>E</code> on the second, then <code>E</code> lines <code>v w weight</code>
+      (a missing weight defaults to 1), then optionally <code>V</code> lines <code>x y</code> giving the
+      vertex coordinates. Any coordinate scale works — they are re-centred and scaled to fit.
+      Edges are read as <b>directed</b>, <code>v → w</code>.
+      <br><br>
+      Files dropped into a <code>graphs/</code> folder next to this page appear in the menu above, via
+      <code>graphs/index.json</code> or plain directory listing — the same convention as the other pages.
+      At most 12 vertices, or the layer grid stops being readable.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Shortest paths as DP, and Bellman-Ford.
+
+     delta_{<=l}(s,w) =  infinity                       if l = 0 and s != w
+                         0                              if l = 0 and s  = w
+                         min( {delta_{<=l-1}(s,w)}      otherwise
+                              u {delta_{<=l-1}(s,v) + c(vw) : vw in E} )
+
+   Note the first term of the min: NOT taking an l-th edge must be an option,
+   or the recurrence computes cheapest walks with exactly l edges instead of
+   at most l, and layer n-1 is not the answer.  bellmanFord needs no such term
+   because it updates dist in place -- the previous value is simply still there.
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const INF = Infinity;
+function fmt(x) {
+  if (x === INF) return "\u221e";
+  if (x === -INF) return "-\u221e";
+  return Number.isInteger(x) ? String(x) : (Math.round(x * 1000) / 1000).toString();
+}
+const fmtw = x => Number.isInteger(x) ? String(x) : (Math.round(x * 1000) / 1000).toString();
+
+/* ---------- presets (algs4 data, verbatim; coordinates added here) -------- */
+
+const PRESETS = {
+  lecture: { name: "lecture example (length layers)", text:
+`4
+4
+0 1 3
+1 2 2
+2 3 2
+3 1 -1
+0.05 0.5
+0.36 0.5
+0.67 0.35
+0.98 0.5` },
+  tinyEWDn: { name: "tinyEWDn (algs4, negative weights)", text:
+`8
+15
+4 5  0.35
+5 4  0.35
+4 7  0.37
+5 7  0.28
+7 5  0.28
+5 1  0.32
+0 4  0.38
+0 2  0.26
+7 3  0.39
+1 3  0.29
+2 7  0.34
+6 2 -1.20
+3 6  0.52
+6 0 -1.40
+6 4 -1.25
+0.05 0.25
+0.88 0.34
+0.05 0.78
+0.72 0.74
+0.34 0.10
+0.63 0.10
+0.30 0.94
+0.42 0.50` },
+  tinyEWDnc: { name: "tinyEWDnc (algs4, negative cycle)", text:
+`8
+15
+4 5  0.35
+5 4 -0.66
+4 7  0.37
+5 7  0.28
+7 5  0.28
+5 1  0.32
+0 4  0.38
+0 2  0.26
+7 3  0.39
+1 3  0.29
+2 7  0.34
+6 2  0.40
+3 6  0.52
+6 0  0.58
+6 4  0.93
+0.05 0.25
+0.88 0.34
+0.05 0.78
+0.72 0.74
+0.34 0.10
+0.63 0.10
+0.30 0.94
+0.42 0.50` },
+  chain: { name: "path graph (worst case: n−1 passes)", text:
+`6
+5
+0 1 1
+1 2 1
+2 3 1
+3 4 1
+4 5 1
+0.05 0.5
+0.24 0.5
+0.43 0.5
+0.62 0.5
+0.81 0.5
+0.99 0.5` },
+  detour: { name: "negative edge beats a short path", text:
+`5
+6
+0 1 4
+0 2 1
+2 3 1
+3 1 -3
+1 4 2
+2 4 6
+0.05 0.5
+0.5 0.2
+0.4 0.85
+0.72 0.6
+0.95 0.4` },
+  cyc: { name: "small negative cycle", text:
+`4
+5
+0 1 2
+1 2 3
+2 3 -4
+3 1 -1
+0 3 8
+0.05 0.5
+0.4 0.2
+0.75 0.45
+0.4 0.85` }
+};
+
+/* ---------- state -------------------------------------------------------- */
+
+let n = 0, E = [], pos = [], adjOut = [], adjIn = [];
+let s = 0;
+let delta = [], deltaFrom = [];           /* the template DP table */
+let mode = "tpl", gran = 0, layView = "table";
+let cmpDelta = false, allArr = false;
+let steps = [], phases = [], cur = 0, timer = null;
+let hoverV = -1, hoverCell = null;
+
+/* ---------- graph parsing (augmented algs4, as the editor writes it) ----- */
+
+function normalizePositions(raw) {
+  if (!raw.length) return [];
+  let a = Infinity, b = Infinity, c2 = -Infinity, d = -Infinity;
+  raw.forEach(p => { a = Math.min(a, p.x); b = Math.min(b, p.y); c2 = Math.max(c2, p.x); d = Math.max(d, p.y); });
+  const w = Math.max(c2 - a, 1e-6), h = Math.max(d - b, 1e-6);
+  const pad = 0.08, avail = 1 - 2 * pad, sc = avail / Math.max(w, h);
+  const offX = pad + (avail - w * sc) / 2, offY = pad + (avail - h * sc) / 2;
+  return raw.map(p => ({ x: offX + (p.x - a) * sc, y: offY + (p.y - b) * sc }));
+}
+function tokenizeLines(t) {
+  return t.split("\n").map(l => l.trim().split(/\s+/).filter(x => x.length)).filter(x => x.length);
+}
+function parseGraph(text) {
+  const lines = tokenizeLines(text);
+  if (!lines.length) throw new Error("Empty input.");
+  let li, V, M;
+  if (lines[0].length >= 2) { V = parseInt(lines[0][0], 10); M = parseInt(lines[0][1], 10); li = 1; }
+  else { if (lines.length < 2) throw new Error("Need E on the second line."); 
+         V = parseInt(lines[0][0], 10); M = parseInt(lines[1][0], 10); li = 2; }
+  if (!Number.isFinite(V) || V < 1) throw new Error("V must be a positive integer.");
+  if (V > 12) throw new Error("At most 12 vertices — the layer grid needs one row per layer.");
+  if (!Number.isFinite(M) || M < 0) throw new Error("E must be a non-negative integer.");
+  const es = [];
+  for (let k = 0; k < M; k++) {
+    if (li >= lines.length) throw new Error("Expected " + M + " edge lines, found " + k + ".");
+    const t = lines[li++];
+    const u = parseInt(t[0], 10), v = parseInt(t[1], 10);
+    if (!Number.isFinite(u) || !Number.isFinite(v)) throw new Error("Edge " + (k + 1) + ": expected two vertices.");
+    if (u < 0 || u >= V || v < 0 || v >= V) throw new Error("Edge " + (k + 1) + ": vertex out of range 0…" + (V - 1) + ".");
+    let w = t.length >= 3 ? parseFloat(t[2]) : 1;
+    if (!Number.isFinite(w)) w = 1;
+    if (u === v) throw new Error("Edge " + (k + 1) + ": self-loops are not drawn here.");
+    es.push({ u: u, v: v, c: w });
+  }
+  let p = null;
+  const rest = lines.length - li;
+  if (rest > 0) {
+    if (rest !== V) throw new Error("After the edges, expected either nothing or exactly " + V +
+                                    " coordinate lines, but found " + rest + ".");
+    const raw = [];
+    for (let i = 0; i < V; i++) {
+      const t = lines[li++], x = parseFloat(t[0]), y = parseFloat(t[1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("Vertex " + i + ": expected \"x y\".");
+      raw.push({ x: x, y: y });
+    }
+    p = normalizePositions(raw);
+  }
+  return { V: V, edges: es, pos: p };
+}
+function circleLayout(V) {
+  const out = [];
+  for (let i = 0; i < V; i++) {
+    const a = (i / V) * Math.PI * 2 - Math.PI / 2;
+    out.push({ x: 0.5 + 0.38 * Math.cos(a), y: 0.5 + 0.38 * Math.sin(a) });
+  }
+  return out;
+}
+
+/* ---------- the DP table ------------------------------------------------- */
+
+function computeDelta() {
+  adjOut = []; adjIn = [];
+  for (let i = 0; i < n; i++) { adjOut.push([]); adjIn.push([]); }
+  E.forEach((e, i) => { adjOut[e.u].push(i); adjIn[e.v].push(i); });
+  delta = []; deltaFrom = [];
+  for (let l = 0; l <= n; l++) { delta.push(new Array(n).fill(INF)); deltaFrom.push(new Array(n).fill(-1)); }
+  delta[0][s] = 0;
+  for (let l = 1; l <= n; l++)
+    for (let w = 0; w < n; w++) {
+      let best = delta[l - 1][w], from = -1;          /* the "don't move" option */
+      adjIn[w].forEach(i => {
+        const e = E[i], q = delta[l - 1][e.u] + e.c;
+        if (q < best) { best = q; from = i; }
+      });
+      delta[l][w] = best; deltaFrom[l][w] = from;
+    }
+}
+/* the walk attaining delta[l][w], as a list of edge indices */
+function deltaPath(l, w) {
+  const t = deltaTrace(l, w);
+  return t ? t.edges.map(x => x[1]) : null;
+}
+/* the full backwards walk from (l,w) to (0,s): which cells it passes through
+   and which edge it uses at each layer. Layers where the value was inherited
+   ("don't take an l-th edge") consume a layer without an edge, so the two
+   cannot be derived from one another. */
+function deltaTrace(l, w) {
+  if (!(delta[l] && delta[l][w] < INF)) return null;
+  const cells = [[l, w]], edges = [];
+  let ll = l, ww = w, guard = 0;
+  while (ll > 0 && guard++ < 5000) {
+    const i = deltaFrom[ll][ww];
+    if (i < 0) ll--;
+    else { edges.unshift([ll, i]); ww = E[i].u; ll--; }
+    cells.push([ll, ww]);
+  }
+  return (ww === s) ? { cells: cells, edges: edges } : null;
+}
+/* what the pointer is currently asking about, in whichever drawing it is over */
+function currentTrace() {
+  const st = steps[cur] || {};
+  if (mode === "tpl") {
+    let l, v;
+    if (hoverCell) { l = hoverCell[0]; v = hoverCell[1]; }
+    else if (hoverV >= 0 && st.row !== undefined) { l = st.row; v = hoverV; }
+    else return null;
+    return deltaTrace(l, v);
+  }
+  const l = hoverCell ? hoverCell[0] : (st.pass || 0);
+  const v = hoverCell ? hoverCell[1] : hoverV;
+  const pr = hoverCell ? (st.psnap && st.psnap[l]) : st.pred;
+  if (v === undefined || v < 0 || !pr) return null;
+  const p = predPath(pr, v);
+  if (!p) return null;
+  const cells = [[l, v]], edges = [];
+  p.forEach(i => { edges.push([l, i]); cells.push([l, E[i].u]); });
+  return { cells: cells, edges: edges, flat: true };   /* one pass, one row */
+}
+const inTrace = (t, l, v) => !!t && t.cells.some(c => c[0] === l && c[1] === v);
+const traceHas = (t, l, i) => !!t && t.edges.some(e => e[0] === l && e[1] === i);
+
+/* The cycle itself, as in negativeCycle(): walk pred back from the endpoint of
+   the improving edge until a vertex repeats, then read the cycle off. */
+function negCycleVerts(pred, w) {
+  const seen = new Array(n).fill(false);
+  let v = w, guard = 0;
+  while (v >= 0 && !seen[v] && guard++ < 4 * n) { seen[v] = true; v = pred[v]; }
+  if (v < 0 || guard >= 4 * n) return null;
+  const res = [], start = v;
+  let x = v, g2 = 0;
+  do { res.unshift(x); x = pred[x]; if (x < 0) return null; } while (x !== start && g2++ < 4 * n);
+  return res.length ? res : null;
+}
+const edgeIndex = (u, v) => E.findIndex(e => e.u === u && e.v === v);
+/* every vertex reachable from the cycle has distance -infinity */
+function reachableFrom(seeds) {
+  const seen = new Array(n).fill(false), q = seeds.slice();
+  seeds.forEach(v => seen[v] = true);
+  while (q.length) {
+    const v = q.shift();
+    adjOut[v].forEach(i => { const w = E[i].v; if (!seen[w]) { seen[w] = true; q.push(w); } });
+  }
+  const out = [];
+  for (let v = 0; v < n; v++) if (seen[v]) out.push(v);
+  return out;
+}
+/* The layered table proves a negative cycle exists but stores no pred pointers,
+   so to NAME one we run the in-place relaxation once in the background. Nothing
+   of this is animated; it only feeds the highlight. */
+function negCycleByRelaxation() {
+  const dist = new Array(n).fill(INF), pred = new Array(n).fill(-1);
+  dist[s] = 0;
+  for (let l = 1; l <= n - 1; l++)
+    for (let v = 0; v < n; v++)
+      adjOut[v].forEach(i => {
+        const e = E[i];
+        if (dist[v] + e.c < dist[e.v]) { dist[e.v] = dist[v] + e.c; pred[e.v] = v; }
+      });
+  for (let v = 0; v < n; v++)
+    for (const i of adjOut[v])
+      if (dist[v] + E[i].c < dist[E[i].v] - 1e-12) return negativeCycleInfo(pred, i);
+  return null;
+}
+function negativeCycleInfo(pred, improvingEdge) {
+  const verts = negCycleVerts(pred, E[improvingEdge].v);
+  if (!verts) return { edges: null, verts: null, negInf: reachableFrom([E[improvingEdge].v]) };
+  const edges = [];
+  verts.forEach(v => { const i = edgeIndex(pred[v], v); if (i >= 0) edges.push([pred[v], v]); });
+  return { edges: edges, verts: verts, negInf: reachableFrom(verts) };
+}
+
+/* ---------- step plumbing ------------------------------------------------ */
+
+/* A name for the state a step represents, independent of which view built it.
+   Switching Table <-> Unfolded DAG rebuilds the run (the DAG view has the
+   unfolding phase in front), so the two lists must be matched up by meaning
+   rather than by index. */
+function sigOf(o) {
+  if (o.unfold !== undefined) return "u" + o.unfold + (o.done ? "e" : "");
+  if (mode === "bf") {
+    if (o.pass === 0) return "init";
+    if (o.cycle !== undefined || o.neg !== undefined) return "chk:end";
+    if (o.endPass) return "p" + o.pass + ":end";
+    if (o.cyc !== undefined || (o.look !== undefined && o.pass === n - 1 && o.edge !== undefined && !o.good))
+      return "chk:e" + o.edge;
+    if (o.edge !== undefined) return "p" + o.pass + ":e" + o.edge;
+    return "p" + o.pass + ":v" + o.fromV;
+  }
+  if (o.cmpRow) return "res";
+  if (o.ansRow) return "ans";
+  if (o.row === undefined) return "intro";
+  if (o.row === 0) return "base";
+  if (o.write) return "l" + o.row + "w" + o.col + ":w";
+  if (o.keep) return "l" + o.row + "w" + o.col + ":k";
+  return "l" + o.row + "w" + o.col + ":e" + o.edge;
+}
+function mkPhase(name) { phases.push({ name: name, from: steps.length, to: steps.length }); }
+function add(o) {
+  o.ph = phases.length - 1; o.hl = o.hl || []; o.hlp = o.hlp || [];
+  o.sig = sigOf(o);
+  steps.push(o); phases[phases.length - 1].to = steps.length - 1;
+}
+
+/* ---------- template DP: layer by layer ---------------------------------- */
+
+function buildTpl() {
+  if (layView === "dag") {
+    /* the construction of the layered graph, before any DP happens:
+       project G onto the x-axis, then repeatedly clone the bottom row and
+       let its edges follow it down into the next layer */
+    mkPhase("Unfolding");
+    add({ unfold: 0, txt: "Here is <i>G</i> again, in its own layout. To unfold it we first flatten it: " +
+          "vertex <i>i</i> moves to position <i>x</i> = <i>i</i> on a line, edges dragged along.",
+          hl: ["r_head"] });
+    add({ unfold: 1, txt: "The same graph, now on a line. Its edges arc over the top \u2014 and the " +
+          "cycles among them are exactly what made the last-edge decomposition circular.",
+          hl: ["r_head"] });
+    for (let l = 1; l <= n; l++)
+      add({ unfold: 1 + l, txt: l === 1
+        ? "Clone the row and slide the copy down: the arcs come with it, and each edge <i>vw</i> now runs " +
+          "from <i>v</i> in layer 0 to <i>w</i> in layer 1 \u2014 <b>one edge used, one layer down</b>. " +
+          "The dashed vertical edges of weight 0 are the option of not moving at all."
+        : "Layer " + l + ": clone and slide again. Every arc becomes an edge from layer " + (l - 1) +
+          " to layer " + l + "; nothing ever points back up.",
+        hl: ["r_head"] });
+    add({ unfold: 1 + n, done: true,
+          txt: "That is the whole trick: <i>n</i>+1 copies of <i>V</i>, every edge of <i>G</i> repeated " +
+               "once per layer, all pointing strictly downwards. <b>No cycles left</b> \u2014 a DAG, and " +
+               "a shortest <i>s</i>-<i>w</i>-walk with at most \u2113 edges in <i>G</i> is a path from " +
+               "(0,<i>s</i>) to (\u2113,<i>w</i>) here. The arcs have done their job and go away.",
+          hl: ["r_head"] });
+  }
+
+  mkPhase("\u2113 = 0");
+  add({ fillTo: 0, txt: "<b>Subproblems</b> (<i>w</i>,\u2113): the cheapest <i>s</i>-<i>w</i>-walk with " +
+        "<b>at most \u2113 edges</b>. Layer \u2113 depends only on layer \u2113\u22121, so the cyclic " +
+        "dependency of the last-edge decomposition is unrolled into a DAG \u2014 the helix.",
+        hl: ["r_head"], hlp: ["t_head"] });
+  add({ fillTo: n, row: 0, write: true,
+        txt: "<b>Base case \u2113 = 0</b>: with no edges at all only <i>s</i> itself is reachable, at cost " +
+             "<code>0</code>; everything else is <code>+\u221e</code>.",
+        hl: ["r_base0", "r_base1"], hlp: ["t_init", "t_src"] });
+
+  for (let l = 1; l <= n; l++) {
+    mkPhase(l === n ? "\u2113 = " + n + " · check" : "\u2113 = " + l);
+    for (let w = 0; w < n; w++) {
+      const inherited = delta[l - 1][w], won = deltaFrom[l][w];
+      if (gran === 1) {
+        add({ fillTo: (l - 1) * n + n + w, row: l, col: w, keep: true,
+              cells: { }, txt: "<b>\u03b4\u2264" + l + "(s," + w + ")</b> starts from the option of " +
+                "<i>not</i> using an \u2113-th edge: <code>\u03b4\u2264" + (l - 1) + "(s," + w + ") = " +
+                fmt(inherited) + "</code>. Now try the incoming edges.",
+              hl: ["r_keep"], hlp: ["t_keep"] });
+        let best = inherited;
+        adjIn[w].forEach(i => {
+          const e = E[i], q = delta[l - 1][e.u] + e.c, better = q < best;
+          if (better) best = q;
+          add({ fillTo: (l - 1) * n + n + w, row: l, col: w, edge: i, look: true, better: better,
+                txt: "edge <code>" + e.u + "\u2192" + w + "</code> of cost <code>" + fmtw(e.c) +
+                     "</code>: <code>\u03b4\u2264" + (l - 1) + "(s," + e.u + ") + c = " +
+                     fmt(delta[l - 1][e.u]) + " + " + fmtw(e.c) + " = " + fmt(q) + "</code> " +
+                     (better ? '<span class="imp">&lt; ' + fmt(best === q ? (q) : best) +
+                               " \u2014 better</span>" : '<span class="no">\u2265 ' + fmt(best) +
+                               ", no improvement</span>"),
+                hl: ["r_min"], hlp: ["t_edge", "t_min"] });
+        });
+      }
+      add({ fillTo: (l - 1) * n + n + w + 1, row: l, col: w, write: true, edge: won >= 0 ? won : -1,
+            good: won >= 0,
+            txt: "<b>\u03b4\u2264" + l + "(s," + w + ") = " + fmt(delta[l][w]) + "</b>" +
+                 (won >= 0
+                   ? " via the last edge <code>" + E[won].u + "\u2192" + w + "</code>."
+                   : (delta[l][w] === inherited && delta[l][w] !== INF
+                        ? " \u2014 unchanged: no incoming edge beats the walk with \u2264 " + (l - 1) +
+                          " edges."
+                        : " \u2014 still unreachable within " + l + " edge" + (l === 1 ? "" : "s") + ".")),
+            hl: ["r_min"], hlp: ["t_min"] });
+    }
+    if (l === n - 1 && n >= 2)
+      add({ fillTo: (l - 1) * n + n + n, row: l, ansRow: true,
+            txt: "Layer <b>" + (n - 1) + " = n\u22121</b> is the original problem: without negative cycles a " +
+                 "shortest walk is a path, and a path has at most <i>n</i>\u22121 edges.",
+            ans: "\u03b4(s,\u00b7) = [" + delta[n - 1].map(fmt).join(", ") + "]",
+            hl: ["r_head"], hlp: ["t_ret"] });
+  }
+
+  mkPhase("Result");
+  const bad = [];
+  for (let w = 0; w < n; w++) if (delta[n][w] < delta[n - 1][w] - 1e-12) bad.push(w);
+  const nc = bad.length ? negCycleByRelaxation() : null;
+  add({ fillTo: n * n + n, cmpRow: true, bad: bad, row: n - 1,
+        txt: bad.length
+          ? "One more layer changed something: <code>\u03b4\u2264" + n + "(s,w) &lt; \u03b4\u2264" +
+            (n - 1) + "(s,w)</code> for <b>w = " + bad.join(", ") + "</b>. By the Lemma that happens " +
+            "<i>iff</i> a negative cycle is reachable from <i>s</i>." +
+            (nc && nc.verts
+              ? " Here it is, in blue: <b>" + nc.verts.join(" \u2192 ") + " \u2192 " + nc.verts[0] +
+                "</b>, total weight <code>" +
+                fmt(Math.round(nc.edges.reduce((a2, pr) => a2 + E[edgeIndex(pr[0], pr[1])].c, 0) * 1e6) / 1e6) +
+                "</code>. Going round once more is always cheaper, so every vertex reachable from it has " +
+                "<code>\u2212\u221e</code> distance and no shortest path at all."
+              : " A walk keeps getting cheaper the longer you make it, so those distances are " +
+                "<code>\u2212\u221e</code> and no shortest path exists.") +
+            " <i>(Finding the cycle is not part of the algorithm \u2014 see the extension below.)</i>"
+          : "Layer <i>n</i> = " + n + " is identical to layer <i>n</i>\u22121: nothing improves by allowing " +
+            "one more edge, so <b>no negative cycle</b> is reachable from <i>s</i> and layer " + (n - 1) +
+            " holds the true distances.",
+        ans: bad.length ? null : "\u03b4(s,\u00b7) = [" + delta[n - 1].map(fmt).join(", ") + "]",
+        neg: bad.length > 0, negInf: bad.length ? reachableFrom(bad) : null,
+        cycle: nc ? nc.edges : null, cycVerts: nc ? nc.verts : null,
+        hl: ["r_min"], hlp: ["t_ret"] });
+}
+
+/* ---------- Bellman-Ford: in place --------------------------------------- */
+
+function buildBF() {
+  const dist = new Array(n).fill(INF), pred = new Array(n).fill(-1);
+  dist[s] = 0;
+  const snap = [dist.slice()], psnap = [pred.slice()];
+
+  mkPhase("init");
+  add({ dist: dist.slice(), pred: pred.slice(), snap: [snap[0]], psnap: [psnap[0]], pass: 0, write: true,
+        txt: "<code>dist[v] \u2190 +\u221e</code> for all <i>v</i>, <code>pred[v] \u2190 null</code>, " +
+             "then <code>dist[" + s + "] \u2190 0</code>. From here on there is a single array: every " +
+             "update is visible to the rest of the same pass.",
+        hl: ["r_base0", "r_base1"], hlp: ["b_init", "b_src"] });
+
+  for (let l = 1; l <= n - 1; l++) {
+    mkPhase("pass " + l);
+    for (let v = 0; v < n; v++) {
+      const changed = [];
+      if (gran === 1) {
+        adjOut[v].forEach(i => {
+          const e = E[i], q = dist[v] + e.c, better = q < dist[e.v];
+          if (better) { dist[e.v] = q; pred[e.v] = v; changed.push(e.v); }
+          add({ dist: dist.slice(), pred: pred.slice(), snap: snap.map(x => x), psnap: psnap.map(x => x), pass: l,
+                edge: i, look: !better, good: better, upd: better ? e.v : -1,
+                txt: "<code>" + v + "\u2192" + e.v + "</code>, cost <code>" + fmtw(e.c) + "</code>: " +
+                     (better
+                       ? '<span class="imp">dist[' + e.v + "] improves to " + fmt(q) + "</span>" +
+                         ", so <code>pred[" + e.v + "] \u2190 " + v + "</code>."
+                       : '<span class="no">dist[' + e.v + "] = " + fmt(dist[e.v]) + " \u2264 " +
+                         fmt(dist[v]) + " + " + fmtw(e.c) + " \u2014 no update</span>."),
+                hl: ["r_min"], hlp: ["b_edge", "b_if", "b_set", "b_pred"] });
+        });
+      } else {
+        adjOut[v].forEach(i => {
+          const e = E[i], q = dist[v] + e.c;
+          if (q < dist[e.v]) { dist[e.v] = q; pred[e.v] = v; changed.push(e.v); }
+        });
+        add({ dist: dist.slice(), pred: pred.slice(), snap: snap.map(x => x), psnap: psnap.map(x => x), pass: l,
+              fromV: v, changedSet: changed.slice(),
+              txt: "All " + adjOut[v].length + " edge" + (adjOut[v].length === 1 ? "" : "s") +
+                   " out of <b>" + v + "</b> (<code>dist[" + v + "] = " + fmt(dist[v]) + "</code>): " +
+                   (changed.length ? '<span class="imp">improved ' +
+                      changed.map(x => "dist[" + x + "] = " + fmt(dist[x])).join(", ") + "</span>."
+                    : '<span class="no">nothing improved</span>.'),
+              hl: ["r_min"], hlp: ["b_edge", "b_if", "b_set", "b_pred"] });
+      }
+    }
+    snap.push(dist.slice()); psnap.push(pred.slice());
+    add({ dist: dist.slice(), pred: pred.slice(), snap: snap.map(x => x), psnap: psnap.map(x => x), pass: l, endPass: true, write: true,
+          txt: "<b>Pass " + l + " done.</b> Every <code>dist[w]</code> is now at most " +
+               "<code>\u03b4\u2264" + l + "(s,w)</code> \u2014 and often already less, because updates " +
+               "made earlier in this pass were used later in the same pass.",
+          hl: ["r_min"], hlp: ["b_pass"] });
+  }
+
+  mkPhase("check");
+  let neg = null;
+  for (let v = 0; v < n && neg === null; v++)
+    for (const i of adjOut[v]) {
+      const e = E[i], q = dist[v] + e.c, better = q < dist[e.v] - 1e-12;
+      add({ dist: dist.slice(), pred: pred.slice(), snap: snap.map(x => x), psnap: psnap.map(x => x), pass: n - 1,
+            edge: i, look: !better, cyc: better,
+            txt: "<code>" + v + "\u2192" + e.v + "</code>: " +
+                 (better
+                   ? "<b>still improves</b> after <i>n</i>\u22121 passes \u2014 impossible for a graph " +
+                     "without negative cycles, since every shortest path has at most <i>n</i>\u22121 edges."
+                   : '<span class="no">no improvement</span>.'),
+            hl: ["r_min"], hlp: ["b_chk", "b_ret_neg"] });
+      if (better) { neg = i; break; }
+    }
+  /* Not animated: once an improving edge is found, read off the cycle it
+     witnesses and mark everything reachable from it as -infinity, the way
+     negativeCycle() and the BFS in the Java version do. */
+  const info = neg === null ? null : negativeCycleInfo(pred, neg);
+  const finalDist = dist.slice();
+  if (info) info.negInf.forEach(v => finalDist[v] = -INF);
+  add({ dist: finalDist, pred: pred.slice(), snap: snap.map(x => x), psnap: psnap.map(x => x), pass: n - 1,
+        cycle: info ? info.edges : null, cycVerts: info ? info.verts : null,
+        negInf: info ? info.negInf : null, neg: neg !== null,
+        txt: neg === null
+          ? "The check pass changed nothing, so <code>dist</code> holds the true distances and " +
+            "<code>pred</code> a shortest-path tree."
+          : "An edge still improves \u21d2 <code>return HAS_NEGATIVE_CYCLE</code>." +
+            (info && info.verts
+              ? " Following <code>pred</code> backwards from the improving vertex must run into the " +
+                "cycle, and there it is: <b>" + info.verts.join(" \u2192 ") + " \u2192 " +
+                info.verts[0] + "</b>, total weight <code>" +
+                fmt(Math.round(info.edges.reduce((a2, pr) =>
+                  a2 + E[edgeIndex(pr[0], pr[1])].c, 0) * 1e6) / 1e6) + "</code>. Every vertex " +
+                "reachable from it has no shortest path at all: going round once more is always " +
+                "cheaper, so <code>dist = \u2212\u221e</code> for " +
+                (info.negInf.length === n ? "every vertex" : "<b>" + info.negInf.join(", ") + "</b>") +
+                ". <i>(Reporting the cycle and the \u2212\u221e vertices goes beyond the pseudocode, " +
+                "which only returns the verdict.)</i>"
+              : ""),
+        ans: neg === null ? "dist = [" + dist.map(fmt).join(", ") + "]" : null,
+        hl: ["r_min"], hlp: [neg === null ? "b_ret" : "b_ret_neg"] });
+}
+
+function build() {
+  computeDelta();
+  steps = []; phases = []; cur = 0;
+  if (mode === "tpl") buildTpl(); else buildBF();
+}
+
+/* ---------- graph drawing ------------------------------------------------ */
+
+const GW = 620, GH = 400, GM = 42;
+let radius = 17;
+const sx = p => GM + p.x * (GW - 2 * GM);
+const sy = p => GM + p.y * (GH - 2 * GM);
+
+function hasReverse(e) { return E.some(f => f.u === e.v && f.v === e.u); }
+
+function drawGraph() {
+  const st = steps[cur] || {};
+  const svg = el("graphSvg");
+  svg.setAttribute("width", GW); svg.setAttribute("height", GH);
+  svg.setAttribute("viewBox", "0 0 " + GW + " " + GH);
+  let minD = Infinity;
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++)
+    minD = Math.min(minD, Math.hypot(sx(pos[i]) - sx(pos[j]), sy(pos[i]) - sy(pos[j])));
+  radius = Number.isFinite(minD) ? Math.max(13, Math.min(22, minD * 0.36)) : 18;
+
+  let dist = st.dist || (st.row !== undefined ? delta[st.row] : delta[0]);
+  if (st.negInf) { dist = dist.slice(); st.negInf.forEach(v => dist[v] = -INF); }
+  const pred = st.pred || null;
+  const out = [];
+  out.push('<defs>');
+  [["plain", "var(--wi-border-strong)"], ["tree", "var(--wi-accent)"], ["look", "var(--wi-examine)"],
+   ["good", "var(--wi-relax)"], ["cyc", "var(--wi-active)"], ["path", "var(--wi-queue)"]].forEach(p =>
+    out.push('<marker id="ga-' + p[0] + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" ' +
+             'markerHeight="5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="' + p[1] + '"/></marker>'));
+  out.push("</defs>");
+
+  /* which edges are special in this step */
+  const cls = new Array(E.length).fill("");
+  if (pred) for (let w = 0; w < n; w++) if (pred[w] >= 0) {
+    const i = E.findIndex(e => e.u === pred[w] && e.v === w);
+    if (i >= 0) cls[i] = "tree";
+  }
+  if (st.row !== undefined && mode === "tpl" && st.row >= 1) {
+    /* the tree of layer l: the last edge of the walk attaining delta[l][w].
+       Not the same as "the edges that improved in layer l" -- most values are
+       inherited from the layer above, and their walk is older than this row. */
+    for (let w = 0; w < n; w++) {
+      if (w === s) continue;
+      const p = deltaPath(st.row, w);
+      if (p && p.length) cls[p[p.length - 1]] = "tree";
+    }
+  }
+  if (st.cycle) st.cycle.forEach(pr => {
+    const i = E.findIndex(e => e.u === pr[0] && e.v === pr[1]); if (i >= 0) cls[i] = "cyc";
+  });
+  const trace = currentTrace();
+  const hoverPath = trace ? trace.edges.map(x => x[1]) : null;
+  if (hoverPath) hoverPath.forEach(i => cls[i] = "path");
+  if (st.edge !== undefined && st.edge >= 0)
+    cls[st.edge] = st.cyc ? "cyc" : (st.good ? "good" : "look");
+  if (st.fromV !== undefined) adjOut[st.fromV].forEach(i => { if (!cls[i]) cls[i] = "look"; });
+
+  if (st.cycle) st.cycle.forEach(pr => {
+    const i = E.findIndex(e => e.u === pr[0] && e.v === pr[1]);
+    if (i < 0) return;
+    const e = E[i];
+    const A = { x: sx(pos[e.u]), y: sy(pos[e.u]) }, B = { x: sx(pos[e.v]), y: sy(pos[e.v]) };
+    const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+    const bow = hasReverse(e) ? 13 : 0, nx = -uy * bow, ny = ux * bow;
+    out.push('<path class="cycunder" d="M' + (A.x + ux * radius * .4) + " " + (A.y + uy * radius * .4) +
+             "Q" + ((A.x + B.x) / 2 + nx) + " " + ((A.y + B.y) / 2 + ny) + " " +
+             (B.x - ux * radius * .4) + " " + (B.y - uy * radius * .4) + '"/>');
+  });
+  if (st.cycVerts) st.cycVerts.forEach(v =>
+    out.push('<circle class="cycring" cx="' + sx(pos[v]) + '" cy="' + sy(pos[v]) + '" r="' +
+             (radius + 4) + '"/>'));
+
+  E.forEach((e, i) => {
+    const A = { x: sx(pos[e.u]), y: sy(pos[e.u]) }, B = { x: sx(pos[e.v]), y: sy(pos[e.v]) };
+    const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1;
+    const ux = dx / L, uy = dy / L;
+    const bow = hasReverse(e) ? 13 : 0;
+    const nx = -uy * bow, ny = ux * bow;
+    const P1 = { x: A.x + ux * radius + nx * .55, y: A.y + uy * radius + ny * .55 };
+    const P2 = { x: B.x - ux * (radius + 3) + nx * .55, y: B.y - uy * (radius + 3) + ny * .55 };
+    const Mx = (A.x + B.x) / 2 + nx, My = (A.y + B.y) / 2 + ny;
+    const k = cls[i] || "plain";
+    out.push('<path class="edge ' + (cls[i] || "") + (hoverPath && !cls[i] ? " dim" : "") + '" d="M' +
+             P1.x + " " + P1.y + "Q" + Mx + " " + My + " " + P2.x + " " + P2.y +
+             '" marker-end="url(#ga-' + k + ')"/>');
+    const t = fmtw(e.c), tw = t.length * 6.2 + 7;
+    out.push('<rect class="wpill" x="' + (Mx - tw / 2) + '" y="' + (My - 7) + '" width="' + tw +
+             '" height="14" rx="3"/>');
+    out.push('<text class="wtxt' + (e.c < 0 ? " neg" : "") + '" x="' + Mx + '" y="' + My + '">' + t + "</text>");
+  });
+
+  for (let v = 0; v < n; v++) {
+    const X = sx(pos[v]), Y = sy(pos[v]);
+    let k = "";
+    if (v === s) k = "src";
+    if (st.col === v || st.fromV === v || (st.edge >= 0 && st.edge !== undefined && E[st.edge].u === v)) k = "from";
+    if (st.col === v && mode === "tpl") k = "cur";
+    if (st.upd === v || (st.changedSet && st.changedSet.indexOf(v) >= 0)) k = "upd";
+    if (trace && trace.cells.some(cc => cc[1] === v) && !k) k = "onpath";
+    if (st.bad && st.bad.indexOf(v) >= 0) k = "cyc";
+    if (st.negInf && st.negInf.indexOf(v) >= 0) k = "neginf";
+    if (st.cycle && st.cycle.some(pr => pr[0] === v || pr[1] === v)) k = "cyc";
+    out.push('<circle class="vtx ' + k + '" cx="' + X + '" cy="' + Y + '" r="' + radius + '"/>');
+    out.push('<text class="vlab" x="' + X + '" y="' + (Y + 1) + '">' + v + "</text>");
+    const dv = dist ? dist[v] : INF, t = fmt(dv), tw = Math.max(20, t.length * 7 + 8);
+    const py = Y - radius - 10;
+    out.push('<rect class="dpill' + (dv === INF ? " inf" : "") + (st.upd === v ? " upd" : "") + '" x="' +
+             (X - tw / 2) + '" y="' + (py - 8) + '" width="' + tw + '" height="16" rx="4"/>');
+    out.push('<text class="dtxt' + (dv === INF ? " inf" : "") + '" x="' + X + '" y="' + py + '">' + t + "</text>");
+    out.push('<circle class="hit" data-v="' + v + '" cx="' + X + '" cy="' + Y + '" r="' + (radius + 6) + '"/>');
+  }
+  svg.innerHTML = out.join("");
+  el("graphMeta").textContent = n + " vertices · " + E.length + " edges · source " + s;
+}
+function predPath(pred, v) {
+  if (!pred) return null;
+  const out = []; let x = v, guard = 0;
+  while (x !== s && pred[x] >= 0 && guard++ < 5000) {
+    const i = E.findIndex(e => e.u === pred[x] && e.v === x);
+    if (i < 0) return null;
+    out.unshift(i); x = pred[x];
+  }
+  return x === s ? out : null;
+}
+
+/* ---------- the layer grid ----------------------------------------------- */
+
+let CW = 62;
+const CHt = 30, LX = 62, LY = 40;
+const lcx = v => LX + v * CW + CW / 2;
+const lcy = l => LY + l * CHt + CHt / 2;
+
+function drawLayers() {
+  if (layView === "dag" && mode === "tpl") { drawDag(); return; }
+  drawTable();
+}
+
+/* ---------- the unfolded DAG --------------------------------------------- */
+
+const DR = 15, DROW = 74, DX0 = 40;
+let dagY0 = 56;
+function dagColW() { return Math.max(66, Math.min(130, Math.round(780 / n))); }
+const dnx = v => DX0 + v * dagColW() + dagColW() / 2;
+const dny = l => dagY0 + l * DROW;
+const arcLift = e => 26 + Math.abs(e.v - e.u) * 13;
+
+/* Every path below is "M x y Q cx cy x y" -- same command sequence, so SMIL can
+   interpolate the d attribute directly from one to the other. That is what lets
+   an arc on one row bend down into an edge between two rows instead of just
+   having its endpoints jump. */
+function arcPath(l, e) {
+  const x1 = dnx(e.u), x2 = dnx(e.v), y = dny(l), lift = arcLift(e), dir = e.v > e.u ? 1 : -1;
+  return "M" + (x1 + dir * DR * .5) + " " + (y - DR * .9) + "Q" + ((x1 + x2) / 2) + " " +
+         (y - DR - lift) + " " + (x2 - dir * DR * .5) + " " + (y - DR * .9);
+}
+function layerPath(l, e) {
+  const x1 = dnx(e.u), y1 = dny(l - 1), x2 = dnx(e.v), y2 = dny(l);
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+  const ax = x1 + dx / L * DR, ay = y1 + dy / L * DR;
+  const bx = x2 - dx / L * (DR + 4), by = y2 - dy / L * (DR + 4);
+  return "M" + ax + " " + ay + "Q" + ((ax + bx) / 2 + (e.v - e.u) * 4) + " " + ((ay + by) / 2) +
+         " " + bx + " " + by;
+}
+function keepPath(l) { return function (v, collapsed) {
+  const x = dnx(v), y1 = dny(l - 1) + DR, y2 = collapsed ? y1 : dny(l) - DR - 3;
+  return "M" + x + " " + y1 + "Q" + x + " " + ((y1 + y2) / 2) + " " + x + " " + y2;
+}; }
+function layerMid(l, e) {
+  const x1 = dnx(e.u), y1 = dny(l - 1), x2 = dnx(e.v), y2 = dny(l);
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+  const ax = x1 + dx / L * DR, ay = y1 + dy / L * DR;
+  const bx = x2 - dx / L * (DR + 4), by = y2 - dy / L * (DR + 4);
+  return { x: (ax + bx) / 2 + (e.v - e.u) * 2, y: (ay + by) / 2 };
+}
+function graphPath(e, gx, gy) {
+  const A = { x: gx(e.u), y: gy(e.u) }, B = { x: gx(e.v), y: gy(e.v) };
+  const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+  const bow = hasReverse(e) ? 13 : 0, nx = -uy * bow, ny = ux * bow;
+  return "M" + (A.x + ux * DR) + " " + (A.y + uy * DR) + "Q" + ((A.x + B.x) / 2 + nx) + " " +
+         ((A.y + B.y) / 2 + ny) + " " + (B.x - ux * (DR + 3)) + " " + (B.y - uy * (DR + 3));
+}
+/* SMIL timing is relative to the document timeline, so an <animate> inserted
+   minutes after load has its default begin="0s" already in the past: it renders
+   frozen at its end value and nothing moves. Declare them indefinite and start
+   them by hand once they are in the DOM. */
+const smilD = (from, to) => '<animate attributeName="d" begin="indefinite" from="' + from + '" to="' +
+                            to + '" dur="0.55s" fill="freeze"/>';
+const smilMove = (dx, dy) => '<animateTransform attributeName="transform" type="translate" ' +
+                             'begin="indefinite" from="' + dx.toFixed(1) + " " + dy.toFixed(1) +
+                             '" to="0 0" dur="0.55s" fill="freeze"/>';
+let lastAnimCur = -1;
+function startAnims(svg) {
+  const list = svg.querySelectorAll("animate, animateTransform");
+  for (let i = 0; i < list.length; i++) {
+    try { list[i].beginElement(); } catch (e) { /* no SMIL: the end state is already correct */ }
+  }
+}
+
+function drawDag() {
+  const st = steps[cur] || {};
+  const svg = el("laySvg");
+  const cw = dagColW(), uf = st.unfold;
+  const rowsVis = (uf === undefined) ? n + 1 : Math.max(1, uf);
+  /* One geometry for every step of this graph: row 0 always sits at the same y,
+     the box is always as tall as the finished stack. Nothing jumps as layers
+     appear, and the graph-layout step lives inside the same box. */
+  const maxLift = E.length ? Math.max.apply(null, E.map(arcLift)) : 0;
+  dagY0 = 30 + DR + maxLift;
+  const W = DX0 + n * cw + 74, H = dagY0 + n * DROW + DR + 34;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const gbW = W - 76, gbH = Math.min(H - 70, 210);
+  const gx = v => 36 + pos[v].x * gbW, gy = v => 26 + pos[v].y * gbH;
+  /* only a genuine step change animates; a redraw caused by hovering must not
+     replay the unfolding under the pointer */
+  /* the closing step of the unfolding shows the same picture as the one before
+     it, so animating it would re-play a layer that is already in place */
+  const anim = (cur !== lastAnimCur) && !st.done;
+  const out = [];
+  out.push('<defs>');
+  [["look", "var(--wi-examine)"], ["good", "var(--wi-relax)"], ["keep", "var(--wi-border-strong)"],
+   ["path", "var(--wi-queue)"], ["plain", "var(--wi-border-strong)"], ["arc", "var(--wi-ink-strong)"]].forEach(p =>
+    out.push('<marker id="da-' + p[0] + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" ' +
+             'markerHeight="5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="' + p[1] + '"/></marker>'));
+  out.push("</defs>");
+
+  /* --- step 0 of the construction: G in its own layout ------------------- */
+  if (uf === 0) {
+    E.forEach(e => {
+      out.push('<path class="darc" d="' + graphPath(e, gx, gy) + '" marker-end="url(#da-arc)"/>');
+      wlabel(out, (gx(e.u) + gx(e.v)) / 2, (gy(e.u) + gy(e.v)) / 2, e.c, true);
+    });
+    for (let v = 0; v < n; v++)
+      dnode(out, gx(v), gy(v), String(v), v === s ? "src" : "", false, "");
+    svg.innerHTML = out.join("");
+    lastAnimCur = cur;
+    el("layMeta").textContent = "the graph, before unfolding";
+    return;
+  }
+
+  /* --- inter-layer edges ------------------------------------------------- */
+  const curEdge = (st.edge !== undefined && st.edge >= 0) ? st.edge : -1;
+  const labelEdges = n * E.length <= 80;
+  const trace = currentTrace();
+  const NEW = (uf !== undefined && uf >= 2) ? rowsVis - 1 : -1;   /* the layer that just arrived */
+  for (let l = 1; l < rowsVis; l++) {
+    const kp = keepPath(l);
+    for (let v = 0; v < n; v++) {                        /* the "stay put" edges, weight 0 */
+      const hot = (uf === undefined && st.keep && st.row === l && st.col === v);
+      out.push('<path class="larr keep' + (hot ? " good" : "") + '" d="' + kp(v, false) +
+               '" marker-end="url(#da-keep)">' +
+               (l === NEW && anim ? smilD(kp(v, true), kp(v, false)) : "") + "</path>");
+    }
+    E.forEach((e, i) => {
+      const d = layerPath(l, e);
+      let k = "plain";
+      if (uf === undefined && st.row === l && curEdge === i) k = st.good ? "good" : "look";
+      else if (traceHas(trace, l, i)) k = "path";
+      /* the new layer's edges start as the arcs they were a moment ago, on the
+         row above, and bend down into place */
+      out.push('<path class="larr ' + (k === "plain" ? "faintedge" : k) + '" d="' + d +
+               '" marker-end="url(#da-' + k + ')">' +
+               (l === NEW && anim ? smilD(arcPath(l - 1, e), d) : "") + "</path>");
+      if (labelEdges || k !== "plain") {
+        const p2 = layerMid(l, e);
+        wlabel(out, p2.x, p2.y, e.c, k !== "plain");
+      }
+    });
+  }
+
+  /* --- the arcs of G, while it is still one row -------------------------- */
+  if (uf === 1) {
+    E.forEach(e => {
+      const lift = arcLift(e);
+      out.push('<path class="darc" d="' + arcPath(0, e) + '" marker-end="url(#da-arc)">' +
+               (anim ? smilD(graphPath(e, gx, gy), arcPath(0, e)) : "") + "</path>");
+      wlabel(out, (dnx(e.u) + dnx(e.v)) / 2, dny(0) - DR - lift * 0.62, e.c, true);
+    });
+  }
+
+  /* --- the nodes ---------------------------------------------------------- */
+  for (let l = 0; l < rowsVis; l++) {
+    for (let v = 0; v < n; v++) {
+      const shown = (uf !== undefined) || ((l * n + v) < (st.fillTo === undefined ? (n + 1) * n : st.fillTo));
+      let k = "";
+      if (v === s && l === 0) k = "src";
+      if (uf === undefined && st.row === l && st.col === v) k = "cur";
+      if (uf === undefined && st.row === l + 1 && curEdge >= 0 && E[curEdge].u === v) k = "from";
+      if (!k && inTrace(trace, l, v)) k = "onpath";
+      const lab = (uf !== undefined) ? String(v) : (shown ? fmt(delta[l][v]) : "");
+      /* circle and label move as one: flattening slides each node in from where
+         it sat in G, a new layer slides in from the row above */
+      let mv = "";
+      if (anim && uf === 1 && l === 0) mv = smilMove(gx(v) - dnx(v), gy(v) - dny(0));
+      else if (anim && l === NEW) mv = smilMove(0, -DROW);
+      dnode(out, dnx(v), dny(l), lab, k, !shown, mv, l, v);
+    }
+    out.push('<text class="laylab" x="' + (DX0 + n * cw + 14) + '" y="' + dny(l) + '">\u2113 = ' + l + "</text>");
+  }
+  for (let v = 0; v < n; v++)
+    out.push('<text class="hdrix' + (st.col === v ? " hot" : "") + '" x="' + dnx(v) + '" y="' +
+             (dagY0 - DR - 13) + '">' + v + "</text>");
+
+  svg.innerHTML = out.join("");
+  lastAnimCur = cur;
+  if (anim) startAnims(svg);
+  el("layMeta").textContent = uf === undefined
+    ? n + " × " + E.length + " edges, all pointing down"
+    : (uf === 1 ? "flattened onto the line" : "layers 0…" + (rowsVis - 1));
+}
+function wlabel(out, x, y, c, strong) {
+  const t = fmtw(c), w = t.length * 6.2 + 7;
+  out.push('<rect class="wpill" x="' + (x - w / 2) + '" y="' + (y - 7) + '" width="' + w + '" height="14" rx="3"/>');
+  out.push('<text class="wtxt' + (c < 0 ? " neg" : "") + (strong ? " strong" : "") + '" x="' + x +
+           '" y="' + y + '">' + t + "</text>");
+}
+function dnode(out, x, y, lab, k, empty, anim, l, v) {
+  out.push("<g>" + (anim || ""));
+  out.push('<circle class="vtx ' + k + (empty ? " ghost" : "") + '" cx="' + x + '" cy="' + y + '" r="' +
+           DR + '"/>');
+  if (lab !== "") out.push('<text class="dagval" x="' + x + '" y="' + (y + 1) + '">' + lab + "</text>");
+  if (l !== undefined)
+    out.push('<circle class="hit" data-l="' + l + '" data-v="' + v + '" cx="' + x + '" cy="' + y +
+             '" r="' + (DR + 4) + '"/>');
+  out.push("</g>");
+}
+
+/* ---------- the layer table ---------------------------------------------- */
+
+function drawTable() {
+  const st = steps[cur] || {};
+  const svg = el("laySvg");
+  CW = Math.max(46, Math.min(78, Math.round(720 / n)));
+  const rows = (mode === "tpl") ? n + 1 : n;      /* layers 0..n, or passes 0..n-1 */
+  const W = LX + n * CW + 20, H = LY + rows * CHt + 22;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const out = [];
+  out.push('<defs>');
+  [["look", "var(--wi-examine)"], ["good", "var(--wi-relax)"], ["keep", "var(--wi-border-strong)"],
+   ["path", "var(--wi-queue)"]].forEach(p =>
+    out.push('<marker id="la-' + p[0] + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" ' +
+             'markerHeight="5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="' + p[1] + '"/></marker>'));
+  out.push("</defs>");
+  out.push('<text class="hdrname" x="6" y="' + (LY - 22) + '">w \u2192</text>');
+  out.push('<text class="hdrname" x="6" y="' + (LY - 6) + '">' + (mode === "tpl" ? "\u2113 \u2193" : "pass \u2193") + "</text>");
+  for (let v = 0; v < n; v++)
+    out.push('<text class="hdrix' + (st.col === v || st.upd === v ? " hot" : "") + '" x="' + lcx(v) +
+             '" y="' + (LY - 12) + '">' + v + "</text>");
+
+  const trace = currentTrace();
+
+  for (let l = 0; l < rows; l++) {
+    out.push('<text class="hdrix' + ((mode === "tpl" ? st.row : st.pass) === l ? " hot" : "") + '" x="' +
+             (LX - 30) + '" y="' + lcy(l) + '">' + l + "</text>");
+    for (let v = 0; v < n; v++) {
+      const x = LX + v * CW, y = LY + l * CHt;
+      let val = null, shown = false;
+      if (mode === "tpl") {
+        shown = (l * n + v) < (st.fillTo === undefined ? (n + 1) * n : st.fillTo);
+        val = delta[l][v];
+      } else {
+        /* snap holds one finished row per completed pass, so rows 0..len-1 come
+           from it and the row of the pass in progress is the live dist */
+        if (st.snap && l < st.snap.length) { val = st.snap[l][v]; shown = true; }
+        else if (st.pass === l && st.dist) { val = st.dist[v]; shown = true; }
+      }
+      let k = "cellbg";
+      if (!shown) k += " empty";
+      if (mode === "tpl" && st.row === l && st.col === v) k += " cur";
+      if (mode !== "tpl" && st.pass === l && (st.upd === v || (st.changedSet || []).indexOf(v) >= 0)) k += " upd";
+      if (mode === "tpl" && st.row === l + 1 && st.edge >= 0 && st.edge !== undefined && E[st.edge].u === v) k += " from";
+      if (st.ansRow && l === n - 1) k += " ans";
+      if (inTrace(trace, l, v)) k += " path";
+      out.push('<rect class="' + k + '" x="' + x + '" y="' + y + '" width="' + CW + '" height="' + CHt + '" rx="3"/>');
+      if (shown) {
+        const t = fmt(val);
+        out.push('<text class="cellval' + (val === INF ? " inf" : "") + '" x="' + lcx(v) + '" y="' +
+                 (lcy(l) + (cmpDelta && mode !== "tpl" ? -4 : 0)) + '">' + t + "</text>");
+        if (cmpDelta && mode !== "tpl" && delta[l] && delta[l][v] !== val)
+          out.push('<text class="cellsub" x="' + lcx(v) + '" y="' + (lcy(l) + 8) + '">\u03b4\u2264' + l +
+                   "=" + fmt(delta[l][v]) + "</text>");
+      }
+      out.push('<rect class="hit" data-l="' + l + '" data-v="' + v + '" x="' + x + '" y="' + y +
+               '" width="' + CW + '" height="' + CHt + '"/>');
+    }
+  }
+
+  /* the inter-layer arrows: this is what makes the grid a graph */
+  const arrow = (l, from, to, k) => {
+    const x1 = lcx(from), y1 = lcy(l - 1), x2 = lcx(to), y2 = lcy(l);
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+    const p1 = 12, p2 = 13;
+    const a = { x: x1 + dx / L * p1, y: y1 + dy / L * p1 }, b = { x: x2 - dx / L * p2, y: y2 - dy / L * p2 };
+    out.push('<path class="larr ' + k + '" d="M' + a.x + " " + a.y + "L" + b.x + " " + b.y +
+             '" marker-end="url(#la-' + k + ')"/>');
+  };
+  if (mode === "tpl") {
+    if (allArr && st.row >= 1)
+      E.forEach(e => arrow(st.row, e.u, e.v, "keep"));
+    if (trace) trace.edges.forEach(pe => arrow(pe[0], E[pe[1]].u, E[pe[1]].v, "path"));
+    if (st.row >= 1 && st.col !== undefined) {
+      if (st.keep) arrow(st.row, st.col, st.col, "keep");
+      if (st.edge !== undefined && st.edge >= 0)
+        arrow(st.row, E[st.edge].u, E[st.edge].v, st.good ? "good" : "look");
+    }
+  }
+  svg.innerHTML = out.join("");
+  el("layMeta").textContent = mode === "tpl"
+    ? "rows 0…" + n + " · layer " + (n - 1) + " is the answer"
+    : "one row per pass · " + (n - 1) + " passes";
+}
+
+/* ---------- side panels --------------------------------------------------- */
+
+function renderDist() {
+  const st = steps[cur] || {};
+  let dist = st.dist || (st.row !== undefined ? delta[st.row] : delta[0]);
+  if (st.negInf) { dist = dist.slice(); st.negInf.forEach(v => dist[v] = -INF); }
+  const pred = st.pred || null;
+  const rows = [];
+  for (let v = 0; v < n; v++) {
+    const p = pred ? pred[v] : (st.row >= 1 && deltaFrom[st.row][v] >= 0 ? E[deltaFrom[st.row][v]].u : -1);
+    rows.push('<tr class="' + (v === s ? "src" : "") + (hoverV === v ? " hot" : "") + '" data-v="' + v + '">' +
+      '<td class="v">' + v + "</td><td>" + fmt(dist ? dist[v] : INF) + "</td><td>" +
+      (v === s ? "\u2014" : (p >= 0 ? p : "\u2014")) + "</td></tr>");
+  }
+  el("distBox").innerHTML = '<table class="dist"><tr><th style="text-align:left">v</th>' +
+    "<th>" + (mode === "tpl" ? "\u03b4\u2264\u2113" : "dist") + "</th><th>pred</th></tr>" +
+    rows.join("") + "</table>";
+  [].forEach.call(el("distBox").querySelectorAll("tr[data-v]"), tr => {
+    tr.addEventListener("mouseenter", () => { hoverV = Number(tr.dataset.v); drawGraph(); drawLayers(); renderDist(); });
+    tr.addEventListener("mouseleave", () => { hoverV = -1; drawGraph(); drawLayers(); renderDist(); });
+    tr.addEventListener("click", () => setSource(Number(tr.dataset.v)));
+  });
+  el("distMeta").textContent = mode === "tpl"
+    ? "\u2113 = " + (st.row === undefined ? 0 : st.row) : "after pass " + (st.pass || 0);
+}
+
+/* ---------- pseudocode ---------------------------------------------------- */
+
+const K = x => '<span class="kw">' + x + "</span>";
+const C = x => '<span class="cm">' + x + "</span>";
+const F = x => '<span class="fix">' + x + "</span>";
+
+const REC = [
+  { k: "r_head",  t: "\u03b4\u2264\u2113(s,w) =" },
+  { k: "r_base0", t: "    \u221e                                                if \u2113 = 0 and s \u2260 w" },
+  { k: "r_base1", t: "    0                                                if \u2113 = 0 and s = w" },
+  { k: "r_keep",  t: "    min ( { \u03b4\u2264\u2113\u22121(s,w) }                        otherwise" },
+  { k: "r_min",   t: "        \u222a { \u03b4\u2264\u2113\u22121(s,v) + c(vw) : vw \u2208 E } )" }
+];
+const TPL = [
+  { k: "t_head", t: K("procedure") + " shortestPathsDP(G, s):" },
+  { k: "t_init", t: "    " + C("// Base case \u2113 = 0:") },
+  { k: "t_init", t: "    \u03b4[0..n][0..n) := +\u221e   " + C("// \u03b4[\u2113][v] will store \u03b4\u2264\u2113(s,v)") },
+  { k: "t_src",  t: "    \u03b4[0][s] := 0" },
+  { k: "t_l",    t: "    " + K("for") + " \u2113 := 1,\u2026,n            " + C("// layer") },
+  { k: "t_w",    t: "        " + K("for") + " w := 0,\u2026,n\u22121        " + C("// vertex") },
+  { k: "t_keep", t: "            \u03b4[\u2113][w] := \u03b4[\u2113\u22121][w]  " + C("// don't use an \u2113th edge") },
+  { k: "t_edge", t: "            " + K("for") + " vw \u2208 E" },
+  { k: "t_min",  t: "                \u03b4[\u2113][w] := min{\u03b4[\u2113][w], \u03b4[\u2113\u22121][v] + c(vw)}" },
+  { k: "t_ret",  t: "    " + K("return") + " \u03b4" }
+];
+const BF = [
+  { k: "b_init", t: K("procedure") + " bellmanFord(G, s):" },
+  { k: "b_init", t: "    dist[0..n) := +\u221e;   pred[0..n) := null" },
+  { k: "b_src",  t: "    dist[s] := 0" },
+  { k: "b_pass", t: "    " + K("for") + " \u2113 := 1,\u2026,n\u22121" },
+  { k: "b_edge", t: "        " + K("for") + " v := 0,\u2026,n\u22121" },
+  { k: "b_edge", t: "            " + K("for") + " (w,c) \u2208 G.adj[v]" },
+  { k: "b_if",   t: "                " + K("if") + " dist[w] > dist[v] + c" },
+  { k: "b_set",  t: "                    dist[w] := dist[v] + c" },
+  { k: "b_pred", t: "                    pred[w] := v   " + C("// remember for backtrace") },
+  { k: "b_chk",  t: "    " + K("for") + " v := 0,\u2026,n\u22121" },
+  { k: "b_chk",  t: "        " + K("for") + " (w,c) \u2208 G.adj[v]" },
+  { k: "b_chk",  t: "            " + K("if") + " dist[w] > dist[v] + c" },
+  { k: "b_ret_neg", t: "                " + K("return") + " HAS_NEGATIVE_CYCLE" },
+  { k: "b_ret",  t: "    " + K("return") + " (dist, pred)" }
+];
+
+const EXT = [
+  { t: K("procedure") + " negativeCycle(pred, (v,w)):   " + C("// (v,w) still improved after n\u22121 passes") },
+  { t: "    visited[0..n) := false;   x := w" },
+  { t: "    " + K("while") + " \u00acvisited[x]              " + C("// walk pred back until a vertex repeats") },
+  { t: "        visited[x] := true;   x := pred[x]" },
+  { t: "    C := \u27e8\u27e9;   y := x" },
+  { t: "    " + K("repeat") },
+  { t: "        C := x \u00b7 C;   x := pred[x]" },
+  { t: "    " + K("until") + " x = y" },
+  { t: "    " + K("return") + " C                        " + C("// the vertices of a negative cycle") },
+  { t: "" },
+  { t: K("procedure") + " markMinusInfinity(G, dist, C):" },
+  { t: "    R := reachableFrom(G, C)         " + C("// one BFS/DFS, sources = all of C") },
+  { t: "    " + K("for") + " v \u2208 R:  dist[v] := \u2212\u221e" }
+];
+function renderExt() {
+  el("extBody").innerHTML = EXT.map((l, i) =>
+    '<div class="cline">' + (l.t === "" ? '<span class="ln"></span>' :
+    '<span class="ln">' + (i + 1) + "</span>") + "<span>" + l.t + "</span></div>").join("");
+}
+
+function renderCode() {
+  const st = steps[cur] || {};
+  const hl = new Set(st.hl), hlp = new Set(st.hlp);
+  const block = (label, lines, act) => '<div class="sublabel">' + label + "</div>" +
+    lines.map((l, i) => '<div class="cline' + (act.has(l.k) ? " on" : "") + '">' +
+      '<span class="ln">' + (i + 1) + "</span><span>" + l.t + "</span></div>").join("");
+  el("codeBody").innerHTML =
+    block("Step 3 \u00b7 recurrence", REC, hl) +
+    (mode === "tpl" ? block("Step 5 \u00b7 template algorithm", TPL, hlp)
+                    : block("The Bellman-Ford algorithm", BF, hlp));
+  el("codeNote").innerHTML = mode === "tpl"
+    ? "\u0398(n(n+m)) time and \u0398(n\u00b2) space. Note the option of <b>not</b> taking an \u2113-th " +
+      "edge, both in the min and as line 7 of the code: without it the recurrence would compute the " +
+      "cheapest walk with <i>exactly</i> \u2113 edges, and layer n\u22121 would not be the answer."
+    : "\u0398(n) space, O(n(n+m)) time. There is no line corresponding to \u201cdon't take an \u2113-th " +
+      "edge\u201d \u2014 updating <code>dist</code> in place keeps the previous value automatically. " +
+      "The price is that the subproblems (\u2113,v) are no longer solved exactly; the gain is that the " +
+      "answer is reached at least as fast.";
+}
+
+/* ---------- transport / render -------------------------------------------- */
+
+function renderPhases() {
+  const bar = el("phaseBar");
+  bar.innerHTML = "";
+  phases.forEach(p => {
+    const span = p.to - p.from + 1;
+    const pct = cur > p.to ? 100 : cur < p.from ? 0 : ((cur - p.from + 1) / span) * 100;
+    const b = document.createElement("button");
+    b.className = "phasebtn" + (cur >= p.from && cur <= p.to ? " on" : (cur > p.to ? " past" : ""));
+    b.style.flexGrow = String(Math.max(1, span));
+    b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' + pct.toFixed(2) +
+                  '%"></span><span class="lab">' + esc(p.name) + "</span>";
+    b.title = p.name + " \u2014 steps " + (p.from + 1) + "\u2013" + (p.to + 1);
+    b.addEventListener("click", () => { stopPlay(); cur = p.from; render(); });
+    bar.appendChild(b);
+  });
+}
+function render() {
+  const st = steps[cur] || {};
+  drawGraph(); drawLayers(); renderDist(); renderPhases();
+  if (window.innerWidth > 760) renderCode();
+  el("statusBox").innerHTML = (st.txt || "") +
+    (st.ans ? '<b class="ans">' + esc(st.ans) + "</b>" : "") +
+    (st.neg ? '<b class="bad">negative cycle reachable from s</b>' : "");
+  el("phaseName").textContent = phases[st.ph] ? phases[st.ph].name : "";
+  el("scrubber").max = String(Math.max(0, steps.length - 1));
+  el("scrubber").value = String(cur);
+  el("stepNo").textContent = steps.length ? (cur + 1) + " / " + steps.length : "\u2014 / \u2014";
+  el("backBtn").disabled = cur <= 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+  el("srcNote").innerHTML = "Source <b>s = " + s + "</b>. " +
+    (mode === "tpl" ? "Layer n\u22121 = " + (n - 1) + " holds the distances; layer n is the check."
+                    : "n\u22121 = " + (n - 1) + " passes, then one check pass.");
+}
+const PLAY = "\u25B6\uFE0E", PAUSE = "\u23F8\uFE0E";
+function stepFwd() { if (cur < steps.length - 1) { cur++; render(); } else stopPlay(); }
+function stepBack() { if (cur > 0) { cur--; render(); } }
+function stopPlay() { if (timer) { clearInterval(timer); timer = null;
+  el("playBtn").textContent = PLAY; el("playBtn").setAttribute("aria-label", "Play"); } }
+function togglePlay() {
+  if (timer) { stopPlay(); return; }
+  el("playBtn").textContent = PAUSE; el("playBtn").setAttribute("aria-label", "Pause");
+  timer = setInterval(stepFwd, Number(el("speed").value));
+}
+
+/* ---------- input ---------------------------------------------------------- */
+
+function setGraph(text, keepSource) {
+  const err = el("parseErr");
+  let g;
+  try { g = parseGraph(text); } catch (e) { err.textContent = e.message; return false; }
+  err.textContent = "";
+  n = g.V; E = g.edges; pos = g.pos || circleLayout(g.V);
+  if (!keepSource || s >= n) s = 0;
+  el("inputText").value = text;
+  const sel = el("srcSel"); sel.innerHTML = "";
+  for (let i = 0; i < n; i++) { const o = document.createElement("option"); o.value = i; o.textContent = i; sel.appendChild(o); }
+  sel.value = s;
+  hoverV = -1;
+  stopPlay(); build(); render();
+  return true;
+}
+function setSource(v) {
+  if (v < 0 || v >= n) return;
+  s = v; el("srcSel").value = v; hoverV = -1; hoverCell = null;
+  rebuildKeepingPlace();     /* same (l,w) position, recomputed from the new s */
+}
+function prettyName(f) { return decodeURIComponent(f).replace(/\.[^./]+$/, "").replace(/[_-]+/g, " "); }
+async function discoverGraphs() {
+  try {
+    const r = await fetch("graphs/index.json", { cache: "no-store" });
+    if (r.ok) {
+      const d = await r.json();
+      if (Array.isArray(d)) return d.map(it => {
+        const f = typeof it === "string" ? it : it.file;
+        return { label: (typeof it === "object" && (it.label || it.name)) || prettyName(f),
+                 path: "graphs/" + encodeURIComponent(f) };
+      });
+    }
+  } catch (e) { /* no manifest */ }
+  try {
+    const r = await fetch("graphs/", { cache: "no-store" });
+    if (r.ok) {
+      const doc = new DOMParser().parseFromString(await r.text(), "text/html");
+      const hrefs = [].map.call(doc.querySelectorAll("a"), a => a.getAttribute("href") || "")
+        .filter(h => h && h !== "../" && h !== "./" && !h.startsWith("?") && !h.startsWith("/") && !h.endsWith("/"));
+      const uniq = hrefs.filter((h, i) => hrefs.indexOf(h) === i);
+      if (uniq.length) return uniq.map(h => ({ label: prettyName(h), path: "graphs/" + h }));
+    }
+  } catch (e) { /* no listing either */ }
+  return [];
+}
+function populateGraphs() {
+  discoverGraphs().then(list => {
+    const sel = el("fileSel");
+    if (!list.length) { sel.innerHTML = '<option value="">— none found —</option>'; return; }
+    sel.innerHTML = '<option value="">— choose a file —</option>';
+    list.forEach(o => { const x = document.createElement("option"); x.value = o.path; x.textContent = o.label; sel.appendChild(x); });
+  });
+}
+
+/* ---------- init ----------------------------------------------------------- */
+
+/* rebuild, then land on the step that means the same thing as the current one */
+function rebuildKeepingPlace() {
+  const sig = (steps[cur] || {}).sig, ph = (steps[cur] || {}).ph || 0;
+  stopPlay(); build();
+  let i = sig ? steps.findIndex(x => x.sig === sig) : -1;
+  if (i < 0) {                       /* no exact counterpart (e.g. an unfolding
+                                        step has none in the table view) */
+    const p = phases[Math.min(ph, phases.length - 1)];
+    i = p ? p.from : 0;
+  }
+  cur = Math.max(0, Math.min(i, steps.length - 1));
+  render();
+}
+function setView(v) {
+  layView = v;
+  el("viewTab").classList.toggle("on", v === "table");
+  el("viewDag").classList.toggle("on", v === "dag");
+  el("layTitle").textContent = (mode !== "tpl") ? "dist after each pass"
+    : (v === "dag" ? "The unfolded graph" : "Length layers \u00b7 \u03b4\u2264\u2113(s,\u00b7)");
+  rebuildKeepingPlace();
+}
+function setMode(m) {
+  mode = m;
+  el("modeTpl").classList.toggle("on", m === "tpl");
+  el("modeBF").classList.toggle("on", m === "bf");
+  el("subTpl").style.display = m === "tpl" ? "" : "none";
+  el("subBF").style.display = m === "bf" ? "" : "none";
+  el("cmpWrap").style.display = m === "bf" ? "" : "none";
+  el("viewDag").disabled = (m !== "tpl");
+  el("viewDag").title = (m !== "tpl")
+    ? "the unfolded graph is a picture of the layered subproblems; Bellman-Ford has no layers to unfold"
+    : "";
+  el("layTitle").textContent = (m !== "tpl") ? "dist after each pass"
+    : (layView === "dag" ? "The unfolded graph" : "Length layers \u00b7 \u03b4\u2264\u2113(s,\u00b7)");
+  stopPlay(); build(); render();
+}
+function setGran(g) {
+  gran = g;
+  el("granCoarse").classList.toggle("on", g === 0);
+  el("granFine").classList.toggle("on", g === 1);
+  rebuildKeepingPlace();
+}
+function init() {
+  const sel = el("presetSel");
+  Object.keys(PRESETS).forEach(k => {
+    const o = document.createElement("option"); o.value = k; o.textContent = PRESETS[k].name; sel.appendChild(o);
+  });
+  sel.addEventListener("change", e => { if (PRESETS[e.target.value]) setGraph(PRESETS[e.target.value].text, false); });
+  el("fileSel").addEventListener("change", e => {
+    if (!e.target.value) return;
+    el("parseErr").textContent = "Loading " + e.target.value + "\u2026";
+    fetch(e.target.value, { cache: "no-store" })
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+      .then(t => setGraph(t, false))
+      .catch(err => { el("parseErr").textContent = "Could not load: " + err.message; });
+  });
+  el("srcSel").addEventListener("change", e => setSource(Number(e.target.value)));
+  el("loadBtn").addEventListener("click", () => setGraph(el("inputText").value, true));
+  el("copyBtn").addEventListener("click", () => {
+    const t = el("inputText"); t.select();
+    if (navigator.clipboard) navigator.clipboard.writeText(t.value).catch(() => {});
+  });
+  el("modeTpl").addEventListener("click", () => setMode("tpl"));
+  el("modeBF").addEventListener("click", () => setMode("bf"));
+  el("granCoarse").addEventListener("click", () => setGran(0));
+  el("granFine").addEventListener("click", () => setGran(1));
+  el("viewTab").addEventListener("click", () => setView("table"));
+  el("viewDag").addEventListener("click", () => { if (mode === "tpl") setView("dag"); });
+  el("cmpChk").addEventListener("change", e => { cmpDelta = e.target.checked; drawLayers(); });
+  el("allArrChk").addEventListener("change", e => { allArr = e.target.checked; drawLayers(); });
+
+  el("stepBtn").addEventListener("click", () => { stopPlay(); stepFwd(); });
+  el("backBtn").addEventListener("click", () => { stopPlay(); stepBack(); });
+  el("playBtn").addEventListener("click", togglePlay);
+  el("resetBtn").addEventListener("click", () => { stopPlay(); cur = 0; render(); });
+  el("scrubber").addEventListener("input", e => { stopPlay(); cur = Number(e.target.value); render(); });
+  el("speed").addEventListener("input", e => {
+    el("speedVal").textContent = e.target.value + "ms";
+    if (timer) { stopPlay(); togglePlay(); }
+  });
+
+  const gsvg = el("graphSvg");
+  gsvg.addEventListener("mousemove", ev => {
+    const t = ev.target;
+    if (t && t.classList.contains("hit") && t.dataset.v !== undefined) {
+      const v = Number(t.dataset.v);
+      if (v !== hoverV || hoverCell) { hoverV = v; hoverCell = null; drawGraph(); drawLayers(); renderDist(); }
+      const st = steps[cur] || {};
+      const dist = st.dist || (st.row !== undefined ? delta[st.row] : delta[0]);
+      const p = (mode === "tpl") ? (st.row !== undefined ? deltaPath(st.row, v) : null) : predPath(st.pred, v);
+      showTip(ev, '<span class="tt-h">vertex ' + v + "</span><br>" +
+        (mode === "tpl" ? "\u03b4\u2264" + (st.row === undefined ? 0 : st.row) : "dist") + " = <code>" +
+        fmt(dist ? dist[v] : INF) + "</code>" +
+        (p && p.length ? "<br>path: " + s + p.map(i => " \u2192 " + E[i].v).join("") +
+          "<br>" + p.length + " edge" + (p.length === 1 ? "" : "s")
+          : (v === s ? "<br>the source" : "<br>no path yet")) +
+        '<br><span class="tt-s">click: make this the source</span>');
+    } else if (hoverV >= 0) { hoverV = -1; drawGraph(); drawLayers(); renderDist(); hideTip(); }
+    else hideTip();
+  });
+  gsvg.addEventListener("mouseleave", () => { if (hoverV >= 0) { hoverV = -1; drawGraph(); drawLayers(); renderDist(); } hideTip(); });
+  gsvg.addEventListener("click", ev => {
+    const t = ev.target;
+    if (t && t.classList.contains("hit") && t.dataset.v !== undefined) setSource(Number(t.dataset.v));
+  });
+
+  const lsvg = el("laySvg");
+  const setCell = c => {
+    const same = (!c && !hoverCell) || (c && hoverCell && c[0] === hoverCell[0] && c[1] === hoverCell[1]);
+    if (same) return;
+    hoverCell = c;
+    drawGraph(); drawLayers(); renderDist();
+  };
+  lsvg.addEventListener("mousemove", ev => {
+    const t = ev.target;
+    if (t && t.classList.contains("hit") && t.dataset.l !== undefined) {
+      const l = Number(t.dataset.l), v = Number(t.dataset.v);
+      setCell([l, v]);
+      const tr = currentTrace();
+      const val = (mode === "tpl") ? delta[l][v]
+                : ((steps[cur] || {}).snap && (steps[cur] || {}).snap[l] ? steps[cur].snap[l][v] : null);
+      showTip(ev, '<span class="tt-h">' +
+        (mode === "tpl" ? "\u03b4\u2264" + l + "(s," + v + ")" : "dist[" + v + "] after pass " + l) +
+        "</span>" + (val === null ? "" : "<br>= <code>" + fmt(val) + "</code>") +
+        (tr && tr.edges.length
+          ? "<br>walk: " + s + tr.edges.map(x => " \u2192 " + E[x[1]].v).join("") +
+            "<br>" + tr.edges.length + " edge" + (tr.edges.length === 1 ? "" : "s") +
+            (mode === "tpl" && tr.edges.length < l
+              ? ", i.e. " + (l - tr.edges.length) + " layer" + (l - tr.edges.length === 1 ? "" : "s") +
+                " where nothing was added"
+              : "")
+          : (v === s ? "<br>the source itself"
+                     : (val === INF ? "<br>not reachable within " + l + " edge" + (l === 1 ? "" : "s")
+                                    : "<br>no walk recorded yet"))));
+    } else { setCell(null); hideTip(); }
+  });
+  lsvg.addEventListener("mouseleave", () => { setCell(null); hideTip(); });
+
+  window.addEventListener("resize", () => render());
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT") return;
+    if (ev.key === "ArrowRight") { stopPlay(); stepFwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft") { stopPlay(); stepBack(); ev.preventDefault(); }
+  });
+
+  renderExt();
+  populateGraphs();
+  sel.value = "lecture";
+  setGraph(PRESETS.lecture.text, false);
+}
+function moveTip(ev) {
+  const t = el("tooltip");
+  t.style.left = Math.min(ev.clientX + 14, window.innerWidth - t.offsetWidth - 10) + "px";
+  t.style.top = Math.min(ev.clientY + 16, window.innerHeight - t.offsetHeight - 10) + "px";
+}
+function hideTip() { el("tooltip").style.display = "none"; }
+function showTip(ev, html) {
+  const t = el("tooltip");
+  if (!html) { hideTip(); return; }
+  t.innerHTML = html; t.style.display = "block"; moveTip(ev);
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

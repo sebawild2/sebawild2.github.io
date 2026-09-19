@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>An Ω(n) Lower Bound — the Adversary Argument</title>
+<style>
+    :root {
+        --bg: #f5ebd9; --panel: #faf6ed; --panel-border: #d4c5b4;
+        --controls-bg: #ecddc5; --controls-border: #d4c5b4;
+        --ink: #6b675c; --ink-strong: #46433a; --title-muted: #8b8779;
+        --btn: #faf6ed; --btn-border: #b9a793;
+        --read: #dceadf; --read-border: #1b6b45;
+        --unread: #ecddc5; --unread-border: #d4c5b4;
+        --devil: #6d180f; --accent: #b07d18; --active: #cc2f22;
+    }
+    * { box-sizing: border-box; }
+    body { background: var(--bg); color: var(--ink); font-family: var(--wi-font-body)"Segoe UI", Roboto, sans-serif;
+           margin: 0; padding: 22px 26px 60px; }
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; color: var(--ink-strong); }
+    .subtitle { font-size: .92rem; color: var(--title-muted); margin: 0 0 18px; max-width: 900px; line-height: 1.5; }
+    code { background: #ecddc5; padding: 1px 6px; border-radius: 3px; font-family: "SF Mono", var(--wi-font-mono); font-size: .88em; }
+    .controls { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; background: var(--controls-bg);
+                padding: 13px 20px; border-radius: 6px; border: 1px solid var(--controls-border); margin-bottom: 18px; }
+    .cap { font-size: .82rem; color: var(--ink-strong); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
+    button, input[type="number"] { background: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+             padding: 7px 14px; font-size: .9rem; border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: 500; }
+    button:hover:not(:disabled) { background: #fcf9f3; } button:disabled { opacity: .4; cursor: not-allowed; }
+    button.primary { background: #f0d9cd; border-color: #c28577; }
+    .sim-box { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 16px 18px;
+               box-shadow: 0 2px 8px rgba(0,0,0,.04); margin-bottom: 18px; }
+    .sim-title { font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
+    .cells { display: flex; gap: 6px; flex-wrap: wrap; }
+    .cell { width: 54px; height: 60px; border-radius: 5px; border: 2px solid var(--unread-border); background: var(--unread);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 1.05rem; color: var(--ink-strong); position: relative;
+            transition: background .25s, border-color .25s, transform .25s; }
+    .cell .idx { position: absolute; bottom: -18px; font-size: .72rem; color: #b9a793; font-weight: 500; }
+    .cell.read { background: var(--read); border-color: var(--read-border); }
+    .cell.reading { border-color: var(--active); transform: translateY(-6px); }
+    .cell.devil { border-color: var(--devil); border-style: dashed; font-size: 1.5rem; }
+    .cell.flip { background: #f3d9d4; }
+    .cells { margin-bottom: 26px; }
+    .status { background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 5px; padding: 12px 15px;
+              font-size: .95rem; color: var(--ink-strong); line-height: 1.55; min-height: 60px; }
+    .status b { color: #902015; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    @media (max-width: 800px) { .two { grid-template-columns: 1fr; } }
+    .case { border: 1px solid var(--panel-border); border-radius: 5px; padding: 12px 14px; background: #ecddc5; }
+    .case h4 { margin: 0 0 8px; font-size: .88rem; color: var(--ink-strong); }
+    .case .ans { font-size: 1.4rem; font-weight: 700; color: #902015; }
+    .case .arr { font-family: "SF Mono", var(--wi-font-mono); font-size: .82rem; color: var(--ink); margin-top: 6px; word-break: break-all; }
+    .prose { font-size: .9rem; line-height: 1.6; max-width: 880px; }
+    .hidden { display: none !important; }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<h1>Every correct algorithm needs Ω(n) time</h1>
+<p class="subtitle">
+    “We have to read all the numbers.” — an adversary argument, played out step by step.
+    Suppose some algorithm solved the maximum subarray problem in <code>o(n)</code> time. Then on large enough
+    inputs it must stop before it has looked at every entry. Watch what the adversary does with the entry it skipped.
+</p>
+
+<div class="controls">
+    <div style="display:flex;align-items:center;gap:9px">
+        <span class="cap">n</span>
+        <input type="number" id="nIn" value="12" min="3" max="24" style="width:76px">
+        <button onclick="newInstance()">New input</button>
+    </div>
+    <div style="display:flex;gap:8px">
+        <button class="primary" id="nextBtn" onclick="next()">Next ›</button>
+        <button onclick="newInstance()">Restart</button>
+    </div>
+</div>
+
+<div class="sim-box">
+    <div class="sim-title">The input the algorithm is given</div>
+    <div class="cells" id="cells"></div>
+    <div class="status" id="status"></div>
+    <div class="two hidden" id="cases">
+        <div class="case">
+            <h4>Input I₁ — the adversary puts something small in the skipped cell</h4>
+            <div class="ans" id="ans1">–</div>
+            <div class="arr" id="arr1"></div>
+        </div>
+        <div class="case">
+            <h4>Input I₂ — the adversary puts something large there instead</h4>
+            <div class="ans" id="ans2">–</div>
+            <div class="arr" id="arr2"></div>
+        </div>
+    </div>
+</div>
+
+<div class="sim-box hidden" id="conclusion">
+    <div class="sim-title">Conclusion</div>
+    <div class="prose">
+        <p>
+            The algorithm read exactly the same values in both cases, in the same order, so it took the same
+            execution path and produced the same output. But <code>I₁</code> and <code>I₂</code> have
+            <em>different</em> correct answers, so at least one of the two outputs is wrong — contradicting
+            correctness.
+        </p>
+        <p>
+            Hence no correct algorithm can skip an entry on every input, and reading <code>n</code> entries costs
+            <code>Ω(n)</code>. Together with the divide-and-conquer solution this places the complexity of the
+            maximum subarray problem between <code>Ω(n)</code> and <code>O(n log n)</code> — and the linear sweep
+            closes the gap: the problem is <b>Θ(n)</b>.
+        </p>
+    </div>
+</div>
+
+<script>
+let A = [], order = [], skipped = -1, phase = 0, readCount = 0, timer = null;
+
+function kadane(a) {
+    let s = 0, g = 0;
+    for (let r = 1; r <= a.length; r++) { s = Math.max(s + a[r-1], 0); g = Math.max(g, s); }
+    return g;
+}
+
+function newInstance() {
+    if (timer) { clearInterval(timer); timer = null; }
+    const n = Math.max(3, Math.min(24, +document.getElementById("nIn").value || 12));
+    A = Array.from({length: n}, () => Math.floor(Math.random() * 13) - 6);
+    skipped = 1 + Math.floor(Math.random() * (n - 2));
+    order = [];
+    for (let i = 0; i < n; i++) if (i !== skipped) order.push(i);
+    phase = 0; readCount = 0;
+    document.getElementById("cases").classList.add("hidden");
+    document.getElementById("conclusion").classList.add("hidden");
+    document.getElementById("nextBtn").disabled = false;
+    render();
+    setStatus(`An algorithm with running time <code>o(n)</code> performs fewer than <b>n</b> memory accesses ` +
+              `once n is large enough — so there is some entry it never reads. Press <b>Next</b> to let it run.`);
+}
+
+function render() {
+    const box = document.getElementById("cells");
+    box.innerHTML = A.map((v, i) => {
+        const isRead = order.indexOf(i) > -1 && order.indexOf(i) < readCount;
+        const isDevil = i === skipped;
+        const cls = ["cell"];
+        if (isRead) cls.push("read");
+        if (isDevil && phase >= 1) cls.push("devil");
+        if (isDevil && phase >= 3) cls.push("flip");
+        let content;
+        if (isDevil) content = phase >= 3 ? String(A[i]) : (phase >= 1 ? "😈" : "?");
+        else content = isRead ? String(v) : "?";
+        return `<div class="${cls.join(' ')}" id="c${i}">${content}<span class="idx">${i}</span></div>`;
+    }).join("");
+}
+
+function setStatus(html) { document.getElementById("status").innerHTML = html; }
+
+function next() {
+    if (phase === 0) {
+        phase = 1;
+        document.getElementById("nextBtn").disabled = true;
+        timer = setInterval(() => {
+            if (readCount >= order.length) {
+                clearInterval(timer); timer = null;
+                document.getElementById("nextBtn").disabled = false;
+                phase = 2;
+                const guess = kadane(withValue(-1));
+                setStatus(`The algorithm has stopped and must commit to an answer — say it outputs <b>s = ${guess}</b>. ` +
+                          `Whatever it outputs, it never looked at <b>A[${skipped}]</b>: 😈. Press <b>Next</b> to let the adversary move.`);
+                render();
+                return;
+            }
+            readCount++;
+            const i = order[readCount - 1];
+            render();
+            const c = document.getElementById("c" + i);
+            if (c) { c.classList.add("reading"); setTimeout(() => c.classList.remove("reading"), 200); }
+            setStatus(`Reading A[${i}] = ${A[i]} &nbsp;·&nbsp; ${readCount} of ${order.length} accesses.`);
+        }, 260);
+        return;
+    }
+    if (phase === 2) {
+        phase = 3;
+        const small = withValue(-1), large = withValue(bigValue());
+        A = small.slice();
+        render();
+        document.getElementById("cases").classList.remove("hidden");
+        document.getElementById("ans1").textContent = "answer = " + kadane(small);
+        document.getElementById("ans2").textContent = "answer = " + kadane(large);
+        document.getElementById("arr1").textContent = small.map((v,i)=> i===skipped ? "["+v+"]" : v).join("  ");
+        document.getElementById("arr2").textContent = large.map((v,i)=> i===skipped ? "["+v+"]" : v).join("  ");
+        setStatus(`The adversary now fills the skipped cell in two different ways. Both inputs agree on ` +
+                  `<b>every entry the algorithm read</b>, so the algorithm cannot tell them apart — but their ` +
+                  `answers differ: <b>${kadane(small)}</b> versus <b>${kadane(large)}</b>.`);
+        document.getElementById("conclusion").classList.remove("hidden");
+        document.getElementById("nextBtn").disabled = true;
+        return;
+    }
+}
+
+function withValue(v) { const b = A.slice(); b[skipped] = v; return b; }
+function bigValue() {
+    const total = A.reduce((s, x) => s + Math.abs(x), 0);
+    return total + 10;
+}
+
+newInstance();
+</script>
+</body>
+</html>

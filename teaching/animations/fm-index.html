@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FM Index — Backward Search, Locate, Extract — Animated</title>
+<style>
+:root{
+  --bg:#f5ebd9; --panel:#faf6ed; --panel-border:#d4c5b4;
+  --ink:#6b675c; --ink-strong:#46433a; --muted:#8b8779; --dim:#a89880;
+  --btn:#faf6ed; --btn-border:#b9a793; --btn-border-hover:#9c866d;
+  --accent:#cc2f22; --deep:#902015; --new:#2f6b3a; --ccol:#2f5f8a;
+  --grey:#b9ab8d; --shade:#f3d9d0; --fcell:#e3edf3; --bcell:#f7e3dc;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;
+     margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+.container{width:100%;max-width:1600px;display:flex;flex-direction:column}
+h1{font-size:1.5rem;font-weight:500;margin:0 0 4px;letter-spacing:.5px;color:var(--ink-strong);text-transform:uppercase}
+.subtitle{font-size:.9rem;color:var(--muted);margin:0 0 18px;line-height:1.5;max-width:1100px}
+.subtitle code{background:#ecddc5;padding:1px 6px;border-radius:3px}
+.card{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:14px 18px;
+      margin-bottom:14px;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lbl{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.sep{width:1px;height:22px;background:#d4c5b4;margin:0 4px}
+button,select{background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);
+  padding:7px 14px;font-size:.85rem;border-radius:5px;cursor:pointer;font-weight:500;font-family:inherit;
+  transition:background .15s,border-color .15s;white-space:nowrap}
+button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--btn-border-hover)}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--ccol);outline-offset:1px}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:#46433a;color:#faf6ed;border-color:#46433a}
+button.primary:hover:not(:disabled){background:#5c5043;border-color:#5c5043}
+button.mode.on,button.chip.on{background:#f7e6e0;border-color:var(--accent);color:var(--accent);font-weight:600}
+button.chip{font-family:var(--mono);font-size:.85rem;padding:5px 10px}
+textarea{font-family:var(--mono);font-size:.85rem;background:var(--btn);color:var(--ink-strong);
+  border:1px solid var(--btn-border);border-radius:5px;padding:7px 10px;resize:vertical;min-height:62px;width:100%}
+input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+label.chk{font-size:.78rem;color:var(--muted);display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.steplabel{font-size:.78rem;color:var(--muted);min-width:110px;font-variant-numeric:tabular-nums}
+.err{color:var(--accent);font-weight:600;font-size:.8rem;min-height:17px;margin-top:6px}
+.phasebar{display:flex;height:17px;margin:2px 9px 0;border-radius:3px;overflow:hidden;border:1px solid var(--panel-border)}
+.pseg{flex-grow:1;flex-basis:0;min-width:0;display:flex;align-items:center;justify-content:center;
+  font-size:.64rem;color:var(--muted);background:#ecddc5;cursor:pointer;overflow:hidden;white-space:nowrap;
+  border-right:1px solid var(--btn-border);font-family:var(--mono)}
+.pseg:last-child{border-right:none}
+.pseg:nth-child(even){background:#e8ddc0}
+.pseg.on{background:#f7e6e0;color:var(--accent);font-weight:700}
+.box{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:12px 16px;
+     box-shadow:0 2px 8px rgba(0,0,0,.04);margin-bottom:14px}
+.box-title{font-size:.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin:0 0 10px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.box-title .aside{text-transform:none;letter-spacing:0;font-weight:400;font-size:.75rem;color:var(--dim)}
+.status{background:#ecddc5;border:1px solid var(--panel-border);border-radius:5px;padding:11px 13px;
+        font-size:.92rem;color:var(--ink-strong);min-height:48px;line-height:1.6}
+.status b{color:var(--accent)}
+.status code,.stats code,.help code{background:#e4d5bb;padding:0 4px;border-radius:3px;font-family:var(--mono);font-size:.9em;white-space:pre}
+.svg-wrap{background:var(--bg);border-radius:5px;overflow:auto}
+#mWrap{overflow-x:auto;overflow-y:visible}
+svg{display:block}
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 14px var(--sideW,clamp(400px,32vw,580px));align-items:start}
+.splitter{align-self:stretch;cursor:col-resize;position:relative;touch-action:none;user-select:none}
+.splitter::before{content:"";position:absolute;left:6px;top:0;bottom:14px;width:2px;background:var(--panel-border);border-radius:1px}
+.splitter:hover::before,.splitter.drag::before{background:var(--btn-border-hover)}
+.splitter .grip{position:sticky;top:45vh;margin-left:1px;width:12px;height:40px;border-radius:6px;background:var(--btn);
+  border:1px solid var(--btn-border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;line-height:1}
+.splitter:hover .grip,.splitter.drag .grip{border-color:var(--btn-border-hover);color:var(--ink-strong)}
+.side{position:sticky;top:10px;max-height:calc(100vh - 20px);overflow-y:auto}
+@media(max-width:1100px){.stage{grid-template-columns:1fr}.splitter{display:none}.side{position:static;max-height:none}}
+.boxctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-2px 0 8px}
+.stats{font-size:.84rem;line-height:1.75}
+.stats .k{color:var(--muted)} .stats .v{color:var(--ink-strong);font-weight:600;font-variant-numeric:tabular-nums}
+.stats .note{font-size:.76rem;color:var(--dim);font-style:italic}
+.stats hr{border:none;border-top:1px dashed #ecddc5;margin:7px 0}
+.pview{font-family:var(--mono);font-size:1.15rem;letter-spacing:2px}
+.pview span{display:inline-block;padding:0 2px;border-radius:3px}
+.pview .pm{color:var(--accent);font-weight:700}
+.pview .pc{outline:2px solid var(--accent);background:#f7e6e0}
+table.otab{border-collapse:collapse;font-size:.8rem;font-variant-numeric:tabular-nums;margin:4px 0}
+table.otab th,table.otab td{padding:1px 7px;text-align:center;border-bottom:1px dashed #d4c5b4}
+table.otab th{color:var(--muted);font-weight:600;text-align:right}
+table.otab td.ch{font-family:var(--mono);color:var(--ink-strong);font-weight:700}
+table.otab td.on{background:#f7e6e0;color:var(--accent);font-weight:700}
+.formula{background:#faf6ed;border:1px solid var(--panel-border);border-radius:5px;padding:6px 9px;margin:6px 0;
+  font-size:.86rem;color:var(--ink-strong);line-height:1.6}
+pre.pcode{margin:0;font-family:var(--mono);font-size:.8rem;line-height:1.65;color:var(--ink-strong);
+  overflow-x:auto;text-align:left;padding:6px 0;background:#fbf8f0;border:1px solid var(--panel-border);border-radius:6px}
+pre.pcode .ln{display:block;padding:0 10px 0 calc(6px + 2.2em);text-indent:-2.2em;white-space:pre-wrap;border-left:3px solid transparent}
+pre.pcode .ln .no{display:inline-block;width:2.2em;text-indent:0;color:var(--dim);font-size:.9em;user-select:none}
+pre.pcode .ln.hot{background:#f6dfd8;border-left-color:var(--accent)}
+pre.pcode .kw{font-weight:700}
+pre.pcode .cm{color:var(--muted);font-style:italic}
+.watch{font-family:var(--mono);font-size:.82rem;margin-top:8px;color:var(--ink-strong);display:flex;gap:6px 14px;flex-wrap:wrap;min-height:20px}
+.watch span{white-space:nowrap}
+.watch .wk{color:var(--muted)}
+.watch .chg{color:var(--accent);font-weight:700}
+.legend{font-size:.75rem;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.legend svg{display:inline-block;vertical-align:middle}
+details.panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;width:100%;
+  margin-top:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+details.panel>summary{cursor:pointer;padding:13px 18px;font-size:.88rem;font-weight:600;color:var(--ink-strong);list-style:none;user-select:none}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::before{content:"▶ ";font-size:.72rem;color:var(--btn-border-hover)}
+details.panel[open]>summary::before{content:"▼ "}
+.panel-body{padding:0 18px 16px}
+.help{font-size:.84rem;line-height:1.6;max-width:900px}
+.help pre{background:#faf6ed;border:1px solid var(--panel-border);border-radius:5px;padding:9px 12px;font-size:.8rem;overflow-x:auto;margin:8px 0}
+#test-out{font-family:var(--mono);font-size:.75rem;line-height:1.6;white-space:pre-wrap;
+  margin-top:10px;color:#46433a;max-height:360px;overflow-y:auto;background:#faf6ed;border:1px solid var(--panel-border);border-radius:6px;padding:12px}
+.t-pass{color:#2f6b3a;font-weight:600}.t-fail{color:var(--accent);font-weight:700}.t-head{color:var(--ink-strong);font-weight:700}
+.tip{position:fixed;pointer-events:none;background:#46433a;color:#faf6ed;font-size:.8rem;padding:7px 10px;border-radius:5px;
+  max-width:340px;line-height:1.5;z-index:50;display:none;box-shadow:0 3px 10px rgba(0,0,0,.2)}
+.tip code{background:#5c5043;padding:0 4px;border-radius:3px;font-family:var(--mono)}
+.flyer{position:fixed;z-index:40;pointer-events:none;font-family:var(--mono);font-weight:700;color:var(--accent);
+  font-size:15px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  background:#f7e6e0;border:1.5px solid var(--accent);border-radius:4px}
+/* what the index does not store */
+svg .ns{transition:opacity .25s}
+body.stored svg .ns{opacity:.07}
+svg text{font-variant-numeric:tabular-nums}
+.hint{font-size:.76rem;color:var(--dim)}
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>FM Index</h1>
+<p class="subtitle">
+  Counting, locating and reading a text using only its Burrows–Wheeler transform <code>B</code>, the character
+  counts <code>O[c]</code> and a few samples. All occurrences of a pattern form an interval of sorted rotations;
+  <b>backward search</b> finds that interval one character at a time, from the <b>last</b> character of the
+  pattern to the first, with two σ-rank operations per character.
+</p>
+
+<div class="card">
+  <div class="row">
+    <span class="lbl">View</span>
+    <button class="mode" id="tab-lf" onclick="setTab('lf')">LF mapping</button>
+    <button class="mode" id="tab-search" onclick="setTab('search')">Backward search</button>
+    <button class="mode" id="tab-locate" onclick="setTab('locate')">Locate</button>
+    <button class="mode" id="tab-extract" onclick="setTab('extract')">Extract</button>
+    <div class="sep"></div>
+    <span class="lbl">Preset</span>
+    <select id="presetSel" onchange="loadPreset(+this.value)"></select>
+    <div class="sep"></div>
+    <label class="chk" title="Fade everything the FM index does not keep: the rotations, the suffix array (except samples) and the text itself">
+      <input type="checkbox" id="storedToggle" onchange="document.body.classList.toggle('stored',this.checked)"> fade what the index does not store</label>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row" style="align-items:flex-start">
+    <div style="flex:1;min-width:280px">
+      <textarea id="specInput" rows="4" spellcheck="false"></textarea>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button class="primary" onclick="loadFromInput()">Load</button>
+      <span class="hint" id="sizeInfo"></span>
+    </div>
+  </div>
+  <div class="err" id="inputErr"></div>
+  <div class="row" style="margin-top:4px">
+    <span class="lbl" id="patLbl">Pattern P</span>
+    <span class="row" id="patChips" style="gap:6px"></span>
+    <div class="sep"></div>
+    <span class="lbl">Sample rate t</span>
+    <input type="range" id="tSlider" min="1" max="10" value="3" style="width:130px" oninput="setT(+this.value)">
+    <span class="steplabel" id="tLabel" style="min-width:30px"></span>
+    <div class="sep"></div>
+    <span class="hint" id="dragHint">Drag across the text T to search for any substring.</span>
+  </div>
+</div>
+
+<div class="card" id="stepCard">
+  <div class="row" style="margin-bottom:9px">
+    <button id="btnFirst" onclick="stopPlay();goto(0,false)" title="first step">⏮</button>
+    <button id="btnPrev" onclick="stepBy(-1)">← Prev</button>
+    <button id="btnNext" class="primary" onclick="stepBy(1)">Next →</button>
+    <button id="btnLast" onclick="stopPlay();goto(steps.length-1,false)" title="last step">⏭</button>
+    <button id="btnPlay" onclick="togglePlay()">▶ Play</button>
+    <div class="sep"></div>
+    <span style="flex:1;min-width:240px;display:block">
+      <input type="range" id="stepSlider" min="0" max="0" value="0" style="width:100%" oninput="stopPlay();goto(+this.value,false)">
+      <span class="phasebar" id="phaseBar"></span>
+    </span>
+    <span class="steplabel" id="stepLabel"></span>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <input type="range" id="speedSlider" min="1" max="10" value="6" oninput="setSpeed(this.value)" style="width:110px">
+    <span class="steplabel" id="speedLabel" style="min-width:34px">1×</span>
+    <div class="sep"></div>
+    <label class="chk"><input type="checkbox" id="animToggle" checked> animate motion</label>
+    <span class="hint">Keys: ← → step, space play/pause.</span>
+  </div>
+</div>
+
+<div class="box">
+  <div class="box-title">Status</div>
+  <div class="status" id="statusText"></div>
+</div>
+
+<div class="stage" id="stage">
+  <div style="min-width:0">
+    <div class="box">
+      <div class="box-title">Text T <span class="aside" id="tAside"></span></div>
+      <div class="svg-wrap"><svg id="tSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Sorted rotations <span class="aside">point at a row, a character of B or of F for details</span></div>
+      <div class="boxctl">
+        <span class="lbl">Squeeze each row after its first columns</span>
+        <input type="range" id="squeeze" min="1" max="12" value="12" style="width:140px" oninput="setSqueeze(+this.value)">
+        <span class="steplabel" id="squeezeLab" style="min-width:70px"></span>
+      </div>
+      <div class="svg-wrap" id="mWrap"><svg id="mSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+  <div class="splitter" id="splitter" tabindex="0" role="separator" aria-orientation="vertical" aria-label="Resize panels" title="Drag to resize the panels; double-click to reset"><div class="grip">⋮</div></div>
+  <div class="side">
+    <div class="box">
+      <div class="box-title" id="codeTitle">Pseudocode</div>
+      <pre class="pcode" id="codeView"></pre>
+      <div class="watch" id="watch"></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Numbers</div>
+      <div class="stats" id="numbers"></div>
+    </div>
+  </div>
+</div>
+
+<details class="panel">
+  <summary>Input format</summary>
+  <div class="panel-body help">
+    <p>One item per line; lines starting with <code>#</code> are comments.</p>
+<pre>bananaban        the text T; $ is appended (it must not occur elsewhere)
+ana              patterns, one per line — the first one is loaded
+ba
+t=3              optional: sample rate for the suffix array and its inverse
+extract=4,3      optional: Extract shows T[4..4+3)</pre>
+    <p>Type <code>_</code> for a space (drawn as <code>␣</code>). The end-of-word character <code>$</code> is the smallest
+      character; all others are ordered by their character code. Without a <code>t=</code> line, t = ⌊lg(n+1)⌋.</p>
+    <p><b>Long texts.</b> Every rotation is drawn as a row, so the drawing grows with the text. The slider above the
+      rotations squeezes each row after its first few columns (the pattern plus one character, or three columns); B and F
+      always keep full width. Below 5 px the squeezed part is drawn as a plain band.</p>
+    <p><b>Mouse only.</b> The pattern buttons switch patterns; dragging across the drawn text T searches for the
+      selected substring (in <i>Extract</i>: selects the range to decode). The slider t changes the sampling.
+      Clicking a phase below the progress bar jumps to its first step. On wide screens, the bar between the drawing
+      and the pseudocode can be dragged to resize both (double-click resets it).</p>
+    <p><b>Conventions</b>, as in the pseudocode: T = T[0..n] with T[n] = <code>$</code>, so there are n+1 rows;
+      intervals of rows are half-open, [s..e) = {s, …, e−1}. In the drawing, the fence <i>s</i> is solid and the row
+      below it belongs to the interval; the fence <i>e</i> is dashed and the row below it does not.</p>
+  </div>
+</details>
+
+<details class="panel">
+  <summary>Self-tests</summary>
+  <div class="panel-body">
+    <button class="primary" onclick="runTests()">Run all tests</button>
+    <div id="test-out">Not run yet.</div>
+  </div>
+</details>
+
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   0.  Helpers
+   ══════════════════════════════════════════════════════════════════════════ */
+const SVGNS='http://www.w3.org/2000/svg';
+function el(t,a){ const e=document.createElementNS(SVGNS,t); for(const k in a) e.setAttribute(k,a[k]); return e; }
+function txt(x,y,s,a){ const e=el('text',Object.assign({x,y,'text-anchor':'middle'},a||{})); e.textContent=s; return e; }
+function disp(ch){ return ch===' '?'␣':ch; }
+function dstr(s){ return [...s].map(disp).join(''); }
+function code(s){ return '<code>'+dstr(s)+'</code>'; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function plural(k,w){ return k+' '+w+(k!==1?'s':''); }
+function copies(k,c){ return k+' cop'+(k!==1?'ies':'y')+' of '+code(c); }
+function ord(k){ const s=['th','st','nd','rd'], v=k%100; return k+(s[(v-20)%10]||s[v]||s[0]); }
+function sub(c){ return '<sub>'+esc(disp(c))+'</sub>'; }
+/* $ is the smallest character; in ASCII the space would otherwise come first */
+function chRank(c){ return c==='$' ? -1 : c.charCodeAt(0); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1.  The index
+   T[0..n] with T[n] = $.  L = suffix array, R = inverse, B[r] = T[L[r]−1].
+   O[c] = Σ_{c'<c} |B|_{c'}, σ-rank_c(B,i) = |B[0..i)|_c + O[c].
+   ══════════════════════════════════════════════════════════════════════════ */
+function buildModel(T){
+  const N=T.length, n=N-1;
+  const L=[...Array(N).keys()].sort((a,b)=>{
+    for(let k=0;;k++){ const x=T[a+k], y=T[b+k]; if(x!==y) return chRank(x)-chRank(y); }
+  });
+  const R=new Array(N); L.forEach((p,r)=>{ R[p]=r; });
+  const B=L.map(p=>T[(p+N-1)%N]), F=L.map(p=>T[p]);
+  const alpha=[...new Set(T)].sort((a,b)=>chRank(a)-chRank(b));
+  const cnt={}; for(const c of T) cnt[c]=(cnt[c]||0)+1;
+  const Oof={}; let acc=0; for(const c of alpha){ Oof[c]=acc; acc+=cnt[c]; }
+  const rk={};
+  for(const c of alpha){ const a=new Array(N+1); a[0]=0; for(let i=0;i<N;i++) a[i+1]=a[i]+(B[i]===c?1:0); rk[c]=a; }
+  const M={T,N,n,L,R,B,F,alpha,cnt};
+  M.O=c=>{ if(c in Oof) return Oof[c]; let s=0; for(const d of alpha) if(chRank(d)<chRank(c)) s+=cnt[d]; return s; };
+  M.Onext=c=>M.O(c)+(cnt[c]||0);
+  M.cntOf=c=>cnt[c]||0;
+  M.rank=(c,i)=>rk[c]?rk[c][i]:0;
+  M.srank=(c,i)=>M.rank(c,i)+M.O(c);
+  M.LF=r=>M.srank(B[r],r);
+  M.select=(c,x)=>{ let k=0; for(let i=0;i<N;i++) if(B[i]===c && ++k===x) return i; return N; };
+  M.charAtRow=j=>alpha.find(c=>M.O(c)<=j && j<M.Onext(c));
+  M.rot=r=>T.slice(L[r])+T.slice(0,L[r]);
+  return M;
+}
+/* the three procedures, plainly — the step builders below replay them */
+function backwardSearch(M,P){
+  const m=P.length;
+  let c=P[m-1];
+  let s=M.srank(c,0);
+  let e=M.srank(c,M.n+1);
+  for(let j=m-2;j>=0;j--){
+    if(s>=e) break;
+    c=P[j];
+    s=M.srank(c,s);
+    e=M.srank(c,e);
+  }
+  return [s,e];
+}
+function locate(M,s,e,t){
+  const out=[];
+  for(let r=s;r<e;r++){
+    let q=r, k=0;
+    while(M.L[q]%t!==0){ q=M.srank(M.B[q],q); k++; }
+    out.push(M.L[q]+k);
+  }
+  return out;
+}
+function extract(M,i,l,t){
+  const k0=t*Math.floor(i/t);
+  let j=M.R[k0], S='';
+  for(let p=k0;p<=i+l-1;p++){
+    const c=M.charAtRow(j);
+    const r=M.select(c,j-M.O(c)+1);
+    if(p>=i) S+=c;
+    j=r;
+  }
+  return S;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2.  Pseudocode (exactly as on the slides)
+   ══════════════════════════════════════════════════════════════════════════ */
+const SR='σ-rank';
+const K=w=>'<span class="kw">'+w+'</span>', C=w=>'<span class="cm">'+w+'</span>';
+const CODE={
+ lf:{title:'Facts behind every step', lines:[
+   ['F',    'F = sort(B)                         '+C('// first column; B = last column')],
+   ['block','rows starting with c: [O[c]..O[c]+|B|<sub>c</sub>)  '+C('// O[c] = Σ<sub>c′&lt;c</sub> |B|<sub>c′</sub>')],
+   ['same', '<i>i</i>-th c in B = <i>i</i>-th c in F           '+C('// the same character of T')],
+   ['srank',SR+'<sub>c</sub>(B, i) = |B[0..i)|<sub>c</sub> + O[c]      '+C('// fence i in B ↦ fence in F')],
+   ['lf',   'LF(r) = '+SR+'<sub>B[r]</sub>(B, r)             '+C('// row of the suffix T<sub>L[r]−1</sub>')]]},
+ search:{title:'Pseudocode — backwardSearch', lines:[
+   ['proc', K('procedure')+' backwardSearch(B[0..n], P[0..m))'],
+   ['c1',   '    '+C('// B[0..n] given as wavelet tree')],
+   ['c2',   '    '+C('// returns range [s..e) of ranks for suffixes starting with P')],
+   ['c0',   '    c := P[m−1]'],
+   ['s0',   '    s := '+SR+'<sub>c</sub>(B, 0)'],
+   ['e0',   '    e := '+SR+'<sub>c</sub>(B, n+1)'],
+   ['for',  '    '+K('for')+' j := m−2, m−3, …, 0'],
+   ['brk',  '        '+K('if')+' s ≥ e '+K('break')+' '+C('// no matches')],
+   ['c',    '        c := P[j]'],
+   ['s',    '        s := '+SR+'<sub>c</sub>(B, s)'],
+   ['e',    '        e := '+SR+'<sub>c</sub>(B, e)'],
+   ['ret',  '    '+K('return')+' [s..e)']]},
+ locate:{title:'Pseudocode — locate', lines:[
+   ['proc', K('procedure')+' locate(B[0..n], [s..e))'],
+   ['c1',   '    '+C('// B[0..n] given as wavelet tree; L[r] stored only if L[r] ≡ 0 (mod t)')],
+   ['for',  '    '+K('for')+' r := s, …, e−1'],
+   ['init', '        q := r;  k := 0'],
+   ['while','        '+K('while')+' L[q] is not sampled'],
+   ['lf',   '            q := '+SR+'<sub>B[q]</sub>(B, q)  '+C('// backward-search step, c = B[q]')],
+   ['k',    '            k := k + 1'],
+   ['rep',  '        '+K('report')+' L[q] + k']]},
+ extract:{title:'Pseudocode — extract', lines:[
+   ['proc', K('procedure')+' extract(B[0..n], i, ℓ)'],
+   ['c1',   '    '+C('// B[0..n] given as wavelet tree; O[c] = Σ<sub>c′&lt;c</sub> |B|<sub>c′</sub>')],
+   ['c2',   '    '+C('// R[k] stored only if k ≡ 0 (mod t); returns T[i..i+ℓ)')],
+   ['k',    '    k := t·⌊i/t⌋                  '+C('// last sample ≤ i')],
+   ['j',    '    j := R[k]                     '+C('// row of T<sub>k</sub>')],
+   ['S',    '    S := ε'],
+   ['for',  '    '+K('for')+' p := k, k+1, …, i+ℓ−1'],
+   ['c',    '        c := the character with O[c] ≤ j &lt; O[c+1]  '+C('// c = T[p]')],
+   ['r',    '        r := select<sub>c</sub>(B, j − O[c] + 1)       '+C('// (c, r) = D[j]')],
+   ['if',   '        '+K('if')+' p ≥ i '+K('then')+' S := S · c'],
+   ['jr',   '        j := r                         '+C('// follow the link: row of T<sub>p+1</sub>')],
+   ['ret',  '    '+K('return')+' S']]}
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3.  Step sequences
+   A step describes one picture.  Fields used by the painters:
+     line       key of the highlighted pseudocode line
+     ph, plab   phase key and label (phase bar)
+     iv {s,e,split}   interval shading; split = only over the B side (being mapped)
+     bf         a single fence on the B side (the argument i of σ-rank)
+     nf {s,e,sFrom,eFrom}   new fences on the F side, sliding from where they came from
+     cnt {c,fence}   number the c's of B, those above the fence counted
+     arcs [{r,w}]    links B[r] → F[LF(r)], w = 'strong'|'thin'
+     ring {c}        ring the B cells with character c inside iv
+     hi, dot         current row (outline) and a dot moving along a link
+   ══════════════════════════════════════════════════════════════════════════ */
+function occArcs(c,upto,strongFrom){
+  const a=[];
+  for(let r=0;r<M.N;r++) if(M.B[r]===c && r<upto) a.push({r,w:(strongFrom!==undefined&&r>=strongFrom)?'strong':'thin'});
+  return a;
+}
+function srankHtml(c,i,label){
+  const k=M.rank(c,i), o=M.O(c);
+  return SR+sub(c)+'(B, '+(label||i)+') = |B[0..'+i+')|'+sub(c)+' + O['+esc(disp(c))+'] = '+k+' + '+o+' = <b>'+(k+o)+'</b>';
+}
+
+function buildLF(){
+  const S=[];
+  S.push({ph:'intro',plab:'rows',line:'F',
+    msg:'Every row is a rotation of <i>T</i>; the rows are sorted. The first column <b style="color:var(--ccol)">F</b> '+
+        'is <i>sort(B)</i>, the last column <b>B</b> is the Burrows–Wheeler transform. On the right, F is repeated, so '+
+        'that links from B to F can be drawn. Only B and the counts of the characters are actually stored.'});
+  for(const c of M.alpha){
+    const lo=M.O(c), hi=M.Onext(c), k=M.cntOf(c);
+    S.push({ph:'c'+c,plab:disp(c),line:'block',fBlock:c,bandF:c,numF:c,
+      msg:(k>1?'The '+k+' rows starting with '+code(c)+' form':'The row starting with '+code(c)+' forms')+' the block ['+lo+'..'+hi+
+          '): before '+(k>1?'them':'it')+' come'+(lo===1?'s':'')+' the O['+esc(disp(c))+'] = '+plural(lo,'row')+' that start with a smaller '+
+          'character. '+(k>1?'Inside the block, the rows are sorted by <b>what follows</b> '+code(c)+' (shaded, up to the $).':'')});
+    S.push({ph:'c'+c,line:'block',fBlock:c,bandB:c,numB:{c,upto:M.N},numF:c,
+      msg:k===1?'The only '+code(c)+' of B is in row '+M.select(c,1)+'. B[r] is the character <b>just before</b> the rotation in row r.':
+          'Now the '+copies(k,c)+' in B, top to bottom. B[r] is the character <b>just before</b> the rotation in row r, so '+
+          'row r is exactly what follows that '+code(c)+' (shaded). The rows are sorted — so the copies of '+code(c)+' in B are '+
+          '<b>also</b> ordered by what follows them.'});
+    S.push({ph:'c'+c,line:'same',fBlock:c,numB:{c,upto:M.N},numF:c,arcs:occArcs(c,M.N,0),
+      msg:'Same order on both sides: the <i>i</i>-th '+code(c)+' in B and the <i>i</i>-th '+code(c)+' in F are the '+
+          '<b>same character of T</b>. The links of one character never cross.'});
+  }
+  /* σ-rank as a fence that is carried from B to F */
+  let c=null;
+  for(const d of M.alpha) if(d!=='$' && (c===null || M.cntOf(d)>M.cntOf(c))) c=d;
+  if(c===null) c='$';
+  const fences=[...new Set([0,M.select(c,Math.ceil(M.cntOf(c)/2))+1,M.N])];
+  for(const i of fences){
+    const v=M.srank(c,i);
+    S.push({ph:'sr',plab:SR,line:'srank',c,cnt:{c,fence:i},arcs:occArcs(c,i),bf:i,nf:{s:v,sFrom:i,sLab:'σ-rank'},
+      fBlock:c,numF:c,numB:{c,upto:i},formula:srankHtml(c,i,i===M.N?'n+1':i),
+      msg:'Put a fence into B, '+(i===0?'above row 0':i===M.N?'below the last row':'between rows '+(i-1)+' and '+i)+'. '+
+          SR+sub(c)+'(B, '+i+') counts the copies of '+code(c)+' above it and adds the rows of smaller characters: '+srankHtml(c,i,i===M.N?'n+1':i)+'. The links of the '+
+          'counted copies end exactly above that row of F — <b>a fence in B maps to a fence in F</b>.'});
+  }
+  const lfArcs=[]; for(let r=0;r<M.N;r++) lfArcs.push({r,w:'thin'});
+  S.push({ph:'sr',line:'lf',arcs:lfArcs,
+    msg:'LF(r) = '+SR+sub('B[r]')+'(B, r) is the fence just above row r, for the character of that row: it takes '+
+        'row r to the row whose rotation starts <b>one position earlier</b> in T. Point at any character of B or F to '+
+        'follow its link.'});
+  return S;
+}
+
+function buildSearch(P){
+  const S=[], m=P.length, N=M.N;
+  const occOf=(s,e)=>{ const a=[]; for(let r=s;r<e;r++) a.push(M.L[r]); return a; };
+  let c=P[m-1];
+  const base={P};
+  const push=o=>S.push(Object.assign({},base,o));
+  const phase0=dstr(P.slice(m-1));
+  push({ph:'init',plab:phase0,line:'proc',vars:{},pm:m,
+    msg:'Search for P = '+code(P)+' (m = '+m+'), using only B and the counts O[c]. All matches form an interval of '+
+        'rows, and we build it from the <b>last</b> character of P backwards.'});
+  push({ph:'init',line:'c0',vars:{c},pc:m-1,pm:m,fBlock:c,
+    msg:'c := P['+(m-1)+'] = '+code(c)+'. For a single character the interval is simply its block in F.'});
+  let s=M.srank(c,0);
+  push({ph:'init',line:'s0',vars:{c,s},chg:['s'],pc:m-1,pm:m,fBlock:c,bf:0,bfLab:'0',cnt:{c,fence:0},numF:c,
+    nf:{s,sFrom:0},formula:srankHtml(c,0),
+    msg:'s := '+srankHtml(c,0)+'. The fence 0 lies above all of B, so nothing is counted: s is just the number '+
+        'of rows that start with a smaller character.'});
+  let e=M.srank(c,N);
+  push({ph:'init',line:'e0',vars:{c,s,e},chg:['e'],pc:m-1,pm:m,fBlock:c,bf:N,bfLab:'n+1',cnt:{c,fence:N},numF:c,
+    arcs:occArcs(c,N,0),nf:{s,e,sFrom:s,eFrom:N},formula:srankHtml(c,N,'n+1'),
+    msg:'e := '+srankHtml(c,N,'n+1')+'. The fence n+1 lies below all of B, so all '+copies(M.cntOf(c),c)+' are counted.'});
+  let matched=m-1, broke=false;
+  for(let j=m-2;j>=0;j--){
+    const suf=P.slice(matched), ph='j'+j;
+    const cnt=e-s;
+    push({ph,plab:dstr(P.slice(j)),line:'for',vars:{j,c,s,e},chg:['j'],iv:{s,e},pm:matched,occ:{len:m-matched,list:occOf(s,e)},
+      msg:'j := '+j+'. The interval ['+s+'..'+e+') holds the '+cnt+' row'+(cnt!==1?'s':'')+' starting with '+code(suf)+
+          ' — one per occurrence of '+code(suf)+' in T (marked under T).'});
+    if(s>=e){
+      S[S.length-1].plab='✗ break';
+      push({ph,line:'brk',vars:{j,c,s,e},iv:{s,e},pm:matched,
+        msg:'s ≥ e: the interval is empty — no row starts with '+code(suf)+', so no longer string can match either. '+
+            '<b>break</b>.'});
+      broke=true; break;
+    }
+    push({ph,line:'brk',vars:{j,c,s,e},iv:{s,e},pm:matched,occ:{len:m-matched,list:occOf(s,e)},
+      msg:'s &lt; e: '+cnt+' candidate row'+(cnt!==1?'s':'')+' — continue.'});
+    c=P[j];
+    let inside=0; for(let r=s;r<e;r++) if(M.B[r]===c) inside++;
+    push({ph,line:'c',vars:{j,c,s,e},chg:['c'],iv:{s,e},pm:matched,pc:j,ring:{c},
+      occ:{len:m-matched,list:occOf(s,e),ext:c},
+      msg:'c := P['+j+'] = '+code(c)+'. Which occurrences of '+code(suf)+' are preceded by '+code(c)+'? Exactly those '+
+          'whose row ends in '+code(c)+': '+inside+' of the '+cnt+' (ringed in B).'});
+    const os=s, oe=e;
+    const ns=M.srank(c,os);
+    const k1=M.rank(c,os);
+    push({ph,line:'s',vars:{j,c,s:ns,e},chg:['s'],iv:{s:os,e:oe,split:true},pm:matched,pc:j,ring:{c},
+      cnt:{c,fence:os},numF:c,fBlock:c,arcs:occArcs(c,os),nf:{s:ns,sFrom:os},formula:srankHtml(c,os),
+      msg:'s := '+srankHtml(c,os)+'. '+(k1===0
+          ? 'No '+code(c)+' lies above the interval, so the new interval starts at the top of the '+code(c)+'-block.'
+          : 'The '+copies(k1,c)+' above the interval (numbered) link to the first '+plural(k1,'row')+' of the '+
+            code(c)+'-block, so the new interval starts right after them.')});
+    const ne=M.srank(c,oe);
+    push({ph,line:'e',vars:{j,c,s:ns,e:ne},chg:['e'],iv:{s:os,e:oe,split:true},pm:matched,pc:j,ring:{c},
+      cnt:{c,fence:oe},numF:c,fBlock:c,arcs:occArcs(c,oe,os),nf:{s:ns,e:ne,sFrom:os,eFrom:oe},formula:srankHtml(c,oe),
+      msg:'e := '+srankHtml(c,oe)+'. '+(inside===0
+          ? 'No '+code(c)+' lies inside the interval, so e = s: the interval is now empty.'
+          : 'Counting up to the fence e also counts the '+copies(inside,c)+' inside the interval; their links '+
+            '(bold) land in ['+ns+'..'+ne+') — in order, without crossing.')});
+    s=ns; e=ne; matched=j;
+  }
+  const cnt=e-s;
+  push({ph:'ret',plab:'result',line:'ret',vars:{s,e},iv:{s,e},pm:broke?matched:0,occ:broke?null:{len:m,list:occOf(s,e)},
+    formula:'count = e − s = '+cnt,
+    msg: cnt>0
+      ? 'return ['+s+'..'+e+'): '+cnt+' row'+(cnt!==1?'s':'')+' start with '+code(P)+', so P occurs <b>'+cnt+
+        '</b> time'+(cnt!==1?'s':'')+' in T. Which positions? Those are L[r] for r in the interval — the suffix array, '+
+        'which the index keeps only as samples: see <i>Locate</i>.'
+      : 'return ['+s+'..'+e+'): empty — '+code(P)+' does not occur in T.'});
+  return S;
+}
+
+function buildLocate(P,t){
+  const S=[];
+  const [s,e]=backwardSearch(M,P);
+  const m=P.length;
+  const found=[];
+  const base=()=>({P,iv:{s,e},pm:0,samp:true,found:found.slice(),mlen:m});
+  const push=o=>S.push(Object.assign(base(),o));
+  push({ph:'start',plab:'start',line:'proc',vars:{s,e},
+    msg:'Backward search for '+code(P)+' gave the interval ['+s+'..'+e+'). The suffix array L is kept only where '+
+        'L[r] is a multiple of t = '+t+' (boxed); the other entries are not stored. Sampled text positions are marked '+
+        'on T.'});
+  let total=0;
+  for(let r=s;r<e;r++){
+    const ph='r'+r;
+    push({ph,plab:'r = '+r,line:'for',vars:{r},chg:['r'],hi:r,
+      msg:'r := '+r+'. Where in T does the match in row '+r+' start?'});
+    let q=r, k=0;
+    push({ph,line:'init',vars:{r,q,k},chg:['q','k'],hi:q,walk:{from:M.L[r],at:M.L[q]},
+      msg:'q := '+r+'; k := 0. Invariant: L[r] = L[q] + k.'});
+    for(;;){
+      const smp=M.L[q]%t===0;
+      push({ph,line:'while',vars:{r,q,k},hi:q,walk:{from:M.L[r],at:M.L[q]},Lq:q,
+        msg: smp ? 'L['+q+'] = '+M.L[q]+' is sampled — stop.'
+                 : 'L['+q+'] is not stored — take one step to the left in T.'});
+      if(smp) break;
+      const c=M.B[q], q2=M.LF(q);
+      push({ph,line:'lf',vars:{r,q:q2,k},chg:['q'],hi:q2,dot:{from:q,to:q2,kind:'LF'},arcs:[{r:q,w:'strong'}],bf:q,bfLab:'',
+        cnt:{c,fence:q},numF:c,fBlock:c,walk:{from:M.L[r],at:M.L[q2]},formula:srankHtml(c,q),c,
+        msg:'q := '+SR+sub(c)+'(B, '+q+') = '+srankHtml(c,q).split('= ').slice(1).join('= ')+'. Following the link of B['+q+'] = '+
+            code(c)+' leads to the row of the suffix that starts <b>one position earlier</b> in T.'});
+      q=q2; k++; total++;
+      push({ph,line:'k',vars:{r,q,k},chg:['k'],hi:q,walk:{from:M.L[r],at:M.L[q]},
+        msg:'k := '+k+'.'});
+    }
+    const pos=M.L[q]+k;
+    found.push(pos);
+    push({ph,line:'rep',vars:{r,q,k},hi:q,walk:{from:M.L[r],at:M.L[q]},Lq:q,
+      formula:'L['+q+'] + k = '+M.L[q]+' + '+k+' = <b>'+pos+'</b>',
+      msg:'report L['+q+'] + k = '+M.L[q]+' + '+k+' = <b>'+pos+'</b>: T['+pos+'..'+(pos+m)+') = '+code(P)+'.'});
+  }
+  const list=found.slice().sort((a,b)=>a-b);
+  push({ph:'done',plab:'done',line:null,vars:{},
+    msg: e>s ? 'All '+(e-s)+' occurrences: '+list.join(', ')+'. That took '+total+' LF step'+(total!==1?'s':'')+
+          ' in total — at most t − 1 = '+(t-1)+' per occurrence.'
+        : 'The interval is empty, so there is nothing to locate.'});
+  return S;
+}
+
+function buildExtract(i,l,t){
+  const S=[];
+  const k0=t*Math.floor(i/t);
+  const rev={};
+  let out='';
+  const base=()=>({rev:Object.assign({},rev),rsamp:true,xr:{i,l,k:k0},out});
+  const push=o=>S.push(Object.assign(base(),o));
+  push({ph:'start',plab:'start',line:'proc',vars:{i,'ℓ':l},
+    msg:'Read T['+i+'..'+(i+l)+') without having T. The inverse suffix array R is kept only at text positions that '+
+        'are multiples of t = '+t+' (marked). Decoding runs the inverse BWT: row → first character → link.'});
+  push({ph:'start',line:'k',vars:{i,'ℓ':l,k:k0},chg:['k'],tcur:k0,
+    msg:'k := t·⌊i/t⌋ = '+t+'·'+Math.floor(i/t)+' = '+k0+': the last sampled position ≤ i.'});
+  let j=M.R[k0];
+  push({ph:'start',line:'j',vars:{k:k0,j},chg:['j'],tcur:k0,hi:j,hiF:true,
+    msg:'j := R['+k0+'] = '+j+': row '+j+' is the rotation starting at T['+k0+'].'});
+  push({ph:'start',line:'S',vars:{k:k0,j,S:'ε'},chg:['S'],hi:j,hiF:true,
+    msg:'S := ε.'});
+  for(let p=k0;p<=i+l-1;p++){
+    const ph=p<i?'skip':'out';
+    const plab=p<i?'to i':'T['+i+'..'+(i+l)+')';
+    const Sd=()=>out===''?'ε':dstr(out);
+    push({ph,plab,line:'for',vars:{p,j,S:Sd()},chg:['p'],hi:j,hiF:true,tcur:p,
+      msg:'p := '+p+'.'+(p<i?' (Still before i: this character is only needed to get to T['+i+'].)':'')});
+    const c=M.charAtRow(j), o=M.O(c), on=M.Onext(c);
+    push({ph,line:'c',vars:{p,j,c,S:Sd()},chg:['c'],hi:j,hiF:true,fBlock:c,fHi:j,tcur:p,c,
+      formula:'O['+esc(disp(c))+'] = '+o+' ≤ '+j+' &lt; '+on+' = O['+esc(disp(c))+'+1]',
+      msg:'c := the character with O[c] ≤ j &lt; O[c+1]: '+o+' ≤ '+j+' &lt; '+on+', so c = '+code(c)+
+          ' — the first character of row '+j+', which is T['+p+'].'});
+    const x=j-o+1, r=M.select(c,x);
+    push({ph,line:'r',vars:{p,j,c,r,S:Sd()},chg:['r'],hi:j,hiF:true,fBlock:c,fHi:j,tcur:p,c,
+      numB:{c,upto:r+1,only:true},numF:c,arcsFL:[j],
+      formula:'select'+sub(c)+'(B, '+j+' − '+o+' + 1) = select'+sub(c)+'(B, '+x+') = <b>'+r+'</b>',
+      msg:'r := select'+sub(c)+'(B, j − O[c] + 1) = select'+sub(c)+'(B, '+x+') = '+r+'. Row '+j+' holds the '+ord(x)+
+          ' '+code(c)+' of F, and that is the '+ord(x)+' '+code(c)+' of B: D['+j+'] = ('+code(c)+', '+r+').'});
+    if(p>=i){ out+=c; rev[p]='out'; } else rev[p]='skip';
+    push({ph,line:'if',vars:{p,j,c,r,S:Sd()},chg:p>=i?['S']:[],hi:j,hiF:true,fHi:j,tcur:p,fly:{j,p},c,
+      msg: p>=i ? 'p ≥ i: S := S · '+code(c)+' = '+code(out)+'.'
+                : 'p &lt; i: T['+p+'] = '+code(c)+' is decoded, but not part of the answer.'});
+    const jo=j; j=r;
+    push({ph,line:'jr',vars:{p,j,S:Sd()},chg:['j'],hi:j,hiF:true,dot:{from:jo,to:r,kind:'FL'},tcur:p,
+      msg:'j := '+r+': follow the link. B['+r+'] = '+code(c)+' is the character just before the rotation of row '+r+
+          ', so row '+r+' starts at T['+(p+1)+'].'});
+  }
+  push({ph:'ret',plab:'done',line:'ret',vars:{S:dstr(out)},tcur:-1,
+    msg:'return S = '+code(out)+' = T['+i+'..'+(i+l)+'), after '+(i+l-k0)+' inverse-BWT step'+(i+l-k0!==1?'s':'')+
+        (i>k0?' ('+(i-k0)+' of them only to reach position '+i+')':'')+'.'});
+  return S;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   4.  Geometry
+   ══════════════════════════════════════════════════════════════════════════ */
+const RH=20, HDR=36, ML=70, CW=12, TW=22;
+let GM=null, squeezeW=CW;
+/* the first columns keep full width: the pattern and one more character */
+function keepCols(){
+  const k=(tab==='search'||tab==='locate')?Math.max(3,P.length+1):3;
+  return Math.max(1,Math.min(M.N-1,k));
+}
+function setSqueezeUI(w){
+  squeezeW=w;
+  document.getElementById('squeeze').value=w;
+  document.getElementById('squeezeLab').textContent = w>=CW ? 'full width' : w+' px / column';
+}
+function setSqueeze(w){ setSqueezeUI(w); if(!M) return; setupMatrix(); render(false); }
+function autoSqueeze(){
+  const K=3, rest=M.N-1-K;
+  let w=CW;
+  if(M.N-1>40 && rest>0) w=Math.max(1,Math.min(CW,Math.floor((480-K*CW)/rest)));
+  setSqueezeUI(w);
+}
+function geom(){
+  const N=M.N;
+  const xL=ML+16, xR=xL+32, x0=xR+26;
+  const K=keepCols(), w=k=>k<K?CW:squeezeW;
+  const xl=new Array(N); xl[0]=x0-CW/2;
+  for(let k=1;k<N;k++) xl[k]=xl[k-1]+w(k-1);
+  const xB=xl[N-1]+CW/2+10, xF=xB+104, W=xF+172, H=HDR+N*RH+18;
+  return {N,K,xL,xR,x0,xB,xF,W,H,y:r=>HDR+r*RH,xl:k=>xl[k],w,xc:k=>xl[k]+w(k)/2};
+}
+function arcPath(g,r1,r2,dir){
+  const x1=g.xB+11, x2=g.xF-12, y1=g.y(r1)+RH/2, y2=g.y(r2)+RH/2, dx=(x2-x1)*.45;
+  return dir==='FL' ? {d:'M '+x2+' '+y2+' C '+(x2-dx)+' '+y2+' '+(x1+dx)+' '+y1+' '+x1+' '+y1,x1:x2,y1:y2,x2:x1,y2:y1}
+                    : {d:'M '+x1+' '+y1+' C '+(x1+dx)+' '+y1+' '+(x2-dx)+' '+y2+' '+x2+' '+y2,x1,y1,x2,y2};
+}
+function bez(g,r1,r2,dir,u){
+  const p=arcPath(g,r1,r2,dir), dx=(p.x2-p.x1)*.45;
+  const P0=[p.x1,p.y1],P1=[p.x1+dx,p.y1],P2=[p.x2-dx,p.y2],P3=[p.x2,p.y2], v=1-u;
+  return [0,1].map(d=>v*v*v*P0[d]+3*v*v*u*P1[d]+3*v*u*u*P2[d]+u*u*u*P3[d]);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   5.  Painting — the matrix
+   layers: back (dynamic) · static · front (dynamic) · hover
+   ══════════════════════════════════════════════════════════════════════════ */
+let layers=null;
+function setupMatrix(){
+  const svg=document.getElementById('mSvg'); svg.innerHTML='';
+  GM=geom();
+  svg.setAttribute('viewBox','0 0 '+GM.W+' '+GM.H);
+  svg.setAttribute('width',GM.W); svg.setAttribute('height',GM.H);
+  const defs=el('defs',{});
+  for(const [id,col] of [['ahR','#cc2f22'],['ahB','#2f5f8a']]){
+    const mk=el('marker',{id,markerWidth:9,markerHeight:9,refX:7,refY:3.5,orient:'auto',markerUnits:'userSpaceOnUse'});
+    mk.appendChild(el('path',{d:'M0,0 L7,3.5 L0,7 Z',fill:col})); defs.appendChild(mk);
+  }
+  svg.appendChild(defs);
+  layers={back:el('g',{}),stat:el('g',{}),front:el('g',{'pointer-events':'none'}),hov:el('g',{'pointer-events':'none'})};
+  for(const k of ['back','stat','front','hov']) svg.appendChild(layers[k]);
+}
+function paintStatic(st){
+  const g=GM, N=g.N, G=layers.stat; G.innerHTML='';
+  const mono={'font-family':'var(--mono)'};
+  /* headers */
+  G.appendChild(txt(g.xL,HDR-14,'L[r]',{'font-size':11,fill:'var(--muted)'}));
+  G.appendChild(txt(g.xR,HDR-14,'r',{'font-size':11,fill:'var(--muted)'}));
+  { const h=txt(g.x0-4,HDR-14,'T',{'font-size':11,fill:'var(--muted)','text-anchor':'start','font-style':'italic'});
+    const sb=el('tspan',{'baseline-shift':'sub','font-size':8,'font-style':'normal'}); sb.textContent='L[r]'; h.appendChild(sb);
+    const rs=el('tspan',{'font-style':'normal'}); rs.textContent='  as a rotation'; h.appendChild(rs);
+    G.appendChild(h); }
+  G.appendChild(txt(g.xB,HDR-14,'B',{'font-size':12,fill:'var(--accent)','font-weight':700}));
+  G.appendChild(txt(g.xF,HDR-14,'F',{'font-size':12,fill:'var(--ccol)','font-weight':700}));
+  G.appendChild(txt(g.xF,HDR-3,'= sort(B)',{'font-size':9,fill:'var(--muted)'}));
+  const inIv=r=>st.iv && r>=st.iv.s && r<st.iv.e;
+  const mlen=st.P? st.P.length-(st.pm===undefined?st.P.length:st.pm):0;
+  /* bands (LF view): what follows c */
+  if(st.bandF!==undefined||st.bandB!==undefined){
+    for(let r=0;r<N;r++){
+      let k0=-1,k1=-1;
+      const kd=N-1-M.L[r];   /* comparisons end at the $ */
+      if(st.bandF!==undefined && M.F[r]===st.bandF){ k0=1; k1=Math.min(N-2,kd); }
+      if(st.bandB!==undefined && M.B[r]===st.bandB){ k0=0; k1=Math.min(N-2,kd); }
+      if(k0<0) continue;
+      G.appendChild(el('rect',{x:g.xl(k0),y:g.y(r)+2,width:g.xl(k1)+g.w(k1)-g.xl(k0),height:RH-4,rx:3,
+        fill:st.bandF!==undefined?'#dde8ee':'#f1d6cc',opacity:.9}));
+    }
+  }
+  /* F blocks */
+  for(const c of M.alpha){
+    const lo=M.O(c);
+    if(lo>0) G.appendChild(el('line',{x1:g.xF-13,x2:g.xF+13,y1:g.y(lo),y2:g.y(lo),stroke:'var(--btn-border)','stroke-width':1}));
+  }
+  if(st.fBlock!==undefined && M.cntOf(st.fBlock)>0){
+    const c=st.fBlock, lo=M.O(c), hi=M.Onext(c), x=g.xF+96;
+    G.appendChild(el('path',{d:'M '+(x-5)+' '+(g.y(lo)+2)+' Q '+x+' '+(g.y(lo)+2)+' '+x+' '+(g.y(lo)+8)+
+      ' L '+x+' '+(g.y(hi)-8)+' Q '+x+' '+(g.y(hi)-2)+' '+(x-5)+' '+(g.y(hi)-2),fill:'none',stroke:'var(--ccol)','stroke-width':1.4}));
+    const ym=(g.y(lo)+g.y(hi))/2;
+    G.appendChild(txt(x+6,ym-2,disp(c)+'-block',{'font-size':10,fill:'var(--ccol)','text-anchor':'start','font-weight':600}));
+    G.appendChild(txt(x+6,ym+10,'from O['+disp(c)+'] = '+lo,{'font-size':9,fill:'var(--ccol)','text-anchor':'start'}));
+  }
+  /* arcs */
+  const drawArc=(r1,r2,dir,w)=>{
+    const p=arcPath(g,r1,r2,dir);
+    const strong=w==='strong';
+    G.appendChild(el('path',{d:p.d,fill:'none',stroke:dir==='FL'?'var(--ccol)':'var(--accent)',
+      'stroke-width':strong?2:1,opacity:strong?.95:.45,'marker-end':strong?(dir==='FL'?'url(#ahB)':'url(#ahR)'):''}));
+  };
+  for(const a of st.arcs||[]) drawArc(a.r,M.LF(a.r),'LF',a.w);
+  for(const j of st.arcsFL||[]){ const c=M.F[j]; drawArc(M.select(c,j-M.O(c)+1),j,'FL','strong'); }
+  /* numbering */
+  const numB=st.numB?(typeof st.numB==='object'?st.numB:{c:st.numB,upto:M.N}):null;
+  const cntB=st.cnt||null;
+  /* rows */
+  for(let r=0;r<N;r++){
+    const y=g.y(r), yb=y+RH-6;
+    const Lr=M.L[r];
+    const sampled=st.samp && Lr%tRate===0;
+    /* L[r] */
+    const lg=el('g',{class:(st.samp&&sampled)?'':'ns','data-h':'L:'+r});
+    lg.appendChild(el('rect',{x:g.xL-13,y:y+2,width:26,height:RH-4,rx:2,
+      fill:sampled?'#fbf8f0':'none',stroke:sampled?'var(--ink-strong)':(st.samp?'var(--grey)':'var(--btn-border)'),
+      'stroke-width':sampled?1.4:1,'stroke-dasharray':(st.samp&&!sampled)?'2 2':''}));
+    lg.appendChild(txt(g.xL,yb,String(Lr),Object.assign({'font-size':11,
+      fill:st.samp&&!sampled?'var(--grey)':'var(--ink-strong)','font-weight':sampled?700:400},mono)));
+    if(st.Lq===r){ lg.appendChild(el('rect',{x:g.xL-15,y:y,width:30,height:RH,rx:3,fill:'none',
+      stroke:sampled?'var(--new)':'var(--accent)','stroke-width':2})); }
+    G.appendChild(lg);
+    G.appendChild(txt(g.xR,yb,String(r),{'font-size':10,fill:'var(--dim)'}));
+    /* rotation */
+    G.appendChild(el('rect',{x:g.x0-8,y:y,width:g.xl(N-1)-g.x0+8,height:RH,fill:'transparent','data-h':'row:'+r}));
+    const sq=squeezeW<CW && g.K<N-1;
+    if(sq && squeezeW<5)
+      G.appendChild(el('rect',{x:g.xl(g.K),y:y+6,width:g.xl(N-1)-g.xl(g.K),height:RH-10,rx:2,fill:'var(--grey)',
+        opacity:.28,class:'ns','pointer-events':'none'}));
+    const rot=M.rot(r), kd=N-1-Lr;
+    const t=el('text',Object.assign({y:yb,'font-size':14,class:'ns','data-h':'row:'+r},mono));
+    let run=null;
+    const style=k=>{
+      if(mlen>0 && inIv(r) && k<mlen) return 'm';
+      if(k===0) return 'f';
+      if(k>kd) return 'g';
+      return 'n';
+    };
+    const fsq=Math.min(14,Math.max(5,squeezeW+1));
+    const flush=()=>{
+      if(!run) return;
+      const ts=el('tspan',{x:run.xs.join(' ')});
+      ts.textContent=run.s;
+      if(run.q){ ts.setAttribute('font-size',fsq); ts.setAttribute('opacity',.75); }
+      const S={m:{fill:'var(--accent)','font-weight':700},f:{fill:'var(--ccol)','font-weight':700},
+               g:{fill:'var(--grey)'},n:{fill:'var(--ink-strong)'}}[run.k];
+      for(const a in S) ts.setAttribute(a,S[a]);
+      t.appendChild(ts); run=null;
+    };
+    for(let k=0;k<N-1;k++){
+      const q=k>=g.K && squeezeW<CW;
+      if(q && squeezeW<5) break;
+      const s=style(k);
+      if(!run||run.k!==s||run.q!==q){ flush(); run={k:s,q,xs:[],s:''}; }
+      run.xs.push((q ? g.xl(k)+(squeezeW-0.6*fsq)/2 : g.xc(k)-4.2).toFixed(1)); run.s+=disp(rot[k]);
+    }
+    flush();
+    G.appendChild(t);
+    /* B cell */
+    const ringed=st.ring && inIv(r) && M.B[r]===st.ring.c;
+    const bg=el('g',{'data-h':'b:'+r,style:'cursor:pointer'});
+    bg.appendChild(el('rect',{x:g.xB-10,y:y+1,width:20,height:RH-2,rx:3,fill:'var(--bcell)',
+      stroke:ringed?'var(--accent)':'none','stroke-width':ringed?2.2:0}));
+    bg.appendChild(txt(g.xB,yb,disp(M.B[r]),Object.assign({'font-size':14,fill:'var(--accent)','font-weight':700},mono)));
+    G.appendChild(bg);
+    /* F cell */
+    const fh=st.fHi===r;
+    const fg=el('g',{'data-h':'f:'+r,style:'cursor:pointer'});
+    fg.appendChild(el('rect',{x:g.xF-10,y:y+1,width:20,height:RH-2,rx:3,fill:'var(--fcell)',
+      stroke:fh?'var(--ccol)':'none','stroke-width':fh?2.2:0}));
+    fg.appendChild(txt(g.xF,yb,disp(M.F[r]),Object.assign({'font-size':14,fill:'var(--ccol)','font-weight':700},mono)));
+    G.appendChild(fg);
+    /* numbers next to B: the k-th occurrence of c */
+    const nb = numB && M.B[r]===numB.c ? numB : (cntB && M.B[r]===cntB.c ? {c:cntB.c,upto:cntB.fence} : null);
+    if(nb){
+      const kth=M.rank(M.B[r],r)+1;
+      const counted=r<nb.upto;
+      if(!nb.only || r===nb.upto-1)
+        G.appendChild(txt(g.xB+14,y+9,String(kth),{'font-size':10,'text-anchor':'start',
+          fill:counted?'var(--accent)':'var(--grey)','font-weight':counted?700:400}));
+    }
+    if(st.numF!==undefined && M.F[r]===st.numF){
+      G.appendChild(txt(g.xF+14,y+9,String(r-M.O(st.numF)+1),{'font-size':10,'text-anchor':'start',fill:'var(--ccol)'}));
+    }
+  }
+}
+/* dynamic state that can be tweened */
+const DKEYS=['ivS','ivE','ivA','bfY','bfA','nS','nSA','nE','nEA','hiR','hiA','dotU'];
+let live=null;
+function targetOf(st){
+  const d={ivS:0,ivE:0,ivA:0,bfY:0,bfA:0,nS:0,nSA:0,nE:0,nEA:0,hiR:0,hiA:0,dotU:1};
+  if(st.iv){ d.ivS=st.iv.s; d.ivE=st.iv.e; d.ivA=1; }
+  if(st.bf!==undefined){ d.bfY=st.bf; d.bfA=1; }
+  if(st.nf){ if(st.nf.s!==undefined){ d.nS=st.nf.s; d.nSA=1; } if(st.nf.e!==undefined){ d.nE=st.nf.e; d.nEA=1; } }
+  if(st.hi!==undefined){ d.hiR=st.hi; d.hiA=1; }
+  return d;
+}
+function paintDynamic(st,v){
+  const g=GM, B=layers.back, F=layers.front; B.innerHTML=''; F.innerHTML='';
+  const Y=r=>HDR+r*RH;
+  const xLeft=ML-4, xSplit=g.xB+14, xRight=g.xF+16;
+  /* interval */
+  if(v.ivA>0.01){
+    const split=st.iv&&st.iv.split;
+    const x2=split?xSplit:xRight;
+    const ys=Y(v.ivS), ye=Y(v.ivE);
+    B.appendChild(el('rect',{x:xLeft,y:ys,width:x2-xLeft,height:Math.max(0,ye-ys),fill:'var(--shade)',opacity:.75*v.ivA}));
+    F.appendChild(el('line',{x1:xLeft,x2:x2,y1:ys,y2:ys,stroke:'var(--accent)','stroke-width':2,opacity:v.ivA}));
+    F.appendChild(el('line',{x1:xLeft,x2:x2,y1:ye,y2:ye,stroke:'var(--accent)','stroke-width':2,'stroke-dasharray':'6 4',opacity:v.ivA}));
+    /* the bracket: square at s (included), round at e (excluded) */
+    const bx=xLeft-8;
+    F.appendChild(el('path',{d:'M '+(bx+7)+' '+ys+' L '+bx+' '+ys+' L '+bx+' '+(ye-7)+' Q '+bx+' '+ye+' '+(bx+7)+' '+ye,
+      fill:'none',stroke:'var(--accent)','stroke-width':2,opacity:v.ivA}));
+    const sv=st.iv?st.iv.s:Math.round(v.ivS), ev=st.iv?st.iv.e:Math.round(v.ivE);
+    const tight=ye-ys<14;
+    F.appendChild(txt(bx-5,tight?ys-3:ys+4,'s = '+sv,{'font-size':11,'text-anchor':'end',fill:'var(--accent)','font-weight':700,opacity:v.ivA}));
+    F.appendChild(txt(bx-5,tight?ye+12:ye+4,'e = '+ev,{'font-size':11,'text-anchor':'end',fill:'var(--accent)',opacity:v.ivA}));
+  }
+  /* a fence in B (argument of σ-rank) */
+  if(v.bfA>0.01){
+    const y=Y(v.bfY);
+    F.appendChild(el('line',{x1:ML-10,x2:xSplit,y1:y,y2:y,stroke:'var(--ink-strong)','stroke-width':2,'stroke-dasharray':'2 3',opacity:v.bfA}));
+    if(st.bfLab!=='')
+      F.appendChild(txt(ML-14,y+4,'fence '+(st.bfLab!==undefined?st.bfLab:(st.bf!==undefined?st.bf:'')),
+        {'font-size':10,'text-anchor':'end',fill:'var(--ink-strong)',opacity:v.bfA}));
+  }
+  /* new fences, on the F side */
+  const newFence=(val,a,dashed,lab)=>{
+    const y=Y(val);
+    F.appendChild(el('line',{x1:g.xF-18,x2:xRight,y1:y,y2:y,stroke:'var(--accent)','stroke-width':2.4,
+      'stroke-dasharray':dashed?'6 4':'',opacity:a}));
+    F.appendChild(txt(xRight+14,y+4,lab,{'font-size':11,'text-anchor':'start',fill:'var(--accent)','font-weight':700,opacity:a}));
+  };
+  if(v.nSA>0.01) newFence(v.nS,v.nSA,false,(st.nf&&st.nf.sLab?st.nf.sLab:'s')+' := '+(st.nf?st.nf.s:''));
+  if(v.nEA>0.01) newFence(v.nE,v.nEA,true,'e := '+(st.nf?st.nf.e:''));
+  /* current row */
+  if(v.hiA>0.01){
+    const y=Y(v.hiR);
+    F.appendChild(el('rect',{x:g.xL-15,y:y,width:g.xF+13-(g.xL-15),height:RH,rx:4,fill:'none',
+      stroke:'var(--ink-strong)','stroke-width':1.6,opacity:.75*v.hiA}));
+    const xc=st.hiF?g.xF:g.xB;
+    F.appendChild(el('rect',{x:xc-12,y:y-1,width:24,height:RH+2,rx:4,fill:'none',stroke:'var(--ink-strong)','stroke-width':2.4,opacity:v.hiA}));
+  }
+  /* dot along a link */
+  if(st.dot && v.dotU<1){
+    const p=bez(g,st.dot.kind==='FL'?st.dot.to:st.dot.from,st.dot.kind==='FL'?st.dot.from:M.LF(st.dot.from),st.dot.kind,v.dotU);
+    const q=arcPath(g,st.dot.kind==='FL'?st.dot.to:st.dot.from,st.dot.kind==='FL'?st.dot.from:M.LF(st.dot.from),st.dot.kind);
+    F.appendChild(el('path',{d:q.d,fill:'none',stroke:st.dot.kind==='FL'?'var(--ccol)':'var(--accent)','stroke-width':2,opacity:.8}));
+    F.appendChild(el('circle',{cx:p[0],cy:p[1],r:5,fill:st.dot.kind==='FL'?'var(--ccol)':'var(--accent)'}));
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   6.  Painting — the text strip
+   ══════════════════════════════════════════════════════════════════════════ */
+let TG=null;
+function paintText(st){
+  const svg=document.getElementById('tSvg'); svg.innerHTML='';
+  const N=M.N, x0=22, W=x0+N*TW+16;
+  const X=i=>x0+i*TW;
+  const showR=tab==='extract';
+  const marks=[];   // brackets under T: {a,len,kind}
+  if(st.occ){
+    for(const p of st.occ.list){
+      if(st.occ.ext!==undefined){
+        const r=M.R[p];
+        if(M.B[r]===st.occ.ext && p>0) marks.push({a:p-1,len:st.occ.len+1,kind:'ext'});
+        else marks.push({a:p,len:st.occ.len,kind:'dead'});
+      } else marks.push({a:p,len:st.occ.len,kind:'occ'});
+    }
+  }
+  if(st.found) for(const p of st.found) marks.push({a:p,len:st.mlen,kind:'occ'});
+  /* stack brackets so that overlapping ones do not collide */
+  marks.sort((a,b)=>a.a-b.a);
+  const lvEnd=[];
+  for(const mk of marks){ let l=0; while(lvEnd[l]!==undefined && lvEnd[l]>mk.a) l++; mk.lv=l; lvEnd[l]=mk.a+mk.len; }
+  const nLv=Math.max(1,lvEnd.length);
+  const yBr=50, yR=yBr+nLv*7+14, H=showR?yR+34:yBr+nLv*7+12;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.setAttribute('width',W); svg.setAttribute('height',H);
+  TG={x0,X,H,W};
+  const mono={'font-family':'var(--mono)'};
+  for(let i=0;i<N;i++){
+    const x=X(i);
+    const samp=(tab==='locate'||tab==='extract') && i%tRate===0;
+    svg.appendChild(txt(x+TW/2,12,String(i),{'font-size':9,fill:samp?'var(--ccol)':'var(--dim)','font-weight':samp?700:400}));
+    if(samp) svg.appendChild(el('path',{d:'M '+(x+TW/2-4)+' 15 L '+(x+TW/2+4)+' 15 L '+(x+TW/2)+' 19 Z',fill:'var(--ccol)'}));
+    let fill='#fbf8f0', stroke='var(--btn-border)', col='var(--ink-strong)', cls='ns', dash='';
+    let ch=disp(M.T[i]);
+    if(tab==='extract'){
+      const rv=st.rev&&st.rev[i];
+      if(rv==='out'){ fill='#f7e6e0'; stroke='var(--accent)'; col='var(--accent)'; cls=''; }
+      else if(rv==='skip'){ fill='#ecddc5'; col='var(--muted)'; cls=''; }
+      else { col='var(--grey)'; dash='3 2'; }
+      if(st.xr && i>=st.xr.i && i<st.xr.i+st.xr.l && rv!=='out') stroke='var(--accent)';
+    }
+    const g=el('g',{'data-h':'t:'+i,style:'cursor:crosshair'});
+    g.appendChild(el('rect',{x:x+1,y:21,width:TW-2,height:24,rx:3,fill,stroke,'stroke-width':1,'stroke-dasharray':dash}));
+    const tt=txt(x+TW/2,38,ch,Object.assign({'font-size':15,fill:col,'font-weight':600,class:cls},mono));
+    g.appendChild(tt);
+    if(st.tcur===i) g.appendChild(el('rect',{x:x-.5,y:19.5,width:TW+1,height:27,rx:4,fill:'none',stroke:'var(--ink-strong)','stroke-width':2}));
+    svg.appendChild(g);
+    if(showR){
+      const sm=i%tRate===0;
+      svg.appendChild(txt(x+TW/2,yR+16,String(M.R[i]),Object.assign({'font-size':11,
+        fill:sm?'var(--ccol)':'var(--grey)','font-weight':sm?700:400,class:sm?'':'ns'},mono)));
+      if(sm) svg.appendChild(el('rect',{x:x+2,y:yR+3,width:TW-4,height:18,rx:2,fill:'none',stroke:'var(--ccol)','stroke-width':1.2}));
+    }
+  }
+  if(showR) svg.appendChild(txt(x0-6,yR+16,'R',{'font-size':11,fill:'var(--ccol)','text-anchor':'end','font-weight':700}));
+  /* brackets */
+  for(const mk of marks){
+    const y=yBr+mk.lv*7, xa=X(mk.a)+3, xb=X(mk.a+mk.len)-3;
+    const col=mk.kind==='dead'?'var(--grey)':'var(--accent)';
+    svg.appendChild(el('path',{d:'M '+xa+' '+(y-4)+' L '+xa+' '+y+' L '+xb+' '+y+' L '+xb+' '+(y-4),fill:'none',stroke:col,
+      'stroke-width':mk.kind==='dead'?1.2:2,'stroke-dasharray':mk.kind==='dead'?'3 3':''}));
+    if(mk.kind==='ext') svg.appendChild(el('rect',{x:X(mk.a)+2,y:22,width:TW-4,height:22,rx:3,fill:'none',stroke:'var(--accent)','stroke-width':2}));
+  }
+  /* locate: the walk to the left, in the (invisible) text */
+  if(st.walk){
+    const y=yBr+nLv*7+4, xa=X(st.walk.from)+TW/2, xb=X(st.walk.at)+TW/2;
+    if(st.walk.from!==st.walk.at)
+      svg.appendChild(el('path',{d:'M '+xa+' '+y+' L '+(xb+4)+' '+y,stroke:'var(--ink-strong)','stroke-width':1.5,fill:'none',
+        'stroke-dasharray':'3 2'}));
+    svg.appendChild(el('circle',{cx:xb,cy:y,r:4,fill:'var(--ink-strong)'}));
+    svg.appendChild(el('circle',{cx:xa,cy:y,r:3,fill:'none',stroke:'var(--ink-strong)','stroke-width':1.2}));
+  }
+  svg.appendChild(el('g',{id:'tHover','pointer-events':'none'}));
+  if(dragSel){
+    const a=Math.min(dragSel.a,dragSel.b), b=Math.max(dragSel.a,dragSel.b);
+    svg.appendChild(el('rect',{x:X(a),y:19,width:(b-a+1)*TW,height:28,rx:4,fill:'rgba(47,95,138,.12)',stroke:'var(--ccol)','stroke-width':1.5}));
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7.  Side panels
+   ══════════════════════════════════════════════════════════════════════════ */
+function paintCode(st){
+  const def=CODE[tab];
+  document.getElementById('codeTitle').textContent=def.title;
+  const pre=document.getElementById('codeView');
+  pre.innerHTML=def.lines.map((l,i)=>'<span class="ln'+(st.line===l[0]?' hot':'')+'"><span class="no">'+(i+1)+'</span>'+l[1]+'</span>').join('');
+  const w=document.getElementById('watch');
+  const v=st.vars||{};
+  w.innerHTML=Object.keys(v).map(k=>'<span><span class="wk">'+esc(k)+' =</span> <span class="'+
+    ((st.chg||[]).includes(k)?'chg':'')+'">'+esc(typeof v[k]==='string'?dstr(v[k]):v[k])+'</span></span>').join('');
+}
+function paintNumbers(st){
+  let h='';
+  if(st.P!==undefined){
+    const P=st.P, m=P.length;
+    const pm=st.pm===undefined?m:st.pm;
+    h+='<div><span class="k">P =</span> <span class="pview">'+[...P].map((c,k)=>'<span class="'+
+      (k>=pm?'pm ':'')+(st.pc===k?'pc':'')+'">'+esc(disp(c))+'</span>').join('')+'</span></div>';
+  }
+  const act=st.c!==undefined?st.c:(st.vars&&st.vars.c!==undefined?st.vars.c:st.fBlock);
+  h+='<table class="otab"><tr><th>c</th>'+M.alpha.map(c=>'<td class="ch'+(c===act?' on':'')+'">'+esc(disp(c))+'</td>').join('')+'</tr>'+
+     '<tr><th>O[c]</th>'+M.alpha.map(c=>'<td class="'+(c===act?'on':'')+'">'+M.O(c)+'</td>').join('')+'</tr>'+
+     '<tr><th>|B|<sub>c</sub></th>'+M.alpha.map(c=>'<td class="'+(c===act?'on':'')+'">'+M.cntOf(c)+'</td>').join('')+'</tr></table>';
+  h+='<div class="note">O[c] = number of characters smaller than c = first row of the c-block in F.</div>';
+  if(st.formula) h+='<div class="formula">'+st.formula+'</div>';
+  if(tab==='locate'){
+    h+='<hr><span class="k">t =</span> <span class="v">'+tRate+'</span> &nbsp; <span class="k">sampled rows:</span> <span class="v">'+
+       M.L.filter(x=>x%tRate===0).length+' of '+M.N+'</span>';
+    h+='<br><span class="k">reported so far:</span> <span class="v">'+((st.found&&st.found.length)?st.found.join(', '):'—')+'</span>';
+  }
+  if(tab==='extract'){
+    h+='<hr><span class="k">t =</span> <span class="v">'+tRate+'</span> &nbsp; <span class="k">target:</span> <span class="v">T['+
+       exI+'..'+(exI+exL)+')</span>';
+    h+='<br><span class="k">S =</span> <span class="v" style="font-family:var(--mono)">'+(st.out?esc(dstr(st.out)):'ε')+'</span>';
+  }
+  h+='<hr><span class="k">n =</span> <span class="v">'+M.n+'</span> <span class="note">(n+1 = '+M.N+' rows, including $)</span>';
+  document.getElementById('numbers').innerHTML=h;
+}
+function paintLegend(){
+  const sw=(inner,w)=>'<svg width="'+(w||34)+'" height="16">'+inner+'</svg>';
+  const L=document.getElementById('legend');
+  let h='';
+  if(tab==='search'||tab==='locate') h+='<span>'+sw('<rect x="6" y="3" width="26" height="10" fill="#f3d9d0"/><line x1="6" x2="32" y1="3" y2="3" stroke="#cc2f22" stroke-width="2"/><line x1="6" x2="32" y1="13" y2="13" stroke="#cc2f22" stroke-width="2" stroke-dasharray="5 3"/><path d="M 8 3 L 3 3 L 3 9 Q 3 13 8 13" fill="none" stroke="#cc2f22" stroke-width="2"/>')+
+    ' interval [s..e): fence s solid (row below it included), fence e dashed (row below it excluded)</span>';
+  h+='<span>'+sw('<path d="M 2 4 C 16 4 18 12 32 12" fill="none" stroke="#cc2f22" stroke-width="1.6"/>')+' link from B to F (LF)</span>';
+  if(tab==='extract') h+='<span>'+sw('<path d="M 32 4 C 18 4 16 12 2 12" fill="none" stroke="#2f5f8a" stroke-width="1.6"/>')+' link from F back to B (select)</span>';
+  if(tab==='locate') h+='<span>'+sw('<rect x="4" y="2" width="24" height="12" rx="2" fill="#fbf8f0" stroke="#46433a" stroke-width="1.4"/>',30)+' sampled L[r]</span>';
+  L.innerHTML=h;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   8.  Hover and click
+   ══════════════════════════════════════════════════════════════════════════ */
+let hover=null, pinned=null;
+function tipShow(html,ev){
+  const t=document.getElementById('tip'); t.innerHTML=html; t.style.display='block';
+  const x=Math.min(window.innerWidth-360,ev.clientX+14), y=ev.clientY+16;
+  t.style.left=x+'px'; t.style.top=(y+t.offsetHeight>window.innerHeight?ev.clientY-t.offsetHeight-10:y)+'px';
+}
+function tipHide(){ document.getElementById('tip').style.display='none'; }
+function hoverInfo(h){
+  const [k,vs]=h.split(':'), v=+vs;
+  if(k==='row'||k==='L'){
+    const r=v, p=M.L[r];
+    const suf=M.T.slice(p);
+    let s='Row '+r+': the suffix starting at T['+p+'] — '+code(suf.length>40?suf.slice(0,40)+'…':suf)+'<br>L['+r+'] = '+p+', R['+p+'] = '+r+'.';
+    if(tab==='locate') s+=p%tRate===0?'<br>L['+r+'] is sampled (a multiple of t = '+tRate+').':'<br>L['+r+'] is <b>not</b> stored.';
+    return s;
+  }
+  if(k==='b'){
+    const r=v, c=M.B[r], kth=M.rank(c,r)+1, lf=M.LF(r);
+    return 'B['+r+'] = '+code(c)+', the '+ord(kth)+' '+code(c)+' of B — it is T['+((M.L[r]+M.N-1)%M.N)+'], the character before row '+r+'.<br>'+
+      'LF('+r+') = '+SR+sub(c)+'(B, '+r+') = '+(kth-1)+' + '+M.O(c)+' = <b>'+lf+'</b>: the '+ord(kth)+' '+code(c)+' of F.';
+  }
+  if(k==='f'){
+    const j=v, c=M.F[j], x=j-M.O(c)+1, r=M.select(c,x);
+    return 'F['+j+'] = '+code(c)+' because O['+esc(disp(c))+'] = '+M.O(c)+' ≤ '+j+' &lt; '+M.Onext(c)+'.<br>It is the '+ord(x)+
+      ' '+code(c)+' of F; select'+sub(c)+'(B, '+x+') = <b>'+r+'</b> is its copy in B.';
+  }
+  if(k==='t'){
+    const i=v;
+    return 'T['+i+'] = '+code(M.T[i])+'. The suffix starting here is row R['+i+'] = <b>'+M.R[i]+'</b>.'+
+      (tab==='extract'?(i%tRate===0?'<br>R['+i+'] is sampled.':'<br>R['+i+'] is not stored.'):'');
+  }
+  return '';
+}
+function paintHover(){
+  const H=layers.hov; H.innerHTML='';
+  const th=document.getElementById('tHover'); if(th) th.innerHTML='';
+  const h=pinned||hover; if(!h||!M) return;
+  const [k,vs]=h.split(':'), v=+vs, g=GM;
+  const rowBox=(r,col)=>H.appendChild(el('rect',{x:g.xL-15,y:g.y(r),width:g.xF+12-(g.xL-15),height:RH,rx:4,fill:col||'rgba(47,95,138,.10)',
+    stroke:'var(--ccol)','stroke-width':1}));
+  const tBox=(i,len)=>{ if(!th) return; th.appendChild(el('rect',{x:TG.X(i),y:19,width:TW*len,height:28,rx:4,
+    fill:'rgba(47,95,138,.12)',stroke:'var(--ccol)','stroke-width':1.5})); };
+  if(k==='row'||k==='L'){ rowBox(v); tBox(M.L[v],M.N-M.L[v]); }
+  if(k==='t'){ rowBox(M.R[v]); tBox(v,1); }
+  if(k==='b'){
+    const r=v, c=M.B[r], lf=M.LF(r);
+    for(let q=0;q<r;q++) if(M.B[q]===c) H.appendChild(txt(g.xB+14,g.y(q)+9,String(M.rank(c,q)+1),{'font-size':10,'text-anchor':'start',fill:'var(--ccol)','font-weight':700}));
+    H.appendChild(el('line',{x1:g.x0-8,x2:g.xB+14,y1:g.y(r),y2:g.y(r),stroke:'var(--ccol)','stroke-width':1.6,'stroke-dasharray':'2 3'}));
+    const p=arcPath(g,r,lf,'LF');
+    H.appendChild(el('path',{d:p.d,fill:'none',stroke:'var(--ccol)','stroke-width':2.2,'marker-end':'url(#ahB)'}));
+    H.appendChild(el('rect',{x:g.xF-11,y:g.y(lf),width:22,height:RH,rx:3,fill:'none',stroke:'var(--ccol)','stroke-width':2}));
+    H.appendChild(el('rect',{x:g.xB-11,y:g.y(r),width:22,height:RH,rx:3,fill:'none',stroke:'var(--ccol)','stroke-width':2}));
+    const pT=(M.L[r]+M.N-1)%M.N; tBox(pT,1);
+  }
+  if(k==='f'){
+    const j=v, c=M.F[j], r=M.select(c,j-M.O(c)+1);
+    const p=arcPath(g,r,j,'FL');
+    H.appendChild(el('path',{d:p.d,fill:'none',stroke:'var(--ccol)','stroke-width':2.2,'marker-end':'url(#ahB)'}));
+    H.appendChild(el('rect',{x:g.xF-11,y:g.y(j),width:22,height:RH,rx:3,fill:'none',stroke:'var(--ccol)','stroke-width':2}));
+    H.appendChild(el('rect',{x:g.xB-11,y:g.y(r),width:22,height:RH,rx:3,fill:'none',stroke:'var(--ccol)','stroke-width':2}));
+    tBox(M.L[j],1);
+  }
+}
+function hoverTarget(ev){
+  let n=ev.target;
+  while(n && n.getAttribute && !n.getAttribute('data-h')) n=n.parentNode;
+  return n && n.getAttribute ? n.getAttribute('data-h') : null;
+}
+function bindHover(svgId){
+  const svg=document.getElementById(svgId);
+  svg.addEventListener('mousemove',ev=>{
+    const h=hoverTarget(ev);
+    if(h!==hover){ hover=h; paintHover(); }
+    if(h) tipShow(hoverInfo(h),ev); else tipHide();
+  });
+  svg.addEventListener('mouseleave',()=>{ hover=null; paintHover(); tipHide(); });
+}
+/* dragging across T selects a substring */
+let dragSel=null;
+function bindDrag(){
+  const svg=document.getElementById('tSvg');
+  const idxAt=ev=>{ const r=svg.getBoundingClientRect(); const x=(ev.clientX-r.left); return Math.max(0,Math.min(M.N-1,Math.floor((x-TG.x0)/TW))); };
+  svg.addEventListener('pointerdown',ev=>{ if(!M||tab==='lf') return; const i=idxAt(ev); dragSel={a:i,b:i};
+    svg.setPointerCapture(ev.pointerId); paintText(steps[cur]); });
+  svg.addEventListener('pointermove',ev=>{ if(!dragSel) return; const i=idxAt(ev); if(i!==dragSel.b){ dragSel.b=i; paintText(steps[cur]); } });
+  const end=()=>{
+    if(!dragSel) return;
+    const a=Math.min(dragSel.a,dragSel.b), b=Math.max(dragSel.a,dragSel.b);
+    dragSel=null;
+    if(tab==='extract'){ exI=a; exL=b-a+1; rebuild(); }
+    else { const P=M.T.slice(a,b+1); addPattern(P); setPattern(P); }
+  };
+  svg.addEventListener('pointerup',end);
+  svg.addEventListener('pointercancel',()=>{ dragSel=null; paintText(steps[cur]); });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   9.  Driver
+   ══════════════════════════════════════════════════════════════════════════ */
+let M=null, tab='lf', steps=[], cur=0, patterns=[], P='', tRate=3, exI=0, exL=1;
+let animHandle=null, speedFactor=1;
+function render(animate){
+  const st=steps[cur];
+  document.getElementById('statusText').innerHTML=st.msg;
+  document.getElementById('stepLabel').textContent='step '+(cur+1)+' / '+steps.length;
+  document.getElementById('stepSlider').value=cur;
+  document.getElementById('btnPrev').disabled=document.getElementById('btnFirst').disabled=(cur===0);
+  document.getElementById('btnNext').disabled=document.getElementById('btnLast').disabled=(cur===steps.length-1);
+  paintStatic(st); paintText(st); paintCode(st); paintNumbers(st); paintHover();
+  /* keep the interesting part of a long text in view */
+  const focus = (st.tcur!==undefined && st.tcur>=0) ? st.tcur : st.walk ? st.walk.at : st.xr ? st.xr.i : null;
+  if(focus!==null){
+    const wrap=document.getElementById('tSvg').parentNode, x=TG.X(focus);
+    if(x<wrap.scrollLeft+40 || x>wrap.scrollLeft+wrap.clientWidth-120) wrap.scrollLeft=Math.max(0,x-wrap.clientWidth/3);
+  }
+  updatePhases();
+  /* motion */
+  const tgt=targetOf(st);
+  const from=Object.assign({},live||tgt);
+  if(!live || !animate){ from.dotU=1; Object.assign(from,tgt); }
+  else {
+    /* things that appear come from where they logically originate */
+    if(from.ivA<0.5 && tgt.ivA>0){
+      if(from.nSA>0.5){ from.ivS=from.nS; from.ivE=from.nEA>0.5?from.nE:from.nS; } else { from.ivS=tgt.ivS; from.ivE=tgt.ivE; }
+    }
+    if(from.nSA<0.5 && tgt.nSA>0 && st.nf){ from.nS=st.nf.sFrom!==undefined?st.nf.sFrom:tgt.nS; }
+    if(from.nEA<0.5 && tgt.nEA>0 && st.nf){ from.nE=st.nf.eFrom!==undefined?st.nf.eFrom:tgt.nE; }
+    if(from.bfA<0.5) from.bfY=tgt.bfY;
+    if(from.hiA<0.5) from.hiR=tgt.hiR;
+    from.dotU=st.dot?0:1;
+  }
+  if(animHandle){ cancelAnimationFrame(animHandle); animHandle=null; }
+  const dur=(animate?650:0)/speedFactor, t0=performance.now();
+  const frame=now=>{
+    const t=dur===0?1:Math.min(1,(now-t0)/dur);
+    const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    const v={};
+    for(const k of DKEYS) v[k]=from[k]+(tgt[k]-from[k])*(k==='dotU'?t:e);
+    paintDynamic(st,v);
+    live=v;
+    if(t<1) animHandle=requestAnimationFrame(frame); else animHandle=null;
+  };
+  animHandle=requestAnimationFrame(frame);
+  if(animate && st.fly) flyChar(st.fly);
+}
+function flyChar(f){
+  const svg=document.getElementById('mSvg'), ts=document.getElementById('tSvg');
+  const r1=svg.getBoundingClientRect(), r2=ts.getBoundingClientRect();
+  const sx=r1.width/GM.W, x1=r1.left+(GM.xF-11)*sx, y1=r1.top+GM.y(f.j)*sx;
+  const x2=r2.left+TG.X(f.p)+1, y2=r2.top+21;
+  const d=document.createElement('div'); d.className='flyer'; d.textContent=disp(M.F[f.j]);
+  d.style.left=x1+'px'; d.style.top=y1+'px'; document.body.appendChild(d);
+  const a=d.animate([{transform:'translate(0,0)'},{transform:'translate('+(x2-x1)+'px,'+(y2-y1)+'px)'}],
+    {duration:700/speedFactor,easing:'ease-in-out'});
+  a.onfinish=()=>d.remove();
+}
+function phaseList(){
+  const out=[];
+  steps.forEach((s,i)=>{ if(!out.length||out[out.length-1].ph!==s.ph) out.push({ph:s.ph,lab:s.plab||s.ph,i}); });
+  return out;
+}
+function buildPhases(){
+  const ps=phaseList(), bar=document.getElementById('phaseBar'); bar.innerHTML='';
+  ps.forEach((p,k)=>{
+    const end=k+1<ps.length?ps[k+1].i:steps.length;
+    const seg=document.createElement('span');
+    seg.className='pseg'; seg.style.flexGrow=String(end-p.i);
+    seg.textContent=p.lab; seg.title=p.lab+' (step '+(p.i+1)+')';
+    seg.onclick=()=>{ stopPlay(); goto(p.i,false); };
+    bar.appendChild(seg);
+  });
+}
+function updatePhases(){
+  const ps=phaseList(), segs=document.getElementById('phaseBar').children;
+  ps.forEach((p,k)=>{ const end=k+1<ps.length?ps[k+1].i:steps.length; if(segs[k]) segs[k].classList.toggle('on',cur>=p.i&&cur<end); });
+}
+function goto(i,animate){
+  const was=cur;
+  cur=Math.max(0,Math.min(steps.length-1,i));
+  const anim=!!animate && document.getElementById('animToggle').checked && Math.abs(cur-was)===1;
+  render(anim);
+}
+function stepBy(d){ stopPlay(); goto(cur+d,true); }
+let playTimer=null;
+function togglePlay(){ playTimer?stopPlay():startPlay(); }
+function startPlay(){
+  if(cur>=steps.length-1) goto(0,false);
+  document.getElementById('btnPlay').textContent='⏸ Pause';
+  const tick=()=>{ if(cur>=steps.length-1){ stopPlay(); return; } goto(cur+1,true); playTimer=setTimeout(tick,1100/speedFactor); };
+  playTimer=setTimeout(tick,10);
+}
+function stopPlay(){ if(playTimer){ clearTimeout(playTimer); playTimer=null; } document.getElementById('btnPlay').textContent='▶ Play'; }
+function setSpeed(v){ speedFactor=Math.pow(1.35,v-6); document.getElementById('speedLabel').textContent=(Math.round(speedFactor*10)/10).toFixed(1)+'×'; }
+
+function rebuild(keepStep){
+  if(!M) return;
+  stopPlay();
+  const old=cur;
+  if(tab==='lf') steps=buildLF();
+  else if(tab==='search') steps=buildSearch(P);
+  else if(tab==='locate') steps=buildLocate(P,tRate);
+  else steps=buildExtract(exI,exL,tRate);
+  setupMatrix();
+  document.getElementById('stepSlider').max=steps.length-1;
+  buildPhases(); live=null;
+  cur=keepStep?Math.min(old,steps.length-1):0;
+  paintLegend(); paintChips();
+  document.getElementById('tAside').textContent =
+    tab==='extract' ? 'the index does not have T — drag across it to choose which part to decode'
+    : tab==='lf' ? 'point at a character to see its row' : 'drag across T to search for any substring';
+  render(false);
+}
+function setTab(t){
+  tab=t;
+  for(const x of ['lf','search','locate','extract']) document.getElementById('tab-'+x).classList.toggle('on',x===t);
+  document.getElementById('patLbl').style.display=document.getElementById('patChips').style.display=(t==='search'||t==='locate')?'':'none';
+  document.getElementById('dragHint').textContent = t==='extract' ? 'Drag across the text T to choose the range T[i..i+ℓ).'
+     : t==='lf' ? '' : 'Drag across the text T to search for any substring.';
+  pinned=null; rebuild();
+  /* remember the tab in the URL; not allowed in sandboxed previews (about:srcdoc), which is harmless */
+  try{ if(location.protocol!=='about:') history.replaceState(null,'','#'+t); }catch(e){}
+}
+function paintChips(){
+  const box=document.getElementById('patChips'); box.innerHTML='';
+  for(const p of patterns){
+    const b=document.createElement('button'); b.className='chip'+(p===P?' on':''); b.textContent=dstr(p);
+    b.onclick=()=>setPattern(p); box.appendChild(b);
+  }
+}
+function addPattern(p){ if(!patterns.includes(p)) patterns.push(p); }
+function setPattern(p){ P=p; rebuild(); }
+function setT(v){ tRate=v; document.getElementById('tLabel').textContent=String(v); if(tab==='locate'||tab==='extract') rebuild(); else paintText(steps[cur]); }
+
+function parseSpec(raw){
+  let text=null; const pats=[]; let t=null, ex=null;
+  for(let ln of raw.split(/\r?\n/)){
+    ln=ln.replace(/\s+$/,'');
+    if(/^\s*#/.test(ln) || ln.trim()==='') continue;
+    let mm=ln.match(/^\s*t\s*=\s*(\d+)\s*$/i); if(mm){ t=+mm[1]; continue; }
+    mm=ln.match(/^\s*extract\s*=\s*(\d+)\s*[,; ]\s*(\d+)\s*$/i); if(mm){ ex=[+mm[1],+mm[2]]; continue; }
+    if(text===null) text=ln; else pats.push(ln.replace(/_/g,' '));
+  }
+  if(text===null) throw new Error('No text given: the first line should be the text T.');
+  const T=text.replace(/_/g,' ').replace(/\$/g,'')+'$';
+  if(T.length<2) throw new Error('The text is empty.');
+  for(const p of pats) if(!p.length) throw new Error('Empty pattern.');
+  return {T,pats,t,ex};
+}
+function loadFromInput(){
+  const err=document.getElementById('inputErr'); err.textContent='';
+  try{
+    const sp=parseSpec(document.getElementById('specInput').value);
+    M=buildModel(sp.T);
+    autoSqueeze();
+    patterns=sp.pats.length?sp.pats.slice():[M.T.slice(0,Math.min(2,M.n))];
+    P=patterns[0];
+    const tmax=Math.max(1,M.n);
+    tRate=Math.max(1,Math.min(tmax,sp.t||Math.floor(Math.log2(M.N))));
+    const ts=document.getElementById('tSlider'); ts.max=tmax; ts.value=tRate;
+    document.getElementById('tLabel').textContent=String(tRate);
+    if(sp.ex){ exI=Math.min(sp.ex[0],M.n); exL=Math.max(1,Math.min(sp.ex[1],M.N-exI)); }
+    else { exI=Math.min(M.n,tRate+1); exL=Math.max(1,Math.min(3,M.N-exI)); }
+    document.getElementById('sizeInfo').textContent='n+1 = '+M.N+' rows, σ = '+M.alpha.length;
+    rebuild();
+  }catch(e){ err.textContent=e.message; console.error(e); }
+}
+const PRESETS=[
+  ['bananaban  (lecture example)','bananaban\nana\nba\nnab\nanb\nt=3\nextract=4,3'],
+  ['alf␣eats␣alfalfa','alf_eats_alfalfa\nalf\nlfa\nfa\na_\nt=4\nextract=9,4'],
+  ['abracadabra','abracadabra\nabra\nbra\ncad\nabc\nt=3\nextract=5,4'],
+  ['hannahbansbananasman','hannahbansbananasman\nana\nanas\nnas\nanarchy\nt=4\nextract=6,5'],
+  ['have␣had␣hadnt␣hasnt␣havent␣has␣what','have_had_hadnt_hasnt_havent_has_what\nha\nhad\nnt_\n_ha\nt=5\nextract=16,6'],
+  ['mississippi','mississippi\nssi\nissi\nppi\nsip\nt=3\nextract=4,4'],
+  ['telomere repeats (DNA)','TTAGGGTTAGGGTTAGCGTTAGGG\nTTAGGG\nAGG\nGCG\nGGGT\nt=5\nextract=13,5'],
+  ['it␣was␣the␣best␣of␣times…  (long)','it_was_the_best_of_times_it_was_the_worst_of_times_it_was_the_age_of_wisdom_it_was_the_age_of_foolishness\n'+
+    'it_was\nthe_\ns_of\nage_of\nt=6\nextract=40,12']
+];
+function loadPreset(k){
+  document.getElementById('presetSel').value=k;
+  document.getElementById('specInput').value=PRESETS[k][1];
+  loadFromInput();
+}
+
+/* the movable separator between the drawing and the side panels */
+function bindSplitter(){
+  const sp=document.getElementById('splitter'), stage=document.getElementById('stage');
+  let drag=false;
+  const setW=w=>{ const r=stage.getBoundingClientRect(); w=Math.max(280,Math.min(r.width-340,w));
+    stage.style.setProperty('--sideW',Math.round(w)+'px'); };
+  const cur=()=>document.querySelector('.side').getBoundingClientRect().width;
+  sp.addEventListener('pointerdown',ev=>{ drag=true; sp.classList.add('drag'); sp.setPointerCapture(ev.pointerId); ev.preventDefault(); });
+  sp.addEventListener('pointermove',ev=>{ if(drag) setW(stage.getBoundingClientRect().right-ev.clientX-7); });
+  const end=()=>{ drag=false; sp.classList.remove('drag'); };
+  sp.addEventListener('pointerup',end); sp.addEventListener('pointercancel',end);
+  sp.addEventListener('dblclick',()=>stage.style.removeProperty('--sideW'));
+  sp.addEventListener('keydown',ev=>{
+    if(ev.key==='ArrowLeft'){ ev.preventDefault(); ev.stopPropagation(); setW(cur()+30); }
+    else if(ev.key==='ArrowRight'){ ev.preventDefault(); ev.stopPropagation(); setW(cur()-30); }
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   10.  Self-tests
+   ══════════════════════════════════════════════════════════════════════════ */
+function runTests(){
+  const out=[]; let pass=0, fail=0;
+  const ok=(n,c,d)=>{ if(c){pass++;out.push('<span class="t-pass">PASS</span>  '+n);} else {fail++;out.push('<span class="t-fail">FAIL</span>  '+n+(d?'\n         '+d:''));} };
+  const head=t=>out.push('<span class="t-head">'+t+'</span>');
+  const occNaive=(T,P)=>{ const a=[]; for(let i=0;i+P.length<=T.length;i++) if(T.startsWith(P,i)) a.push(i); return a; };
+  head('1 — The lecture example T = bananaban$');
+  { const X=buildModel('bananaban$');
+    ok('B = nnbnba$aaa',X.B.join('')==='nnbnba$aaa',X.B.join(''));
+    ok('L = 9 5 7 3 1 6 0 8 4 2',X.L.join(' ')==='9 5 7 3 1 6 0 8 4 2',X.L.join(' '));
+    ok('O = $:0 a:1 b:5 n:7',[X.O('$'),X.O('a'),X.O('b'),X.O('n')].join()==='0,1,5,7');
+    ok('P = ana → [3..5)',backwardSearch(X,'ana').join()==='3,5',backwardSearch(X,'ana').join());
+    ok('P = ba → [5..7), two matches (the corrected line 6)',backwardSearch(X,'ba').join()==='5,7');
+    const typo=(()=>{ let c='a', s=X.srank(c,0), e=X.srank(c,X.n); c='b'; s=X.srank(c,s); e=X.srank(c,e); return [s,e].join(); })();
+    ok('with σ-rank(B, n) in line 6 one match would be lost: [5..6)',typo==='5,6',typo);
+    ok('locate ana, t = 3 → {3, 1}',locate(X,3,5,3).sort().join()==='1,3');
+    ok('extract T[4..7) = nab',extract(X,4,3,3)==='nab',extract(X,4,3,3));
+  }
+  head('2 — LF is a permutation that steps left in T');
+  { let good=true;
+    for(const T of ['bananaban$','alf eats alfalfa$','mississippi$','abracadabra$']){
+      const X=buildModel(T), seen=new Set();
+      for(let r=0;r<X.N;r++){ const q=X.LF(r); seen.add(q); if(X.L[r]>0 && X.L[q]!==X.L[r]-1) good=false; }
+      if(seen.size!==X.N) good=false;
+    }
+    ok('LF(r) is the row of T[L[r]−1..] and a bijection',good);
+  }
+  head('3 — Random texts: search, locate and extract against the naive answers');
+  { let bad='';
+    for(let it=0;it<400 && !bad;it++){
+      const sig=1+Math.floor(Math.random()*4), n=1+Math.floor(Math.random()*40);
+      let T=''; for(let i=0;i<n;i++) T+='abcd'[Math.floor(Math.random()*sig)]; T+='$';
+      const X=buildModel(T);
+      const m=1+Math.floor(Math.random()*4); let Pp=''; for(let i=0;i<m;i++) Pp+='abcde'[Math.floor(Math.random()*(sig+1))];
+      const [s,e]=backwardSearch(X,Pp), nv=occNaive(T,Pp);
+      if(e-s!==nv.length){ bad='count '+JSON.stringify([T,Pp,s,e,nv]); break; }
+      for(let t=1;t<=5;t++){
+        const loc=locate(X,s,e,t).sort((a,b)=>a-b);
+        if(loc.join()!==nv.join()){ bad='locate '+JSON.stringify([T,Pp,t,loc,nv]); break; }
+        const i=Math.floor(Math.random()*X.N), l=1+Math.floor(Math.random()*(X.N-i));
+        if(extract(X,i,l,t)!==T.slice(i,i+l)){ bad='extract '+JSON.stringify([T,i,l,t]); break; }
+      }
+    }
+    ok('400 random texts × t = 1..5',bad==='',bad);
+  }
+  head('4 — The step sequences replay the procedures');
+  { let bad='';
+    const keep=[M,tab];
+    for(const [,spec] of PRESETS){
+      const sp=parseSpec(spec); M=buildModel(sp.T);
+      for(const Pp of sp.pats){
+        const S=buildSearch(Pp), last=S[S.length-1], r=backwardSearch(M,Pp);
+        if(last.vars.s!==r[0]||last.vars.e!==r[1]) bad='search '+Pp;
+        const Lc=buildLocate(Pp,3); const fin=Lc[Lc.length-1];
+        if(r[1]>r[0] && (fin.found||[]).length!==r[1]-r[0]) bad='locate '+Pp;
+      }
+      const E=buildExtract(1,Math.min(3,M.N-1),3);
+      if(E[E.length-1].out!==M.T.slice(1,1+Math.min(3,M.N-1))) bad='extract '+sp.T;
+    }
+    [M,tab]=keep;
+    ok('all presets, all patterns',bad==='',bad);
+  }
+  out.push('\n'+pass+' passed, '+fail+' failed');
+  document.getElementById('test-out').innerHTML=out.join('\n');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   11.  Start
+   ══════════════════════════════════════════════════════════════════════════ */
+(function init(){
+  const sel=document.getElementById('presetSel');
+  PRESETS.forEach((p,k)=>{ const o=document.createElement('option'); o.value=k; o.textContent=p[0]; sel.appendChild(o); });
+  bindHover('mSvg'); bindHover('tSvg'); bindDrag(); bindSplitter();
+  document.getElementById('mSvg').addEventListener('click',ev=>{
+    const h=hoverTarget(ev); pinned=(h&&h===pinned)?null:(h&&/^[bf]:/.test(h)?h:null); paintHover();
+  });
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.getElementById('animToggle').checked=false;
+  setSpeed(6);
+  const h=(location.hash||'').slice(1);
+  tab=['lf','search','locate','extract'].includes(h)?h:'lf';
+  document.getElementById('specInput').value=PRESETS[0][1];
+  loadFromInput();
+  setTab(tab);
+})();
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if(e.key==='ArrowRight'){ e.preventDefault(); stepBy(1); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); stepBy(-1); }
+  else if(e.key===' '){ e.preventDefault(); togglePlay(); }
+});
+</script>
+</body>
+</html>

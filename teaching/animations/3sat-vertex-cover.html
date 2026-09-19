@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3SAT ≤p Vertex Cover · an NP-hardness reduction, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --wi-radius:4px; --wi-radius-lg:5px;
+    /* the two edge kinds of the slides: blue!50!black for clause triangles, green!50!black for negations */
+    --e-clause:#2b3a80; --e-neg:#2f7a2a;
+    --s-fill:#f0d7cd;          /* headingscolor!20!backcolor: "fat" vertices of the cover */
+    --out-fill:#e6efe0;        /* light green: V \ S in the equivalence tab */
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code, .expl code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+  i.m { font-style:italic; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input[type=number] { width:4.2em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  .seg.tabs button { padding:7px 16px; font-size:.86rem; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  .tabrow { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin:0 0 14px; }
+  .tabrow .tabhint { font-size:.8rem; color:var(--wi-ink-faint); }
+
+  /* --- operation bar --- */
+  .opbar { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:10px 18px;
+           background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+           border-radius:var(--wi-radius-lg); margin-bottom:14px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+
+  /* --- transport: slider + phase bar --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0;
+              width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden;
+              flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage --- */
+  .stage { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(330px,1fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-box + .sim-box { margin-top:14px; }
+  .col-side .sim-box + .sim-box { margin-top:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; margin:0 auto; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:88px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status .ok  { color:var(--wi-relax); font-weight:bold; }
+  .status .bad { color:var(--wi-active); font-weight:bold; }
+  .status .ca { color:var(--e-clause); font-weight:bold; }
+  .status .ne { color:var(--e-neg); font-weight:bold; }
+  .status .inS { background:var(--s-fill); border-radius:3px; padding:0 4px; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem;
+            color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:50%; border:1px solid var(--wi-border); display:inline-block; }
+  .sw.line { height:3px; width:1.3em; border:0; border-radius:1px; }
+
+  /* --- the formula, one clickable span per literal --- */
+  .fml { font-size:1.08rem; line-height:2.0; color:var(--wi-ink-strong); }
+  .fml .cl { display:inline-block; padding:1px 3px; border-radius:4px; border:1px solid transparent; white-space:nowrap; }
+  .fml .cl.hot { background:#f6e6df; border-color:var(--wi-accent-soft); }
+  .fml .cl.sat { border-color:var(--wi-relax); }
+  .fml .cl.unsat { border-color:var(--wi-active); }
+  .fml .cl .ci { font-size:.7em; color:var(--wi-ink-faint); vertical-align:sub; margin-left:1px; }
+  .fml .lit { cursor:pointer; padding:0 3px; border-radius:3px; border-bottom:2px solid transparent; }
+  .fml .lit:hover { background:var(--wi-panel-2); border-bottom-color:var(--wi-border-strong); }
+  .fml .lit.t { color:var(--wi-relax); font-weight:bold; }
+  .fml .lit.f { color:var(--wi-ink-faint); text-decoration:line-through; }
+  .fml .lit.inS { background:var(--s-fill); }
+  .fml .lit.hot { outline:2px solid var(--wi-active); outline-offset:-1px; }
+  .fml .op { color:var(--wi-ink-soft); padding:0 2px; }
+  .vars { display:flex; flex-wrap:wrap; gap:6px 8px; margin-top:8px; align-items:center; }
+  .vars .lbl { margin-right:4px; }
+  .var { font-family:var(--wi-font-body); font-size:.86rem; padding:2px 9px; border-radius:12px;
+         border:1px solid var(--wi-border); background:var(--wi-panel-2); cursor:pointer; color:var(--wi-ink-strong); }
+  .var:hover { border-color:var(--wi-border-strong); }
+  .var.set1 { border-color:var(--wi-relax); color:var(--wi-relax); font-weight:bold; }
+  .var.set0 { border-color:var(--wi-ink-faint); color:var(--wi-ink-soft); }
+  .var.auto { border-style:dashed; }
+  .var.conf { border-color:var(--wi-active); color:var(--wi-active); background:#f6e6df; }
+  .fmlnote { font-size:.74rem; color:var(--wi-ink-faint); margin-top:6px; line-height:1.45; }
+
+  /* --- set S panel --- */
+  .sset { display:flex; flex-wrap:wrap; gap:6px; min-height:34px; align-items:center; }
+  .sset .empty { color:var(--wi-ink-faint); font-style:italic; font-size:.86rem; }
+  .chip { font-size:.86rem; padding:2px 9px; border-radius:12px; background:var(--s-fill);
+          border:1px solid var(--wi-accent); color:var(--wi-ink-strong); cursor:pointer; }
+  .chip:hover { border-color:var(--wi-accent-dark); background:#f6e6df; }
+  .chip.fresh { animation:chippop .34s cubic-bezier(.2,1.3,.5,1) both; }
+  .chip .ci { font-size:.75em; color:var(--wi-ink-faint); margin-left:3px; }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+
+  /* --- pseudocode / proof --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.74rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent;
+           white-space:pre-wrap; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .cline .ca { color:var(--e-clause); }
+  .cline .ne { color:var(--e-neg); }
+  .cline.prose { font-family:var(--wi-font-body); font-size:.86rem; white-space:normal; }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em;
+              text-transform:uppercase; color:var(--wi-ink-faint); padding:10px 12px 3px;
+              border-top:1px solid var(--wi-border-soft); margin-top:6px; }
+  .sublabel:first-child { border-top:0; margin-top:0; padding-top:2px; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  /* --- editor --- */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:170px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .hint pre { background:var(--wi-panel-2); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius);
+              padding:6px 9px; font-size:.9em; margin:6px 0; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:290px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+
+  /* --- equivalence tab --- */
+  .three { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; }
+  .three .sim-box { margin:0; }
+  .three svg { width:100%; height:auto; }
+  .verdict { display:flex; flex-wrap:wrap; gap:8px 22px; font-size:.9rem; margin-top:4px; }
+  .verdict .v { display:flex; align-items:center; gap:6px; }
+  .verdict .ok { color:var(--wi-relax); font-weight:bold; }
+  .verdict .bad { color:var(--wi-active); font-weight:bold; }
+  .expl { font-size:.86rem; line-height:1.55; color:var(--wi-ink); max-width:100ch; }
+  .expl b.s { background:var(--s-fill); padding:0 4px; border-radius:3px; }
+  .expl b.o { background:var(--out-fill); padding:0 4px; border-radius:3px; }
+
+  .mobile-note { display:none; background:var(--wi-controls); border:1px solid var(--wi-accent-soft);
+                 border-radius:var(--wi-radius-lg); padding:11px 15px; font-size:.82rem;
+                 color:var(--wi-ink-strong); margin-bottom:14px; }
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls, .opbar { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; border-radius:var(--wi-radius); }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .stepno { font-size:.7rem; }
+    .mobile-note { display:block; }
+    .desk-only { display:none !important; }
+  }
+
+  /* --- SVG classes --- */
+  .vtx circle.body { fill:var(--wi-panel-2); stroke:var(--wi-border-strong); stroke-width:1.6;
+                transition:fill .25s, stroke .25s, stroke-width .25s; }
+  .vtx.inS circle.body { fill:var(--s-fill); stroke:var(--wi-accent); stroke-width:3; }
+  .vtx.out circle.body { fill:var(--out-fill); stroke:var(--wi-relax); stroke-width:3; }
+  .vtx.sat circle.body { stroke:var(--wi-active); stroke-width:3.2; }
+  .vtx.want circle.body { stroke-dasharray:4 3; stroke:var(--wi-active); stroke-width:2.6; }
+  .vtx.hov circle.body { stroke:var(--wi-ink-strong); stroke-width:3.4; }
+  .vtx text { font-family:var(--wi-font-body); font-size:15px; fill:var(--wi-ink-strong);
+              text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .vtx.inS text { font-weight:bold; fill:var(--wi-accent-dark); }
+  .vtx text tspan.sub { font-size:11px; }
+  .vtx.pop circle.body { animation:vpop .38s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box; transform-origin:center; }
+  .vtx.ghost { opacity:.28; }
+  .clab { font-family:var(--wi-font-body); font-size:13px; fill:var(--wi-ink-faint); text-anchor:middle;
+          dominant-baseline:central; pointer-events:none; font-style:italic; }
+  .clab.hot { fill:var(--wi-accent); font-weight:bold; }
+  .clab tspan.sub { font-size:10px; }
+  .tribg { fill:#f6e6df; stroke:none; opacity:0; transition:opacity .2s; }
+  .tribg.hot { opacity:1; }
+  .tribg.sat { fill:#e8f0e2; opacity:1; }
+  .tribg.unsat { fill:#f6d9d3; opacity:1; }
+  .edge { fill:none; stroke-width:2.6; stroke-linecap:round; transition:stroke .25s, stroke-width .25s, opacity .25s; }
+  .edge.clause { stroke:var(--e-clause); }
+  .edge.neg { stroke:var(--e-neg); }
+  .edge.plain { stroke:var(--wi-border-strong); stroke-width:2.2; }
+  .edge.faint { opacity:.35; }
+  .edge.ok { stroke-width:3.2; }
+  .edge.bad { stroke:var(--wi-active); stroke-width:4.4; stroke-dasharray:7 5; }
+  .edge.hov { stroke-width:5; }
+  .edge.miss { stroke:var(--wi-active); stroke-width:2.4; stroke-dasharray:3 5; }
+  .ehit { fill:none; stroke:transparent; stroke-width:14; cursor:pointer; }
+  .hit, .vtx circle.hit { fill:transparent; stroke:none; cursor:pointer; }
+
+  @keyframes vpop { from { transform:scale(.55); opacity:.3; } to { transform:none; opacity:1; } }
+  @keyframes chippop { from { transform:scale(.6); opacity:0; } to { transform:none; opacity:1; } }
+  @keyframes edraw { from { stroke-dashoffset:var(--len); } to { stroke-dashoffset:0; } }
+  .drawin { stroke-dasharray:var(--len); animation:edraw .45s ease-out both; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>3SAT &le;<sub>p</sub> Vertex Cover &nbsp;·&nbsp; an NP-hardness reduction, step by step</h1>
+</div>
+
+<p class="subtitle">
+  A <b>Karp reduction</b> turns every instance of one problem into an instance of another, in polynomial time,
+  so that the answers agree.  Here a 3-CNF formula <i>φ</i> with <i>n</i> clauses becomes a graph <i>G</i> with a
+  <span style="color:var(--e-clause)">triangle per clause</span> and an
+  <span style="color:var(--e-neg)">edge between every pair of complementary literals</span>; the threshold is
+  <i>k</i> = 2<i>n</i>.  The page builds <i>G</i>, then walks through both directions of the correctness proof.
+  Everything is live: <b>click a literal</b> to fix its variable, <b>click a vertex</b> to put it into or take it out of <i>S</i>.
+</p>
+
+<div class="mobile-note">
+  <b>Small screen:</b> this is the compact demo. The pseudocode and proof with live line highlighting are
+  on the desktop version.
+</div>
+
+<div class="tabrow">
+  <span class="seg tabs" role="tablist">
+    <button id="tabBtnRed" class="on" role="tab">The reduction 3SAT &le;<sub>p</sub> VC</button>
+    <button id="tabBtnEq" role="tab">Vertex Cover &harr; Independent Set &harr; Clique</button>
+  </span>
+  <span class="tabhint" id="tabHint">Two views on the same theme: the reduction proves hardness, the equivalences carry it on.</span>
+</div>
+
+<!-- ================================================================== TAB 1: the reduction -->
+<section id="tabRed">
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Random</span>
+    <input type="number" id="rndN" min="2" max="12" value="4" title="clauses">
+    <span class="lbl" style="text-transform:none;letter-spacing:0">clauses,</span>
+    <input type="number" id="rndM" min="3" max="16" value="4" title="variables">
+    <span class="lbl" style="text-transform:none;letter-spacing:0">variables</span>
+    <button id="randBtn">Draw</button>
+  </div>
+  <div class="ctl">
+    <label for="colsIn">Columns</label>
+    <input type="number" id="colsIn" min="1" max="12" value="2">
+  </div>
+  <div class="ctl">
+    <button id="clearAssignBtn" title="forget all fixed variables">Clear assignment</button>
+    <button id="resetSBtn" title="use the set S produced by the ⇒ direction again" style="display:none">Reset S</button>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="modeNote"></span>
+  <span class="opnote" style="margin-left:auto">Arrow keys step. Click a literal to make it true; click a vertex to toggle it in <i>S</i>.</span>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">— / —</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="120" max="2000" value="800" style="width:88px">
+      <span class="stepno" id="speedVal">800ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The formula φ</span><span class="rhs" id="fmlMeta"></span></div>
+      <div class="fml" id="fmlBox"></div>
+      <div class="vars" id="varsBox"></div>
+      <div class="fmlnote">Click a literal to make it true (its variable is fixed accordingly); click a variable chip
+        to cycle <b>?</b> → 1 → 0.  Dashed chips were chosen by the page to satisfy as many clauses as possible.</div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The graph G = g(φ)</span><span class="rhs" id="graphMeta"></span></div>
+      <div class="svgscroll"><svg id="graphSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw line" style="background:var(--e-clause)"></span> (a) same clause</span>
+        <span class="item"><span class="sw line" style="background:var(--e-neg)"></span> (b) negations of each other</span>
+        <span class="item"><span class="sw" style="background:var(--s-fill);border-color:var(--wi-accent)"></span> in the cover <i>S</i></span>
+        <span class="item"><span class="sw" style="border:2px solid var(--wi-active)"></span> satisfied literal</span>
+        <span class="item"><span class="sw line" style="background:var(--wi-active)"></span> uncovered edge</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The set S</span><span class="rhs" id="sMeta"></span></div>
+      <div class="sset" id="sBox"></div>
+    </div>
+    <details class="code desk-only" id="codeBox" open>
+      <summary>Reduction &amp; correctness proof</summary>
+      <div class="codebody" id="codeBody"></div>
+      <div class="codenote" id="codeNote"></div>
+    </details>
+  </div>
+</div>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      One clause per line, exactly three literals; a negative number is a negated variable
+      (<code>-3</code> is ¬<i>x</i><sub>3</sub>; <code>!x3</code>, <code>~x3</code>, <code>¬x3</code> work too, and
+      <code>∨</code>, <code>|</code>, parentheses are ignored).  Lines starting with <code>#</code> are comments.
+      <pre># φ from the lecture
+1 2 -3
+-1 3 4
+-1 -2 -4
+2 3 4
+cols 2
+assign -1 -2 -3 4</pre>
+      <code>cols c</code> sets how many clause triangles go in one row; <code>assign l₁ l₂ …</code> presets an
+      assignment as a list of true literals.  To place a clause by hand, append <code>@ x y</code> to its line
+      (grid units: one clause pitch is 1, so <code>@ 0 0</code>, <code>@ 1 0</code>, <code>@ 0.5 1</code> …).
+      Limits: 12 clauses, variables <i>x</i><sub>1</sub>…<i>x</i><sub>16</sub>.
+    </div>
+  </div>
+</details>
+
+</section>
+
+<!-- ================================================================== TAB 2: VC <-> IS <-> Clique -->
+<section id="tabEq" hidden>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="eqPresetSel">Graph</label>
+    <select id="eqPresetSel"></select>
+    <button id="eqFromRedBtn" title="take the graph g(φ) built on the other tab, with its layout">Use G = g(φ) from the reduction</button>
+  </div>
+  <div class="ctl">
+    <button id="eqClearBtn">Clear S</button>
+    <button id="eqMinBtn" title="exhaustive search; may give up on large graphs">Minimum vertex cover</button>
+    <button id="eqCompBtn" title="S := V \ S">Complement S</button>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="eqNote">Click any vertex, in any of the three pictures, to move it between
+    <b style="background:var(--s-fill)">S</b> and <b style="background:var(--out-fill);color:var(--wi-relax)">V&thinsp;\&thinsp;S</b>.</span>
+</div>
+
+<div class="sim-box" style="margin-bottom:14px">
+  <div class="sim-title"><span>Verdict</span><span class="rhs" id="eqMeta"></span></div>
+  <div class="verdict" id="eqVerdict"></div>
+</div>
+
+<div class="three">
+  <div class="sim-box">
+    <div class="sim-title"><span>G — is S a vertex cover?</span><span class="rhs" id="eq1Meta"></span></div>
+    <svg id="eqSvg1" class="stagesvg"></svg>
+  </div>
+  <div class="sim-box">
+    <div class="sim-title"><span>G — is V&thinsp;\&thinsp;S an independent set?</span><span class="rhs" id="eq2Meta"></span></div>
+    <svg id="eqSvg2" class="stagesvg"></svg>
+  </div>
+  <div class="sim-box">
+    <div class="sim-title"><span>Ḡ (complement) — is V&thinsp;\&thinsp;S a clique?</span><span class="rhs" id="eq3Meta"></span></div>
+    <svg id="eqSvg3" class="stagesvg"></svg>
+  </div>
+</div>
+
+<div class="sim-box" style="margin-top:14px">
+  <div class="sim-title"><span>Why the same edges light up in all three pictures</span></div>
+  <div class="expl">
+    An edge {<i>u</i>,<i>v</i>} of <i>G</i> is <b>uncovered</b> by <b class="s">S</b> exactly when both endpoints lie in
+    <b class="o">V&thinsp;\&thinsp;S</b> — which is exactly when it is an edge <i>inside</i> V&thinsp;\&thinsp;S, i.e.
+    a violation of independence — which is exactly a pair of V&thinsp;\&thinsp;S that is <i>not</i> adjacent in the
+    complement Ḡ, i.e. a missing clique edge.  Hence
+    <br>
+    <span style="display:inline-block;margin:6px 0 2px 1.5em">
+      <i>S</i> is a vertex cover of <i>G</i> &nbsp;⇔&nbsp; V&thinsp;\&thinsp;S is an independent set of <i>G</i>
+      &nbsp;⇔&nbsp; V&thinsp;\&thinsp;S is a clique of Ḡ,
+    </span>
+    <br>
+    and with |V&thinsp;\&thinsp;S| = |V| − |S| the three decision problems reduce to each other:
+    (<i>G</i>, <i>k</i>) ∈ <span style="font-variant:small-caps">VertexCover</span>
+    &nbsp;⇔&nbsp; (<i>G</i>, |V|−<i>k</i>) ∈ <span style="font-variant:small-caps">IndependentSet</span>
+    &nbsp;⇔&nbsp; (Ḡ, |V|−<i>k</i>) ∈ <span style="font-variant:small-caps">Clique</span>.
+    The maps (<i>G</i>,<i>k</i>) ↦ (<i>G</i>, |V|−<i>k</i>) and <i>G</i> ↦ Ḡ are computable in polynomial time,
+    so all three are NP-complete once one of them is.
+  </div>
+</div>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="eqInputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="eqLoadBtn">Load</button></div>
+      <div class="err" id="eqParseErr"></div>
+    </div>
+    <div class="hint">
+      The usual undirected-graph format: <code>V</code>, then <code>E</code>, then one edge <code>u v</code> per line
+      (vertices 0 … V−1).  Optionally, after the edges, exactly V lines <code>x y</code> with the drawing coordinates
+      of the vertices (any scale; the picture is fitted to the box).  A line <code>S 0 2 3</code> presets the set <i>S</i>.
+      Lines starting with <code>#</code> are comments.  At most 30 vertices.
+    </div>
+  </div>
+</details>
+
+</section>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   3SAT <=_p VertexCover, as in the lecture.
+
+   phi = C_1 ∧ ... ∧ C_n over x_1..x_m, C_i = (l_{i,1} ∨ l_{i,2} ∨ l_{i,3}).
+     V = { L_{i,j} : i = 1..n, j = 1,2,3 }
+     E = { {L_{i,j}, L_{p,q}} : l_{i,j} ≡ ¬l_{p,q} }                          (b) green
+       ∪ { {L_{i,1},L_{i,2}}, {L_{i,2},L_{i,3}}, {L_{i,3},L_{i,1}} : i=1..n } (a) blue
+     k = 2n
+   Claim: phi satisfiable  <=>  G has a vertex cover of size <= 2n.
+
+   Conventions on this page
+     * vertex id of L_{i,j} is 3*(i-1) + (j-1)  (0-based internally, 1-based in all text)
+     * "=>": for every clause the FIRST satisfied literal (left to right) is the one
+       left out of S; this reproduces the picture on the slides for the lecture example.
+     * "<=": the literals not in S are set to true; variables that remain free are
+       shown as "?" and count as "arbitrary" in the proof.
+   ========================================================================== */
+
+const el  = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* names of literals, HTML and SVG flavours */
+const varHtml = v => "<i>x</i><sub>" + (v + 1) + "</sub>";
+const litHtml = l => (l.neg ? "¬" : "") + varHtml(l.v);
+const litText = l => (l.neg ? "¬" : "") + "x" + (l.v + 1);
+const litSvg  = l => (l.neg ? "¬" : "") + '<tspan font-style="italic">x</tspan><tspan class="sub" dy=".38em">' + (l.v + 1) + "</tspan>";
+const LHtml   = id => "<i>L</i><sub>" + (Math.floor(id / 3) + 1) + "," + (id % 3 + 1) + "</sub>";
+const CHtml   = i => "<i>C</i><sub>" + (i + 1) + "</sub>";
+
+/* ---------- presets ------------------------------------------------------ */
+
+const PRESETS = {
+  lecture: { name: "φ from the lecture (4 clauses)",
+    text: "# the example of the slides\n1 2 -3\n-1 3 4\n-1 -2 -4\n2 3 4\ncols 2\nassign -1 -2 -3 4" },
+  sat3:    { name: "3SAT example (a clause with x and ¬x)",
+    text: "# (x1 ∨ ¬x3 ∨ x2) ∧ (¬x3 ∨ x4 ∨ ¬x5) ∧ (x5 ∨ ¬x5 ∨ ¬x1) ∧ (x1 ∨ x3 ∨ x5)\n1 -3 2\n-3 4 -5\n5 -5 -1\n1 3 5\ncols 2\nassign 1 -5" },
+  tiny:    { name: "two clauses",
+    text: "1 2 3\n-1 -2 -3\ncols 2" },
+  unsat:   { name: "unsatisfiable: all 8 clauses over 3 variables",
+    text: "# every assignment falsifies exactly one clause\n1 2 3\n1 2 -3\n1 -2 3\n1 -2 -3\n-1 2 3\n-1 2 -3\n-1 -2 3\n-1 -2 -3\ncols 4" },
+  chain:   { name: "implication chain",
+    text: "# x1 forces x2 forces x3 forces x4 forces ¬x1\n1 1 1\n-1 2 2\n-2 3 3\n-3 4 4\n-4 -1 -1\ncols 3" },
+  onepol:  { name: "a variable with one polarity only",
+    text: "# x3 never appears negated: no green edge for it\n1 -2 3\n2 3 -4\n-1 3 4\ncols 3" }
+};
+
+/* ---------- state -------------------------------------------------------- */
+
+let clauses = [];        /* [[{v,neg},{v,neg},{v,neg}], ...] */
+let vars = [];           /* sorted list of variable indices (0-based) that occur */
+let clausePos = [];      /* [{x,y}] in grid units, one per clause */
+let cols = 2;
+let edges = [];          /* [{a,b,kind:'clause'|'neg'|'both'}] */
+let adj = [];            /* adj[v] = Set of edge indices */
+let userAssign = {};     /* v -> 0|1 fixed by the user */
+let manualCover = null;  /* Set of vertex ids, or null = follow the ⇒ construction */
+let steps = [], phases = [], cur = 0;
+let timer = null;
+let curPresetKey = "lecture";
+
+/* ---------- parsing ------------------------------------------------------ */
+
+function parseLit(tok) {
+  const m = tok.match(/^([-!~¬]|not)?\s*x?_?\{?(\d+)\}?$/i);
+  if (!m) throw new Error('Cannot read literal "' + tok + '".');
+  const idx = parseInt(m[2], 10);
+  if (idx < 1) throw new Error("Variables are numbered from 1.");
+  if (idx > 16) throw new Error("Variables up to x16 only.");
+  return { v: idx - 1, neg: !!m[1] };
+}
+
+function parseFormula(text) {
+  const cls = [], pos = [];
+  let ncols = null, assignLits = null;
+  const lines = text.split(/\r?\n/);
+  for (let ln = 0; ln < lines.length; ln++) {
+    let line = lines[ln].replace(/#.*$/, "").trim();
+    if (!line) continue;
+    let mm;
+    if ((mm = line.match(/^cols?\s*[:=]?\s*(\d+)$/i))) { ncols = parseInt(mm[1], 10); continue; }
+    if ((mm = line.match(/^assign\s*[:=]?\s*(.*)$/i))) {
+      assignLits = mm[1].split(/[\s,]+/).filter(Boolean).map(parseLit); continue;
+    }
+    /* several clauses on one line, joined by ∧ or & */
+    const chunks = line.split(/∧|&&|&|\band\b/i).map(s => s.trim()).filter(Boolean);
+    for (const chunk0 of chunks) {
+      let chunk = chunk0, at = null;
+      const parts = chunk.split("@");
+      if (parts.length === 2) {
+        const c = parts[1].trim().split(/[\s,]+/).map(Number);
+        if (c.length < 2 || !c.every(Number.isFinite)) throw new Error("Line " + (ln + 1) + ': expected "@ x y".');
+        at = { x: c[0], y: c[1] }; chunk = parts[0];
+      } else if (parts.length > 2) throw new Error("Line " + (ln + 1) + ": too many @.");
+      const toks = chunk.replace(/[()]/g, " ").replace(/∨|\|\||\||\bor\b/gi, " ").split(/[\s,]+/).filter(Boolean);
+      if (toks.length !== 3) throw new Error("Line " + (ln + 1) + ": a clause needs exactly three literals, found " + toks.length + ".");
+      cls.push(toks.map(parseLit)); pos.push(at);
+    }
+  }
+  if (cls.length === 0) throw new Error("No clause found.");
+  if (cls.length > 12) throw new Error("At most 12 clauses — the picture would not be readable.");
+  return { clauses: cls, pos: pos, cols: ncols, assign: assignLits };
+}
+
+/* ---------- the graph ---------------------------------------------------- */
+
+function buildGraph() {
+  const n = clauses.length;
+  const seen = new Set(); vars = [];
+  clauses.forEach(c => c.forEach(l => { if (!seen.has(l.v)) { seen.add(l.v); vars.push(l.v); } }));
+  vars.sort((a, b) => a - b);
+
+  edges = []; adj = [];
+  for (let i = 0; i < 3 * n; i++) adj.push(new Set());
+  const key = (a, b) => a < b ? a + "-" + b : b + "-" + a;
+  const idx = {};
+  const addEdge = (a, b, kind) => {
+    const k = key(a, b);
+    if (idx[k] !== undefined) { edges[idx[k]].kind = "both"; return; }
+    idx[k] = edges.length; edges.push({ a: Math.min(a, b), b: Math.max(a, b), kind: kind });
+    adj[a].add(idx[k]); adj[b].add(idx[k]);
+  };
+  for (let i = 0; i < n; i++) { addEdge(3 * i, 3 * i + 1, "clause"); addEdge(3 * i + 1, 3 * i + 2, "clause"); addEdge(3 * i + 2, 3 * i, "clause"); }
+  for (let a = 0; a < 3 * n; a++) for (let b = a + 1; b < 3 * n; b++) {
+    const la = litOf(a), lb = litOf(b);
+    if (la.v === lb.v && la.neg !== lb.neg) addEdge(a, b, "neg");
+  }
+  /* layout: grid unless given */
+  for (let i = 0; i < n; i++) if (!clausePos[i]) clausePos[i] = { x: i % cols, y: Math.floor(i / cols) };
+}
+const litOf = id => clauses[Math.floor(id / 3)][id % 3];
+const isNeg = e => e.kind === "neg" || e.kind === "both";
+const isCla = e => e.kind === "clause" || e.kind === "both";
+const negEdges = () => edges.map((e, i) => i).filter(i => isNeg(edges[i]));
+const covered = (e, S) => S.has(e.a) || S.has(e.b);
+
+/* ---------- assignments -------------------------------------------------- */
+
+const litTrue  = (l, A) => A[l.v] === undefined ? undefined : (A[l.v] === 1) !== l.neg;
+const clauseSat = (c, A) => c.some(l => litTrue(l, A) === true);
+const numSat = A => clauses.filter(c => clauseSat(c, A)).length;
+
+/* complete the user's partial assignment so that as many clauses as possible are
+   satisfied (all of them if that is possible); brute force over the free variables */
+function completeAssign(partial) {
+  const free = vars.filter(v => partial[v] === undefined);
+  const A = {}; vars.forEach(v => { if (partial[v] !== undefined) A[v] = partial[v]; });
+  let best = null, bestSat = -1;
+  const total = 1 << free.length;
+  for (let mask = 0; mask < total; mask++) {
+    free.forEach((v, k) => A[v] = (mask >> k) & 1);
+    const s = numSat(A);
+    if (s > bestSat) { bestSat = s; best = Object.assign({}, A); if (s === clauses.length) break; }
+  }
+  return { assign: best, sat: bestSat, auto: free };
+}
+
+/* ---------- step generation ---------------------------------------------- */
+
+function mkPhase(name) { phases.push({ name: name, from: steps.length, to: steps.length }); }
+function add(o) {
+  o.ph = phases.length - 1;
+  o.hl = o.hl || [];
+  o.S = o.S || new Set();
+  o.assign = o.assign || {};
+  steps.push(o);
+  phases[phases.length - 1].to = steps.length - 1;
+}
+const lst = (arr, f) => arr.map(f).join(", ");
+
+function build() {
+  buildGraph();
+  steps = []; phases = []; cur = 0;
+  const n = clauses.length, m = vars.length;
+  const nNeg = negEdges().length;
+
+  /* --- phase: the formula --------------------------------------------------- */
+  mkPhase("φ");
+  add({ drawn: 0, txt: "<b>Input:</b> a 3-CNF formula <i>φ</i> with <i>n</i> = " + n + " clauses over " +
+        m + " variable" + (m === 1 ? "" : "s") + ", each clause a disjunction of exactly three literals. " +
+        "We build a graph <i>G</i> and a threshold <i>k</i> such that <i>φ</i> is satisfiable iff <i>G</i> has a vertex " +
+        "cover of size at most <i>k</i>.", hl: ["g_in"], assign: Object.assign({}, userAssign) });
+
+  /* --- phase (a): one triangle per clause ------------------------------------ */
+  mkPhase("(a) clause triangles");
+  for (let i = 0; i < n; i++) {
+    const tri = edges.map((e, k) => k).filter(k => isCla(edges[k]) && edges[k].a >= 3 * i && edges[k].b < 3 * i + 3);
+    add({ drawn: i + 1, drawnNeg: new Set(), clauseHL: i, freshV: [3 * i, 3 * i + 1, 3 * i + 2], freshE: tri,
+          hl: ["g_V", "g_Ea"], assign: Object.assign({}, userAssign),
+          txt: "Clause " + CHtml(i) + " = (" + clauses[i].map(litHtml).join(" ∨ ") + ") gets three vertices " +
+               lst([0, 1, 2], j => LHtml(3 * i + j)) + ", one per literal occurrence, joined into a " +
+               '<span class="ca">triangle</span>. Any vertex cover must take at least two of them.' });
+  }
+
+  /* --- phase (b): negation edges, one step per variable -------------------- */
+  mkPhase("(b) negation edges");
+  const drawnNeg = new Set();
+  vars.forEach(v => {
+    const pos = [], neg = [];
+    for (let id = 0; id < 3 * n; id++) { const l = litOf(id); if (l.v === v) (l.neg ? neg : pos).push(id); }
+    const es = negEdges().filter(e => litOf(edges[e].a).v === v && !drawnNeg.has(e));
+    es.forEach(e => drawnNeg.add(e));
+    let txt;
+    if (es.length === 0)
+      txt = varHtml(v) + " occurs " + (pos.length + neg.length) + " time" + (pos.length + neg.length === 1 ? "" : "s") +
+            ", but only " + (pos.length ? "positively" : "negated") + " — no pair of complementary literals, so " +
+            '<span class="ne">no edge</span> for this variable.';
+    else
+      txt = varHtml(v) + " occurs " + pos.length + " time" + (pos.length === 1 ? "" : "s") + " positively and " + neg.length +
+            " time" + (neg.length === 1 ? "" : "s") + " negated: every " + varHtml(v) + " is joined to every ¬" + varHtml(v) +
+            " by a <span class=\"ne\">green edge</span> — " + es.length + " edge" + (es.length === 1 ? "" : "s") + ". " +
+            (es.some(e => edges[e].kind === "both") ? "One of them runs inside a clause triangle: the pair is both (a) and (b), a simple graph has just one edge there. " : "") +
+            "A cover that leaves out both ends of such an edge would correspond to a contradictory assignment.";
+    add({ drawn: n, drawnNeg: new Set(drawnNeg), litHL: pos.concat(neg), freshE: es, hl: ["g_Eb"],
+          assign: Object.assign({}, userAssign), txt: txt });
+  });
+
+  /* --- phase: the threshold -------------------------------------------------- */
+  mkPhase("k = 2n");
+  add({ drawn: n, drawnNeg: new Set(drawnNeg), hl: ["g_k", "g_out"], assign: Object.assign({}, userAssign),
+        txt: "The instance is complete: <i>G</i> has |<i>V</i>| = 3<i>n</i> = " + 3 * n + " vertices and |<i>E</i>| = " +
+             edges.length + " edges (" + 3 * n + " triangle edges" + (nNeg ? ", " + nNeg + " negation edge" + (nNeg === 1 ? "" : "s") : "") +
+             (edges.length < 3 * n + nNeg ? ", " + (3 * n + nNeg - edges.length) + " coinciding" : "") + "), the threshold is <i>k</i> = 2<i>n</i> = " +
+             2 * n + ". Constructing (<i>G</i>, <i>k</i>) takes O(<i>n</i>²) time — polynomial. It remains to show " +
+             "that the answers agree.",
+        ans: "Claim: φ satisfiable ⇔ G has a vertex cover of size ≤ 2n." });
+
+  /* --- phase ⇒: assignment to cover ------------------------------------------- */
+  mkPhase("V ⇒ S");
+  const comp = completeAssign(userAssign);
+  const A = comp.assign;
+  const satAll = comp.sat === n;
+  const fixedTxt = Object.keys(userAssign).length
+    ? "You fixed " + lst(Object.keys(userAssign).map(Number).sort((a, b) => a - b), v => varHtml(v) + " = " + userAssign[v]) +
+      (comp.auto.length ? "; the remaining " + comp.auto.length + " variable" + (comp.auto.length === 1 ? " was" : "s were") + " chosen to satisfy as many clauses as possible." : ".")
+    : "No variable is fixed, so the page picked an assignment that satisfies as many clauses as possible.";
+  add({ drawn: n, drawnNeg: new Set(drawnNeg), assign: A, auto: comp.auto, hl: ["p1_a"],
+        txt: "<b>⇒</b> Take an assignment <i>V</i>: " + lst(vars, v => varHtml(v) + " = " + A[v]) + ". " + fixedTxt + " " +
+             (satAll ? 'It satisfies <span class="ok">all ' + n + " clauses</span>: in every clause at least one literal is true (green in the formula)."
+                     : 'It satisfies only <span class="bad">' + comp.sat + " of " + n + " clauses</span>" +
+                       (Object.keys(userAssign).length ? " — try other values, or clear the assignment." : ": <b>φ is unsatisfiable</b>.") +
+                       " The construction below needs a satisfied literal in every clause; watch what goes wrong without one.") });
+  const S = new Set();
+  let stalled = false;
+  for (let i = 0; i < n; i++) {
+    const c = clauses[i];
+    let j = c.findIndex(l => litTrue(l, A) === true);
+    const hasSat = j >= 0;
+    if (!hasSat) { j = 0; stalled = true; }
+    const others = [0, 1, 2].filter(q => q !== j).map(q => 3 * i + q);
+    others.forEach(x => S.add(x));
+    add({ drawn: n, drawnNeg: new Set(drawnNeg), assign: A, auto: comp.auto, clauseHL: i, S: new Set(S), freshS: others,
+          litHL: hasSat ? [3 * i + j] : [], wantHL: hasSat ? [] : [3 * i + j], hl: ["p1_b", "p1_c"],
+          txt: hasSat
+            ? "Clause " + CHtml(i) + ": the first satisfied literal is " + litHtml(c[j]) + " (vertex " + LHtml(3 * i + j) + "). " +
+              "Put the <b>other two</b> vertices " + lst(others, LHtml) + " into <i>S</i>; they cover the triangle. |<i>S</i>| = " + S.size + "."
+            : 'Clause ' + CHtml(i) + ' has <span class="bad">no satisfied literal</span> under <i>V</i>. The proof has nothing to leave out here; ' +
+              "we leave out " + LHtml(3 * i + j) + " anyway (any choice covers the triangle) and put " + lst(others, LHtml) + " into <i>S</i>. |<i>S</i>| = " + S.size + "." });
+  }
+  const bad1 = negEdges().filter(e => !covered(edges[e], S));
+  const eh1 = {}; negEdges().forEach(e => eh1[e] = covered(edges[e], S) ? "ok" : "bad");
+  add({ drawn: n, drawnNeg: new Set(drawnNeg), assign: A, auto: comp.auto, S: new Set(S), edgeHL: eh1, hl: ["p1_d"],
+        txt: "All <span class=\"ca\">triangle edges</span> are covered by construction, |<i>S</i>| = 2<i>n</i> = " + S.size + ". " +
+             "The remaining edges are the <span class=\"ne\">negation edges</span> {<i>x</i>, ¬<i>x</i>}. " +
+             (bad1.length === 0
+               ? 'Every one of them has an endpoint in <i>S</i> — <span class="ok">all covered</span>. Indeed: an uncovered ' +
+                 "edge would mean both <i>x</i> and ¬<i>x</i> were the satisfied literal of their clauses, which no assignment does."
+               : '<span class="bad">' + bad1.length + " edge" + (bad1.length === 1 ? "" : "s") + " uncovered</span>: " +
+                 lst(bad1, e => litHtml(litOf(edges[e].a)) + "/" + litHtml(litOf(edges[e].b))) + ". Both ends were left out, " +
+                 "so the construction needed both <i>x</i> and ¬<i>x</i> to be true — impossible for a genuine assignment; this is the " +
+                 "contradiction ⚡ of the proof, visible because <i>V</i> did not satisfy φ.") });
+  add({ drawn: n, drawnNeg: new Set(drawnNeg), assign: A, auto: comp.auto, S: new Set(S), hl: ["p1_e"],
+        txt: bad1.length === 0
+          ? "<b>Conclusion ⇒:</b> from a satisfying assignment we obtained a vertex cover of size exactly 2<i>n</i>, " +
+            "so (<i>G</i>, 2<i>n</i>) is a yes-instance of Vertex Cover."
+          : "<b>⇒ did not go through</b> — as expected, since <i>V</i> does not satisfy φ. " +
+            (satAll ? "" : Object.keys(userAssign).length ? "Fix different variables (or clear the assignment) to see the construction succeed." :
+             "For an unsatisfiable φ the theorem says <i>no</i> vertex cover of size 2<i>n</i> exists; you can try to find one below by clicking vertices."),
+        ans: bad1.length === 0 ? "S is a vertex cover, |S| = 2n = " + S.size + "." : "S is not a vertex cover." });
+  const Sauto = new Set(S);
+
+  /* --- phase ⇐: cover to assignment -------------------------------------------- */
+  mkPhase("S ⇒ V");
+  const C = manualCover ? new Set(manualCover) : Sauto;
+  const src = manualCover ? "the set <i>S</i> you selected" : "the set <i>S</i> just constructed";
+  add({ drawn: n, drawnNeg: new Set(drawnNeg), S: new Set(C), hl: ["p2_a"], assign: {},
+        txt: "<b>⇐</b> Now forget the assignment and take " + src + " with |<i>S</i>| = " + C.size + " " +
+             (C.size <= 2 * n ? '≤ 2<i>n</i> — the size the claim allows.' : '<span class="bad">&gt; 2<i>n</i></span> — too large for the claim; the proof does not apply.') +
+             " We check that it is a vertex cover and then read off an assignment." });
+  /* triangles */
+  const cnt = i => [0, 1, 2].filter(j => C.has(3 * i + j)).length;
+  const badTri = [], eh2 = {};
+  for (let i = 0; i < n; i++) if (cnt(i) < 2) {
+    badTri.push(i);
+    [...adj[3 * i], ...adj[3 * i + 1], ...adj[3 * i + 2]].forEach(e => { if (isCla(edges[e]) && !covered(edges[e], C)) eh2[e] = "bad"; });
+  }
+  const sizeOK = C.size <= 2 * n;
+  add({ drawn: n, drawnNeg: new Set(drawnNeg), S: new Set(C), edgeHL: eh2, hl: ["p2_b"], assign: {}, triHL: badTri,
+        txt: badTri.length === 0
+          ? "Every <span class=\"ca\">clause triangle</span> has at least two of its vertices in <i>S</i>, so all triangle edges are covered. " +
+            (sizeOK ? "Two per triangle already make 2<i>n</i> = " + 2 * n + " vertices; with |<i>S</i>| ≤ 2<i>n</i> this forces |<i>S</i>| = 2<i>n</i> and " +
+                      "<b>exactly one vertex per clause is outside <i>S</i></b>." + (C.size === 2 * n ? "" : " (Here |S| = " + C.size + ".)")
+                    : "But |<i>S</i>| = " + C.size + " &gt; 2<i>n</i>: some clause has all three vertices in <i>S</i>, which the proof rules out.")
+          : '<span class="bad">' + lst(badTri, CHtml) + (badTri.length === 1 ? " has" : " have") + " fewer than two vertices in <i>S</i></span>: a triangle edge is uncovered (red), so " +
+            "<i>S</i> is <b>not</b> a vertex cover." });
+  const badNeg = negEdges().filter(e => !covered(edges[e], C));
+  const eh3 = {}; negEdges().forEach(e => eh3[e] = covered(edges[e], C) ? "ok" : "bad");
+  add({ drawn: n, drawnNeg: new Set(drawnNeg), S: new Set(C), edgeHL: eh3, hl: ["p2_b"], assign: {},
+        txt: badNeg.length === 0
+          ? "Every <span class=\"ne\">negation edge</span> {<i>x</i>, ¬<i>x</i>} has an endpoint in <i>S</i> — covered. " +
+            (badTri.length === 0 ? '<span class="ok"><i>S</i> is a vertex cover.</span>' : "")
+          : '<span class="bad">' + badNeg.length + " negation edge" + (badNeg.length === 1 ? "" : "s") + " uncovered</span> (" +
+            lst(badNeg, e => litHtml(litOf(edges[e].a)) + "/" + litHtml(litOf(edges[e].b))) + "): both endpoints are outside <i>S</i>, so " +
+            "<i>S</i> is <b>not</b> a vertex cover." });
+  const isVC = badTri.length === 0 && badNeg.length === 0;
+  if (badTri.length === 0 && sizeOK) {
+    /* read off the assignment, clause by clause */
+    const B = {}, conflicts = new Set(), setBy = {};
+    for (let i = 0; i < n; i++) {
+      const outs = [0, 1, 2].filter(j => !C.has(3 * i + j)).map(j => 3 * i + j);
+      const o = outs[0];                       /* exactly one, since cnt(i) >= 2 and |S| <= 2n */
+      const l = litOf(o), want = l.neg ? 0 : 1;
+      let txt;
+      if (B[l.v] === undefined) {
+        B[l.v] = want; setBy[l.v] = o;
+        txt = "Clause " + CHtml(i) + ": the vertex not in <i>S</i> is " + LHtml(o) + " = " + litHtml(l) + ". Make it true: <b>" +
+              varHtml(l.v) + " := " + want + "</b>. This satisfies " + CHtml(i) + ".";
+      } else if (B[l.v] === want) {
+        txt = "Clause " + CHtml(i) + ": the vertex not in <i>S</i> is " + LHtml(o) + " = " + litHtml(l) + "; " + varHtml(l.v) + " = " + want +
+              " already, consistent. " + CHtml(i) + " is satisfied.";
+      } else {
+        conflicts.add(l.v);
+        txt = "Clause " + CHtml(i) + ": the vertex not in <i>S</i> is " + LHtml(o) + " = " + litHtml(l) + ", but " + varHtml(l.v) + " = " + B[l.v] +
+              ' was set by ' + LHtml(setBy[l.v]) + '. <span class="bad">Contradiction</span> — and indeed the edge between ' + LHtml(setBy[l.v]) +
+              " and " + LHtml(o) + " is uncovered; this cannot happen for a vertex cover.";
+      }
+      add({ drawn: n, drawnNeg: new Set(drawnNeg), S: new Set(C), clauseHL: i, litHL: [o], assign: Object.assign({}, B),
+            conf: new Set(conflicts), hl: ["p2_c", "p2_d"], txt: txt, edgeHL: conflicts.has(l.v) && B[l.v] !== want ?
+              Object.fromEntries(negEdges().filter(e => !covered(edges[e], C)).map(e => [e, "bad"])) : {} });
+    }
+    const free = vars.filter(v => B[v] === undefined);
+    const finalA = Object.assign({}, B); free.forEach(v => finalA[v] = 0);
+    if (conflicts.size === 0) {
+      add({ drawn: n, drawnNeg: new Set(drawnNeg), S: new Set(C), assign: finalA, auto: free, hl: ["p2_d", "p2_e", "p2_f"],
+            txt: "<i>V</i> is well defined: no variable was asked to be both true and false, because every {<i>x</i>, ¬<i>x</i>} edge is covered — " +
+                 "at most one of its ends is outside <i>S</i>. " +
+                 (free.length ? "Variables not mentioned by any left-out literal (" + lst(free, varHtml) + ") are arbitrary; take 0. " : "") +
+                 "Every clause contains its left-out literal, which is true: <span class=\"ok\">all " + n + " clauses are satisfied</span>.",
+            ans: "φ is satisfiable, e.g. by " + lst(vars, v => litText({ v: v, neg: false }) + " = " + finalA[v]) + "." });
+    } else {
+      add({ drawn: n, drawnNeg: new Set(drawnNeg), S: new Set(C), assign: B, conf: conflicts, hl: ["p2_d"],
+            edgeHL: eh3,
+            txt: "The reading-off produced a <span class=\"bad\">contradiction</span> for " + lst([...conflicts], varHtml) + ", " +
+                 "so this <i>S</i> yields no assignment — consistent with <i>S</i> not being a vertex cover. Add one endpoint of each red edge to <i>S</i> " +
+                 "(that costs a vertex per edge, so |S| grows beyond 2n) or take out a different vertex of the triangle.",
+            ans: "S is not a vertex cover." });
+    }
+  } else {
+    add({ drawn: n, drawnNeg: new Set(drawnNeg), S: new Set(C), hl: ["p2_a"], assign: {}, edgeHL: Object.assign({}, eh2, Object.fromEntries(badNeg.map(e => [e, "bad"]))),
+          triHL: badTri,
+          txt: "The claim's hypothesis fails — " + (!sizeOK ? "|<i>S</i>| &gt; 2<i>n</i>" : "<i>S</i> is not a vertex cover") +
+               " — so there is nothing to read off. Click vertices to repair <i>S</i>: every clause needs exactly two of its three vertices " +
+               "in <i>S</i>, and no green edge may have both ends outside.",
+          ans: isVC ? "S is a vertex cover, but too large." : "S is not a vertex cover." });
+  }
+}
+
+/* ---------- geometry ----------------------------------------------------- */
+
+const D = 72;                 /* "node distance" of the slides: triangle height */
+const PITCH = 2.5 * D;        /* clause pitch (same in both directions) */
+const R = 21;                 /* vertex radius; label font 15px */
+let vpos = [], bbox = null;
+
+function layout() {
+  vpos = [];
+  const n = clauses.length;
+  for (let i = 0; i < n; i++) {
+    const tx = clausePos[i].x * PITCH, ty = clausePos[i].y * PITCH;
+    vpos.push({ x: tx, y: ty });
+    vpos.push({ x: tx - 0.6 * D, y: ty + D });
+    vpos.push({ x: tx + 0.6 * D, y: ty + D });
+  }
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  vpos.forEach(p => { minx = Math.min(minx, p.x); miny = Math.min(miny, p.y); maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); });
+  const pad = R + 26;
+  const ox = pad - minx, oy = pad - miny;
+  vpos = vpos.map(p => ({ x: p.x + ox, y: p.y + oy }));
+  bbox = { w: maxx - minx + 2 * pad, h: maxy - miny + 2 * pad };
+}
+const triCenter = i => ({ x: vpos[3 * i].x, y: vpos[3 * i].y + 0.65 * D });
+
+/* an edge is drawn straight unless the straight segment passes over another
+   vertex; then it bends away from that vertex (quadratic Bézier). Edges that
+   coincide with a triangle edge bend outwards so both stay visible. */
+function edgePath(e) {
+  const p = vpos[e.a], q = vpos[e.b];
+  const dx = q.x - p.x, dy = q.y - p.y, L = Math.hypot(dx, dy) || 1;
+  const nx = -dy / L, ny = dx / L;                    /* unit normal */
+  let h = 0;
+  if (e.kind === "both") {
+    const c = triCenter(Math.floor(e.a / 3));
+    const side = Math.sign((c.x - p.x) * nx + (c.y - p.y) * ny) || 1;
+    h = -side * 1.9 * R;
+  } else if (isNeg(e)) {
+    /* obstacles: the other vertices, and the clause labels in the triangle centres */
+    const obst = vpos.map((q, w) => ({ x: q.x, y: q.y, r: R + 12, skip: w === e.a || w === e.b }));
+    for (let i = 0; i < clauses.length; i++) { const c = triCenter(i); obst.push({ x: c.x, y: c.y, r: 24, skip: false }); }
+    let worst = null, worstD = Infinity;
+    obst.forEach(o => {
+      if (o.skip) return;
+      const t = ((o.x - p.x) * dx + (o.y - p.y) * dy) / (L * L);
+      if (t <= 0.02 || t >= 0.98) return;
+      const cx = p.x + t * dx, cy = p.y + t * dy;
+      const d = Math.hypot(o.x - cx, o.y - cy) - o.r;
+      if (d < worstD) { worstD = d; worst = o; }
+    });
+    if (worst !== null && worstD < 0) {
+      const side = Math.sign((worst.x - p.x) * nx + (worst.y - p.y) * ny) || 1;
+      h = -side * (2 * (-worstD + 6) + 0.22 * L);
+    }
+  }
+  const mx = (p.x + q.x) / 2 + nx * h, my = (p.y + q.y) / 2 + ny * h;
+  /* trim the ends so they stop at the circle border */
+  const trim = (from, to) => { const ddx = to.x - from.x, ddy = to.y - from.y, l = Math.hypot(ddx, ddy) || 1;
+                               return { x: from.x + ddx / l * R, y: from.y + ddy / l * R }; };
+  const s = trim(p, { x: mx, y: my }), t = trim(q, { x: mx, y: my });
+  const d = h === 0 ? "M" + s.x + "," + s.y + " L" + t.x + "," + t.y
+                    : "M" + s.x + "," + s.y + " Q" + mx + "," + my + " " + t.x + "," + t.y;
+  /* rough length for the draw-in animation */
+  const len = Math.hypot(t.x - s.x, t.y - s.y) + Math.abs(h);
+  return { d: d, len: len, mid: { x: 0.25 * s.x + 0.5 * mx + 0.25 * t.x, y: 0.25 * s.y + 0.5 * my + 0.25 * t.y } };
+}
+
+/* ---------- drawing ------------------------------------------------------ */
+
+let hovV = -1, hovE = -1, hovC = -1;
+
+function drawGraph() {
+  const st = steps[cur] || {};
+  const svg = el("graphSvg");
+  layout();
+  svg.setAttribute("width", bbox.w); svg.setAttribute("height", bbox.h);
+  svg.setAttribute("viewBox", "0 0 " + bbox.w + " " + bbox.h);
+  const n = clauses.length;
+  const drawn = st.drawn === undefined ? n : st.drawn;
+  const drawnNeg = st.drawnNeg || (st.drawn === undefined ? new Set(negEdges()) : new Set());
+  const S = st.S || new Set();
+  const freshV = new Set(st.freshV || []), freshE = new Set(st.freshE || []), freshS = new Set(st.freshS || []);
+  const litHL = new Set(st.litHL || []), wantHL = new Set(st.wantHL || []);
+  const eh = st.edgeHL || {};
+  const triHL = new Set(st.triHL || []);
+  const out = [];
+
+  /* clause backgrounds + labels */
+  for (let i = 0; i < n; i++) {
+    if (i >= drawn) continue;
+    const a = vpos[3 * i], b = vpos[3 * i + 1], c = vpos[3 * i + 2], cc = triCenter(i);
+    let cls = "tribg";
+    if (st.clauseHL === i || hovC === i) cls += " hot";
+    if (triHL.has(i)) cls += " unsat";
+    out.push('<polygon class="' + cls + '" points="' + a.x + "," + (a.y - R * 1.6) + " " + (b.x - R * 1.6) + "," + (b.y + R * 1.3) + " " +
+             (c.x + R * 1.6) + "," + (c.y + R * 1.3) + '"/>');
+    out.push('<text class="clab' + (st.clauseHL === i || hovC === i ? " hot" : "") + '" x="' + cc.x + '" y="' + cc.y + '">C<tspan class="sub" dy=".35em">' + (i + 1) + "</tspan></text>");
+  }
+  /* edges */
+  edges.forEach((e, k) => {
+    const cla = isCla(e), neg = isNeg(e);
+    const shown = (cla && e.b < 3 * drawn) || (neg && drawnNeg.has(k));
+    if (!shown) return;
+    const p = edgePath(e);
+    if (e.kind === "both" && e.b < 3 * drawn) {      /* (a) and (b) coincide: show the straight blue one too */
+      const ps = edgePath({ a: e.a, b: e.b, kind: "clause" });
+      out.push('<path class="edge clause' + (eh[k] ? " " + eh[k] : "") + '" d="' + ps.d + '"/>');
+    }
+    let cls = "edge " + (neg ? "neg" : "clause");
+    if (eh[k]) cls += " " + eh[k];
+    if (hovE === k) cls += " hov";
+    if (freshE.has(k)) cls += " drawin";
+    out.push('<path class="' + cls + '" style="--len:' + p.len.toFixed(1) + '" d="' + p.d + '"/>');
+    out.push('<path class="ehit" data-e="' + k + '" d="' + p.d + '"/>');
+  });
+  /* vertices */
+  for (let id = 0; id < 3 * n; id++) {
+    if (id >= 3 * drawn) continue;
+    const p = vpos[id], l = litOf(id);
+    let cls = "vtx";
+    if (S.has(id)) cls += " inS";
+    if (litHL.has(id)) cls += " sat";
+    if (wantHL.has(id)) cls += " want";
+    if (hovV === id) cls += " hov";
+    if (freshV.has(id) || freshS.has(id)) cls += " pop";
+    out.push('<g class="' + cls + '"><circle class="body" cx="' + p.x + '" cy="' + p.y + '" r="' + R + '"/>' +
+             '<text x="' + p.x + '" y="' + (p.y - 1) + '">' + litSvg(l) + "</text>" +
+             '<circle class="hit" data-v="' + id + '" cx="' + p.x + '" cy="' + p.y + '" r="' + (R + 4) + '"/></g>');
+  }
+  svg.innerHTML = out.join("");
+}
+
+/* ---------- formula & assignment panel ---------------------------------- */
+
+function renderFormula() {
+  const st = steps[cur] || {};
+  const A = st.assign || {}, S = st.S || new Set(), litHL = new Set(st.litHL || []);
+  const conf = st.conf || new Set();
+  const parts = clauses.map((c, i) => {
+    const sat = clauseSat(c, A);
+    const allF = c.every(l => litTrue(l, A) === false);
+    let cls = "cl";
+    if (st.clauseHL === i || hovC === i) cls += " hot";
+    if (Object.keys(A).length && sat) cls += " sat";
+    if (allF) cls += " unsat";
+    const lits = c.map((l, j) => {
+      const id = 3 * i + j, t = litTrue(l, A);
+      let lc = "lit";
+      if (t === true) lc += " t"; else if (t === false) lc += " f";
+      if (S.has(id)) lc += " inS";
+      if (litHL.has(id) || hovV === id) lc += " hot";
+      return '<span class="' + lc + '" data-lit="' + id + '" title="click: make this literal true">' + litHtml(l) + "</span>";
+    });
+    return '<span class="' + cls + '" data-cl="' + i + '">(' + lits.join('<span class="op">∨</span>') + ')<span class="ci">' + CHtml(i) + "</span></span>";
+  });
+  el("fmlBox").innerHTML = "<i>φ</i> = " + parts.join('<span class="op">∧</span>');
+  const nS = Object.keys(A).length ? numSat(A) : null;
+  el("fmlMeta").textContent = "n = " + clauses.length + " clauses · " + vars.length + " variables" +
+                              (nS !== null ? " · " + nS + "/" + clauses.length + " satisfied" : "");
+  /* variable chips */
+  const auto = new Set(st.auto || []);
+  const chips = vars.map(v => {
+    const val = A[v];
+    let cls = "var";
+    if (val === 1) cls += " set1"; else if (val === 0) cls += " set0";
+    if (auto.has(v) && userAssign[v] === undefined) cls += " auto";
+    if (conf.has(v)) cls += " conf";
+    const fixed = userAssign[v] !== undefined;
+    return '<span class="' + cls + '" data-var="' + v + '" title="' + (fixed ? "fixed by you — click to change" : "click to fix") + '">' +
+           varHtml(v) + " = " + (val === undefined ? "?" : val) + (fixed ? " ●" : "") + "</span>";
+  });
+  el("varsBox").innerHTML = '<span class="lbl">assignment V</span>' + chips.join("");
+}
+
+function renderS() {
+  const st = steps[cur] || {};
+  const S = st.S || new Set(), fresh = new Set(st.freshS || []);
+  const box = el("sBox");
+  const n = clauses.length;
+  if (!S.size) {
+    box.innerHTML = '<span class="empty">' + (st.ph <= 3 ? "The set S appears once the correctness proof starts." : "S is empty — click vertices to add some.") + "</span>";
+    el("sMeta").textContent = "|S| = 0 · k = 2n = " + 2 * n;
+    return;
+  }
+  const ids = [...S].sort((a, b) => a - b);
+  box.innerHTML = ids.map(id => '<span class="chip' + (fresh.has(id) ? " fresh" : "") + '" data-v="' + id + '" title="click: remove from S">' +
+                                 litHtml(litOf(id)) + '<span class="ci">' + LHtml(id) + "</span></span>").join("");
+  el("sMeta").textContent = "|S| = " + S.size + (S.size === 2 * n ? " = 2n" : S.size < 2 * n ? " < 2n" : " > 2n") + " · k = 2n = " + 2 * n +
+                            (manualCover ? " · your S" : "");
+}
+
+/* ---------- pseudocode / proof ------------------------------------------ */
+
+const K = s => '<span class="kw">' + s + "</span>";
+const CM = s => '<span class="cm">' + s + "</span>";
+const RED = [
+  { k: "g_in",  t: K("input:") + " φ = C₁ ∧ … ∧ Cₙ over x₁,…,xₘ,  Cᵢ = (lᵢ,₁ ∨ lᵢ,₂ ∨ lᵢ,₃)" },
+  { k: "g_V",   t: "V := { Lᵢ,ⱼ : i = 1..n, j = 1,2,3 }                " + CM("// one vertex per literal") },
+  { k: "g_Eb",  t: 'E := <span class="ne">{ {Lᵢ,ⱼ, Lₚ,q} : lᵢ,ⱼ ≡ ¬lₚ,q }</span>  ' + CM("// (b) negations") },
+  { k: "g_Ea",  t: '   ∪ <span class="ca">{ {Lᵢ,₁,Lᵢ,₂}, {Lᵢ,₂,Lᵢ,₃}, {Lᵢ,₃,Lᵢ,₁} : i = 1..n }</span> ' + CM("// (a) same clause") },
+  { k: "g_k",   t: "k := 2n" },
+  { k: "g_out", t: K("output:") + " (G = (V,E), k)          " + CM("// O(n²) time") }
+];
+const P1 = [
+  { k: "p1_a", t: "Let φ be satisfiable ⇒ every Cᵢ has a satisfied literal lᵢ,ⱼ." },
+  { k: "p1_b", t: "Add the <i>other two</i> vertices of the clause to S." },
+  { k: "p1_c", t: '⇒ |S| = 2n and S covers all <span class="ca">clause-triangle edges</span>.' },
+  { k: "p1_d", t: 'Remaining edges have the form <span class="ne">{x, ¬x}</span>. If such an edge were uncovered, both x and ¬x would be satisfied literals ⚡' },
+  { k: "p1_e", t: "⇒ G has a vertex cover of size 2n." }
+];
+const P2 = [
+  { k: "p2_a", t: "Given a vertex cover S of G with |S| ≤ 2n." },
+  { k: "p2_b", t: 'S must contain 2 vertices per <span class="ca">clause triangle</span> ⇒ |S| = 2n, S is a minimum VC.' },
+  { k: "p2_c", t: "Define V so that all literals <i>not</i> in S are satisfied (other variables arbitrary)." },
+  { k: "p2_d", t: 'V is well defined, since <span class="ne">{x, ¬x}</span>-edges must be covered.' },
+  { k: "p2_e", t: "V makes φ true: from every clause at least one literal is satisfied, since |S| = 2n." },
+  { k: "p2_f", t: "⇒ φ is satisfiable." }
+];
+
+function renderCode() {
+  const st = steps[cur] || {};
+  const hl = new Set(st.hl || []);
+  const block = (label, lines, prose) => {
+    const out = ['<div class="sublabel">' + label + "</div>"];
+    lines.forEach(l => out.push('<div class="cline' + (prose ? " prose" : "") + (hl.has(l.k) ? " on" : "") + '"><span>' + l.t + "</span></div>"));
+    return out.join("");
+  };
+  el("codeBody").innerHTML = block("The reduction g", RED, false) +
+                             block("Claim: φ satisfiable ⇔ G has a VC of size ≤ 2n — proof of ⇒", P1, true) +
+                             block("Proof of ⇐", P2, true);
+  el("codeNote").innerHTML = "Together with <b>Vertex Cover ∈ NP</b> (certificate: S; check |S| ≤ k and every edge covered) " +
+                             "and the NP-completeness of 3SAT, this shows that Vertex Cover is NP-complete.";
+}
+
+/* ---------- transport / render pass ------------------------------------ */
+
+function renderPhases() {
+  const bar = el("phaseBar");
+  bar.innerHTML = "";
+  phases.forEach(p => {
+    const span = p.to - p.from + 1;
+    const pct = cur > p.to ? 100 : cur < p.from ? 0 : ((cur - p.from + 1) / span) * 100;
+    const b = document.createElement("button");
+    b.className = "phasebtn" + (cur >= p.from && cur <= p.to ? " on" : (cur > p.to ? " past" : ""));
+    b.style.flexGrow = String(Math.max(1, span));
+    b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' + pct.toFixed(2) + '%"></span><span class="lab">' + esc(p.name) + "</span>";
+    b.title = p.name + " — steps " + (p.from + 1) + "–" + (p.to + 1);
+    b.addEventListener("click", () => { stopPlay(); cur = p.from; render(); });
+    bar.appendChild(b);
+  });
+}
+
+function render() {
+  const st = steps[cur] || {};
+  drawGraph(); renderFormula(); renderS(); renderPhases();
+  if (window.innerWidth > 760) renderCode();
+  el("statusBox").innerHTML = (st.txt || "") + (st.ans ? '<b class="ans">' + st.ans + "</b>" : "");
+  el("phaseName").textContent = phases[st.ph] ? phases[st.ph].name : "";
+  el("graphMeta").textContent = "|V| = " + 3 * clauses.length + " · |E| = " + edges.length + " · k = " + 2 * clauses.length;
+  el("scrubber").max = String(Math.max(0, steps.length - 1));
+  el("scrubber").value = String(cur);
+  el("stepNo").textContent = steps.length ? (cur + 1) + " / " + steps.length : "— / —";
+  el("backBtn").disabled = cur <= 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+  el("resetSBtn").style.display = manualCover ? "" : "none";
+  const nf = Object.keys(userAssign).length;
+  el("modeNote").innerHTML = (nf ? "<b>" + nf + "</b> variable" + (nf === 1 ? "" : "s") + " fixed by you" : "No variable fixed — the ⇒ direction uses an assignment chosen by the page") +
+                             (manualCover ? " &nbsp;·&nbsp; the ⇐ direction uses <b>your</b> S (|S| = " + manualCover.size + ")" : " &nbsp;·&nbsp; the ⇐ direction reuses the constructed S") + ".";
+}
+
+const PLAY = "\u25B6\uFE0E", PAUSE = "\u23F8\uFE0E";
+function stepFwd() { if (cur < steps.length - 1) { cur++; render(); } else stopPlay(); }
+function stepBack() { if (cur > 0) { cur--; render(); } }
+function stopPlay() {
+  if (timer) { clearInterval(timer); timer = null; el("playBtn").textContent = PLAY; el("playBtn").setAttribute("aria-label", "Play"); }
+}
+function togglePlay() {
+  if (timer) { stopPlay(); return; }
+  el("playBtn").textContent = PAUSE; el("playBtn").setAttribute("aria-label", "Pause");
+  timer = setInterval(stepFwd, Number(el("speed").value));
+}
+
+/* ---------- tooltips ------------------------------------------------------ */
+
+function tipVertex(id) {
+  const st = steps[cur] || {}, S = st.S || new Set(), A = st.assign || {};
+  const l = litOf(id), i = Math.floor(id / 3);
+  const t = litTrue(l, A);
+  const nb = [...adj[id]].map(e => edges[e].a === id ? edges[e].b : edges[e].a);
+  return '<span class="tt-h">' + LHtml(id) + " = " + litHtml(l) + "</span><br>" +
+         "literal " + (id % 3 + 1) + " of clause " + CHtml(i) + (t === undefined ? "" : " · " + (t ? "true" : "false") + " under V") + "<br>" +
+         (S.has(id) ? "<b>in S</b>" : "not in S") + " · degree " + nb.length + ": " + nb.map(LHtml).join(", ") + "<br>" +
+         '<span class="tt-s">click: ' + (S.has(id) ? "remove from" : "add to") + " S</span>";
+}
+function tipEdge(k) {
+  const e = edges[k], st = steps[cur] || {}, S = st.S || new Set();
+  const kind = e.kind === "both" ? "same clause <i>and</i> negations of each other" : isNeg(e) ? "negations of each other (b)" : "same clause (a)";
+  return '<span class="tt-h">{' + LHtml(e.a) + ", " + LHtml(e.b) + "}</span><br>" + litHtml(litOf(e.a)) + " — " + litHtml(litOf(e.b)) + "<br>" + kind + "<br>" +
+         (st.ph >= 4 ? (covered(e, S) ? '<span style="color:var(--wi-relax)">covered</span> by ' + [e.a, e.b].filter(x => S.has(x)).map(LHtml).join(", ")
+                                      : '<span style="color:var(--wi-active)">uncovered</span>') : "");
+}
+function moveTip(ev) {
+  const t = el("tooltip");
+  const x = Math.min(ev.clientX + 14, window.innerWidth - t.offsetWidth - 10);
+  const y = Math.min(ev.clientY + 16, window.innerHeight - t.offsetHeight - 10);
+  t.style.left = x + "px"; t.style.top = y + "px";
+}
+function showTip(html, ev) { const t = el("tooltip"); t.innerHTML = html; t.style.display = "block"; moveTip(ev); }
+function hideTip() { el("tooltip").style.display = "none"; }
+
+/* ---------- interaction: assignment and cover ---------------------------- */
+
+function phaseStart(k) { return phases[Math.min(k, phases.length - 1)].from; }
+
+function setVar(v, val) {           /* val: 0, 1 or undefined */
+  stopPlay();
+  if (val === undefined) delete userAssign[v]; else userAssign[v] = val;
+  manualCover = null;                 /* the ⇐ direction follows the new construction again */
+  build(); cur = phaseStart(4); render(); refreshInput();
+}
+function toggleInS(id) {
+  stopPlay();
+  const st = steps[cur] || {};
+  const base = manualCover ? new Set(manualCover) : new Set(st.ph === 5 ? st.S : (steps[phaseStart(5)].S));
+  if (base.has(id)) base.delete(id); else base.add(id);
+  manualCover = base;
+  build(); cur = phaseStart(5); render();
+}
+
+/* ---------- input --------------------------------------------------------- */
+
+function fillPresets() {
+  const s = el("presetSel"); s.innerHTML = "";
+  Object.keys(PRESETS).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = PRESETS[k].name; s.appendChild(o); });
+  const o = document.createElement("option"); o.value = "custom"; o.textContent = "(custom input)"; s.appendChild(o);
+}
+function formulaText() {
+  const lines = clauses.map((c, i) => c.map(l => (l.neg ? "-" : "") + (l.v + 1)).join(" ") +
+                (clausePos[i] && clausePos[i].given ? " @ " + clausePos[i].x + " " + clausePos[i].y : ""));
+  lines.push("cols " + cols);
+  const fixed = Object.keys(userAssign).map(Number).sort((a, b) => a - b);
+  if (fixed.length) lines.push("assign " + fixed.map(v => (userAssign[v] ? "" : "-") + (v + 1)).join(" "));
+  return lines.join("\n");
+}
+function refreshInput() { el("inputText").value = formulaText(); el("colsIn").value = cols; }
+
+function loadFormula(text, fromPreset) {
+  let p;
+  try { p = parseFormula(text); } catch (e) { el("parseErr").textContent = e.message; return false; }
+  el("parseErr").textContent = "";
+  clauses = p.clauses;
+  cols = p.cols || Math.min(4, Math.max(2, Math.ceil(clauses.length / 2)));
+  clausePos = p.pos.map(q => q ? { x: q.x, y: q.y, given: true } : null);
+  userAssign = {};
+  if (p.assign) p.assign.forEach(l => userAssign[l.v] = l.neg ? 0 : 1);
+  manualCover = null;
+  build(); cur = 0;
+  if (!fromPreset) el("presetSel").value = "custom";
+  refreshInput(); render();
+  return true;
+}
+function randomFormula() {
+  const n = Math.max(2, Math.min(12, Number(el("rndN").value) || 4));
+  const m = Math.max(3, Math.min(16, Number(el("rndM").value) || 4));
+  const lines = [];
+  for (let i = 0; i < n; i++) {
+    const pool = Array.from({ length: m }, (_, k) => k + 1);
+    const pick = [];
+    for (let j = 0; j < 3; j++) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    lines.push(pick.map(v => (Math.random() < 0.5 ? "-" : "") + v).join(" "));
+  }
+  loadFormula(lines.join("\n"), false);
+}
+
+/* ---------- init (tab 1) -------------------------------------------------- */
+
+function initRed() {
+  fillPresets();
+  el("presetSel").addEventListener("change", e => {
+    const p = PRESETS[e.target.value]; if (p) { curPresetKey = e.target.value; loadFormula(p.text, true); }
+  });
+  el("randBtn").addEventListener("click", randomFormula);
+  el("loadBtn").addEventListener("click", () => loadFormula(el("inputText").value, false));
+  el("colsIn").addEventListener("change", e => {
+    const c = Math.max(1, Math.min(12, Number(e.target.value) || 2));
+    cols = c; clausePos = clausePos.map(q => q && q.given ? q : null);
+    const keep = cur; build(); cur = Math.min(keep, steps.length - 1); refreshInput(); render();
+  });
+  el("clearAssignBtn").addEventListener("click", () => { userAssign = {}; manualCover = null; build(); cur = phaseStart(4); render(); refreshInput(); });
+  el("resetSBtn").addEventListener("click", () => { manualCover = null; build(); cur = phaseStart(5); render(); });
+
+  el("stepBtn").addEventListener("click", () => { stopPlay(); stepFwd(); });
+  el("backBtn").addEventListener("click", () => { stopPlay(); stepBack(); });
+  el("playBtn").addEventListener("click", togglePlay);
+  el("resetBtn").addEventListener("click", () => { stopPlay(); cur = 0; render(); });
+  el("scrubber").addEventListener("input", e => { stopPlay(); cur = Number(e.target.value); render(); });
+  el("speed").addEventListener("input", e => { el("speedVal").textContent = e.target.value + "ms"; if (timer) { stopPlay(); togglePlay(); } });
+
+  /* the graph: hover and click */
+  const svg = el("graphSvg");
+  svg.addEventListener("mousemove", ev => {
+    const t = ev.target;
+    let v = -1, e = -1;
+    if (t.classList.contains("hit")) v = Number(t.dataset.v);
+    else if (t.classList.contains("ehit")) e = Number(t.dataset.e);
+    if (v !== hovV || e !== hovE) { hovV = v; hovE = e; drawGraph(); renderFormula(); }
+    if (v >= 0) showTip(tipVertex(v), ev); else if (e >= 0) showTip(tipEdge(e), ev); else hideTip();
+  });
+  svg.addEventListener("mouseleave", () => { hovV = -1; hovE = -1; hideTip(); drawGraph(); renderFormula(); });
+  svg.addEventListener("click", ev => {
+    const t = ev.target;
+    if (t.classList.contains("hit")) toggleInS(Number(t.dataset.v));
+  });
+  /* the formula: literals fix variables, clauses highlight triangles */
+  el("fmlBox").addEventListener("click", ev => {
+    const lit = ev.target.closest(".lit");
+    if (!lit) return;
+    const l = litOf(Number(lit.dataset.lit));
+    const want = l.neg ? 0 : 1;
+    setVar(l.v, userAssign[l.v] === want ? undefined : want);
+  });
+  el("fmlBox").addEventListener("mouseover", ev => {
+    const cl = ev.target.closest(".cl");
+    const c = cl ? Number(cl.dataset.cl) : -1;
+    if (c !== hovC) { hovC = c; drawGraph(); renderFormula(); }
+  });
+  el("fmlBox").addEventListener("mouseleave", () => { if (hovC >= 0) { hovC = -1; drawGraph(); renderFormula(); } });
+  el("varsBox").addEventListener("click", ev => {
+    const chip = ev.target.closest(".var");
+    if (!chip) return;
+    const v = Number(chip.dataset.var), cur0 = userAssign[v];
+    setVar(v, cur0 === undefined ? 1 : cur0 === 1 ? 0 : undefined);
+  });
+  el("sBox").addEventListener("click", ev => {
+    const chip = ev.target.closest(".chip");
+    if (chip) toggleInS(Number(chip.dataset.v));
+  });
+
+  window.addEventListener("resize", () => { if (!el("tabRed").hidden) render(); });
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
+    if (el("tabRed").hidden) return;
+    if (ev.key === "ArrowRight") { stopPlay(); stepFwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft")  { stopPlay(); stepBack(); ev.preventDefault(); }
+  });
+
+  el("presetSel").value = "lecture";
+  loadFormula(PRESETS.lecture.text, true);
+}
+
+/* ==========================================================================
+   Tab 2: Vertex Cover <-> Independent Set <-> Clique on one vertex set.
+   ========================================================================== */
+
+const EQ_PRESETS = {
+  lecture: { name: "the Vertex Cover example of the slides",
+    text: "# 7 vertices, VC of size 3\n7\n7\n0 2\n0 1\n1 2\n2 3\n3 4\n3 5\n3 6\n0.45 1\n-0.1 0\n1 0\n2 0\n3 0\n2 1\n2 -1\nS 0 2 3" },
+  c5: { name: "C₅ (odd cycle)", text: "5\n5\n0 1\n1 2\n2 3\n3 4\n4 0\n0 1\n-0.95 0.31\n-0.59 -0.81\n0.59 -0.81\n0.95 0.31\nS 0 2" },
+  petersen: { name: "Petersen graph", text: "# minimum VC has 6 vertices\n10\n15\n0 1\n1 2\n2 3\n3 4\n4 0\n0 5\n1 6\n2 7\n3 8\n4 9\n5 7\n7 9\n9 6\n6 8\n8 5\n" +
+      "0 2\n1.9 0.62\n1.18 -1.62\n-1.18 -1.62\n-1.9 0.62\n0 1\n0.95 0.31\n0.59 -0.81\n-0.59 -0.81\n-0.95 0.31" },
+  bip: { name: "K₃,₃ minus two edges", text: "6\n7\n0 3\n0 4\n1 3\n1 4\n1 5\n2 4\n2 5\n0 1\n1 1\n2 1\n0 0\n1 0\n2 0\nS 3 4 5" },
+  star: { name: "star with a triangle", text: "6\n6\n0 1\n0 2\n0 3\n0 4\n0 5\n4 5\n0 0\n-1 1\n1 1\n-1 -1\n0.3 -1.1\n1.2 -0.3\nS 0" }
+};
+
+let G = { n: 0, edges: [], pos: [], labels: null, hasE: [] };
+let eqS = new Set();
+let eqHov = -1;
+
+function parseGraph(text) {
+  const lines = text.split(/\r?\n/).map(l => l.replace(/#.*$/, "").trim()).filter(Boolean);
+  let sLine = null;
+  const body = lines.filter(l => { if (/^S\b/i.test(l)) { sLine = l; return false; } return true; }).map(l => l.split(/\s+/));
+  if (body.length < 2) throw new Error("Need V and E on the first two lines.");
+  let n, e, li;
+  if (body[0].length >= 2) { n = parseInt(body[0][0], 10); e = parseInt(body[0][1], 10); li = 1; }
+  else { n = parseInt(body[0][0], 10); e = parseInt(body[1][0], 10); li = 2; }
+  if (!(n >= 1)) throw new Error("V must be a positive integer.");
+  if (n > 30) throw new Error("At most 30 vertices.");
+  if (!(e >= 0)) throw new Error("E must be a non-negative integer.");
+  const edgesG = [], seen = new Set();
+  for (let k = 0; k < e; k++) {
+    const t = body[li++];
+    if (!t) throw new Error("Expected " + e + " edge lines, found " + k + ".");
+    const u = parseInt(t[0], 10), v = parseInt(t[1], 10);
+    if (!(u >= 0 && u < n && v >= 0 && v < n)) throw new Error("Edge " + (k + 1) + ": vertices must be in 0…" + (n - 1) + ".");
+    if (u === v) continue;
+    const key = Math.min(u, v) + "-" + Math.max(u, v);
+    if (seen.has(key)) continue;
+    seen.add(key); edgesG.push([Math.min(u, v), Math.max(u, v)]);
+  }
+  const rest = body.length - li;
+  let pos = null;
+  if (rest === n) {
+    pos = [];
+    for (let i = 0; i < n; i++) { const t = body[li++]; const x = parseFloat(t[0]), y = parseFloat(t[1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("Vertex " + i + ': expected "x y".'); pos.push({ x: x, y: -y }); }
+  } else if (rest !== 0) throw new Error("After the edges, expected nothing or exactly " + n + " coordinate lines, found " + rest + ".");
+  if (!pos) pos = Array.from({ length: n }, (_, i) => ({ x: Math.cos(2 * Math.PI * i / n - Math.PI / 2), y: Math.sin(2 * Math.PI * i / n - Math.PI / 2) }));
+  let S = new Set();
+  if (sLine) sLine.split(/\s+/).slice(1).forEach(t => { const v = parseInt(t, 10); if (v >= 0 && v < n) S.add(v); });
+  return { n: n, edges: edgesG, pos: pos, S: S };
+}
+
+function setGraph(g, labels) {
+  G = { n: g.n, edges: g.edges, pos: fitPositions(g.pos), labels: labels || null };
+  G.hasE = Array.from({ length: g.n }, () => new Array(g.n).fill(false));
+  g.edges.forEach(([u, v]) => { G.hasE[u][v] = G.hasE[v][u] = true; });
+  eqS = new Set([...(g.S || [])].filter(v => v < g.n));
+  el("eqNote").innerHTML = 'Click any vertex, in any of the three pictures, to move it between <b style="background:var(--s-fill)">S</b> and <b style="background:var(--out-fill);color:var(--wi-relax)">V&thinsp;\\&thinsp;S</b>.';
+  renderEq();
+}
+function fitPositions(raw) {
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  raw.forEach(p => { minx = Math.min(minx, p.x); miny = Math.min(miny, p.y); maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); });
+  const w = Math.max(maxx - minx, 1e-6), h = Math.max(maxy - miny, 1e-6);
+  const s = 0.84 / Math.max(w, h);
+  const offX = 0.08 + (0.84 - w * s) / 2, offY = 0.08 + (0.84 - h * s) / 2;
+  return raw.map(p => ({ x: offX + (p.x - minx) * s, y: offY + (p.y - miny) * s }));
+}
+
+const EQW = 380, EQH = 270, EQR = 19;
+const eqXY = p => ({ x: 20 + p.x * (EQW - 40), y: 20 + p.y * (EQH - 40) });
+
+function eqViolations() {          /* edges of G with both ends outside S = the red pairs of all three views */
+  return G.edges.filter(([u, v]) => !eqS.has(u) && !eqS.has(v));
+}
+
+function drawEq(svgId, mode) {
+  const svg = el(svgId);
+  svg.setAttribute("viewBox", "0 0 " + EQW + " " + EQH);
+  svg.setAttribute("width", EQW); svg.setAttribute("height", EQH);
+  const out = [];
+  const bad = new Set(eqViolations().map(([u, v]) => u + "-" + v));
+  const trim = (p, q) => { const dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy) || 1;
+    return { x1: p.x + dx / l * EQR, y1: p.y + dy / l * EQR, x2: q.x - dx / l * EQR, y2: q.y - dy / l * EQR }; };
+  const line = (u, v, cls) => { const t = trim(eqXY(G.pos[u]), eqXY(G.pos[v]));
+    out.push('<line class="edge ' + cls + '" x1="' + t.x1 + '" y1="' + t.y1 + '" x2="' + t.x2 + '" y2="' + t.y2 + '"/>'); };
+  if (mode === 3) {
+    /* complement: all non-edges; pairs inside V \ S that are NOT adjacent in the complement are the missing clique edges */
+    for (let u = 0; u < G.n; u++) for (let v = u + 1; v < G.n; v++) {
+      if (G.hasE[u][v]) { if (bad.has(u + "-" + v)) line(u, v, "miss"); continue; }
+      const inside = !eqS.has(u) && !eqS.has(v);
+      line(u, v, inside ? "plain ok" : "plain faint");
+    }
+  } else {
+    G.edges.forEach(([u, v]) => line(u, v, bad.has(u + "-" + v) ? "plain bad" : "plain"));
+  }
+  for (let v = 0; v < G.n; v++) {
+    const p = eqXY(G.pos[v]);
+    const inS = eqS.has(v);
+    let cls = "vtx " + (mode === 1 ? (inS ? "inS" : "") : (inS ? "" : "out"));
+    if (eqHov === v) cls += " hov";
+    const lab = G.labels ? G.labels[v] : String(v);
+    out.push('<g class="' + cls + '"><circle class="body" cx="' + p.x + '" cy="' + p.y + '" r="' + EQR + '"/>' +
+             '<text x="' + p.x + '" y="' + (p.y - 1) + '">' + lab + "</text>" +
+             '<circle class="hit" data-v="' + v + '" cx="' + p.x + '" cy="' + p.y + '" r="' + (EQR + 4) + '"/></g>');
+  }
+  svg.innerHTML = out.join("");
+}
+
+function renderEq() {
+  drawEq("eqSvg1", 1); drawEq("eqSvg2", 2); drawEq("eqSvg3", 3);
+  const bad = eqViolations();
+  const k = eqS.size, out = G.n - k, ok = bad.length === 0;
+  const mark = ok ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>';
+  const cnt = ok ? "" : " — " + bad.length + " red " + (bad.length === 1 ? "pair" : "pairs");
+  el("eqVerdict").innerHTML =
+    '<span class="v">' + mark + " S (|S| = " + k + ") is " + (ok ? "" : "<b>not</b> ") + "a vertex cover of G" + cnt + "</span>" +
+    '<span class="v">' + mark + " V\\S (" + out + " vertices) is " + (ok ? "" : "<b>not</b> ") + "an independent set of G</span>" +
+    '<span class="v">' + mark + " V\\S is " + (ok ? "" : "<b>not</b> ") + "a clique of Ḡ</span>";
+  el("eqMeta").textContent = "|V| = " + G.n + " · |E| = " + G.edges.length + " · |Ē| = " + (G.n * (G.n - 1) / 2 - G.edges.length);
+  el("eq1Meta").textContent = "|S| = " + k;
+  el("eq2Meta").textContent = "|V\\S| = " + out;
+  el("eq3Meta").textContent = "|V\\S| = " + out;
+}
+
+/* minimum vertex cover by branching on an uncovered edge (include u or include v), with a node budget */
+function minVertexCover() {
+  let best = null, budget = 400000;
+  const S = new Set();
+  const rec = () => {
+    if (--budget < 0) return;
+    if (best && S.size >= best.size) return;
+    const e = G.edges.find(([u, v]) => !S.has(u) && !S.has(v));
+    if (!e) { best = new Set(S); return; }
+    S.add(e[0]); rec(); S.delete(e[0]);
+    S.add(e[1]); rec(); S.delete(e[1]);
+  };
+  rec();
+  return { S: best, complete: budget >= 0 };
+}
+
+function eqTip(v) {
+  const deg = G.edges.filter(([a, b]) => a === v || b === v).length;
+  return '<span class="tt-h">vertex ' + (G.labels ? G.labels[v] : v) + "</span><br>" + (eqS.has(v) ? "<b>in S</b>" : "in V\\S") +
+         " · degree " + deg + " in G, " + (G.n - 1 - deg) + " in Ḡ<br>" + '<span class="tt-s">click: move to ' + (eqS.has(v) ? "V\\S" : "S") + "</span>";
+}
+
+function initEq() {
+  const s = el("eqPresetSel");
+  Object.keys(EQ_PRESETS).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = EQ_PRESETS[k].name; s.appendChild(o); });
+  const o = document.createElement("option"); o.value = "custom"; o.textContent = "(custom input)"; s.appendChild(o);
+  const load = (text, fromPreset) => {
+    try { const g = parseGraph(text); setGraph(g, null); el("eqParseErr").textContent = ""; el("eqInputText").value = text; if (!fromPreset) s.value = "custom"; }
+    catch (e) { el("eqParseErr").textContent = e.message; }
+  };
+  s.addEventListener("change", e => { const p = EQ_PRESETS[e.target.value]; if (p) load(p.text, true); });
+  el("eqLoadBtn").addEventListener("click", () => load(el("eqInputText").value, false));
+  el("eqFromRedBtn").addEventListener("click", () => {
+    /* the graph g(φ) of the reduction tab, with its layout and literal labels, and the S currently shown there */
+    layout();
+    const st = steps[cur] || {};
+    const g = { n: 3 * clauses.length, edges: edges.map(e => [e.a, e.b]), pos: vpos.map(p => ({ x: p.x, y: p.y })), S: new Set(st.S || []) };
+    setGraph(g, Array.from({ length: g.n }, (_, id) => litSvg(litOf(id))));
+    s.value = "custom";
+    const lines = [g.n, g.edges.length].concat(g.edges.map(e => e.join(" "))).concat(g.pos.map(p => p.x.toFixed(0) + " " + (-p.y).toFixed(0)));
+    if (eqS.size) lines.push("S " + [...eqS].sort((a, b) => a - b).join(" "));
+    el("eqInputText").value = "# G = g(φ) from the reduction tab; vertex 3(i-1)+(j-1) is L_{i,j}\n" + lines.join("\n");
+  });
+  el("eqClearBtn").addEventListener("click", () => { eqS = new Set(); renderEq(); });
+  el("eqCompBtn").addEventListener("click", () => { eqS = new Set(Array.from({ length: G.n }, (_, v) => v).filter(v => !eqS.has(v))); renderEq(); });
+  el("eqMinBtn").addEventListener("click", () => {
+    const r = minVertexCover();
+    if (r.S) { eqS = r.S; renderEq(); }
+    el("eqNote").innerHTML = r.S ? (r.complete ? "A <b>minimum</b> vertex cover has " + r.S.size + " vertices — so the largest independent set and the largest clique of Ḡ have " + (G.n - r.S.size) + "."
+                                               : "Search budget exhausted: this cover of size " + r.S.size + " is the best found, not necessarily minimum.")
+                                 : "The search gave up before finding any cover.";
+  });
+  ["eqSvg1", "eqSvg2", "eqSvg3"].forEach(id => {
+    const svg = el(id);
+    svg.addEventListener("mousemove", ev => {
+      const t = ev.target;
+      const v = t.classList.contains("hit") ? Number(t.dataset.v) : -1;
+      if (v !== eqHov) { eqHov = v; drawEq("eqSvg1", 1); drawEq("eqSvg2", 2); drawEq("eqSvg3", 3); }
+      if (v >= 0) showTip(eqTip(v), ev); else hideTip();
+    });
+    svg.addEventListener("mouseleave", () => { if (eqHov >= 0) { eqHov = -1; drawEq("eqSvg1", 1); drawEq("eqSvg2", 2); drawEq("eqSvg3", 3); } hideTip(); });
+    svg.addEventListener("click", ev => {
+      const t = ev.target;
+      if (!t.classList.contains("hit")) return;
+      const v = Number(t.dataset.v);
+      if (eqS.has(v)) eqS.delete(v); else eqS.add(v);
+      renderEq();
+    });
+  });
+  s.value = "lecture";
+  load(EQ_PRESETS.lecture.text, true);
+}
+
+/* ---------- tabs ---------------------------------------------------------- */
+
+function showTab(which) {
+  const red = which === "red";
+  el("tabRed").hidden = !red; el("tabEq").hidden = red;
+  el("tabBtnRed").classList.toggle("on", red); el("tabBtnEq").classList.toggle("on", !red);
+  el("tabHint").textContent = red ? "Two views on the same theme: the reduction proves hardness, the equivalences carry it on."
+                                  : "One vertex set S, three questions — and always the same red pairs.";
+  if (!red) stopPlay();
+  if (red) render(); else renderEq();
+  hideTip();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initRed(); initEq();
+  el("tabBtnRed").addEventListener("click", () => showTab("red"));
+  el("tabBtnEq").addEventListener("click", () => showTab("eq"));
+});
+</script>
+</body>
+</html>

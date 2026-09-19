@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overlap graphs &amp; Hamiltonian paths &middot; step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    --wi-radius:4px; --wi-radius-lg:5px;
+    /* the four accents double as the base colours: A C G T */
+    --b-a:#2a6a63; --b-c:#b07d18; --b-g:#4a7c3f; --b-t:#902015;
+    /* the (up to four) solution colours */
+    --sol0:#902015; --sol1:#2a6a63; --sol2:#b07d18; --sol3:#4a7c3f;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code, .status code { background:var(--wi-controls); padding:1px 5px;
+              border-radius:3px; font-size:.85em; font-family:var(--wi-font-mono); }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.str { font-family:var(--wi-font-mono); font-size:.8rem; width:15em; text-transform:uppercase; }
+  input.num { width:3.6em; font-family:var(--wi-font-mono); font-size:.8rem; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* --- transport: slider + phase bar --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  /* half a slider thumb, so the phase bar lines up with the scrubber track;
+     the thumb is chunkier on touch screens */
+  @media (max-width:760px) { .progress { --thumb:11px; } }
+  .phasebar { display:flex; margin:5px var(--thumb) 0;
+              width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden;
+              flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage --- */
+  .stage { display:flex; flex-direction:column; gap:14px; }
+  .panels { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr); gap:14px;
+            align-items:start; }
+  @media (max-width:1100px) { .panels { grid-template-columns:1fr 1fr; } }
+  @media (max-width:760px) { .panels { grid-template-columns:1fr; } }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; margin:0 auto; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:104px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status b { color:var(--wi-accent-dark); }
+
+  /* the little suffix/prefix check */
+  .check { font-family:var(--wi-font-mono); font-size:1rem; line-height:1.35; margin-top:8px;
+           color:var(--wi-ink-strong); }
+  .check .row { white-space:pre; }
+  .check .ov { background:#f0d7cd; border-radius:2px; box-shadow:0 0 0 1px var(--wi-accent-soft); }
+  .check .no { background:#eae1d2; border-radius:2px; box-shadow:0 0 0 1px var(--wi-border); }
+  .check .verdict { font-family:var(--wi-font-body); font-size:.82rem; margin-top:3px; }
+  .check .yes { color:var(--wi-relax); } .check .nope { color:var(--wi-ink-faint); }
+
+  /* composition list */
+  .comp { display:flex; flex-wrap:wrap; gap:5px; }
+  .kchip { font-family:var(--wi-font-mono); font-size:.82rem; padding:2px 6px; border-radius:3px;
+           background:var(--wi-panel-2); border:1px solid var(--wi-border-soft); color:var(--wi-ink-strong); }
+  .kchip .mult { color:var(--wi-ink-faint); font-size:.85em; }
+  .kchip.hot { border-color:var(--wi-active); background:#f6e6df; }
+  .kchip.done { opacity:.45; }
+
+  /* reconstruction tiles */
+  .recon + .recon { margin-top:9px; }
+  .recon .head { font-family:var(--wi-font-head); font-size:.68rem; letter-spacing:.08em;
+                 text-transform:uppercase; color:var(--wi-ink-faint); display:flex; align-items:center;
+                 gap:7px; margin-bottom:4px; }
+  .recon .sw2 { width:.8em; height:.8em; border-radius:2px; display:inline-block; }
+  .tiles { display:flex; gap:2px; flex-wrap:wrap; }
+  .tiles .t { font-family:var(--wi-font-mono); font-size:.8rem; width:1.35em; height:1.6em;
+              display:flex; align-items:center; justify-content:center; border-radius:2px;
+              background:var(--wi-panel-2); border:1px solid var(--wi-border-soft);
+              color:var(--wi-ink-faint); }
+  .tiles .t.on { color:#fcf9f3; border-color:transparent; }
+  .tiles .t.diff { box-shadow:0 0 0 2px var(--wi-ink-strong); }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem;
+            color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+  .swl { width:1.5em; height:0; border-top:3px solid var(--wi-ink); display:inline-block; }
+
+  /* --- pseudocode --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; display:grid; grid-template-columns:1fr 1fr; gap:0 18px; }
+  @media (max-width:900px) { .codebody { grid-template-columns:1fr; } }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent;
+           white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em;
+              text-transform:uppercase; color:var(--wi-ink-faint); padding:10px 12px 3px;
+              border-top:1px solid var(--wi-border-soft); margin-top:6px; }
+  .sublabel.first { border-top:0; margin-top:0; padding-top:2px; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  /* --- editor --- */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,280px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:150px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:280px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+  .tooltip code { font-family:var(--wi-font-mono); font-size:.9em; }
+
+  .mobile-note { display:none; background:var(--wi-controls); border:1px solid var(--wi-accent-soft);
+                 border-radius:var(--wi-radius-lg); padding:11px 15px; font-size:.82rem;
+                 color:var(--wi-ink-strong); margin-bottom:14px; }
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    h1 { font-size:1.3rem; }
+    .controls { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .mobile-note { display:block; }
+    .desk-only { display:none !important; }
+  }
+
+  /* --- SVG classes --- */
+  .nodec { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.4; }
+  .nodec.hot { stroke:var(--wi-active); stroke-width:2.6; fill:#f6e6df; }
+  .nodec.cand { stroke:var(--wi-examine); stroke-width:2.2; fill:#f7edd9; }
+  .nodec.on0 { stroke:var(--sol0); stroke-width:2.6; }
+  .nodec.on1 { stroke:var(--sol1); stroke-width:2.6; }
+  .nodec.on2 { stroke:var(--sol2); stroke-width:2.6; }
+  .nodec.on3 { stroke:var(--sol3); stroke-width:2.6; }
+  .nodec.dim { opacity:.4; }
+  .nch { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-ink-strong);
+         text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .nix { font-family:var(--wi-font-mono); font-size:9.5px; fill:var(--wi-ink-faint);
+         text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .ovbox { fill:#f0d7cd; stroke:var(--wi-accent-soft); stroke-width:.8; pointer-events:none; }
+  .e { fill:none; stroke:#a6947a; stroke-width:1.4; }
+  .e.bb { stroke:var(--wi-ink-soft); stroke-width:2; }
+  .e.hot { stroke:var(--wi-active); stroke-width:2.6; }
+  .e.dim { stroke:var(--wi-inert); stroke-width:1.2; opacity:.5; }
+  .e.p0 { stroke:var(--sol0); stroke-width:2.8; }
+  .e.p1 { stroke:var(--sol1); stroke-width:2.8; }
+  .e.p2 { stroke:var(--sol2); stroke-width:2.8; }
+  .e.p3 { stroke:var(--sol3); stroke-width:2.8; }
+  .tile { fill:var(--wi-panel-2); stroke:var(--wi-border-soft); stroke-width:1; }
+  .tile.win { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2; }
+  .tile.dimmed { opacity:.32; }
+  .tch { font-family:var(--wi-font-mono); font-size:14px; fill:var(--wi-ink-strong);
+         text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .card { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.2; }
+  .card.fresh { stroke:var(--wi-active); stroke-width:2; fill:#f6e6df; }
+  .cix { font-family:var(--wi-font-mono); font-size:9.5px; fill:var(--wi-ink-faint);
+         dominant-baseline:central; }
+  .glab { font-family:var(--wi-font-body); font-size:13px; fill:var(--wi-ink-soft); font-style:italic; }
+  .hit { fill:transparent; cursor:pointer; }
+  @keyframes pop { from { opacity:0; transform:translateY(-7px) scale(.7); } to { opacity:1; transform:none; } }
+  .popin { animation:pop .3s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box; transform-origin:center; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>Overlap graphs &nbsp;&middot;&nbsp; from a string to a Hamiltonian path</h1>
+</div>
+
+<p class="subtitle">
+  A sequencing machine never hands us the genome; it hands us the <b><i>k</i>-mer composition</b>
+  &mdash; the multiset of all length-<i>k</i> windows, in no particular order. The
+  <b>overlap graph</b> puts one vertex per read and an arc <i>r<sub>i</sub>r<sub>j</sub></i> whenever the
+  last <i>k</i>&minus;1 letters of <i>R<sub>i</sub></i> are the first <i>k</i>&minus;1 letters of
+  <i>R<sub>j</sub></i>; an assembly is then a <b>Hamiltonian path</b>. Watch the graph being built in the
+  order the reads came from the string &mdash; and then watch that order be taken away again.
+  Hover a vertex to see its neighbours.
+</p>
+
+<div class="mobile-note">
+  <b>Small screen:</b> this is the compact demo &mdash; the drawing, the scrubber and the commentary.
+  The pseudocode with live line highlighting is on the desktop version.
+</div>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <label for="inT">String <i>T</i></label>
+    <input type="text" id="inT" class="str" spellcheck="false">
+    <label for="inK"><i>k</i></label>
+    <input type="number" id="inK" class="num" min="2" max="8" step="1">
+    <button id="applyBtn" class="pri">Set</button>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Overlap search</span>
+    <span class="seg" id="granSeg">
+      <button id="granCoarse" class="on">one step per read</button>
+      <button id="granFine">every pair</button>
+    </span>
+  </div>
+  <div class="ctl">
+    <label class="chk"><input type="checkbox" id="baseChk" checked> colour the bases</label>
+    <label class="chk"><input type="checkbox" id="focusChk" checked> hover dims the rest</label>
+    <label class="chk"><input type="checkbox" id="ixChk"> show indices</label>
+  </div>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (&larr;)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (&rarr;)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+      <button id="replayBtn" title="Replay the rearrangement">&#x21BB; replay move</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">&mdash; / &mdash;</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="60" max="1400" value="420" style="width:88px">
+      <span class="stepno" id="speedVal">420ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="sim-box">
+    <div class="sim-title"><span id="stageTitle">The string</span><span class="rhs" id="stageMeta"></span></div>
+    <div class="svgscroll"><svg id="mainSvg" class="stagesvg"></svg></div>
+    <div class="legend" id="legendBox"></div>
+  </div>
+
+  <div class="panels">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>The composition &#8475;</span><span class="rhs" id="compMeta"></span></div>
+      <div class="comp" id="compBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Spelled out</span><span class="rhs" id="reconMeta"></span></div>
+      <div id="reconBox"></div>
+    </div>
+  </div>
+</div>
+
+<details class="code desk-only" id="codeBox" open style="margin-top:18px">
+  <summary>Definitions &amp; construction</summary>
+  <div class="codebody" id="codeBody"></div>
+  <div class="codenote" id="codeNote"></div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      Lines starting with <code>#</code> are ignored, so a file can hold several examples with comments.
+      Of the remaining lines, the one that is a small integer is <i>k</i>; the other one is the input
+      (either order, as in the Rosalind &ldquo;string composition&rdquo; format):
+      <br><br>
+      <code>3</code><br><code>TAATGCCATGGGATGTT</code>
+      <br><br>
+      A line with <b>several whitespace-separated words</b> is instead read as the <i>k</i>-mer multiset
+      &#8475; itself &mdash; then <i>k</i> is the word length and there is no string to slice up, so the first
+      phase just lays the reads out:
+      <br><br>
+      <code>TAA AAT ATG TGT GTT ATG</code>
+      <br><br>
+      For the &ldquo;nice&rdquo; layout of the graph the reads have to be put in <i>some</i> order that makes the
+      backbone a path: with a string that is the order they were cut out of it; with a bare multiset the page
+      solves the assembly problem first and uses that order (and says so). At most 26 reads &mdash; beyond
+      that the picture is unreadable, and the point of it is lost.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Overlap graph of a k-mer composition, and its Hamiltonian paths.
+
+   Following the lecture definitions:
+     Composition_k(T) = {{ T[0..k), T[1..1+k), ..., T[n-k..n) }}   (a multiset)
+     G_O(R) = (V,E) with V = {r_0,...,r_{n-k}}, r_i labelled R_i, and
+     r_i r_j in E  iff  R_i[1..k) = R_j[0..k-1).
+
+   Note that the definition has no i != j, so a read like GGG whose suffix
+   equals its own prefix carries a self-loop.  It is drawn (faithful to the
+   textbook figure) and it can never be used by a Hamiltonian path.
+
+   Vertex ids 0..N-1 are fixed and refer to the reads *in the order given*
+   (for a string: the order they were cut from it).  A layout is a permutation
+   of the vertices onto slots on a horizontal line:
+       slotNice   -- the order that makes the backbone a path
+       slotAlpha  -- lexicographic by label
+   Everything drawn is derived from the slot positions, so the same code draws
+   both layouts and every intermediate frame of the move between them.
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+/* ---------- presets ------------------------------------------------------ */
+
+const PRESETS = {
+  cp3:    { name: "TAATGCCATGGGATGTT · k = 3", T: "TAATGCCATGGGATGTT", k: 3 },
+  cp5:    { name: "TAATGCCATGGGATGTT · k = 5", T: "TAATGCCATGGGATGTT", k: 5 },
+  small:  { name: "TAATGTT · k = 3",           T: "TAATGTT",           k: 3 },
+  rep:    { name: "AGCAGCAGC · k = 3",         T: "AGCAGCAGC",         k: 3 },
+  many:   { name: "ATGCGATGACCTGA · k = 3",    T: "ATGCGATGACCTGA",    k: 3 },
+  bin:    { name: "0001110100 · k = 3",        T: "0001110100",        k: 3 },
+  nosol:  { name: "reads: TAA AAT ATG TGT GTT ATG",
+            reads: ["TAA", "AAT", "ATG", "TGT", "GTT", "ATG"], k: 3 }
+};
+
+const MAXREADS = 26, MAXSOL = 12, SHOWSOL = 4, BUDGET = 3e6;
+
+/* ---------- state -------------------------------------------------------- */
+
+let T = "", k = 3, haveT = true;
+let reads = [], N = 0;
+let outOf = [], inOf = [], edges = [], eidOf = {};
+let extraRange = [];           /* vertex -> [from,to) in `edges` of its non-backbone out-arcs */
+let nBB = 0;                   /* number of backbone arcs (a prefix of `edges`) */
+let nice = [], alpha = [], slotNice = [], slotAlpha = [];
+let ixOf = [];                 /* the *fixed* index of a read: its place in sorted R */
+let sols = [], solTrunc = false;
+let steps = [], phases = [], cur = 0;
+let gran = 0, colorBases = true, focusHover = true, showIx = false;
+let hoverV = null, timer = null;
+let drawnKey = null, tweenId = null;
+let baseColor = {};            /* letter -> css colour */
+
+/* ---------- model -------------------------------------------------------- */
+
+function suffix(s) { return s.slice(1); }
+function prefix(s) { return s.slice(0, k - 1); }
+function isArc(u, v) { return suffix(reads[u]) === prefix(reads[v]); }
+
+/* all Hamiltonian paths, deduplicated by the string they spell.
+
+   Two reads with the same label are interchangeable, so at every choice point
+   only the lowest-indexed unused copy of a label is tried.  That kills the
+   (multiplicity)! blow-up and makes the enumeration produce exactly one
+   representative per distinct spelled string -- the string determines its own
+   window sequence, so distinct label sequences spell distinct strings. */
+function enumerateSolutions() {
+  sols = []; solTrunc = false;
+  if (!N) return;
+  const used = new Array(N).fill(false), path = [];
+  let budget = 0, stop = false;
+  const canon = v => {
+    for (let u = 0; u < v; u++) if (!used[u] && reads[u] === reads[v]) return false;
+    return true;
+  };
+  const spell = p => { let s = reads[p[0]]; for (let t = 1; t < p.length; t++) s += reads[p[t]].slice(-1); return s; };
+  (function dfs() {
+    if (stop) return;
+    if (++budget > BUDGET) { stop = true; solTrunc = true; return; }
+    if (path.length === N) {
+      sols.push({ str: spell(path), seq: path.slice() });
+      if (sols.length >= MAXSOL) { stop = true; solTrunc = true; }
+      return;
+    }
+    const last = path.length ? path[path.length - 1] : null;
+    const cand = last === null ? Array.from({ length: N }, (_, i) => i) : outOf[last];
+    for (const v of cand) {
+      if (used[v] || v === last || !canon(v)) continue;
+      used[v] = true; path.push(v);
+      dfs();
+      path.pop(); used[v] = false;
+      if (stop) return;
+    }
+  })();
+}
+
+function buildModel() {
+  N = reads.length;
+  outOf = []; inOf = [];
+  for (let v = 0; v < N; v++) { outOf.push([]); inOf.push([]); }
+  for (let u = 0; u < N; u++) for (let v = 0; v < N; v++) if (isArc(u, v)) { outOf[u].push(v); inOf[v].push(u); }
+
+  enumerateSolutions();
+
+  /* the layout that makes a backbone visible */
+  nice = haveT ? Array.from({ length: N }, (_, i) => i)
+               : (sols.length ? sols[0].seq.slice() : Array.from({ length: N }, (_, i) => i));
+  slotNice = new Array(N);
+  nice.forEach((v, s) => slotNice[v] = s);
+  alpha = Array.from({ length: N }, (_, i) => i).sort((a, b) =>
+    reads[a] < reads[b] ? -1 : reads[a] > reads[b] ? 1 : slotNice[a] - slotNice[b]);
+  slotAlpha = new Array(N);
+  alpha.forEach((v, s) => slotAlpha[v] = s);
+  /* r_0 ... r_{n-k} are numbered by the order the input lists them, i.e.
+     lexicographically -- NOT by where they sit in the genome, which is exactly
+     the thing we are not given.  So an index never changes, whichever way the
+     vertices happen to be arranged on screen. */
+  ixOf = slotAlpha.slice();
+
+  /* arcs, in the order the animation reveals them: backbone first, then the
+     rest grouped by source vertex in nice order */
+  edges = []; eidOf = {};
+  const add = (u, v, bb) => {
+    const key = u + ">" + v;
+    if (eidOf[key] !== undefined) return;
+    eidOf[key] = edges.length;
+    edges.push({ id: edges.length, u: u, v: v, self: u === v, bb: !!bb });
+  };
+  for (let s = 0; s + 1 < N; s++) { const u = nice[s], v = nice[s + 1]; if (isArc(u, v)) add(u, v, true); }
+  nBB = edges.length;
+  extraRange = new Array(N);
+  for (const u of nice) {
+    const from = edges.length;
+    for (const v of nice) if (isArc(u, v)) add(u, v, false);
+    extraRange[u] = [from, edges.length];
+  }
+
+  /* base colours: the four accents, in alphabet order */
+  const pal = ["var(--b-a)", "var(--b-c)", "var(--b-g)", "var(--b-t)"];
+  const letters = [...new Set(reads.join("").split(""))].sort();
+  baseColor = {};
+  if (letters.join("") === "ACGT") { baseColor = { A: pal[0], C: pal[1], G: pal[2], T: pal[3] }; }
+  else letters.forEach((c, i) => baseColor[c] = pal[i % 4]);
+}
+
+/* ---------- geometry ----------------------------------------------------- */
+
+/* one SVG unit = one CSS pixel (width/height are set to the viewBox), so the
+   font sizes below are literal and stay in scale with the running text.
+
+   The stage keeps ONE size for the whole run -- the union of what the string
+   view and the graph view need.  Nothing on the page reflows between phases,
+   and, more importantly, the three arrangements of the reads
+       staircase under the string  ->  lexicographic grid  ->  row of vertices
+   live in the same coordinate system, so a read can simply be tweened from
+   one to the next: the same 15 boxes throughout, only rearranged. */
+const FONT = 12, CW = FONT * 0.6;
+const TW = 26, TH = 30, TG = 3, PITCH = 20;
+let R = 19, SP = 60, Y0 = 200, GW = 900, GH = 400;
+let SW = 900, SH = 400, GY = 200, XOFF = 0, SX = 34, SG = null;
+
+function arcH(spanSlots) { return Math.min(190, 26 + 30 * Math.sqrt(Math.max(0, spanSlots - 1))); }
+
+/* the graph is sized from the arcs of *both* layouts, so no arc is ever
+   clipped and the picture does not jump when the vertices are re-sorted */
+function graphGeometry() {
+  R = Math.max(16, Math.round(k * CW / 2 + 9));
+  SP = 2 * R + 22;
+  let hi = R + 30, lo = R + 30;
+  ["nice", "alpha"].forEach(L => {
+    edges.forEach(e => {
+      if (e.self) { hi = Math.max(hi, R + 40 + 30); return; }
+      const sa = slotOf(e.u, L), sb = slotOf(e.v, L), h = arcH(Math.abs(sb - sa)) + R + 26;
+      if (sb > sa) hi = Math.max(hi, h); else lo = Math.max(lo, h);
+    });
+  });
+  Y0 = Math.round(hi);
+  GH = Math.round(hi + lo);
+  GW = Math.round(2 * (R + 16) + Math.max(1, N - 1) * SP);
+}
+
+function stringGeom() {
+  const cardW = 2 * R, cardH = 18, x0 = 34, y0 = 26;
+  const strW = haveT ? T.length * (TW + TG) - TG : 0;
+  const perRow = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(N * 1.6))));
+  const rows = Math.ceil(N / perRow);
+  const cellW = cardW + 18, cellH = cardH + 10;
+  const stairTop = y0 + (haveT ? TH + 26 : 22);
+  const gridTop = stairTop + 16;
+  const bodyW = Math.max(strW, (N - 1) * (TW + TG) + cardW, perRow * cellW);
+  const H = Math.max(stairTop + (haveT ? (N - 1) * PITCH + cardH : 0),
+                     gridTop + (rows - 1) * cellH + cardH) + 22;
+  return { x0: x0, y0: y0, cardW: cardW, cardH: cardH, perRow: perRow, cellW: cellW,
+           cellH: cellH, stairTop: stairTop, gridTop: gridTop, strW: strW,
+           bodyW: bodyW, W: 2 * x0 + bodyW, H: H };
+}
+
+function stageGeometry() {
+  graphGeometry();
+  SG = stringGeom();
+  SW = Math.max(GW, SG.W);
+  SH = Math.max(GH, SG.H);
+  GY = Y0 + (SH - GH) / 2;                 /* the row of vertices, vertically centred */
+  XOFF = (SW - GW) / 2;
+  SX = Math.round((SW - SG.bodyW) / 2);    /* the string block, horizontally centred */
+}
+function sizeStage(svg) {
+  svg.setAttribute("width", SW); svg.setAttribute("height", SH);
+  svg.setAttribute("viewBox", "0 0 " + SW + " " + SH);
+}
+function xOfSlot(s) { return R + 16 + s * SP + XOFF; }
+function slotOf(v, layout) { return layout === "alpha" ? slotAlpha[v] : slotNice[v]; }
+function posOf(layout) {
+  const p = new Array(N);
+  for (let v = 0; v < N; v++) p[v] = { x: xOfSlot(slotOf(v, layout)), y: GY };
+  return p;
+}
+
+/* where read v sits in each of the three arrangements */
+function boxCfg(kind) {
+  const g = SG, out = new Array(N);
+  for (let v = 0; v < N; v++) {
+    if (kind === "row") {
+      out[v] = { x: xOfSlot(slotNice[v]), y: GY, w: 2 * R, h: 2 * R, rx: R };
+    } else if (kind === "stair" && haveT) {
+      out[v] = { x: SX + slotNice[v] * (TW + TG) + g.cardW / 2,
+                 y: g.stairTop + slotNice[v] * PITCH + g.cardH / 2,
+                 w: g.cardW, h: g.cardH, rx: 3 };
+    } else {
+      const i = slotAlpha[v], r = Math.floor(i / g.perRow), c = i % g.perRow;
+      out[v] = { x: SX + c * g.cellW + g.cardW / 2, y: g.gridTop + r * g.cellH + g.cardH / 2,
+                 w: g.cardW, h: g.cardH, rx: 3 };
+    }
+  }
+  return out;
+}
+function boxSvg(b, cls) {
+  return '<rect class="' + cls + '" x="' + (b.x - b.w / 2) + '" y="' + (b.y - b.h / 2) +
+         '" width="' + b.w + '" height="' + b.h + '" rx="' + b.rx + '"/>';
+}
+
+/* ---------- drawing: the graph ------------------------------------------- */
+
+const MARKERS = ["base", "bb", "hot", "dim", "p0", "p1", "p2", "p3"];
+const MCOLOR = { base: "var(--wi-border)", bb: "var(--wi-ink-soft)", hot: "var(--wi-active)",
+                 dim: "var(--wi-inert)", p0: "var(--sol0)", p1: "var(--sol1)",
+                 p2: "var(--sol2)", p3: "var(--sol3)" };
+
+function defs() {
+  const out = ["<defs>"];
+  MARKERS.forEach(m => {
+    out.push('<marker id="ah-' + m + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.4" ' +
+             'markerHeight="5.4" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="' +
+             MCOLOR[m] + '"/></marker>');
+  });
+  out.push("</defs>");
+  return out.join("");
+}
+
+/* geometry of one arc from the live positions; `off` nudges parallel copies apart */
+function arcGeom(a, b, self, off) {
+  off = off || 0;
+  if (self) {
+    const x = a.x, y = a.y;
+    return "M " + (x - 6.5) + "," + (y - R * 0.86) +
+           " C " + (x - 26 - off) + "," + (y - R - 40 - off) +
+           " " + (x + 26 + off) + "," + (y - R - 40 - off) +
+           " " + (x + 6.5) + "," + (y - R * 0.86);
+  }
+  const fwd = b.x >= a.x, dx = Math.abs(b.x - a.x);
+  if (fwd && dx < SP * 1.35) {                       /* neighbours: a straight arrow */
+    const dy = b.y - a.y, L = Math.hypot(b.x - a.x, dy) || 1;
+    const ux = (b.x - a.x) / L, uy = dy / L, o = off * 0.9;
+    return "M " + (a.x + ux * R - uy * o) + "," + (a.y + uy * R + ux * o) +
+           " L " + (b.x - ux * R - uy * o) + "," + (b.y - uy * R + ux * o);
+  }
+  const h = arcH(dx / SP) + off;
+  const s = fwd ? -1 : 1;                            /* forward over the top, backward underneath */
+  const sx = a.x + (fwd ? 0.55 : -0.55) * R, sy = a.y + s * 0.83 * R;
+  const ex = b.x + (fwd ? -0.55 : 0.55) * R, ey = b.y + s * 0.83 * R;
+  return "M " + sx + "," + sy + " C " + sx + "," + (sy + s * h) + " " +
+         ex + "," + (ey + s * h) + " " + ex + "," + ey;
+}
+
+/* One <text> per label with a <tspan> per letter: the browser does the
+   spacing, so nothing depends on the mono font's advance width.  Where a
+   (k-1)-mer has to be marked, the box behind it is measured from the rendered
+   glyphs afterwards (see markOverlaps). */
+function labelSvg(v, x, y, cls) {
+  const lab = reads[v], sp = [];
+  for (let c = 0; c < lab.length; c++) {
+    const col = colorBases && baseColor[lab[c]] ? ' fill="' + baseColor[lab[c]] + '"' : "";
+    sp.push("<tspan" + col + ">" + esc(lab[c]) + "</tspan>");
+  }
+  return '<text class="' + (cls || "nch") + '" data-lab="' + v + '" x="' + x + '" y="' + y + '">' +
+         sp.join("") + "</text>";
+}
+
+/* put the pink boxes behind the matching (k-1)-mers, measured from the glyphs */
+function markOverlaps(svg, ovbox) {
+  const layer = svg.querySelector("#ovLayer");
+  if (!layer || !ovbox) return;
+  let html = "";
+  Object.keys(ovbox).forEach(v => {
+    const t = svg.querySelector('text[data-lab="' + v + '"]');
+    if (!t || !t.getStartPositionOfChar) return;
+    const from = ovbox[v][0], to = ovbox[v][1];
+    try {
+      const a = t.getStartPositionOfChar(from), b = t.getEndPositionOfChar(to - 1);
+      html += '<rect class="ovbox" x="' + (a.x - 1.2) + '" y="' + (a.y - FONT * 0.68) +
+              '" width="' + (b.x - a.x + 2.4) + '" height="' + (FONT * 1.36) + '" rx="2"/>';
+    } catch (err) { /* text not measurable yet -- skip the box, not the frame */ }
+  });
+  layer.innerHTML = html;
+}
+
+function drawGraph(st, pos) {
+  const svg = el("mainSvg");
+  stageGeometry();
+  sizeStage(svg);
+  if (!pos) pos = posOf(st.layout || "nice");
+
+  const ne = st.ne === undefined ? edges.length : st.ne;
+  const ecls = st.ecls || {};
+  const shown = st.showPaths || (st.trace ? [st.trace.pi] : []);
+  const focus = (focusHover && hoverV !== null) ? hoverV : null;
+
+  /* the arcs of the solutions being highlighted, as an overlay: an arc used by
+     two solutions is stroked twice, nudged apart, so neither disappears */
+  const overlay = [], ringOf = {};
+  shown.forEach(pi => {
+    const seq = sols[pi].seq;
+    const upto = (st.trace && st.trace.pi === pi) ? st.trace.upto : seq.length - 1;
+    if (!st.showPaths) ringOf[seq[0]] = pi;
+    for (let t = 1; t <= upto; t++) {
+      const id = eidOf[seq[t - 1] + ">" + seq[t]];
+      if (id !== undefined) overlay.push({ id: id, pi: pi });
+      if (!st.showPaths) ringOf[seq[t]] = pi;
+    }
+  });
+  const dimRest = shown.length > 0;
+
+  const arcs = [], circles = [], labels = [], hits = [];
+
+  for (let i = 0; i < ne; i++) {
+    const e = edges[i];
+    let cls = e.bb ? "bb" : "base";
+    if (dimRest) cls = "dim";
+    if (ecls[e.id]) cls = ecls[e.id];
+    if (focus !== null && e.u !== focus && e.v !== focus) cls = "dim";
+    arcs.push('<path class="e ' + cls + '" d="' + arcGeom(pos[e.u], pos[e.v], e.self, 0) +
+              '" marker-end="url(#ah-' + cls + ')"/>');
+  }
+  overlay.forEach(o => {
+    const e = edges[o.id];
+    if (o.id >= ne) return;
+    if (focus !== null && e.u !== focus && e.v !== focus) return;
+    const off = shown.length > 1 ? o.pi * 6 : 0;
+    arcs.push('<path class="e p' + o.pi + '" d="' + arcGeom(pos[e.u], pos[e.v], e.self, off) +
+              '" marker-end="url(#ah-p' + o.pi + ')"/>');
+  });
+
+  for (let v = 0; v < N; v++) {
+    const p = pos[v];
+    let cls = "nodec";
+    if (st.hotV !== undefined && st.hotV === v) cls += " hot";
+    else if (st.candV && st.candV.indexOf(v) >= 0) cls += " cand";
+    else if (ringOf[v] !== undefined) cls += " on" + ringOf[v];
+    if (focus !== null && v !== focus && outOf[focus].indexOf(v) < 0 && inOf[focus].indexOf(v) < 0)
+      cls += " dim";
+    circles.push('<circle class="' + cls + '" cx="' + p.x + '" cy="' + p.y + '" r="' + R + '"/>');
+    labels.push(labelSvg(v, p.x, p.y));
+    if (showIx)
+      labels.push('<text class="nix" x="' + p.x + '" y="' + (p.y + R + 10) + '">r' +
+                  ixOf[v] + "</text>");
+    hits.push('<circle class="hit" data-v="' + v + '" cx="' + p.x + '" cy="' + p.y + '" r="' + (R + 3) + '"/>');
+  }
+
+  svg.innerHTML = defs() + "<g>" + arcs.join("") + "</g><g>" + circles.join("") +
+                  '</g><g id="ovLayer"></g><g>' + labels.join("") + "</g><g>" + hits.join("") + "</g>";
+  markOverlaps(svg, st.ovbox);
+}
+
+/* ---------- drawing: the string and its windows --------------------------- */
+
+/* the string row, at a given opacity: it fades out as the reads stop being
+   windows of anything and become an unordered multiset */
+function stringSvg(op, st) {
+  if (!haveT || op <= 0.001) return "";
+  const g = SG, out = ['<g opacity="' + op.toFixed(3) + '">'];
+  out.push('<text class="glab" text-anchor="end" x="' + (SX - 9) + '" y="' + (g.y0 + TH / 2 + 5) +
+           '">T =</text>');
+  for (let i = 0; i < T.length; i++) {
+    const inWin = st && st.win !== undefined && st.win >= 0 && i >= st.win && i < st.win + k;
+    out.push('<rect class="tile' + (inWin ? " win" : "") + '" x="' + (SX + i * (TW + TG)) +
+             '" y="' + g.y0 + '" width="' + TW + '" height="' + TH + '" rx="3"/>');
+    const col = colorBases && baseColor[T[i]] ? ' fill="' + baseColor[T[i]] + '"' : "";
+    out.push('<text class="tch" x="' + (SX + i * (TW + TG) + TW / 2) + '" y="' + (g.y0 + TH / 2) +
+             '"' + col + ">" + esc(T[i]) + "</text>");
+    if (showIx)
+      out.push('<text class="nix" x="' + (SX + i * (TW + TG) + TW / 2) + '" y="' + (g.y0 - 8) +
+               '">' + i + "</text>");
+  }
+  out.push("</g>");
+  return out.join("");
+}
+function rLabelSvg(op) {
+  if (op <= 0.001) return "";
+  return '<g opacity="' + op.toFixed(3) + '"><text class="glab" x="' + SX + '" y="' +
+         (SG.gridTop - 12) + '">&#8475; =</text></g>';
+}
+
+function drawString(st) {
+  const svg = el("mainSvg");
+  stageGeometry();
+  sizeStage(svg);
+  const grid = !!st.sortedGrid || !haveT;
+  const cfg = boxCfg(grid ? "grid" : "stair");
+  const shown = st.cards === undefined ? N : st.cards;
+  const out = [defs(), stringSvg(st.dimT ? 0.3 : 1, st), grid ? rLabelSvg(1) : ""];
+  for (let v = 0; v < N; v++) {
+    const i = grid ? slotAlpha[v] : slotNice[v];
+    if (i >= shown) continue;
+    const last = !grid && i === shown - 1;
+    const fresh = (last && st.win !== undefined && st.win >= 0) ? " fresh" : "";
+    out.push(last ? '<g class="popin">' : "<g>");
+    out.push(boxSvg(cfg[v], "card" + fresh) + labelSvg(v, cfg[v].x, cfg[v].y));
+    if (showIx && !grid)
+      out.push('<text class="cix" x="' + (cfg[v].x + cfg[v].w / 2 + 6) + '" y="' + cfg[v].y +
+               '">R' + ixOf[v] + "</text>");
+    out.push("</g>");
+  }
+  svg.innerHTML = out.join("");
+}
+
+/* ---------- moving between arrangements ---------------------------------- */
+
+function stopTween() { if (tweenId) { cancelAnimationFrame(tweenId); tweenId = null; } }
+
+/* stair -> grid -> row (and back): the reads keep their identity and are
+   carried to their new place, so it stays visible that the multiset never
+   changes -- only the arrangement does.  The card also rounds into the vertex
+   circle on the way (rx and height are interpolated too). */
+const KEYOP = { stair: [1, 0], grid: [0.3, 1], row: [0, 0] };   /* [string, "R =" label] */
+
+function morphBoxes(fk, tk, st, done) {
+  stopTween(); stageGeometry();
+  const svg = el("mainSvg");
+  sizeStage(svg);
+  const a = boxCfg(fk), b = boxCfg(tk);
+  const D = Math.max(600, 2.2 * Number(el("speed").value));
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  const t0 = performance.now();
+  const lerp = (p, q, t) => p + (q - p) * t;
+  function frame(now) {
+    const g = clamp((now - t0) / D, 0, 1);
+    const out = [defs(),
+                 stringSvg(lerp(KEYOP[fk][0], KEYOP[tk][0], g), null),
+                 rLabelSvg(lerp(KEYOP[fk][1], KEYOP[tk][1], g))];
+    for (let v = 0; v < N; v++) {
+      const s = 0.3 * (slotNice[v] / Math.max(1, N - 1));      /* a slight stagger, in reading order */
+      const t = ease(clamp((g - s) / (1 - s), 0, 1));
+      const bx = { x: lerp(a[v].x, b[v].x, t), y: lerp(a[v].y, b[v].y, t),
+                   w: lerp(a[v].w, b[v].w, t), h: lerp(a[v].h, b[v].h, t),
+                   rx: lerp(a[v].rx, b[v].rx, t) };
+      out.push(boxSvg(bx, "card") + labelSvg(v, bx.x, bx.y));
+    }
+    svg.innerHTML = out.join("");
+    if (g < 1) tweenId = requestAnimationFrame(frame);
+    else { tweenId = null; if (done) done(); }
+  }
+  tweenId = requestAnimationFrame(frame);
+}
+
+/* row -> row: the vertices are re-sorted.  Whoever moves right travels over
+   the top, whoever moves left underneath, so nobody walks through anybody */
+function tweenLayout(from, to, st, done) {
+  stopTween();
+  stageGeometry();
+  const a = posOf(from), b = posOf(to);
+  const D = Math.max(500, 2.6 * Number(el("speed").value));
+  const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const t0 = performance.now();
+  const bump = new Array(N);
+  for (let v = 0; v < N; v++) {
+    const d = (b[v].x - a[v].x) / SP;
+    bump[v] = (d >= 0 ? -1 : 1) * Math.min(95, 18 + 6 * Math.abs(d));
+  }
+  function frame(now) {
+    const t = clamp((now - t0) / D, 0, 1), e = ease(t);
+    const pos = new Array(N);
+    for (let v = 0; v < N; v++)
+      pos[v] = { x: a[v].x + (b[v].x - a[v].x) * e, y: GY + bump[v] * Math.sin(Math.PI * t) };
+    drawGraph(st, pos);
+    if (t < 1) tweenId = requestAnimationFrame(frame);
+    else { tweenId = null; drawGraph(st, null); if (done) done(); }
+  }
+  tweenId = requestAnimationFrame(frame);
+}
+
+/* which arrangement a step wants to be drawn in */
+function viewKey(st) {
+  if (st.view === "s") return (st.sortedGrid || !haveT) ? "grid" : "stair";
+  return "row-" + (st.layout || "nice");
+}
+function baseKind(key) { return key.indexOf("row") === 0 ? "row" : key; }
+
+/* animate from one arrangement to another; false = nothing to animate */
+function transition(fromKey, toKey, st) {
+  if (!fromKey || fromKey === toKey) return false;
+  const fk = baseKind(fromKey), tk = baseKind(toKey);
+  /* claim the target arrangement now: if the viewer steps on mid-flight, the
+     move is abandoned rather than started again from the beginning */
+  drawnKey = toKey;
+  if (fk === "row" && tk === "row") {
+    tweenLayout(fromKey.slice(4), toKey.slice(4), st);
+    return true;
+  }
+  if (fk === tk) return false;
+  morphBoxes(fk, tk, st, () => {
+    drawnKey = toKey;
+    if (st.view === "s") drawString(st); else drawGraph(st, null);
+  });
+  return true;
+}
+
+/* ---------- step generation ---------------------------------------------- */
+
+function mkPhase(name) { phases.push({ name: name, from: steps.length, to: steps.length }); }
+function add(o) {
+  o.ph = phases.length - 1;
+  steps.push(o);
+  phases[phases.length - 1].to = steps.length - 1;
+}
+
+const CODE_ALL = ["c_head", "c_v", "c_e", "p_head", "p_v", "p_e0", "p_i", "p_j", "p_if", "p_add",
+                  "p_ret", "h_head", "h_spell", "h_np"];
+
+/* a small monospace suffix/prefix check for the status box */
+function checkHtml(u, v, ok) {
+  const A = reads[u], B = reads[v];
+  const cls = ok ? "ov" : "no";
+  const pad = " ".repeat(1);
+  let h = '<div class="check">';
+  h += '<div class="row">' + esc(A[0]) + '<span class="' + cls + '">' + esc(A.slice(1)) + "</span></div>";
+  h += '<div class="row">' + pad + '<span class="' + cls + '">' + esc(B.slice(0, k - 1)) +
+       "</span>" + esc(B[k - 1]) + "</div>";
+  h += '<div class="verdict ' + (ok ? "yes" : "nope") + '">' +
+       (ok ? "R<sub>i</sub>[1..k) = R<sub>j</sub>[0..k&minus;1) = <b>" + esc(A.slice(1)) + "</b> &nbsp;&rarr;&nbsp; add the arc"
+           : "<b>" + esc(A.slice(1)) + "</b> &ne; <b>" + esc(B.slice(0, k - 1)) + "</b> &nbsp;&rarr;&nbsp; no arc") +
+       "</div></div>";
+  return h;
+}
+function ovOf(u, v) { const o = {}; o[u] = [1, k]; o[v] = [0, k - 1]; return o; }
+/* the same picture for one source and all the reads it matches at once */
+function ovFan(u, vs) {
+  const o = {};
+  vs.forEach(v => o[v] = [0, k - 1]);
+  o[u] = [1, k];                      /* the source shows its suffix, even if it matches itself */
+  return o;
+}
+function checkFanHtml(u, vs) {
+  const A = reads[u], show = vs.slice(0, 6);
+  let h = '<div class="check"><div class="row">' + esc(A[0]) +
+          '<span class="ov">' + esc(A.slice(1)) + "</span></div>";
+  show.forEach(v => {
+    const B = reads[v];
+    h += '<div class="row"> <span class="ov">' + esc(B.slice(0, k - 1)) + "</span>" +
+         esc(B[k - 1]) + "</div>";
+  });
+  if (vs.length > show.length)
+    h += '<div class="verdict">&hellip; and ' + (vs.length - show.length) + " more</div>";
+  h += '<div class="verdict yes">every read whose first ' + (k - 1) + " letters are <b>" +
+       esc(A.slice(1)) + "</b> gets an arc from <code>" + esc(A) + "</code></div></div>";
+  return h;
+}
+
+function build() {
+  buildModel();
+  steps = []; phases = []; cur = 0;
+  const nSol = sols.length;
+
+  /* ---- 1. the k-mer composition -------------------------------------- */
+  mkPhase("k-mer composition");
+  if (haveT) {
+    add({ view: "s", win: -1, cards: 0,
+          txt: "A genome is a string <code>T</code> of length " + T.length + ". No machine reads it " +
+               "end to end; what comes back are short <b>reads</b>. Idealise that: every window of " +
+               "length <i>k</i> = " + k + " is read exactly once.",
+          hl: ["c_head"] });
+    for (let i = 0; i < N; i++)
+      add({ view: "s", win: i, cards: i + 1,
+            txt: "Window at position " + i + ": <code>T[" + i + ".." + (i + k) + ") = " +
+                 esc(reads[i]) + "</code>. Slid one letter along, so consecutive reads overlap in " +
+                 (k - 1) + " letters &mdash; that is the whole basis of what follows.",
+            hl: ["c_head"] });
+    add({ view: "s", win: -1, cards: N, sortedGrid: true, dimT: true,
+          txt: "All " + N + " reads. And now the honest part: the machine does <b>not</b> tell us where " +
+               "they came from. The input is the <b>multiset</b> &#8475; = Composition<sub>" + k +
+               "</sub>(T), conventionally written in lexicographic order &mdash; " +
+               "any order at all would carry the same information. " +
+               "<b>The string is now gone.</b>",
+          hl: ["c_head"] });
+  } else {
+    add({ view: "s", cards: N, sortedGrid: true,
+          txt: "The input is a multiset of " + N + " reads of length " + k +
+               ", with no string to slice them out of &mdash; exactly the situation an assembler is in. " +
+               "The task: is there a string whose " + k + "-mer composition is precisely this?",
+          hl: ["c_head"] });
+  }
+
+  /* ---- 2. the backbone ------------------------------------------------ */
+  mkPhase("Backbone");
+  add({ view: "g", layout: "nice", nodes: N, ne: 0,
+        txt: "One vertex <i>r<sub>i</sub></i> per read &mdash; " + N + " of them, duplicate labels " +
+             "included. They are numbered <b>in the order the input lists them</b>, lexicographically: " +
+             "that is the only order we actually have, and <i>r<sub>i</sub></i> keeps its number from " +
+             "here on, however the picture is rearranged." + (haveT ? " To see anything at all we now <b>cheat</b> and place them left to right in the order they were cut out of <i>T</i>. No real assembly can do that &mdash; nobody sequences a genome they already have, and the sequencing order is exactly what is unknown. The <i>positions</i> are the fake here; the vertices, the labels and the arcs are all real." : (nSol ? " There is no given order, so the page has solved the assembly problem once by brute force and places them in <i>that</i> order &mdash; the same cheat, just harder to come by." : " No order makes them into a path (there is no assembly at all), so they are placed as given.")),
+        hl: ["c_v", "p_v"] });
+  for (let s = 0; s + 1 < N; s++) {
+    const u = nice[s], v = nice[s + 1], id = eidOf[u + ">" + v];
+    if (id === undefined) {
+      add({ view: "g", layout: "nice", ne: nBB, hotV: u,
+            txt: "<code>" + esc(reads[u]) + "</code> and <code>" + esc(reads[v]) + "</code> do <b>not</b> " +
+                 "overlap in " + (k - 1) + " letters, so there is no arc here. This layout is not a path.",
+            check: checkHtml(u, v, false), ovbox: ovOf(u, v), hl: ["c_e", "p_if"] });
+      continue;
+    }
+    add({ view: "g", layout: "nice", ne: id + 1, hotV: u, ecls: { [id]: "hot" }, ovbox: ovOf(u, v),
+          txt: "Neighbouring reads always overlap: the last " + (k - 1) + " letters of <code>" +
+               esc(reads[u]) + "</code> are the first " + (k - 1) + " of <code>" + esc(reads[v]) +
+               "</code>, so <b>r<sub>" + ixOf[u] + "</sub>r<sub>" + ixOf[v] + "</sub> &isin; E</b>.",
+          check: checkHtml(u, v, true), hl: ["c_e", "p_if", "p_add"] });
+  }
+  add({ view: "g", layout: "nice", ne: nBB,
+        txt: "The <b>backbone</b>: " + nBB + " arcs, and following them from left to right spells " +
+             (haveT ? "<code>" + esc(T) + "</code> back" : "an assembly") +
+             ". But this is a picture <i>we</i> drew from knowledge we are not supposed to have. " +
+             "The definition of E does not mention it &mdash; every pair of reads has to be checked.",
+        hl: ["c_e"] });
+
+  /* ---- 3. every overlap ---------------------------------------------- */
+  mkPhase("All overlaps");
+  for (const u of nice) {
+    const [from, to] = extraRange[u];
+    if (gran === 1) {
+      let cnt = from;                                   /* arcs of u drawn so far */
+      for (const v of nice) {
+        const ok = isArc(u, v), id = eidOf[u + ">" + v];
+        const known = ok && id !== undefined && id < from;   /* already on the backbone */
+        if (ok && !known) cnt++;
+        add({ view: "g", layout: "nice", ne: cnt, hotV: u, candV: [v], ovbox: ovOf(u, v),
+              ecls: ok && id !== undefined ? { [id]: "hot" } : {},
+              txt: "<b>i = r<sub>" + ixOf[u] + "</sub></b> (<code>" + esc(reads[u]) + "</code>), " +
+                   "<b>j = r<sub>" + ixOf[v] + "</sub></b> (<code>" + esc(reads[v]) + "</code>)" +
+                   (ok ? (known ? ": an overlap &mdash; this is the backbone arc we already have."
+                                : ": an overlap the nice layout hid. <b>Add it.</b>")
+                       : ": no overlap."),
+              check: checkHtml(u, v, ok), hl: ["c_e", "p_i", "p_j", "p_if"].concat(ok ? ["p_add"] : []) });
+      }
+    }
+    const added = to - from;
+    const ecls = {};
+    for (let i = from; i < to; i++) ecls[edges[i].id] = "hot";
+    add({ view: "g", layout: "nice", ne: to, hotV: u, ecls: ecls,
+          candV: outOf[u], ovbox: ovFan(u, outOf[u]), check: checkFanHtml(u, outOf[u]),
+          txt: "Read <b>r<sub>" + ixOf[u] + "</sub></b> = <code>" + esc(reads[u]) +
+               "</code> ends with <code>" + esc(suffix(reads[u])) +
+               "</code>, so it has an arc to <b>every</b> read starting with <code>" +
+               esc(suffix(reads[u])) + "</code>" +
+               (added ? ": " + added + " arc" + (added === 1 ? "" : "s") + " beyond the backbone" +
+                        (edges.slice(from, to).some(e => e.self)
+                          ? " &mdash; including a <b>self-loop</b>, since the definition puts no " +
+                            "<i>i</i> &ne; <i>j</i> on it"
+                          : "") + "."
+                      : ": nothing beyond the backbone arc."),
+          hl: ["c_e", "p_i", "p_j", "p_if", "p_add"] });
+  }
+  add({ view: "g", layout: "nice", ne: edges.length,
+        txt: "The full overlap graph <b>G<sub>O</sub>(&#8475;)</b>: " + N + " vertices, " + edges.length +
+             " arcs. Checking all pairs costs &Theta;(<i>N</i><sup>2</sup>) comparisons &mdash; already " +
+             "the construction is expensive for real data, quite apart from what we do with it next.",
+        hl: ["c_e", "p_ret"] });
+
+  /* ---- 4. sorted alphabetically -------------------------------------- */
+  mkPhase("Sorted");
+  add({ view: "g", layout: "alpha", ne: edges.length,
+        showPaths: nSol ? [0] : [],
+        txt: "Same graph, same arcs &mdash; only the vertices are now in <b>lexicographic order</b>, " +
+             "which is the order the input actually arrived in. Watch the assembly (highlighted) " +
+             "come apart as they move.",
+        hl: ["c_v"] });
+  add({ view: "g", layout: "alpha", ne: edges.length,
+        txt: "This is the whole truth of the input: " + N + " labelled vertices and " + edges.length +
+             " arcs. The path is still in there &mdash; nothing was added or removed &mdash; but nothing " +
+             "in the drawing points at it any more. Finding it back is the actual problem.",
+        hl: ["c_v", "c_e"] });
+
+  /* ---- 5. Hamiltonian paths ------------------------------------------- */
+  mkPhase("Hamiltonian path");
+  if (!nSol) {
+    add({ view: "g", layout: "alpha", ne: edges.length,
+          txt: "An assembly of &#8475; is a path that visits <b>every vertex exactly once</b> &mdash; a " +
+               "<b>Hamiltonian path</b>. Here there is <b>none</b>: this multiset is nobody's " +
+               k + "-mer composition. Every read has to be used exactly once, and no ordering manages it.",
+          hl: ["h_head", "h_spell"] });
+    return;
+  }
+  const show = Math.min(SHOWSOL, nSol);
+  add({ view: "g", layout: "alpha", ne: edges.length,
+        txt: "An assembly is a path visiting <b>every vertex exactly once</b> &mdash; a <b>Hamiltonian " +
+             "path</b>. Read the labels along it, one new letter per arc, and out comes a string whose " +
+             k + "-mer composition is exactly &#8475;.",
+        hl: ["h_head", "h_spell"] });
+  for (let pi = 0; pi < show; pi++) {
+    const seq = sols[pi].seq;
+    for (let t = 0; t < N; t++) {
+      const v = seq[t];
+      add({ view: "g", layout: "alpha", ne: edges.length, trace: { pi: pi, upto: t }, hotV: v,
+            spell: { pi: pi, chars: k + t },
+            txt: t === 0
+              ? "<b>Assembly " + (pi + 1) + "</b> starts at <code>" + esc(reads[v]) +
+                "</code>, contributing all " + k + " of its letters."
+              : "&hellip; then the arc to <code>" + esc(reads[v]) + "</code>, whose first " + (k - 1) +
+                " letters we already have; it adds the single letter <code>" +
+                esc(reads[v].slice(-1)) + "</code>.",
+            hl: ["h_head", "h_spell"] });
+    }
+  }
+  add({ view: "g", layout: "alpha", ne: edges.length,
+        showPaths: Array.from({ length: show }, (_, i) => i),
+        spell: { pi: -1, chars: -1 },
+        txt: nSol === 1
+          ? "One Hamiltonian path, one assembly &mdash; this time. Nothing guarantees that: reads only " +
+            "constrain their overlaps, and <b>Directed Hamiltonian Path is NP-complete</b>, so we have no " +
+            "efficient way to find even one."
+          : "<b>" + (solTrunc ? "At least " + nSol : nSol) + " different Hamiltonian paths</b>" +
+            (show < nSol ? " (" + show + " drawn)" : "") + ", spelling <b>" +
+            (solTrunc ? "at least " + nSol : nSol) + " different strings</b>, every one of them perfectly " +
+            "consistent with &#8475;. Two problems, then: the answer need not be <b>unique</b>, and " +
+            "<b>Directed Hamiltonian Path is NP-complete</b> &mdash; we cannot even find one efficiently.",
+        hl: ["h_head", "h_np"] });
+  add({ view: "g", layout: "nice", ne: edges.length,
+        showPaths: Array.from({ length: show }, (_, i) => i),
+        spell: { pi: -1, chars: -1 },
+        txt: "The same " + (show === 1 ? "path" : show + " paths") + ", drawn back in the layout we " +
+             "started from. " + (nSol > 1
+               ? "One of them is the backbone; the others weave through the same vertices differently. " +
+                 "Nothing distinguishes them: the graph does not know which string was real."
+               : "In this layout it is obvious &mdash; which is exactly the information the input " +
+                 "does not contain."),
+        hl: ["h_head"] });
+}
+
+/* ---------- side panels --------------------------------------------------- */
+
+function renderComp(st) {
+  const box = el("compBox");
+  const mult = {};
+  reads.forEach(r => mult[r] = (mult[r] || 0) + 1);
+  const labs = Object.keys(mult).sort();
+  const hotLab = st.hotV !== undefined ? reads[st.hotV] : null;
+  const candLabs = {};
+  (st.candV || []).forEach(v => candLabs[reads[v]] = 1);
+  box.innerHTML = labs.map(L =>
+    '<span class="kchip' + (L === hotLab ? " hot" : "") + '">' + esc(L) +
+    (mult[L] > 1 ? '<span class="mult">&times;' + mult[L] + "</span>" : "") + "</span>").join("");
+  el("compMeta").textContent = N + " read" + (N === 1 ? "" : "s") + " · " + labs.length + " distinct";
+}
+
+function tileRow(label, color, str, other, shownChars) {
+  const t = [];
+  for (let i = 0; i < str.length; i++) {
+    const on = shownChars < 0 || i < shownChars;
+    const diff = other && other[i] !== str[i];
+    t.push('<span class="t' + (on ? " on" : "") + (on && diff ? " diff" : "") + '"' +
+           (on ? ' style="background:' + color + '"' : "") + ">" + esc(str[i]) + "</span>");
+  }
+  return '<div class="recon"><div class="head">' +
+         '<span class="sw2" style="background:' + color + '"></span>' + label + "</div>" +
+         '<div class="tiles">' + t.join("") + "</div></div>";
+}
+
+function renderRecon(st) {
+  const box = el("reconBox");
+  const nSol = sols.length;
+  if (!nSol) {
+    box.innerHTML = '<div class="placeholder">No Hamiltonian path, so there is no string to spell: ' +
+                    'this multiset is not the ' + k + '-mer composition of anything.</div>';
+    el("reconMeta").textContent = "no assembly";
+    return;
+  }
+  const colors = ["var(--sol0)", "var(--sol1)", "var(--sol2)", "var(--sol3)"];
+  const show = Math.min(SHOWSOL, nSol);
+  el("reconMeta").textContent = (solTrunc ? "\u2265 " : "") + nSol + " assembl" + (nSol === 1 ? "y" : "ies");
+
+  if (st.trace) {
+    const pi = st.trace.pi, s = sols[pi].str;
+    const other = nSol > 1 ? sols[(pi + 1) % nSol].str : null;
+    box.innerHTML = tileRow("Assembly " + (pi + 1), colors[pi % 4], s, null,
+                            st.spell ? st.spell.chars : -1);
+    return;
+  }
+  if (st.spell && st.spell.pi === -1) {
+    const rows = [];
+    for (let pi = 0; pi < show; pi++)
+      rows.push(tileRow("Assembly " + (pi + 1), colors[pi % 4], sols[pi].str,
+                        nSol > 1 ? sols[(pi + 1) % show].str : null, -1));
+    box.innerHTML = rows.join("") +
+      (show < nSol ? '<div class="placeholder" style="margin-top:8px">and ' + (nSol - show) +
+                     (solTrunc ? " or more" : "") + " more &mdash; the boxed letters mark where two of " +
+                     "them disagree.</div>"
+                   : (nSol > 1 ? '<div class="placeholder" style="margin-top:8px">The boxed letters mark ' +
+                                 'where consecutive assemblies disagree.</div>' : ""));
+    return;
+  }
+  box.innerHTML = '<div class="placeholder">Nothing spelled yet. ' +
+                  (haveT ? "The string is <code>" + esc(T) + "</code> &mdash; but that is not part of " +
+                           "the input, and it need not be the only answer."
+                         : "Any Hamiltonian path spells one.") + "</div>";
+}
+
+function renderLegend(st) {
+  const items = [];
+  if (st.view === "s") {
+    items.push('<span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> the current window</span>');
+    items.push('<span class="item"><span class="sw" style="background:var(--wi-panel-2)"></span> a read</span>');
+    if (colorBases)
+      items.push('<span class="item">bases: ' + Object.keys(baseColor).map(c =>
+        '<b style="color:' + baseColor[c] + '">' + esc(c) + "</b>").join("&thinsp;") + "</span>");
+  } else {
+    items.push('<span class="item"><span class="swl" style="border-color:var(--wi-ink-soft)"></span> backbone arc</span>');
+    items.push('<span class="item"><span class="swl" style="border-color:var(--wi-border)"></span> other overlap arc</span>');
+    items.push('<span class="item"><span class="swl" style="border-color:var(--wi-active)"></span> just added</span>');
+    const nSol = Math.min(SHOWSOL, sols.length);
+    for (let i = 0; i < nSol; i++)
+      items.push('<span class="item"><span class="swl" style="border-color:var(--sol' + i +
+                 ')"></span> assembly ' + (i + 1) + "</span>");
+    items.push('<span class="item" style="color:var(--wi-ink-faint)">forward arcs above, backward arcs below</span>');
+  }
+  el("legendBox").innerHTML = items.join("");
+}
+
+/* ---------- pseudocode ---------------------------------------------------- */
+
+const K = s => '<span class="kw">' + s + "</span>";
+const C = s => '<span class="cm">' + s + "</span>";
+
+const DEFS = [
+  { k: "c_head", t: "Composition" + sub("k") + "(T) = {{ T[0..k), T[1..1+k), …, T[n−k..n) }}" },
+  { k: "c_head", t: "                                          " + C("// a multiset") },
+  { k: "c_v",    t: "G" + sub("O") + "(ℛ) = (V, E)   for ℛ = {{R" + sub("0") + ", …, R" + sub("n−k") + "}}" },
+  { k: "c_v",    t: "    V = { r" + sub("0") + ", …, r" + sub("n−k") + " },  r" + sub("i") + " labelled R" + sub("i") },
+  { k: "c_e",    t: "    r" + sub("i") + "r" + sub("j") + " ∈ E   ⟺   R" + sub("i") + "[1..k) = R" + sub("j") + "[0..k−1)" }
+];
+const PROC = [
+  { k: "p_head", t: K("procedure") + " overlapGraph(ℛ = {{R" + sub("0") + ",…,R" + sub("n−k") + "}}, k):" },
+  { k: "p_v",    t: "    V := { r" + sub("0") + ", …, r" + sub("n−k") + " }" },
+  { k: "p_e0",   t: "    E := ∅" },
+  { k: "p_i",    t: "    " + K("for") + " i := 0, …, n−k" },
+  { k: "p_j",    t: "        " + K("for") + " j := 0, …, n−k" },
+  { k: "p_if",   t: "            " + K("if") + " R" + sub("i") + "[1..k) = R" + sub("j") + "[0..k−1)" },
+  { k: "p_add",  t: "                E := E ∪ { r" + sub("i") + "r" + sub("j") + " }" },
+  { k: "p_ret",  t: "    " + K("return") + " (V, E)" }
+];
+const SOLV = [
+  { k: "h_head",  t: "assembly of \u211B  =  Hamiltonian path  r" + sub("i(0)") + " \u2192 r" + sub("i(1)") +
+                     " \u2192 \u2026 \u2192 r" + sub("i(n\u2212k)") + "  in G" + sub("O") + "(\u211B)" },
+  { k: "h_spell", t: "spells  T = R" + sub("i(0)") + " \u00B7 R" + sub("i(1)") + "[k\u22121] \u00B7 \u2026 \u00B7 R" +
+                     sub("i(n\u2212k)") + "[k\u22121]" },
+  { k: "h_np",    t: "Problem 1:  the path \u2014 hence T \u2014 need not be unique" },
+  { k: "h_np",    t: "Problem 2:  " + K("Directed Hamiltonian Path") + " is NP-complete" }
+];
+function sub(s) { return "<sub>" + s + "</sub>"; }
+
+function renderCode(st) {
+  const hl = new Set(st.hl || []);
+  const block = (label, lines, numbered, first) => {
+    const out = ['<div class="sublabel' + (first ? " first" : "") + '">' + label + "</div>"];
+    lines.forEach((l, i) => {
+      const on = hl.has(l.k) ? " on" : "";
+      out.push('<div class="cline' + on + '">' +
+               (numbered ? '<span class="ln">' + (i + 1) + "</span>" : "") +
+               "<span>" + l.t + "</span></div>");
+    });
+    return out.join("");
+  };
+  el("codeBody").innerHTML =
+    '<div>' + block("Definitions", DEFS, false, true) + block("A solution", SOLV, false, false) + "</div>" +
+    '<div>' + block("Construction, straight from the definition", PROC, true, true) + "</div>";
+  el("codeNote").innerHTML =
+    "The double loop is the definition of E read as an algorithm: &Theta;(<i>N</i><sup>2</sup>) pairs, each " +
+    "an (<i>k</i>&minus;1)-letter comparison. <b>Overlap search</b> above switches between one step per " +
+    "value of <i>i</i> and one step per pair (<i>i</i>,&thinsp;<i>j</i>). Nothing here searches for the " +
+    "Hamiltonian path &mdash; that is the hard part, and it is where the de Bruijn graph comes in.";
+}
+
+/* ---------- render pass --------------------------------------------------- */
+
+function renderPhases() {
+  const bar = el("phaseBar");
+  bar.innerHTML = "";
+  phases.forEach(p => {
+    const span = p.to - p.from + 1;
+    /* the fill edge sits exactly where the scrubber thumb sits */
+    const pct = cur > p.to ? 100 : cur < p.from ? 0 : ((cur - p.from) / span) * 100;
+    const b = document.createElement("button");
+    b.className = "phasebtn" + (cur >= p.from && cur <= p.to ? " on" : (cur > p.to ? " past" : ""));
+    b.style.flexGrow = String(Math.max(1, span));
+    b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' +
+                  pct.toFixed(2) + '%"></span><span class="lab">' + esc(p.name) + "</span>";
+    b.title = p.name + " — steps " + (p.from + 1) + "–" + (p.to + 1);
+    b.addEventListener("click", () => { stopPlay(); cur = p.from; render(); });
+    bar.appendChild(b);
+  });
+}
+
+function render(noMove) {
+  const st = steps[cur] || {};
+  stopTween();
+  const key = viewKey(st);
+  /* an arrangement change is animated; the final frame is drawn by the callback */
+  const moving = !noMove && transition(drawnKey, key, st);
+  if (!moving) {
+    drawnKey = key;
+    if (st.view === "s") drawString(st); else drawGraph(st, null);
+  }
+  if (st.view === "s") {
+    el("stageTitle").innerHTML = (!haveT || st.sortedGrid)
+      ? "The composition &#8475;" : "The string and its windows";
+    el("stageMeta").textContent = "k = " + k + " · " + N + " reads";
+  } else {
+    el("stageTitle").innerHTML = "The overlap graph <i>G</i><sub>O</sub>(&#8475;)" +
+      ((st.layout || "nice") === "alpha" ? " &middot; lexicographic" : " &middot; assembly order");
+    el("stageMeta").textContent = N + " vertices · " +
+      (st.ne === undefined ? edges.length : st.ne) + "/" + edges.length + " arcs";
+  }
+  el("statusBox").innerHTML = (st.txt || "") + (st.check || "");
+  el("phaseName").textContent = phases[st.ph] ? phases[st.ph].name : "";
+  renderComp(st); renderRecon(st); renderLegend(st); renderPhases();
+  if (window.innerWidth > 760) renderCode(st);
+  el("scrubber").max = String(Math.max(0, steps.length - 1));
+  el("scrubber").value = String(cur);
+  el("stepNo").textContent = steps.length ? (cur + 1) + " / " + steps.length : "— / —";
+  el("backBtn").disabled = cur <= 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+  const prev = cur > 0 ? steps[cur - 1] : null;
+  el("replayBtn").style.display = (prev && viewKey(prev) !== key) ? "" : "none";
+}
+
+const PLAY = "\u25B6\uFE0E", PAUSE = "\u23F8\uFE0E";
+function stepFwd() { if (cur < steps.length - 1) { cur++; render(); } else stopPlay(); }
+function stepBack() { if (cur > 0) { cur--; render(); } }   /* moves run backwards too */
+
+/* Autoplay waits for a move to land before taking the next step.  A
+   rearrangement lasts longer than a typical step delay, so a plain interval
+   would keep restarting it and it would never be seen to finish. */
+function stopPlay() {
+  if (timer) { clearTimeout(timer); timer = null; el("playBtn").textContent = PLAY; }
+}
+function planNext() { timer = setTimeout(playTick, Number(el("speed").value)); }
+function playTick() {
+  if (tweenId) { timer = setTimeout(playTick, 70); return; }    /* still moving: hold */
+  if (cur >= steps.length - 1) { stopPlay(); return; }
+  cur++; render();
+  planNext();
+}
+function togglePlay() {
+  if (timer) { stopPlay(); return; }
+  if (cur >= steps.length - 1) return;
+  el("playBtn").textContent = PAUSE;
+  planNext();
+}
+function replayMove() {
+  const st = steps[cur] || {};
+  if (cur === 0) return;
+  const from = viewKey(steps[cur - 1]), to = viewKey(st);
+  if (from === to) return;
+  drawnKey = from;
+  if (!transition(from, to, st)) { drawnKey = to; render(true); }
+}
+
+/* ---------- hover --------------------------------------------------------- */
+
+function tipFor(v) {
+  const outs = outOf[v].filter(w => w !== v).map(w => reads[w]);
+  const ins = inOf[v].filter(w => w !== v).map(w => reads[w]);
+  const uniq = a => [...new Set(a)].sort().join(", ") || "—";
+  return '<span class="tt-h">' + esc(reads[v]) + "</span>" +
+         '<br><span class="tt-s">suffix</span> <code>' + esc(suffix(reads[v])) + "</code>" +
+         ' &nbsp;<span class="tt-s">prefix</span> <code>' + esc(prefix(reads[v])) + "</code>" +
+         '<br><span class="tt-s">out (' + outOf[v].length + "):</span> " + esc(uniq(outs)) +
+         '<br><span class="tt-s">in (' + inOf[v].length + "):</span> " + esc(uniq(ins)) +
+         (outOf[v].indexOf(v) >= 0 ? '<br><span class="tt-s">plus a self-loop</span>' : "");
+}
+function moveTip(ev) {
+  const t = el("tooltip");
+  t.style.left = Math.min(ev.clientX + 14, window.innerWidth - t.offsetWidth - 10) + "px";
+  t.style.top = Math.min(ev.clientY + 16, window.innerHeight - t.offsetHeight - 10) + "px";
+}
+function hideTip() { el("tooltip").style.display = "none"; }
+
+/* ---------- input --------------------------------------------------------- */
+
+function fillPresets() {
+  const s = el("presetSel");
+  s.innerHTML = "";
+  Object.keys(PRESETS).forEach(key => {
+    const o = document.createElement("option");
+    o.value = key; o.textContent = PRESETS[key].name;
+    s.appendChild(o);
+  });
+}
+function refreshInputs() {
+  el("inT").value = haveT ? T : "";
+  el("inK").value = k;
+  el("inputText").value = haveT
+    ? "# k, then the string (either order)\n" + k + "\n" + T
+    : "# a bare k-mer multiset, one line, whitespace-separated\n" + reads.join(" ");
+}
+function fail(msg) { el("parseErr").textContent = msg; return false; }
+
+function setString(t, kk, keepPos) {
+  t = String(t).toUpperCase().replace(/\s+/g, "");
+  kk = Math.round(Number(kk));
+  if (!t.length) return fail("The string is empty.");
+  if (t.length > MAXREADS + 7) return fail("At most " + (MAXREADS + 7) + " characters.");
+  if (!Number.isFinite(kk) || kk < 2) return fail("k must be at least 2.");
+  if (kk > t.length) return fail("k = " + kk + " is longer than the string.");
+  if (t.length - kk + 1 > MAXREADS) return fail("That gives more than " + MAXREADS + " reads.");
+  el("parseErr").textContent = "";
+  T = t; k = kk; haveT = true;
+  reads = [];
+  for (let i = 0; i + k <= T.length; i++) reads.push(T.substr(i, k));
+  return finish(keepPos);
+}
+function setReads(list, keepPos) {
+  list = list.map(s => s.toUpperCase()).filter(s => s.length);
+  if (list.length < 2) return fail("Give at least two reads.");
+  const L = list[0].length;
+  if (list.some(s => s.length !== L)) return fail("All reads must have the same length.");
+  if (L < 2) return fail("Reads must be at least 2 letters long.");
+  if (list.length > MAXREADS) return fail("At most " + MAXREADS + " reads.");
+  el("parseErr").textContent = "";
+  T = ""; k = L; haveT = false; reads = list;
+  return finish(keepPos);
+}
+function finish(keepPos) {
+  const keepPh = keepPos ? ((steps[cur] || {}).ph || 0) : 0;
+  drawnKey = null;
+  build();
+  cur = keepPos ? phases[Math.min(keepPh, phases.length - 1)].from : 0;
+  refreshInputs(); render(true);
+  return true;
+}
+function loadFromText() {
+  const lines = el("inputText").value.split(/\r?\n/)
+                  .map(l => l.trim()).filter(l => l.length && !/^#/.test(l));
+  if (!lines.length) return fail("Nothing to read.");
+  let kk = null, data = null;
+  lines.forEach(l => {
+    if (/^\d{1,2}$/.test(l)) { if (kk === null) kk = Number(l); }
+    else if (data === null) data = l;
+  });
+  if (data === null) return fail("No input line found (a string, or a list of k-mers).");
+  const words = data.split(/\s+/);
+  if (words.length > 1) return setReads(words, false);
+  if (kk === null) return fail("Give k on a line of its own.");
+  return setString(words[0], kk, false);
+}
+
+/* ---------- init ---------------------------------------------------------- */
+
+function init() {
+  fillPresets();
+  el("presetSel").addEventListener("change", e => {
+    const p = PRESETS[e.target.value];
+    stopPlay();
+    if (!p) return;
+    if (p.reads) setReads(p.reads.slice(), false); else setString(p.T, p.k, false);
+  });
+  el("applyBtn").addEventListener("click", () => { stopPlay(); setString(el("inT").value, el("inK").value, false); });
+  [el("inT"), el("inK")].forEach(x => x.addEventListener("keydown", ev => {
+    if (ev.key === "Enter") { stopPlay(); setString(el("inT").value, el("inK").value, false); }
+  }));
+  el("loadBtn").addEventListener("click", () => { stopPlay(); loadFromText(); });
+
+  el("granCoarse").addEventListener("click", () => setGran(0));
+  el("granFine").addEventListener("click", () => setGran(1));
+  el("baseChk").addEventListener("change", e => { colorBases = e.target.checked; render(true); });
+  el("focusChk").addEventListener("change", e => { focusHover = e.target.checked; render(true); });
+  el("ixChk").addEventListener("change", e => { showIx = e.target.checked; render(true); });
+
+  el("stepBtn").addEventListener("click", () => { stopPlay(); stepFwd(); });
+  el("backBtn").addEventListener("click", () => { stopPlay(); stepBack(); });
+  el("playBtn").addEventListener("click", togglePlay);
+  el("resetBtn").addEventListener("click", () => { stopPlay(); cur = 0; drawnKey = null; render(true); });
+  el("replayBtn").addEventListener("click", () => { stopPlay(); replayMove(); });
+  el("scrubber").addEventListener("input", e => { stopPlay(); cur = Number(e.target.value); render(true); });
+  el("speed").addEventListener("input", e => {
+    el("speedVal").textContent = e.target.value + "ms";
+    if (timer) { stopPlay(); togglePlay(); }
+  });
+
+  const svg = el("mainSvg");
+  svg.addEventListener("mousemove", ev => {
+    const t = ev.target;
+    if (t && t.classList.contains("hit")) {
+      const v = Number(t.dataset.v);
+      if (v !== hoverV) { hoverV = v; if (!tweenId) drawGraph(steps[cur] || {}, null); }
+      const tip = el("tooltip");
+      tip.innerHTML = tipFor(v); tip.style.display = "block"; moveTip(ev);
+    } else if (hoverV !== null) {
+      hoverV = null; hideTip(); if (!tweenId) drawGraph(steps[cur] || {}, null);
+    } else hideTip();
+  });
+  svg.addEventListener("mouseleave", () => {
+    hideTip();
+    if (hoverV !== null) { hoverV = null; if (!tweenId) drawGraph(steps[cur] || {}, null); }
+  });
+
+  window.addEventListener("resize", () => render(true));
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT") return;
+    if (ev.key === "ArrowRight") { stopPlay(); stepFwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft") { stopPlay(); stepBack(); ev.preventDefault(); }
+    if (ev.key === " ") { togglePlay(); ev.preventDefault(); }
+  });
+
+  el("presetSel").value = "cp3";
+  setString(PRESETS.cp3.T, PRESETS.cp3.k, false);
+}
+
+function setGran(g) {
+  gran = g;
+  el("granCoarse").classList.toggle("on", g === 0);
+  el("granFine").classList.toggle("on", g === 1);
+  const keepPh = (steps[cur] || {}).ph || 0;
+  build();
+  cur = phases[Math.min(keepPh, phases.length - 1)].from;
+  render(true);
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

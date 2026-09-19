@@ -10,27 +10,27 @@
 <title>Space-Efficient Hierholzer — Animated</title>
 <style>
     :root {
-        --bg: #f1eed9;
-        --panel: #f8f6ec;
-        --panel-border: #cdc9bb;
-        --controls-bg: #e7e3ca;
-        --controls-border: #cdc9bb;
+        --bg: #f5ebd9;
+        --panel: #faf6ed;
+        --panel-border: #d4c5b4;
+        --controls-bg: #ecddc5;
+        --controls-border: #d4c5b4;
         --ink: #6b675c;
         --ink-strong: #46433a;
         --title-muted: #8b8779;
-        --btn: #f8f6ec;
-        --btn-border: #aeaa9e;
+        --btn: #faf6ed;
+        --btn-border: #b9a793;
         --btn-border-hover: #8d897c;
 
-        --node-cream: #f8f6ec;
-        --node-cream-border: #aeaa9e;
+        --node-cream: #faf6ed;
+        --node-cream-border: #b9a793;
         --active: #cc2f22;        /* vertex currently being emitted */
 
         /* algorithm colours — fixed throughout the page */
-        --edge:     #aeaa9e;      /* an edge of G not yet touched   */
+        --edge:     #b9a793;      /* an edge of G not yet touched   */
         --tree:     #6d180f;      /* spanning tree T (setup only)   */
         --skeleton: #902015;      /* the skeleton S                 */
-        --skeleton-pale: #c08777; /* the part of S not yet written out */
+        --skeleton-pale: #c28577; /* the part of S not yet written out */
         --carry:    #1b6b45;      /* forests from the Forest Lemma: P, F_i / R */
         --batch:    #b07d18;      /* the current batch N_i … N_j    */
         --circuit:  #437089;      /* circuits C_k = H − R           */
@@ -50,7 +50,7 @@
 
     h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--ink-strong); }
     .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; max-width: 90ch; line-height: 1.5; }
-    .subtitle code { background: #e7e3ca; padding: 1px 6px; border-radius: 3px; }
+    .subtitle code { background: #ecddc5; padding: 1px 6px; border-radius: 3px; }
 
     /* ---- controls ---- */
     .controls {
@@ -71,16 +71,16 @@
         border-radius: 4px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
         font-weight: 500; font-family: inherit;
     }
-    button:hover:not(:disabled), select:hover { background-color: #fbfaf4; border-color: var(--btn-border-hover); }
+    button:hover:not(:disabled), select:hover { background-color: #fcf9f3; border-color: var(--btn-border-hover); }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
-    button.primary { background-color: #f0d9cd; border-color: #c08777; }
-    button.primary:hover:not(:disabled) { background-color: #fbfaf4; }
+    button.primary { background-color: #f0d9cd; border-color: #c28577; }
+    button.primary:hover:not(:disabled) { background-color: #fcf9f3; }
     select { cursor: pointer; padding-right: 10px; }
 
     .seg { display: inline-flex; border: 1px solid var(--btn-border); border-radius: 4px; overflow: hidden; }
     .seg button { border: none; border-radius: 0; padding: 8px 14px; background: var(--btn); font-size: 0.86rem; }
     .seg button + button { border-left: 1px solid var(--btn-border); }
-    .seg button.on { background: #6d180f; color: #f8f6ec; }
+    .seg button.on { background: #6d180f; color: #faf6ed; }
     .seg button.on:hover { background: #86342a; }
 
     input[type="range"] { accent-color: #cc2f22; cursor: pointer; vertical-align: middle; }
@@ -137,7 +137,7 @@
     .side { display: flex; flex-direction: column; gap: 18px; }
 
     .status {
-        background: #e7e3ca; border: 1px solid var(--panel-border); border-radius: 5px;
+        background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 5px;
         padding: 11px 14px; font-size: 0.92rem; color: var(--ink-strong); min-height: 72px;
         line-height: 1.45;
     }
@@ -165,8 +165,8 @@
     }
     .tok.hl { transform: translateY(-2px); box-shadow: 0 0 0 2px var(--ink-strong); }
     .tok.dull { opacity: 0.25; }
-    .tok.w      { background: var(--skeleton); border-color: var(--skeleton); color: #f8f6ec; }
-    .tok.c      { background: var(--circuit);  border-color: var(--circuit);  color: #fbfaf4; }
+    .tok.w      { background: var(--skeleton); border-color: var(--skeleton); color: #faf6ed; }
+    .tok.c      { background: var(--circuit);  border-color: var(--circuit);  color: #fcf9f3; }
     .tok.wf     { background: transparent; border-color: var(--skeleton); color: var(--skeleton); opacity: 0.4; }
     .tok.cf     { background: transparent; border-style: dashed; border-color: var(--circuit); color: var(--circuit); opacity: 0.65; font-size: 0.74rem; }
     .tok.start  { background: var(--node-cream); border-color: var(--node-cream-border); color: var(--ink-strong); font-weight: 700; }
@@ -201,7 +201,7 @@
         border-radius: 5px; padding: 10px; width: 250px; height: 250px; resize: vertical;
     }
     .editor-help { font-size: 0.82rem; color: var(--ink); max-width: 460px; line-height: 1.55; }
-    .editor-help code { background: #e7e3ca; padding: 1px 5px; border-radius: 3px; }
+    .editor-help code { background: #ecddc5; padding: 1px 5px; border-radius: 3px; }
     .err { color: #6d180f; font-weight: 600; font-size: 0.82rem; min-height: 18px; margin-top: 6px; }
 
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -1410,7 +1410,7 @@ function renderStream(f, prevOut) {
             if (st.kind === 'C') {
                 const tn = circuitTone(trace.rankOfEdge[st.id]);
                 // dark-on-pale contrast colour, tuned to the new slate hue (was a leftover navy)
-                sty = ` style="background:${tn.css};border-color:${tn.css};color:${tn.light > 58 ? '#203541' : '#fbfaf4'}"`;
+                sty = ` style="background:${tn.css};border-color:${tn.css};color:${tn.light > 58 ? '#203541' : '#fcf9f3'}"`;
             }
             html += `<span class="tok ${st.kind === 'W' ? 'w' : 'c'}${k >= prevOut ? ' fresh' : ''}${hl}" id="tk${k}"${sty} ${attrs}>${st.to}</span>`;
         } else if (st.kind === 'W') {

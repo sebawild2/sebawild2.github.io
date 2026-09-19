@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The inexact turnpike problem · interval backtracking</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 14px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code, .status code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  /* --- tabs --- */
+  .tabs { display:flex; flex-wrap:wrap; gap:0; border-bottom:2px solid var(--wi-border-soft); margin-bottom:16px; }
+  .tabs button { border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent;
+                 padding:8px 16px 7px; font-size:.86rem; color:var(--wi-ink-soft); margin-bottom:-2px; }
+  .tabs button:hover:not(:disabled) { background:var(--wi-panel); border-bottom-color:var(--wi-border); }
+  .tabs button.on { color:var(--wi-accent); border-bottom-color:var(--wi-accent); font-weight:bold; }
+  .tabs button .no { display:inline-block; font-family:var(--wi-font-mono); font-size:.8em; color:var(--wi-ink-faint);
+                     margin-right:6px; }
+  .tabs button.on .no { color:var(--wi-accent-soft); }
+  .tabpane { display:none; }
+  .tabpane.on { display:block; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.str { font-family:var(--wi-font-mono); font-size:.8rem; width:14em; }
+  input.wide { width:26em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  .opbar { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:10px 18px;
+           background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+           border-radius:var(--wi-radius-lg); margin-bottom:14px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  /* --- transport --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0; width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden; flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px;
+              font-size:.68rem; line-height:1.3; font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-left-width:0;
+              border-radius:0; color:var(--wi-ink-faint); cursor:pointer; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage --- */
+  .stage { display:grid; gap:18px; align-items:start; }
+  /* --- draggable splitter between the drawing column and the explanation column --- */
+  .stage { grid-template-columns:minmax(0,1.3fr) 12px minmax(300px,1fr); }
+  .stage.sized { grid-template-columns:minmax(0,var(--left)) 12px minmax(0,1fr); }
+  .splitter { align-self:stretch; cursor:col-resize; position:relative; touch-action:none; border-radius:3px; }
+  .splitter::before { content:""; position:absolute; left:5px; top:0; bottom:0; width:2px; background:var(--wi-border-soft); border-radius:1px; }
+  .splitter::after { content:""; position:absolute; left:3px; top:50%; width:6px; height:34px; margin-top:-17px; border-radius:3px;
+                     background:var(--wi-border); }
+  .splitter:hover::before, .splitter.drag::before { background:var(--wi-accent-soft); }
+  .splitter:hover::after, .splitter.drag::after { background:var(--wi-accent); }
+  @media (max-width:1080px) { .stage, .stage.sized { grid-template-columns:1fr; } .splitter { display:none; } }
+
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-box + .sim-box { margin-top:14px; }
+  .col-side .sim-box + .sim-box { margin-top:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:88px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status code { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-panel-2); }
+  .k-ok { color:var(--wi-relax); font-weight:bold; }
+  .k-bad { color:var(--wi-active); font-weight:bold; }
+  .k-ex { color:var(--wi-examine); font-weight:bold; }
+  .k-q { color:var(--wi-queue); font-weight:bold; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem; color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  /* --- chips (multisets) --- */
+  .chips { display:flex; flex-wrap:wrap; gap:4px 5px; align-items:flex-start; }
+  .chip { font-family:var(--wi-font-mono); font-size:.78rem; line-height:1.3; padding:2px 6px;
+          border:1px solid var(--wi-border-soft); border-radius:3px; background:var(--wi-panel-2);
+          color:var(--wi-ink-strong); position:relative; }
+  .chip.sub { font-size:.72rem; padding:1px 5px 2px; text-align:center; }
+  .chip .fr { display:block; font-size:.78em; color:var(--wi-ink-faint); line-height:1.15; letter-spacing:.02em; }
+  .chip.new { background:#f6e6df; border-color:var(--wi-active); color:var(--wi-active); font-weight:bold; }
+  .chip.used { color:var(--wi-ink-faint); background:var(--wi-panel); border-style:dashed; }
+  .chip.used::after { content:""; position:absolute; left:6px; right:6px; top:50%; border-top:1px solid var(--wi-ink-faint); }
+  .chip.ok { background:#e8f0e2; border-color:var(--wi-relax); }
+  .chip.miss { background:#f6e6df; border-color:var(--wi-active); color:var(--wi-active); }
+  .chip.extra { background:#f7edd9; border-color:var(--wi-examine); color:var(--wi-examine); }
+  .chip.max { background:#f6e6df; border-color:var(--wi-active); color:var(--wi-active); font-weight:bold; }
+  .chip.cand { background:#f7edd9; border-color:var(--wi-examine); color:var(--wi-examine); font-weight:bold; }
+  .chip.hot { box-shadow:0 0 0 2px var(--wi-accent-soft); }
+  .setline { font-family:var(--wi-font-mono); font-size:.78rem; color:var(--wi-ink-soft); margin:6px 0 0; line-height:1.5;
+             word-break:break-word; }
+  .setline b { color:var(--wi-ink-strong); }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+  .summ { font-size:.86rem; margin:0 0 8px; }
+  .summ.good { color:var(--wi-relax); font-weight:bold; }
+  .summ.bad { color:var(--wi-ink-strong); }
+
+  /* --- amino acid table --- */
+  .aatab { display:grid; grid-template-columns:repeat(2, 1fr); gap:0 14px; font-size:.78rem; }
+  .aarow { display:grid; grid-template-columns:1.3em 1.3fr 2.4em; gap:8px; padding:1px 6px; border-radius:3px;
+           align-items:baseline; color:var(--wi-ink-soft); }
+  .aarow .lt { font-family:var(--wi-font-mono); font-weight:bold; color:var(--wi-ink-strong); }
+  .aarow .ms { font-family:var(--wi-font-mono); text-align:right; }
+  .aarow.hot { background:#f6e6df; color:var(--wi-active); }
+  .aarow.hot .lt, .aarow.hot .ms { color:var(--wi-active); }
+  .aarow.inpep .lt { color:var(--wi-accent); }
+  .aanote { font-size:.72rem; color:var(--wi-ink-faint); margin-top:8px; line-height:1.45; }
+
+  /* --- toll table --- */
+  .tolltab { border-collapse:collapse; font-family:var(--wi-font-mono); font-size:.74rem; }
+  .tolltab th, .tolltab td { padding:2px 5px; text-align:center; min-width:2.2em; border:1px solid var(--wi-border-soft); }
+  .tolltab th { color:var(--wi-ink-faint); font-weight:normal; background:var(--wi-panel-2); }
+  .tolltab td { cursor:default; }
+  .tolltab td.blank { border:0; }
+  .tolltab td.ok { background:#e8f0e2; color:var(--wi-relax); }
+  .tolltab td.extra { background:#f7edd9; color:var(--wi-examine); }
+  .tolltab td.plain { background:var(--wi-panel-2); }
+  .tolltab td.hot, .tolltab th.hot { background:#f6e6df !important; color:var(--wi-active) !important; font-weight:bold; }
+
+  /* --- recursion tree --- */
+  .tree { font-family:var(--wi-font-mono); font-size:.76rem; line-height:1.55; }
+  .frame { display:flex; gap:6px; align-items:baseline; padding:1px 6px; border-radius:3px; white-space:nowrap; }
+  .frame .st { display:inline-block; width:1.3em; text-align:center; }
+  .frame .lab { color:var(--wi-ink-faint); }
+  .frame .sset { color:var(--wi-ink-strong); }
+  .frame.open .st { color:var(--wi-examine); }
+  .frame.ok .st, .frame.ok .sset { color:var(--wi-relax); }
+  .frame.fail .st { color:var(--wi-active); }
+  .frame.fail .sset { color:var(--wi-ink-faint); text-decoration:line-through; }
+  .frame.cur { background:#f6e6df; }
+  .frame.future { opacity:.35; }
+  .treewrap { overflow-x:auto; max-height:420px; overflow-y:auto; }
+
+  /* --- pseudocode --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head); font-size:.72rem;
+                           text-transform:uppercase; letter-spacing:.1em; color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent; white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  /* --- editor --- */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head); font-size:.78rem;
+                             letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr; gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:130px; font-family:var(--wi-font-mono); font-size:.78rem; background:var(--wi-panel-2);
+             color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius); padding:6px 9px;
+             font-size:.76rem; color:var(--wi-ink-strong); box-shadow:0 3px 10px rgba(0,0,0,.12);
+             max-width:270px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls, .opbar { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    input.wide { width:100%; }
+  }
+
+  /* --- SVG classes --- */
+  .road { stroke:var(--wi-border-strong); stroke-width:10; stroke-linecap:round; }
+  .roadmid { stroke:var(--wi-bg); stroke-width:1.2; stroke-dasharray:7 7; }
+  .roadhit { fill:transparent; cursor:copy; }
+  .exit { fill:var(--wi-panel-2); stroke:var(--wi-ink-strong); stroke-width:2; }
+  .exit.drag { cursor:grab; }
+  .exit.drag:active { cursor:grabbing; }
+  .exit.sel { stroke:var(--wi-accent); stroke-width:3; fill:#f0d7cd; }
+  .exit.fixed { fill:var(--wi-controls); }
+  .exit.cand { fill:#f7edd9; stroke:var(--wi-examine); stroke-dasharray:3 2; }
+  .exit.candbad { fill:#f6e6df; stroke:var(--wi-active); stroke-dasharray:3 2; }
+  .exit.hot { stroke:var(--wi-active); stroke-width:3; }
+  .exlab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .exlab.faint { fill:var(--wi-ink-faint); font-size:11px; }
+  .exlab.cand { fill:var(--wi-examine); font-weight:bold; }
+  .exlab.candbad { fill:var(--wi-active); font-weight:bold; }
+  .seglab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-accent); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .seghit { fill:transparent; cursor:pointer; }
+  .seghit:hover { fill:rgba(144,32,21,.08); }
+  .segsel { fill:rgba(144,32,21,.16); stroke:var(--wi-accent); stroke-width:1.5; stroke-dasharray:4 3; }
+  .arc { fill:none; stroke-width:1.6; }
+  .arc.ok { stroke:var(--wi-relax); }
+  .arc.bad { stroke:var(--wi-active); stroke-dasharray:4 3; }
+  .arc.neu { stroke:var(--wi-queue); }
+  .arc.faint { stroke:var(--wi-inert); stroke-width:1.2; }
+  .arc.hot { stroke:var(--wi-active); stroke-width:2.4; }
+  .arclab { font-family:var(--wi-font-mono); font-size:12px; text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .arclab.ok { fill:var(--wi-relax); font-weight:bold; }
+  .arclab.bad { fill:var(--wi-active); font-weight:bold; }
+  .arclab.neu { fill:var(--wi-queue); }
+  .arclab.faint { fill:var(--wi-ink-faint); }
+  .arclab.hot { fill:var(--wi-active); font-weight:bold; }
+  .arclabbg { fill:var(--wi-bg); }
+
+  .aabox { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.2; }
+  .aabox.hot { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2; }
+  .aabox.infrag { fill:#f0d7cd; stroke:var(--wi-accent); stroke-width:1.6; }
+  .aabox.pending { fill:var(--wi-bg); stroke:var(--wi-border-soft); stroke-dasharray:3 3; }
+  .aalet { font-family:var(--wi-font-mono); font-size:19px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .aalet.pending { fill:var(--wi-ink-faint); }
+  .aamass { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-accent); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .aamass.pending { fill:var(--wi-inert); }
+  .cut { stroke:var(--wi-ink-strong); stroke-width:2; }
+  .cut.pending { stroke:var(--wi-inert); }
+  .cut.hot { stroke:var(--wi-active); stroke-width:3.5; }
+  .sumlab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; }
+  .sumlab.pending { fill:var(--wi-inert); }
+  .sumlab.hot { fill:var(--wi-active); font-weight:bold; }
+  .brace { fill:none; stroke:var(--wi-active); stroke-width:2.2; }
+  .bracelab { font-family:var(--wi-font-mono); font-size:14px; fill:var(--wi-active); text-anchor:middle; dominant-baseline:central; font-weight:bold; }
+  .axis { stroke:var(--wi-border-strong); stroke-width:1.2; }
+  .axtick { stroke:var(--wi-border-strong); stroke-width:1; }
+  .axlab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint); text-anchor:middle; }
+  .peak { fill:var(--wi-queue); stroke:var(--wi-panel-2); stroke-width:.6; }
+  .peak.new { fill:var(--wi-active); }
+  .peaklab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-soft); text-anchor:middle; }
+  .peaklab.new { fill:var(--wi-active); font-weight:bold; }
+  .ttl { font-family:var(--wi-font-body); font-size:14px; fill:var(--wi-ink-soft); font-style:italic; }
+  .hit { fill:transparent; cursor:pointer; }
+
+
+  .randbar { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
+  .randbar input[type=number] { width:4.6em; }
+  .randbar .lbl { font-size:.66rem; }
+  /* --- tab 5: tracking chart --- */
+  .trk { stroke-width:2; fill:none; }
+  .trk.top { stroke:var(--wi-queue); }
+  .trk.cut { stroke:var(--wi-examine); stroke-dasharray:4 3; }
+  .trk.true { stroke:var(--wi-accent); }
+  .trk.lead { stroke:var(--wi-relax); stroke-width:2.6; }
+  .trkdot { stroke:none; }
+  .trkdot.top { fill:var(--wi-queue); } .trkdot.cut { fill:var(--wi-examine); } .trkdot.true { fill:var(--wi-accent); } .trkdot.lead { fill:var(--wi-relax); }
+  .alive { fill:var(--wi-relax); } .dead { fill:var(--wi-active); }
+  /* --- tab 4: formula --- */
+  .formula { font-family:var(--wi-font-body); font-size:.95rem; line-height:1.7; color:var(--wi-ink-strong); overflow-x:auto; }
+  .formula .row { margin:2px 0 8px; }
+  .formula .lhs { color:var(--wi-ink-soft); }
+  .formula .term { display:inline-block; padding:0 2px; border-radius:3px; }
+  .formula .term.cur { background:#f6e6df; color:var(--wi-active); font-weight:bold; }
+  .formula .term.dim { color:var(--wi-ink-faint); }
+  .formula .term.pos { color:var(--wi-queue); }
+  .formula .term.neg { color:var(--wi-ink-faint); }
+  .formula .term.zero { color:var(--wi-examine); }
+  .formula sup { font-size:.72em; }
+  .formula .note { font-size:.8rem; color:var(--wi-ink-soft); margin-top:6px; line-height:1.5; }
+  .coefbar { fill:var(--wi-queue); }
+  .coefbar.neg { fill:var(--wi-inert); }
+  .coefbar.zero { fill:var(--wi-examine); }
+  .coefbar.cur { fill:var(--wi-active); }
+  .coeflab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-soft); text-anchor:middle; }
+  .coeflab.cur { fill:var(--wi-active); font-weight:bold; }
+
+  /* --- tab 5: leaderboard --- */
+  .board { border-collapse:collapse; font-family:var(--wi-font-mono); font-size:.76rem; width:100%; }
+  .board th { text-align:left; color:var(--wi-ink-faint); font-weight:normal; padding:2px 8px; border-bottom:1px solid var(--wi-border-soft); }
+  .board td { padding:1px 8px; border-bottom:1px solid var(--wi-border-soft); white-space:nowrap; }
+  .board tr.keep td { background:#eef4ea; }
+  .board tr.trim td { color:var(--wi-ink-faint); background:var(--wi-panel); }
+  .board tr.trim td.pep { text-decoration:line-through; }
+  .board tr.heavy td { background:#f6e6df; color:var(--wi-ink-faint); }
+  .board tr.heavy td.pep { text-decoration:line-through; }
+  .board tr.parent td { background:#f7edd9; }
+  .board tr.true td.pep { color:var(--wi-accent); font-weight:bold; }
+  .board tr.lead td.pep::after { content:" ★"; color:var(--wi-accent); }
+  .board tr.sel td { outline:2px solid var(--wi-accent-soft); outline-offset:-2px; }
+  .board tr { cursor:pointer; }
+  .board tr.cut td { border-bottom:2px solid var(--wi-accent); }
+  .board td.num { text-align:right; }
+  .board .more { color:var(--wi-ink-faint); font-style:italic; cursor:pointer; }
+  .leaderbox { font-size:.9rem; line-height:1.55; }
+  .leaderbox .big { font-family:var(--wi-font-mono); font-size:1.15rem; color:var(--wi-accent); font-weight:bold; }
+  .leaderbox .kv { color:var(--wi-ink-soft); font-size:.82rem; }
+  .spec-e { fill:var(--wi-inert); }
+  .spec-t { fill:var(--wi-active); }
+  .spec-ok { fill:var(--wi-relax); }
+
+
+  .ivl { font-family:var(--wi-font-mono); }
+  .ptbar { fill:#dfe9db; stroke:var(--wi-relax); stroke-width:1.4; }
+  .ptbar.fixed { fill:var(--wi-controls); stroke:var(--wi-ink-strong); }
+  .ptbar.new { fill:#f7edd9; stroke:var(--wi-examine); stroke-dasharray:4 3; }
+  .ptbar.bad { fill:#f6e6df; stroke:var(--wi-active); stroke-dasharray:4 3; }
+  .ptbar.sol { fill:#f0d7cd; stroke:var(--wi-accent); }
+  .ptlab { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .ptlab.new { fill:var(--wi-examine); font-weight:bold; }
+  .ptlab.bad { fill:var(--wi-active); font-weight:bold; }
+  .ptlab.faint { fill:var(--wi-ink-faint); font-size:11px; }
+  .frame .opt { color:var(--wi-ink-soft); }
+  .chip.trial { background:#f7edd9; border-color:var(--wi-examine); color:var(--wi-examine); font-weight:bold; }
+  .chip.assigned { color:var(--wi-ink-faint); background:var(--wi-panel); border-style:dashed; }
+  .chip .fr.pair { color:var(--wi-relax); }
+  .solrow { font-family:var(--wi-font-mono); font-size:.8rem; line-height:1.6; }
+  .solrow b { color:var(--wi-accent); }
+  .cline.dimline { opacity:.4; }
+  .frame .sw { width:.7em; height:.7em; margin-right:2px; }
+  @keyframes pop { from { opacity:0; transform:translateY(-6px) scale(.7); } to { opacity:1; transform:none; } }
+  .pop { animation:pop .32s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box; transform-origin:center; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption { font-family: var(--wi-font-head); letter-spacing: .05em; }
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>The inexact turnpike problem &nbsp;·&nbsp; interval backtracking</h1>
+</div>
+
+<p class="subtitle">
+  Real measurements come with errors. In the <b>inexact turnpike problem</b> every toll is only known up to an
+  additive error: the input is a multiset of <b>intervals</b> [<i>d</i>, <i>d̄</i>], and we ask for exit positions
+  0 = <i>S</i>[0] &lt; … &lt; <i>S</i>[<i>n</i>−1] together with a <b>bijection</b> between the
+  <i>n</i>(<i>n</i>−1)/2 pairs of exits and the intervals, such that every pair's distance lies in its interval.
+  This variant is strongly NP-hard, so the pseudopolynomial trick is gone; what remains is search. The algorithm
+  below extends largest-first backtracking: every exit is an <b>interval of possible positions</b>, kept as tight
+  as the constraints collected so far allow, and the bijection is built pair by pair.
+</p>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="preset">Example</label>
+    <select id="preset"></select>
+  </div>
+  <div class="ctl randbar" id="genBar">
+    <span class="lbl">true S or P</span><input type="text" id="genS" class="str" spellcheck="false" placeholder="S 0 3 8 9 11" style="width:13em">
+    <span class="lbl">error ε</span><input type="number" id="genEps" min="0" max="20" value="1">
+    <span class="lbl">seed</span><input type="number" id="genSeed" min="0" max="9999" value="1">
+    <label class="chk"><input type="checkbox" id="genTamper"> shift one interval (may become infeasible)</label>
+    <button id="genGo" class="pri">Measure</button>
+  </div>
+  <div class="ctl">
+    <label class="chk" title="forward checking by bipartite matching and most-constrained-pair-first ordering"><input type="checkbox" id="prune"> pruning heuristics</label>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Detail</span>
+    <span class="seg">
+      <button id="detCoarse" class="on">One step per exit</button>
+      <button id="detFine">Every assignment</button>
+    </span>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="note"></span>
+</div>
+
+<div class="transport" id="transport"></div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Exits as position intervals</span><span class="rhs" id="meta"></span></div>
+      <div class="svgscroll"><svg id="svg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:var(--wi-controls);border-color:var(--wi-ink-strong)"></span> end exits</span>
+        <span class="item"><span class="sw" style="background:#dfe9db;border-color:var(--wi-relax)"></span> placed exit — bar = positions still possible</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> new exit being placed</span>
+        <span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> contradiction</span>
+        <span class="item"><span class="sw" style="background:#f0d7cd;border-color:var(--wi-accent)"></span> a solution</span>
+      </div>
+      <div class="solrow" id="solrow"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The distance intervals</span><span class="rhs" id="ivMeta"></span></div>
+      <div class="svgscroll"><svg id="ivSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:var(--wi-panel-2)"></span> unused</span>
+        <span class="item"><span class="sw" style="border-color:var(--wi-active);border-width:2px"></span> can be the largest remaining distance</span>
+        <span class="item"><span class="sw" style="border-color:var(--wi-examine);border-width:2px"></span> tried for the current pair</span>
+        <span class="item"><span class="sw" style="background:#b8c9e0;border-color:#4a6a90"></span> assigned; same colour as its arc; inner bar = what the constraints still allow for that pair</span>
+      </div>
+      <div class="opnote" style="margin-top:6px">Hover an interval or an arc to highlight its counterpart.</div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phase"></span></div>
+      <div class="status" id="status"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Search tree</span><span class="rhs" id="treeMeta"></span></div>
+      <div class="treewrap"><div class="tree" id="tree"></div></div>
+    </div>
+  </div>
+</div>
+
+<details class="code" open style="margin-top:18px">
+  <summary>Pseudocode</summary>
+  <div class="codebody" id="code"></div>
+  <div class="codenote" id="codeNote"></div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="text" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="load">Load</button></div>
+      <div class="err" id="err"></div>
+    </div>
+    <div class="hint">
+      One interval per line, as <code>lo hi</code> or <code>lo..hi</code> (integers, lo ≤ hi); a single number
+      <code>d</code> is the exact distance [d, d]. The number of intervals must be <i>n</i>(<i>n</i>−1)/2 for the
+      number of exits <i>n</i>. Lines starting with <code>#</code> are ignored. The generator above produces such
+      a list from a true set of exits: every distance is measured with an error drawn uniformly from
+      {−ε, …, ε}, and the interval is the measurement ±ε, so the true distance is always covered.
+      At most 10 exits (45 intervals).
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+const el  = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const SVGNS = "http://www.w3.org/2000/svg";
+function mk(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const fmtSet = (arr, open, close) => (open || "{") + arr.join(", ") + (close || "}");
+const MS = arr => "{{" + arr.join(", ") + "}}";        /* multiset notation of the lecture */
+
+/* ---------- multisets ---------------------------------------------------- */
+
+const asc = (a, b) => a - b;
+function prefSums(P) { const S = [0]; P.forEach(p => S.push(S[S.length - 1] + p)); return S; }
+function deltaOf(S) {
+  const D = [];
+  for (let i = 0; i < S.length; i++) for (let j = i + 1; j < S.length; j++) D.push(S[j] - S[i]);
+  return D.sort(asc);
+}
+function countMap(arr) { const m = new Map(); arr.forEach(x => m.set(x, (m.get(x) || 0) + 1)); return m; }
+/* A \ B as multisets (A, B sorted) */
+function msMinus(A, B) {
+  const cb = countMap(B), out = [];
+  A.forEach(x => { const c = cb.get(x) || 0; if (c > 0) cb.set(x, c - 1); else out.push(x); });
+  return out;
+}
+const msSubset = (A, B) => msMinus(A, B).length === 0;
+const msEqual  = (A, B) => A.length === B.length && A.every((x, i) => x === B[i]);
+const arrEq    = msEqual;
+
+/* ---------- parsing ------------------------------------------------------ */
+
+function parseIntList(str) {
+  const toks = str.trim().split(/[\s,;]+/).filter(Boolean);
+  const out = [];
+  for (const t of toks) {
+    if (!/^\d+$/.test(t)) throw new Error("not an integer: " + t);
+    out.push(parseInt(t, 10));
+  }
+  return out;
+}
+function stripComments(txt) { return txt.split(/\r?\n/).filter(l => !/^\s*#/.test(l)).join("\n"); }
+
+/* ---------- tooltip ------------------------------------------------------ */
+
+function moveTip(ev) {
+  const tip = el("tooltip"), pad = 14;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  const r = tip.getBoundingClientRect();
+  if (x + r.width > window.innerWidth - 8) x = ev.clientX - r.width - pad;
+  if (y + r.height > window.innerHeight - 8) y = ev.clientY - r.height - pad;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function showTip(html, ev) { const t = el("tooltip"); t.innerHTML = html; t.style.display = "block"; moveTip(ev); }
+function hideTip() { el("tooltip").style.display = "none"; }
+
+/* ---------- transport (slider + phase bar), one instance per animated tab -- */
+
+function makePlayer(containerId, onRender) {
+  const box = el(containerId);
+  box.innerHTML =
+    '<div class="transport-row">' +
+    '<span class="ctl" style="gap:6px">' +
+    '<button class="icon" data-k="reset" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>' +
+    '<button class="icon" data-k="back" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>' +
+    '<button class="icon pri" data-k="fwd" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>' +
+    '<button class="icon" data-k="play" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>' +
+    '<button class="icon" data-k="end" title="Jump to the end" aria-label="Jump to the end">&#x23ED;&#xFE0E;&#x23ED;&#xFE0E;</button>' +
+    '</span>' +
+    '<span class="progress"><input type="range" min="0" max="0" value="0"><div class="phasebar"></div></span>' +
+    '<span class="stepno" data-k="no">— / —</span>' +
+    '<span class="ctl" style="gap:6px"><span class="lbl">Speed</span>' +
+    '<input type="range" data-k="speed" min="60" max="1400" value="500" style="width:88px">' +
+    '<span class="stepno" data-k="speedval">500ms</span></span></div>';
+  const q = k => box.querySelector('[data-k="' + k + '"]');
+  const scrub = box.querySelector('.progress input[type=range]'), bar = box.querySelector(".phasebar");
+  const pl = { steps: [], phases: [], cur: 0, timer: null };
+
+  pl.render = () => {
+    scrub.max = String(Math.max(0, pl.steps.length - 1)); scrub.value = String(pl.cur);
+    q("no").textContent = pl.steps.length ? (pl.cur + 1) + " / " + pl.steps.length : "— / —";
+    bar.innerHTML = "";
+    pl.phases.forEach(p => {
+      const span = p.to - p.from + 1;
+      const pct = pl.cur > p.to ? 100 : pl.cur < p.from ? 0 : ((pl.cur - p.from + 1) / span) * 100;
+      const b = document.createElement("button");
+      b.className = "phasebtn" + (pl.cur >= p.from && pl.cur <= p.to ? " on" : (pl.cur > p.to ? " past" : ""));
+      b.style.flexGrow = String(Math.max(1, span));
+      b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' + pct.toFixed(2) +
+                    '%"></span><span class="lab">' + esc(p.name) + "</span>";
+      b.title = p.name + " — steps " + (p.from + 1) + "–" + (p.to + 1);
+      b.addEventListener("click", () => { pl.stop(); pl.cur = p.from; pl.render(); });
+      bar.appendChild(b);
+    });
+    q("back").disabled = pl.cur <= 0; q("fwd").disabled = pl.cur >= pl.steps.length - 1;
+    q("end").disabled = q("fwd").disabled;
+    onRender(pl.steps[pl.cur] || {}, pl);
+  };
+  pl.goto = k => { pl.cur = Math.max(0, Math.min(pl.steps.length - 1, k)); pl.render(); };
+  pl.fwd = () => { if (pl.cur < pl.steps.length - 1) { pl.cur++; pl.render(); } else pl.stop(); };
+  pl.back = () => { if (pl.cur > 0) { pl.cur--; pl.render(); } };
+  pl.stop = () => { if (pl.timer) { clearInterval(pl.timer); pl.timer = null; } q("play").innerHTML = "&#x25B6;&#xFE0E;"; };
+  pl.play = () => {
+    if (pl.timer) { pl.stop(); return; }
+    if (pl.cur >= pl.steps.length - 1) pl.cur = 0;
+    q("play").innerHTML = "&#x23F8;&#xFE0E;";
+    pl.timer = setInterval(pl.fwd, Number(q("speed").value));
+  };
+  pl.set = (steps, phases, at) => { pl.stop(); pl.steps = steps; pl.phases = phases; pl.cur = at || 0; pl.render(); };
+  pl.phaseStartOf = k => { for (const p of pl.phases) if (k >= p.from && k <= p.to) return p.from; return 0; };
+
+  q("reset").addEventListener("click", () => { pl.stop(); pl.goto(0); });
+  q("back").addEventListener("click",  () => { pl.stop(); pl.back(); });
+  q("fwd").addEventListener("click",   () => { pl.stop(); pl.fwd(); });
+  q("end").addEventListener("click",   () => { pl.stop(); pl.goto(pl.steps.length - 1); });
+  q("play").addEventListener("click",  pl.play);
+  scrub.addEventListener("input", () => { pl.stop(); pl.goto(Number(scrub.value)); });
+  q("speed").addEventListener("input", () => {
+    q("speedval").textContent = q("speed").value + "ms";
+    if (pl.timer) { clearInterval(pl.timer); pl.timer = setInterval(pl.fwd, Number(q("speed").value)); }
+  });
+  return pl;
+}
+
+/* ---------- step-list builder shared by the animated tabs ------------------ */
+
+function StepList() {
+  this.steps = []; this.phases = [];
+}
+StepList.prototype.phase = function (name) { this.phases.push({ name: name, from: this.steps.length, to: this.steps.length }); };
+StepList.prototype.add = function (o) {
+  if (!this.phases.length) this.phase("");
+  o.ph = this.phases.length - 1; this.steps.push(o);
+  this.phases[this.phases.length - 1].to = this.steps.length - 1;
+  return o;
+};
+
+const rint = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+function randomP(n, mx) { const P = []; for (let i = 0; i < n; i++) P.push(rint(1, mx)); return P; }
+/* ---------- geometry of a road drawing ------------------------------------ */
+
+/* An arc between two exits, drawn above the road.  Height grows with the
+   distance so that arcs of nested spans do not sit on top of each other. */
+function arcPath(x1, x2, y, hmax, L, dist) {
+  const h = 18 + (hmax - 18) * Math.min(1, dist / Math.max(1, L));
+  return "M" + x1 + "," + y + " Q" + ((x1 + x2) / 2) + "," + (y - 2 * h) + " " + x2 + "," + y;
+}
+const arcApex = (y, hmax, L, dist) => y - (18 + (hmax - 18) * Math.min(1, dist / Math.max(1, L)));
+
+/* seeded RNG (mulberry32) */
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* ==========================================================================
+   Inexact turnpike: intervals instead of exact tolls.
+
+   Model.  n exits x_0 < x_1 < ... < x_{n-1}, integers, x_0 = 0.  Input: a
+   multiset I of n(n-1)/2 integer intervals.  Wanted: positions plus a
+   bijection pairs -> intervals with x_r - x_l ∈ assigned interval.
+
+   Algorithm (an interval version of largest-first backtracking, in the spirit
+   of Skiena & Sundaram 1994).  Every constraint "x_v - x_u ∈ [lo, hi]" is a
+   pair of difference constraints, so the set C of constraints collected so far
+   is a weighted graph; Floyd-Warshall gives, for every pair, the tightest
+   bounds implied by C (and detects contradictions as negative cycles).  The
+   "interval of an exit" is exactly its bound relative to x_0.
+
+     * The largest remaining TRUE distance is between an end exit and a new
+       exit (same argument as in the exact case).  It lies in some unused
+       interval J which must be able to be the largest: J.hi >= K.lo for every
+       other unused K.  We branch over these J (largest hi first) and over the
+       two ends.
+     * The new exit's position is then constrained by J; we branch over the
+       slot it takes in the left-to-right order (only slots consistent with C).
+     * Its distances to all other placed exits must be matched to unused
+       intervals, one each: branch over the candidates intersecting the
+       current bounds, adding the constraint and re-checking feasibility.
+     * When no interval is left, C is feasible and any solution of the
+       difference constraints (shortest paths from x_0) is an answer.
+
+   This is complete: it never rejects a feasible instance.  Its running time
+   is exponential in the worst case -- the problem is strongly NP-hard.
+   ========================================================================== */
+
+const K = s => '<span class="kw">' + s + "</span>";
+const C = s => '<span class="cm">' + s + "</span>";
+const LIMIT = 8000;
+const hueOf = i => (i * 137.508) % 360;
+const colStroke = i => "hsl(" + hueOf(i) + ",55%,38%)";
+const colFill   = i => "hsl(" + hueOf(i) + ",55%,80%)";
+const colInner  = i => "hsl(" + hueOf(i) + ",60%,55%)";
+const ivStr = iv => iv.lo === iv.hi ? String(iv.lo) : "[" + iv.lo + "," + iv.hi + "]";
+
+const CODE = [
+  [1,  K("procedure") + " inexactTurnpike(I, n)                  " + C("// |I| = n(n−1)/2 intervals")],
+  [2,  "    " + K("for each") + " J ∈ I " + K("that can be the largest") + "       " + C("// J.hi ≥ K.lo for all K ≠ J")],
+  [3,  "        C := { x₀ = 0,  x_{n−1} − x₀ ∈ J }"],
+  [4,  "        R := inexactRec(C, I \\ {J});   " + K("if") + " R ≠ NO  " + K("return") + " R"],
+  [5,  "    " + K("return") + " NO"],
+  [6,  ""],
+  [7,  K("procedure") + " inexactRec(C, U)             " + C("// invariant: C feasible, every placed pair has its interval")],
+  [8,  "    " + K("if") + " U = ∅   " + K("return") + " any solution of C            " + C("// shortest paths from x₀")],
+  [9,  "    " + K("for each") + " J ∈ U " + K("that can be the largest of") + " U"],
+  [10, "        " + K("for") + " side ∈ {left, right}"],
+  [11, "            p := new exit;  C′ := C ∪ { x_p − x₀ ∈ J }   " + C("// left") + "   or  C ∪ { x_{n−1} − x_p ∈ J }   " + C("// right")],
+  [12, "            " + K("for each") + " slot of p in the order of placed exits " + K("with") + " C′ ∪ {order} feasible"],
+  [13, "                " + K("if pruning") + ": " + K("skip") + " slot " + K("unless") + " the pairs of p can be matched to distinct unused intervals   " + C("// bipartite matching")],
+  [24, "                R := assignPairs(p, placed exits other than the end used, C′ ∪ {order}, U \\ {J})"],
+  [14, "                " + K("if") + " R ≠ NO  " + K("return") + " R"],
+  [15, "    " + K("return") + " NO"],
+  [16, ""],
+  [17, K("procedure") + " assignPairs(p, Q, C, U)"],
+  [18, "    " + K("if") + " Q = ∅   " + K("return") + " inexactRec(C, U)"],
+  [19, "    q := first(Q)   " + C("// pruning: the q with the fewest candidate intervals") + ";  [lo, hi] := bounds of |x_p − x_q| under C"],
+  [20, "    " + K("for each") + " distinct K ∈ U " + K("with") + " K ∩ [lo, hi] ≠ ∅"],
+  [21, "        C′ := C ∪ { |x_p − x_q| ∈ K }"],
+  [22, "        " + K("if") + " C′ feasible:  R := assignPairs(p, Q \\ {q}, C′, U \\ {K});  " + K("if") + " R ≠ NO  " + K("return") + " R"],
+  [23, "    " + K("return") + " NO"]
+];
+
+/* ---------- difference constraints ---------------------------------------- */
+
+/* points are integers 0..n-1 (0 = left end, 1 = right end, then in order of
+   placement).  cons: [{u, v, lo, hi}] meaning lo <= x_v - x_u <= hi. */
+function bounds(nPts, cons) {
+  const INF = 1e15, d = [];
+  for (let i = 0; i < nPts; i++) { d.push(new Array(nPts).fill(INF)); d[i][i] = 0; }
+  cons.forEach(c => { d[c.u][c.v] = Math.min(d[c.u][c.v], c.hi); d[c.v][c.u] = Math.min(d[c.v][c.u], -c.lo); });
+  for (let k = 0; k < nPts; k++) for (let i = 0; i < nPts; i++) if (d[i][k] < INF)
+    for (let j = 0; j < nPts; j++) if (d[k][j] < INF && d[i][k] + d[k][j] < d[i][j]) d[i][j] = d[i][k] + d[k][j];
+  for (let i = 0; i < nPts; i++) if (d[i][i] < 0) return null;
+  return d;           /* x_v - x_u <= d[u][v];  x_v - x_u >= -d[v][u] */
+}
+const diffRange = (d, u, v) => [-d[v][u], d[u][v]];        /* bounds of x_v - x_u */
+
+/* can the pairs (each with a set of admissible interval ids) be matched to distinct intervals? */
+function canMatch(adm) {
+  const matchOf = new Map();
+  const tryPair = (i, seen) => {
+    for (const k of adm[i]) {
+      if (seen.has(k)) continue; seen.add(k);
+      if (!matchOf.has(k) || tryPair(matchOf.get(k), seen)) { matchOf.set(k, i); return true; }
+    }
+    return false;
+  };
+  for (let i = 0; i < adm.length; i++) if (!tryPair(i, new Set())) return false;
+  return true;
+}
+
+/* ---------- state ------------------------------------------------------------ */
+
+const st8 = { ivs: [], n: 0, fine: false, prune: false, frames: [], truncated: false, trueS: null, hoverK: null };
+let player;
+
+function canBeLargest(U) {
+  /* ids in U that may hold the largest remaining distance */
+  const out = [];
+  U.forEach(j => { const J = st8.ivs[j]; if (U.every(k => k === j || st8.ivs[k].lo <= J.hi)) out.push(j); });
+  out.sort((a, b) => st8.ivs[b].hi - st8.ivs[a].hi || st8.ivs[b].lo - st8.ivs[a].lo);
+  return out;
+}
+
+function build() {
+  const ivs = st8.ivs, m = ivs.length, n = st8.n;
+  const sl = new StepList();
+  const frames = st8.frames = [];
+  st8.truncated = false;
+  let count = 0;
+  const add = o => { count++; if (count > LIMIT) { st8.truncated = true; throw "limit"; } o.major = !!o.major; return sl.add(o); };
+
+  /* snapshot helper */
+  const snap = (placed, order, cons, assign, U, extra) => {
+    const d = bounds(n, cons);
+    const pts = placed.map(p => ({ id: p, lo: d ? -d[p][0] : null, hi: d ? d[0][p] : null }));
+    return Object.assign({ pts: pts, order: order.slice(), assign: assign.slice(), U: U.slice(), feasible: !!d, dmat: d }, extra);
+  };
+  const pairTxt = (u, v) => "x<sub>" + v + "</sub> − x<sub>" + u + "</sub>";
+  const name = p => p === 0 ? "the left end x₀" : p === 1 ? "the right end x₁" : "x<sub>" + p + "</sub>";
+
+  let solution = null;
+
+  function rec(placed, order, cons, assign, U, fid, depth) {
+    sl.phase("depth " + depth);
+    if (U.length === 0) {
+      const d = bounds(n, cons);
+      const S = placed.map(p => d[0][p]).sort(asc);          /* x_p := shortest path from x_0 */
+      const sol = order.map(p => d[0][p]);
+      frames[fid].okAt = sl.steps.length;
+      add(snap(placed, order, cons, assign, U, { hl: [8], major: true, fid: fid, done: true, sol: sol,
+        txt: "<b>Every interval is assigned and the constraints are consistent.</b> Any solution of the difference " +
+             "constraints is a valid set of exits; the one shown takes every exit at its <i>largest</i> possible " +
+             "position (shortest-path distances from x₀). Where a bar is wider than one point, other positions work too.",
+        ans: "S = " + fmtSet(sol, "[", "]") }));
+      return sol;
+    }
+    const cands = canBeLargest(U);
+    add(snap(placed, order, cons, assign, U, { hl: [9], fid: fid, cands: cands,
+      txt: cands.length + " unused interval" + (cands.length === 1 ? "" : "s") + " could contain the largest remaining " +
+           "distance (its upper end is at least every other unused lower end): " + cands.map(j => ivStr(ivs[j])).join(", ") +
+           ". That distance must be measured from an end exit, so it puts a new exit at a distance J from x₀ or from x₁." }));
+    for (const j of cands) {
+      const J = ivs[j];
+      for (const side of [0, 1]) {
+        const p = placed.length;           /* new point id */
+        const c1 = side === 0 ? { u: 0, v: p, lo: J.lo, hi: J.hi } : { u: p, v: 1, lo: J.lo, hi: J.hi };
+        const consP = cons.concat([c1]);
+        const placedP = placed.concat([p]);
+        const assignP = assign.concat([{ u: c1.u, v: c1.v, k: j }]);
+        const UP = U.filter(x => x !== j);
+        add(snap(placedP, order, consP, assignP, UP, { hl: [10, 11], fid: fid, newPt: p, J: j,
+          txt: "Try <b>J = " + ivStr(J) + "</b> from the <b>" + (side === 0 ? "left" : "right") + "</b>: new exit " + name(p) +
+               " with " + (side === 0 ? pairTxt(0, p) : pairTxt(p, 1)) + " ∈ " + ivStr(J) + ". Its position interval is shown dashed; " +
+               "it is then tried in every slot of the left-to-right order it fits into." }));
+        for (let sIx = 0; sIx + 1 < order.length; sIx++) {
+          const L = order[sIx], R = order[sIx + 1];
+          const consS = consP.concat([{ u: L, v: p, lo: 1, hi: 1e9 }, { u: p, v: R, lo: 1, hi: 1e9 }]);
+          const dS = bounds(n, consS);
+          const orderS = order.slice(0, sIx + 1).concat([p], order.slice(sIx + 1));
+          const cid = frames.length;
+          frames.push({ id: cid, parent: fid, kind: "place", j: j, side: side, p: p, L: L, R: R, createdAt: sl.steps.length });
+          const slotTxt = "slot between " + name(L) + " and " + name(R);
+          if (!dS) {
+            frames[cid].failAt = sl.steps.length;
+            if (st8.fine) add(snap(placedP, order, consP, assignP, UP, { hl: [12], fid: cid, newPt: p, J: j, badSlot: [L, R],
+              txt: "The " + slotTxt + " is impossible: the position interval of " + name(p) + " does not fit there." }));
+            continue;
+          }
+          const Qs = orderS.filter(q => q !== p && !(side === 0 ? q === 0 : q === 1));
+          if (st8.prune) {
+            const adm = Qs.map(q => { const lo_ = orderS.indexOf(p) < orderS.indexOf(q) ? p : q, hi_ = lo_ === p ? q : p; const rg = diffRange(dS, lo_, hi_);
+                                       return UP.filter(k => ivs[k].hi >= rg[0] && ivs[k].lo <= rg[1]); });
+            if (!canMatch(adm)) {
+              frames[cid].failAt = sl.steps.length;
+              add(snap(placedP, orderS, consS, assignP, UP, { hl: [13], fid: cid, newPt: p, J: j, major: true, pruned: true,
+                txt: "<b>Pruned:</b> in the " + slotTxt + ", the " + Qs.length + " new pairs cannot all get <i>distinct</i> unused intervals " +
+                     "(no perfect matching between pairs and the intervals intersecting their ranges), so no assignment order needs to be tried." }));
+              continue;
+            }
+          }
+          add(snap(placedP, orderS, consS, assignP, UP, { hl: [12, 24], fid: cid, newPt: p, J: j,
+            txt: "Slot: " + name(p) + " goes between " + name(L) + " and " + name(R) + ". Now every other placed exit needs an " +
+                 "unused interval for its distance to " + name(p) + "." }));
+          const R2 = assignPairs(p, Qs, placedP, orderS, consS, assignP, UP, cid, depth);
+          if (R2) { frames[cid].okAt = frames[cid].okAt || sl.steps.length; return R2; }
+          frames[cid].failAt = sl.steps.length;
+          sl.phase("depth " + depth);
+          add(snap(placed, order, cons, assign, U, { hl: [14, 15], fid: cid, major: true, failed: true,
+            txt: "<b>Dead end:</b> " + name(p) + " with J = " + ivStr(J) + " from the " + (side === 0 ? "left" : "right") + " in the " + slotTxt +
+                 " cannot be completed. Backtrack &mdash; the exit is removed again." }));
+        }
+      }
+    }
+    return null;
+  }
+
+  function assignPairs(p, Q, placed, order, cons, assign, U, fid, depth) {
+    if (Q.length === 0) {
+      add(snap(placed, order, cons, assign, U, { hl: [18], fid: fid, major: true, fixed: p,
+        txt: "<b>Exit " + name(p) + " is placed:</b> all its distances to the other exits have intervals, and the constraint " +
+             "system is consistent. The bars show how much slack is left for every exit. " + U.length + " interval" + (U.length === 1 ? "" : "s") + " remain." }));
+      return rec(placed, order, cons, assign, U, fid, depth + 1);
+    }
+    const d = bounds(n, cons);
+    const candsOf = q => {
+      const lo_ = order.indexOf(p) < order.indexOf(q) ? p : q, hi_ = lo_ === p ? q : p;
+      const rg = diffRange(d, lo_, hi_), seen = new Set(), ks = [];
+      U.forEach(k => { const K = ivs[k], key = K.lo + "," + K.hi; if (seen.has(key)) return; seen.add(key); if (K.hi >= rg[0] && K.lo <= rg[1]) ks.push(k); });
+      ks.sort((a, b) => ivs[b].hi - ivs[a].hi);
+      return { q: q, lo_: lo_, hi_: hi_, rg: rg, ks: ks };
+    };
+    let pick = candsOf(Q[0]);
+    if (st8.prune) Q.forEach(q => { const c = candsOf(q); if (c.ks.length < pick.ks.length) pick = c; });
+    const q = pick.q, lo_ = pick.lo_, hi_ = pick.hi_, rg = pick.rg, ks = pick.ks;
+    if (st8.fine || ks.length === 0)
+      add(snap(placed, order, cons, assign, U, { hl: [19, 20], fid: fid, newPt: p, pairQ: q, range: rg, ks: ks,
+        txt: "Pair (" + name(q) + ", " + name(p) + ")" + (st8.prune && Q.length > 1 ? " &mdash; the pair with the fewest options" : "") + ": the constraints allow " +
+             pairTxt(lo_, hi_) + " ∈ [" + rg[0] + ", " + rg[1] + "]. " +
+             (ks.length ? ks.length + " distinct unused interval" + (ks.length === 1 ? "" : "s") + " intersect this range: " + ks.map(k => ivStr(ivs[k])).join(", ") + "."
+                        : '<span class="k-bad">No unused interval intersects it &mdash; contradiction.</span>') }));
+    for (const k of ks) {
+      const K = ivs[k];
+      const cons2 = cons.concat([{ u: lo_, v: hi_, lo: K.lo, hi: K.hi }]);
+      const d2 = bounds(n, cons2);
+      const assign2 = assign.concat([{ u: lo_, v: hi_, k: k }]);
+      const cid = frames.length;
+      frames.push({ id: cid, parent: fid, kind: "assign", u: lo_, v: hi_, k: k, createdAt: sl.steps.length });
+      if (st8.fine) add(snap(placed, order, d2 ? cons2 : cons, assign2, U.filter(x => x !== k), { hl: [21, 22], fid: cid, newPt: p, pairQ: q, trial: k, bad: !d2,
+        txt: "Assign " + pairTxt(lo_, hi_) + " ∈ " + ivStr(K) + ". " + (d2 ? '<span class="k-ok">Consistent</span> &mdash; the bars tighten accordingly.'
+             : '<span class="k-bad">Inconsistent</span> with the other constraints (a negative cycle in the constraint graph): try the next interval.') }));
+      if (!d2) { frames[cid].failAt = sl.steps.length; continue; }
+      const R = assignPairs(p, Q.filter(x => x !== q), placed, order, cons2, assign2, U.filter(x => x !== k), cid, depth);
+      if (R) { frames[cid].okAt = frames[cid].okAt || sl.steps.length; return R; }
+      frames[cid].failAt = sl.steps.length;
+    }
+    if (st8.fine || ks.length) add(snap(placed, order, cons, assign, U, { hl: [23], fid: fid, newPt: p, pairQ: q,
+      txt: "No interval works for the pair (" + name(q) + ", " + name(p) + ") &mdash; undo the previous assignment and try its next option." }));
+    return null;
+  }
+
+  try {
+    sl.phase("start");
+    add({ pts: [], order: [], assign: [], U: ivs.map((_, i) => i), hl: [1], fid: -1, major: true,
+      txt: "Input: " + m + " intervals for n = " + n + " exits. Exit x₀ = 0 is fixed; x₁ will be the right end. " +
+           "Every constraint we collect has the form lo ≤ x<sub>v</sub> − x<sub>u</sub> ≤ hi, so consistency is a shortest-path question." });
+    const roots = canBeLargest(ivs.map((_, i) => i));
+    add({ pts: [], order: [], assign: [], U: ivs.map((_, i) => i), hl: [2], fid: -1, cands: roots,
+      txt: "Which interval holds the <b>largest</b> distance (the whole road)? Any J whose upper end is at least every other lower end: " +
+           roots.map(j => ivStr(ivs[j])).join(", ") + "." + (roots.length > 1 ? " Unlike the exact problem, this can already be ambiguous." : "") });
+    for (const j of roots) {
+      const J = ivs[j];
+      const cons = [{ u: 0, v: 1, lo: J.lo, hi: J.hi }];
+      const fid = frames.length;
+      frames.push({ id: fid, parent: -1, depth: 0, kind: "root", j: j, side: -1, p: 1, createdAt: sl.steps.length });
+      add(snap([0, 1], [0, 1], cons, [{ u: 0, v: 1, k: j }], ivs.map((_, i) => i).filter(i => i !== j), { hl: [3, 4], fid: fid, major: true, J: j,
+        txt: "<b>Road length ∈ " + ivStr(J) + "</b>: x₀ = 0 and x₁ ∈ " + ivStr(J) + ". Call inexactRec with the remaining " + (m - 1) + " intervals." }));
+      const R = rec([0, 1], [0, 1], cons, [{ u: 0, v: 1, k: j }], ivs.map((_, i) => i).filter(i => i !== j), fid, 0);
+      if (R) { solution = R; frames[fid].okAt = frames[fid].okAt || sl.steps.length; break; }
+      frames[fid].failAt = sl.steps.length;
+      sl.phase("start");
+      add({ pts: [], order: [], assign: [], U: ivs.map((_, i) => i), hl: [4, 5], fid: -1, major: true, failed: true,
+        txt: "No solution with road length in " + ivStr(J) + "." + (j === roots[roots.length - 1] ? "" : " Try the next candidate for the largest distance.") });
+    }
+    if (!solution) {
+      sl.phase("result");
+      add({ pts: [], order: [], assign: [], U: ivs.map((_, i) => i), hl: [5], fid: -1, major: true, done: true,
+        txt: "<b>NO</b>: no exits and no bijection satisfy all intervals. The search was exhaustive, so this is a proof of infeasibility &mdash; " +
+             "one that, in the worst case, no known algorithm can shorten substantially.", ans: "infeasible" });
+    }
+  } catch (e) { if (e !== "limit") throw e; }
+
+  let steps = sl.steps, phases = sl.phases;
+  if (!st8.fine) {
+    const keep = steps.map((s, i) => s.major || i === steps.length - 1);
+    const map = []; let k = 0; steps.forEach((s, i) => { map.push(k); if (keep[i]) k++; });
+    const f = i => map[Math.min(i, steps.length - 1)];
+    frames.forEach(fr => { fr.createdAt = f(fr.createdAt); if (fr.okAt !== undefined) fr.okAt = f(fr.okAt); if (fr.failAt !== undefined) fr.failAt = f(fr.failAt); });
+    const ph = []; phases.forEach(p => { const kept = []; for (let i = p.from; i <= p.to; i++) if (keep[i]) kept.push(map[i]); if (kept.length) ph.push({ name: p.name, from: kept[0], to: kept[kept.length - 1] }); });
+    steps = steps.filter((s, i) => keep[i]); phases = ph;
+  }
+  const merged = [];
+  phases.forEach(p => { const last = merged[merged.length - 1]; if (last && last.name === p.name && last.to + 1 === p.from) last.to = p.to; else merged.push(Object.assign({}, p)); });
+  let final = merged;
+  if (merged.length > 22) { const per = Math.ceil(merged.length / 22); final = []; for (let k = 0; k < merged.length; k += per) { const g = merged.slice(k, k + per); final.push({ name: g.length === 1 ? g[0].name : g[0].name + " …", from: g[0].from, to: g[g.length - 1].to }); } }
+  final.forEach((p, k) => { for (let i = p.from; i <= p.to; i++) steps[i].ph = k; });
+  player.set(steps, final, 0);
+  el("note").innerHTML = "<b>n = " + n + "</b> exits &middot; " + m + " intervals &middot; " + frames.filter(f => f.kind !== "assign").length + " placement attempt" + (frames.filter(f => f.kind !== "assign").length === 1 ? "" : "s") + " &middot; " + frames.length + " branches" +
+    (solution ? ' &middot; <span class="k-ok">feasible</span>' : st8.truncated ? "" : ' &middot; <span class="k-bad">infeasible</span>') +
+    (st8.truncated ? ' &middot; <b>trace cut off after ' + LIMIT + ' steps</b>' : "") +
+    (st8.trueS ? " &middot; measured from S = " + fmtSet(st8.trueS, "[", "]") : "");
+}
+
+/* ---------- drawing ------------------------------------------------------------ */
+
+function pairRange(s, a) {
+  const d = s.dmat; if (!d) return null;
+  const r = diffRange(d, a.u, a.v), iv = st8.ivs[a.k];
+  return [Math.max(r[0], iv.lo), Math.min(r[1], iv.hi)];
+}
+
+function draw(s) {
+  const svg = el("svg"), ivs = st8.ivs;
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const maxHi = Math.max(1, ...ivs.map(i => i.hi));
+  const y = 120, H = 190, x0 = 40, sc = (W - 80) / maxHi, hmax = 92;
+  const xOf = v => x0 + v * sc;
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.innerHTML = "";
+  mk("line", { x1: xOf(0), y1: y, x2: xOf(maxHi), y2: y, class: "road" }, svg);
+  mk("line", { x1: xOf(0), y1: y, x2: xOf(maxHi), y2: y, class: "roadmid" }, svg);
+  const pts = s.pts || [];
+  const byId = {}; pts.forEach(p => byId[p.id] = p);
+  const mid = p => (p.lo + p.hi) / 2;
+  const hovPts = new Set();
+  (s.assign || []).forEach(a => {
+    const P = byId[a.u], Qp = byId[a.v]; if (!P || !Qp || P.lo === null || Qp.lo === null) return;
+    const a1 = xOf(mid(P)), a2 = xOf(mid(Qp)), dist = Math.abs(mid(Qp) - mid(P));
+    const isNew = s.newPt !== undefined && (a.u === s.newPt || a.v === s.newPt), isTrial = s.trial !== undefined && a.k === s.trial;
+    const hov = st8.hoverK === a.k; if (hov) { hovPts.add(a.u); hovPts.add(a.v); }
+    const dpath = arcPath(Math.min(a1, a2), Math.max(a1, a2), y - 12, hmax, maxHi, dist);
+    const path = mk("path", { d: dpath, class: "arc" }, svg);
+    path.style.stroke = isTrial && s.bad ? "var(--wi-active)" : colStroke(a.k);
+    path.style.strokeWidth = hov ? 4 : (isNew || isTrial) ? 2.6 : 1.6;
+    path.style.opacity = st8.hoverK !== null && !hov ? .25 : (isNew || isTrial || hov) ? 1 : .6;
+    if (isTrial && s.bad) path.style.strokeDasharray = "4 3";
+    const hit = mk("path", { d: dpath, class: "arc" }, svg);
+    hit.style.stroke = "transparent"; hit.style.strokeWidth = 10; hit.dataset.k = a.k; hit.style.cursor = "pointer";
+    if (isNew || isTrial || hov || pts.length <= 5) {
+      const ax = (a1 + a2) / 2, ay = arcApex(y - 12, hmax, maxHi, dist), lab = ivStr(ivs[a.k]);
+      mk("rect", { x: ax - 4 * lab.length - 3, y: ay - 8, width: 8 * lab.length + 6, height: 15, rx: 3, class: "arclabbg", style: "pointer-events:none" }, svg);
+      const t = mk("text", { x: ax, y: ay, class: "arclab" }, svg); t.textContent = lab; t.style.fill = colStroke(a.k);
+      if (hov || isTrial) t.style.fontWeight = "bold";
+    }
+  });
+  pts.forEach(p => {
+    if (p.lo === null) return;
+    const isNew = p.id === s.newPt && !s.fixed, isEnd = p.id <= 1;
+    const cls = s.bad && isNew ? "bad" : s.sol ? "sol" : isNew ? "new" : isEnd ? "fixed" : "";
+    const x1 = xOf(p.lo), x2 = xOf(p.hi);
+    const r = mk("rect", { x: x1 - 5, y: y - 9, width: x2 - x1 + 10, height: 18, rx: 5, class: "ptbar " + cls }, svg);
+    if (hovPts.has(p.id)) { r.style.stroke = "var(--wi-accent)"; r.style.strokeWidth = 3; }
+    const t = mk("text", { x: (x1 + x2) / 2, y: y + 26, class: "ptlab " + (cls === "new" ? "new" : cls === "bad" ? "bad" : "") }, svg);
+    t.textContent = "x" + p.id + (p.lo === p.hi ? " = " + p.lo : " ∈ [" + p.lo + "," + p.hi + "]");
+    if (s.sol) mk("circle", { cx: xOf(s.sol[s.order.indexOf(p.id)]), cy: y, r: 6, class: "exit sel" }, svg);
+  });
+  if (s.badSlot) {
+    const L = byId[s.badSlot[0]], R = byId[s.badSlot[1]];
+    if (L && R) mk("rect", { x: xOf(L.hi) + 6, y: y - 12, width: Math.max(2, xOf(R.lo) - xOf(L.hi) - 12), height: 24, rx: 3, class: "segsel" }, svg);
+  }
+  svg.onmousemove = ev => { const t = ev.target, k = t.dataset && t.dataset.k !== undefined ? Number(t.dataset.k) : null; if (k !== st8.hoverK) { st8.hoverK = k; player.render(); } };
+  svg.onmouseleave = () => { if (st8.hoverK !== null) { st8.hoverK = null; player.render(); } };
+  el("meta").textContent = s.order && s.order.length ? "order: " + s.order.map(i => "x" + i).join(" < ") : "";
+  el("solrow").innerHTML = s.sol ? "<b>S</b> = " + fmtSet(s.sol, "[", "]") + " &nbsp; distances: " +
+    (s.assign || []).slice().sort((a, b) => (s.sol[s.order.indexOf(a.v)] - s.sol[s.order.indexOf(a.u)]) - (s.sol[s.order.indexOf(b.v)] - s.sol[s.order.indexOf(b.u)]))
+      .map(a => { const d = s.sol[s.order.indexOf(a.v)] - s.sol[s.order.indexOf(a.u)]; return '<span style="color:' + colStroke(a.k) + '">' + d + "∈" + ivStr(ivs[a.k]) + "</span>"; }).join(", ") : "";
+}
+
+/* the intervals, drawn as intervals on a distance axis, stacked into rows */
+function drawIntervals(s) {
+  const svg = el("ivSvg"), ivs = st8.ivs;
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const maxHi = Math.max(1, ...ivs.map(i => i.hi));
+  const x0 = 40, sc = (W - 80) / maxHi, xOf = v => x0 + v * sc;
+  const byK = new Map(); (s.assign || []).forEach(a => byK.set(a.k, a));
+  const cands = new Set(s.cands || []), ks = new Set(s.ks || []);
+  const idx = ivs.map((_, i) => i).sort((a, b) => ivs[a].lo - ivs[b].lo || ivs[a].hi - ivs[b].hi);
+  const rowEnd = [], rowOf = {};
+  idx.forEach(i => { const lo = xOf(ivs[i].lo) - 8; let r = rowEnd.findIndex(e => e < lo); if (r < 0) { r = rowEnd.length; rowEnd.push(0); } rowEnd[r] = xOf(ivs[i].hi) + 8; rowOf[i] = r; });
+  const rh = 22, yAx = 24 + rowEnd.length * rh, H = yAx + 30;
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.innerHTML = "";
+  mk("line", { x1: x0 - 4, y1: yAx, x2: W - x0 + 4, y2: yAx, class: "axis" }, svg);
+  const stepC = maxHi <= 30 ? 2 : maxHi <= 80 ? 5 : maxHi <= 300 ? 20 : 50;
+  for (let m = 0; m <= maxHi; m += stepC) { mk("line", { x1: xOf(m), y1: yAx, x2: xOf(m), y2: yAx + 4, class: "axtick" }, svg); const t = mk("text", { x: xOf(m), y: yAx + 16, class: "axlab" }, svg); t.textContent = String(m); }
+  const t0 = mk("text", { x: 4, y: 12, class: "ttl" }, svg); t0.textContent = "distance  →";
+  idx.forEach(i => {
+    const iv = ivs[i], a = byK.get(i), y = 20 + rowOf[i] * rh, x1 = xOf(iv.lo), x2 = xOf(iv.hi);
+    const hov = st8.hoverK === i;
+    const r = mk("rect", { x: x1 - 5, y: y, width: x2 - x1 + 10, height: 13, rx: 4 }, svg);
+    r.style.fill = a ? colFill(i) : "var(--wi-panel-2)";
+    r.style.stroke = a ? colStroke(i) : s.trial === i ? "var(--wi-examine)" : cands.has(i) || s.J === i ? "var(--wi-active)" : ks.has(i) ? "var(--wi-examine)" : "var(--wi-border)";
+    r.style.strokeWidth = hov ? 3 : (s.trial === i || cands.has(i) || ks.has(i) || s.J === i) ? 2 : 1;
+    if (st8.hoverK !== null && !hov) r.style.opacity = .35;
+    r.dataset.k = i; r.style.cursor = "pointer";
+    if (a) {
+      const rg = pairRange(s, a);
+      if (rg) {
+        const ix1 = xOf(rg[0]), ix2 = xOf(rg[1]);
+        if (rg[0] === rg[1]) mk("line", { x1: ix1, y1: y - 2, x2: ix1, y2: y + 15, style: "stroke:" + colStroke(i) + ";stroke-width:2.5;pointer-events:none" }, svg);
+        else mk("rect", { x: ix1 - 2, y: y + 3, width: ix2 - ix1 + 4, height: 7, rx: 2, style: "fill:" + colInner(i) + ";pointer-events:none" }, svg);
+      }
+      if (s.sol) { const d = s.sol[s.order.indexOf(a.v)] - s.sol[s.order.indexOf(a.u)]; mk("circle", { cx: xOf(d), cy: y + 6.5, r: 3.2, style: "fill:var(--wi-ink-strong);pointer-events:none" }, svg); }
+    }
+    const lab = mk("text", { x: (x1 + x2) / 2, y: y - 2, class: "ptlab faint", style: "pointer-events:none;font-size:10px" }, svg);
+    lab.textContent = a ? "x" + a.v + "−x" + a.u : "";
+    if (a) lab.style.fill = colStroke(i);
+    r.addEventListener("mouseenter", ev => showTip('<span class="tt-h">' + ivStr(iv) + "</span>" + (a ? "<br>assigned to x" + a.v + " − x" + a.u + (pairRange(s, a) ? "<br>currently possible: [" + pairRange(s, a).join(", ") + "]" : "") : "<br>unused") +
+                                                  (cands.has(i) ? '<br><span class="tt-s">could be the largest remaining distance</span>' : ""), ev));
+    r.addEventListener("mousemove", moveTip);
+    r.addEventListener("mouseleave", hideTip);
+  });
+  svg.onmousemove = ev => { const t = ev.target, k = t.dataset && t.dataset.k !== undefined ? Number(t.dataset.k) : null; if (k !== st8.hoverK) { st8.hoverK = k; player.render(); } };
+  svg.onmouseleave = () => { hideTip(); if (st8.hoverK !== null) { st8.hoverK = null; player.render(); } };
+  el("ivMeta").textContent = (s.U ? s.U.length : ivs.length) + " unused of " + ivs.length;
+}
+
+function drawTree(s, cur) {
+  const ivs = st8.ivs, parts = [], depthOf = {};
+  st8.frames.forEach(f => {
+    depthOf[f.id] = f.parent < 0 ? 0 : depthOf[f.parent] + 1;
+    if (f.createdAt > cur) return;
+    const status = f.okAt !== undefined && f.okAt <= cur ? "ok" : f.failAt !== undefined && f.failAt <= cur ? "fail" : "open";
+    const icon = status === "ok" ? "✓" : status === "fail" ? "✗" : "○";
+    let lab;
+    if (f.kind === "root") lab = "road: x1 − x0 ∈ " + ivStr(ivs[f.j]);
+    else if (f.kind === "place") lab = "x" + f.p + ": " + ivStr(ivs[f.j]) + " from " + (f.side === 0 ? "left" : "right") + ", between x" + f.L + " and x" + f.R;
+    else lab = "x" + f.v + " − x" + f.u + " ∈ " + ivStr(ivs[f.k]);
+    const kk = f.kind === "assign" ? f.k : f.j;
+    const sw = '<span class="sw" style="background:' + colFill(kk) + ';border-color:' + colStroke(kk) + '"></span>';
+    parts.push('<div class="frame ' + status + (f.id === s.fid ? " cur" : "") + '" style="padding-left:' + (6 + depthOf[f.id] * 14) + 'px"><span class="st">' + icon +
+               "</span>" + sw + '<span class="' + (f.kind === "assign" ? "lab" : "opt") + '">' + esc(lab) + "</span></div>");
+  });
+  el("tree").innerHTML = parts.join("") || '<span class="placeholder">Branches appear here: which interval is the largest, which end, which slot, which interval for each pair.</span>';
+  el("treeMeta").textContent = st8.frames.filter(f => f.createdAt <= cur).length + " / " + st8.frames.length + " branches";
+  const c = el("tree").querySelector(".frame.cur"); if (c) c.scrollIntoView({ block: "nearest" });
+}
+
+function renderCode(s) {
+  const hl = new Set(s.hl || []);
+  let no = 0;
+  el("code").innerHTML = CODE.map(l => {
+    const isPrune = l[0] === 13;
+    const line = l[1] === "" ? "" : String(++no);
+    return '<div class="cline' + (hl.has(l[0]) ? " on" : "") + (isPrune && !st8.prune ? " dimline" : "") + '"><span class="ln">' + line + "</span><span>" + l[1] + "</span></div>";
+  }).join("");
+  el("codeNote").innerHTML = "Every constraint <i>lo</i> ≤ x<sub>v</sub> − x<sub>u</sub> ≤ <i>hi</i> is two edges of a weighted graph; <b>feasible</b> means no negative " +
+    "cycle, and the tightest bound on any x<sub>v</sub> − x<sub>u</sub> is a shortest path (Floyd–Warshall on ≤ n nodes). The exits' bars are these bounds relative " +
+    "to x₀. The search is <b>complete</b> &mdash; it branches over everything the exact argument leaves open: which interval is the largest, which end, which slot, " +
+    "which interval for each new pair &mdash; so an exhausted search proves infeasibility. It is exponential in the worst case: the problem is strongly NP-hard, " +
+    "so unlike the exact turnpike there is no pseudopolynomial way around it." +
+    (st8.prune ? " <b>Pruning on:</b> before the pairs of a new exit are assigned one by one, a bipartite matching checks that they can get <i>distinct</i> unused intervals at all; " +
+                 "and the pair with the fewest candidate intervals is assigned first (fail early). Both are safe: they never discard a feasible branch."
+               : " The dimmed line and the ordering hint are the optional <b>pruning heuristics</b> (checkbox above); they keep the search exhaustive.");
+}
+
+function render(s, pl) {
+  draw(s); drawIntervals(s); drawTree(s, pl.cur); renderCode(s);
+  el("status").innerHTML = (s.txt || "") + (s.ans ? '<span class="ans">' + esc(s.ans) + "</span>" : "");
+  el("phase").textContent = pl.phases[s.ph] ? pl.phases[s.ph].name : "";
+}
+
+/* ---------- input ------------------------------------------------------------ */
+
+function parseIntervals(txt) {
+  const lines = stripComments(txt).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const ivs = []; let trueS = null;
+  for (const l of lines) {
+    const ms = l.match(/^(?:true\s+)?S\s*[:=]?\s*(.*)$/i);
+    if (ms) { trueS = parseIntList(ms[1]).sort(asc); continue; }
+    const m = l.match(/^(\d+)\s*(?:\.\.|–|-|,|\s)\s*(\d+)$/) || l.match(/^(\d+)$/);
+    if (!m) throw new Error("cannot read interval: " + l);
+    const lo = Number(m[1]), hi = m[2] !== undefined ? Number(m[2]) : lo;
+    if (hi < lo) throw new Error("lo > hi in: " + l);
+    if (lo < 1) throw new Error("distances must be ≥ 1 (" + l + ")");
+    ivs.push({ lo: lo, hi: hi });
+  }
+  if (!ivs.length) throw new Error("no intervals");
+  const n = (1 + Math.sqrt(1 + 8 * ivs.length)) / 2;
+  if (!Number.isInteger(n)) throw new Error(ivs.length + " intervals is not n(n−1)/2 for any n");
+  if (n > 10) throw new Error("at most 10 exits (45 intervals)");
+  return { ivs: ivs, n: n, trueS: trueS };
+}
+
+function setIntervals(ivs, n, trueS, fromPreset) {
+  st8.ivs = ivs.map((iv, i) => ({ lo: iv.lo, hi: iv.hi, id: i })); st8.n = n; st8.trueS = trueS || null;
+  el("text").value = (trueS ? "# measured from S " + trueS.join(" ") + "\n" : "") + ivs.map(ivStr).map(x => x.replace(/[\[\]]/g, "").replace(",", " ")).join("\n");
+  el("err").textContent = "";
+  if (!fromPreset) el("preset").value = "";
+  build();
+}
+
+function measure(S, eps, seed, tamperOn) {
+  const rand = rng(seed * 7919 + 17), D = deltaOf(S);
+  const ivs = D.map(d => { const e = Math.floor(rand() * (2 * eps + 1)) - eps; const m = d + e; return { lo: Math.max(1, m - eps), hi: m + eps }; });
+  if (tamperOn && ivs.length > 1) {
+    const i = Math.floor(rand() * (ivs.length - 1)), sh = (eps + 1) * (rand() < 0.5 ? -1 : 1);
+    ivs[i] = { lo: Math.max(1, ivs[i].lo + sh), hi: ivs[i].hi + sh };
+  }
+  return ivs;
+}
+
+function genFromForm(fromPreset) {
+  try {
+    const txt = el("genS").value.trim(); let S;
+    const m = txt.match(/^([SP])\b\s*[:=]?\s*(.*)$/i);
+    if (m && m[1].toUpperCase() === "S") { S = parseIntList(m[2]).sort(asc); if (S[0] !== 0) throw new Error("S must start with 0"); if (new Set(S).size !== S.length) throw new Error("repeated exit"); }
+    else { const P = parseIntList(m ? m[2] : txt); if (P.some(x => x < 1)) throw new Error("P entries must be ≥ 1"); S = prefSums(P); }
+    if (S.length < 2) throw new Error("need at least 2 exits");
+    if (S.length > 10) throw new Error("at most 10 exits");
+    const eps = Math.max(0, Math.min(20, Number(el("genEps").value) || 0)); el("genEps").value = eps;
+    const seed = Number(el("genSeed").value) || 0;
+    setIntervals(measure(S, eps, seed, el("genTamper").checked), S.length, S, fromPreset);
+  } catch (e) { el("err").textContent = e.message; }
+}
+
+const PRESETS = [
+  { key: "lect1", name: "S = [0,3,8,9,11], ε = 1",             S: "S 0 3 8 9 11", eps: 1, seed: 1 },
+  { key: "lect2", name: "S = [0,3,8,9,11], ε = 2 (ambiguous largest)", S: "S 0 3 8 9 11", eps: 2, seed: 4 },
+  { key: "exact", name: "S = [0,3,8,9,11], ε = 0 (exact case)", S: "S 0 3 8 9 11", eps: 0, seed: 1 },
+  { key: "six",   name: "6 exits, ε = 1",                        S: "S 0 4 10 15 17 18", eps: 1, seed: 2 },
+  { key: "tam",   name: "6 exits, ε = 1, one interval shifted (still feasible)",  S: "S 0 4 10 15 17 18", eps: 1, seed: 2, tamper: true },
+  { key: "inf",   name: "6 exits, ε = 0, one distance shifted (infeasible)",  S: "S 0 4 10 15 17 18", eps: 0, seed: 3, tamper: true },
+  { key: "clus",  name: "two clusters, ε = 1",                   S: "S 0 1 2 30 31 32", eps: 1, seed: 3 },
+  { key: "clust", name: "two clusters, ε = 1, one interval shifted", S: "S 0 1 2 30 31 32", eps: 1, seed: 3, tamper: true },
+  { key: "random", name: "random…",                              random: true }
+];
+
+/* ---------- draggable splitter between the two stage columns --------------- */
+function initSplitters() {
+  document.querySelectorAll(".stage").forEach(stage => {
+    if (stage.children.length !== 2) return;
+    const sp = document.createElement("div");
+    sp.className = "splitter"; sp.title = "drag to resize · double-click to reset";
+    stage.insertBefore(sp, stage.children[1]);
+    let dragging = false;
+    const setLeft = clientX => {
+      const r = stage.getBoundingClientRect();
+      const min = 300, max = r.width - 12 - 300;
+      if (max <= min) return;
+      const w = Math.max(min, Math.min(max, clientX - r.left - 6));
+      stage.style.setProperty("--left", w + "px"); stage.classList.add("sized");
+      window.dispatchEvent(new Event("resize"));      /* redraw the SVGs at the new width */
+    };
+    sp.addEventListener("pointerdown", ev => { dragging = true; sp.classList.add("drag"); sp.setPointerCapture(ev.pointerId); ev.preventDefault(); });
+    sp.addEventListener("pointermove", ev => { if (dragging) setLeft(ev.clientX); });
+    const stop = () => { dragging = false; sp.classList.remove("drag"); };
+    sp.addEventListener("pointerup", stop); sp.addEventListener("pointercancel", stop);
+    sp.addEventListener("dblclick", () => { stage.classList.remove("sized"); stage.style.removeProperty("--left"); window.dispatchEvent(new Event("resize")); });
+  });
+}
+
+function init() {
+  player = makePlayer("transport", render);
+  const sel = el("preset");
+  sel.innerHTML = PRESETS.map(p => '<option value="' + p.key + '">' + esc(p.name) + "</option>").join("") + '<option value="">(custom)</option>';
+  const apply = p => {
+    if (p.random) {
+      const n = rint(4, 7), P = randomP(n - 1, 9);
+      el("genS").value = "S " + prefSums(P).join(" "); el("genEps").value = rint(1, 2); el("genSeed").value = rint(1, 9999);
+    } else { el("genS").value = p.S; el("genEps").value = p.eps; el("genSeed").value = p.seed; el("genTamper").checked = !!p.tamper; }
+    genFromForm(true);
+  };
+  sel.addEventListener("change", () => { const p = PRESETS.find(q => q.key === sel.value); if (p) apply(p); });
+  el("genGo").addEventListener("click", () => { el("genSeed").value = rint(1, 9999); genFromForm(false); });
+  el("genS").addEventListener("keydown", ev => { if (ev.key === "Enter") el("genGo").click(); });
+  el("load").addEventListener("click", () => { try { const r = parseIntervals(el("text").value); setIntervals(r.ivs, r.n, r.trueS, false); } catch (e) { el("err").textContent = e.message; } });
+  const setFine = f => { st8.fine = f; el("detCoarse").classList.toggle("on", !f); el("detFine").classList.toggle("on", f); build(); };
+  el("detCoarse").addEventListener("click", () => setFine(false));
+  el("detFine").addEventListener("click", () => setFine(true));
+  el("prune").addEventListener("change", () => { st8.prune = el("prune").checked; build(); });
+  window.addEventListener("resize", () => player.render());
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
+    if (ev.key === "ArrowRight") { player.stop(); player.fwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft")  { player.stop(); player.back(); ev.preventDefault(); }
+    if (ev.key === " ")          { player.play(); ev.preventDefault(); }
+  });
+  sel.value = "lect1"; apply(PRESETS[0]);
+}
+document.addEventListener("DOMContentLoaded", () => { init(); initSplitters(); });
+</script>
+</body>
+</html>

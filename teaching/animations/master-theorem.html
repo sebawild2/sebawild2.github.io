@@ -1,0 +1,1803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Master Theorem &middot; recursion trees, growing n, and Roura's discrete master theorem</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-done:#902015; --wi-inert:#b6b1a1; --wi-inert-border:#8d897c;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+
+    /* --- the four ingredients of a D&C recurrence keep one colour each,
+           everywhere on this page: green!50!black, blue!80!black, violet,
+           orange of the slides (orange darkened for contrast on cream) --- */
+    --mt-a:#1a7a1a;            /* a  — how many subproblems      */
+    --mt-b:#1f1fc4;            /* b  — how much smaller they are */
+    --mt-f:#800080;            /* f  — the conquer effort        */
+    --mt-d:#c25e00;            /* d  — the base case             */
+    --mt-c:#902015;            /* c = log_b(a), the exponent that decides everything */
+    --mt-f-fill:#e6d3e6; --mt-f-fill2:#d8bcd8;
+    --mt-d-fill:#f2ddc2;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .wi-topbar { display:flex; justify-content:space-between; font-size:.78rem;
+               color:var(--wi-ink-faint); margin-bottom:10px; font-family:var(--wi-font-head);
+               letter-spacing:.06em; }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  /* --- maths, set by hand: the page must stay one standalone file --- */
+  .m { font-style:italic; }
+  .mr { font-style:normal; }
+  sup, sub { font-size:.7em; line-height:0; }
+  .ca { color:var(--mt-a); font-weight:bold; }
+  .cb { color:var(--mt-b); font-weight:bold; }
+  .cf { color:var(--mt-f); font-weight:bold; }
+  .cd { color:var(--mt-d); font-weight:bold; }
+  .cc { color:var(--mt-c); font-weight:bold; }
+  .num { font-family:var(--wi-font-mono); font-size:.86em; font-style:normal; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:12px; }
+  .ctl { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  .ctl > label.mathlabel { font-family:var(--wi-font-body); font-size:.95rem; text-transform:none;
+                           letter-spacing:0; }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.tiny { width:4.2em; text-align:center; font-family:var(--wi-font-mono); font-size:.8rem; }
+  input.mid { width:9em; font-family:var(--wi-font-mono); font-size:.8rem; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* --- transport --- */
+  .tbtns { display:flex; gap:6px; }
+  .tbtn { width:40px; padding:7px 0; font-size:1.02rem; line-height:1.05; text-align:center;
+          font-variant-emoji:text; }              /* keep the glyphs monochrome, not colour emoji */
+  .tbtn:disabled { opacity:.32; }
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:16px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+  .progress { flex:1 1 320px; min-width:220px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; }
+  .phasebar { display:flex; width:100%; margin-top:3px; }
+  .phasebtn { flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn.on { background:var(--wi-panel-2); border-color:var(--wi-accent-soft); color:var(--wi-accent);
+                 font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); background:var(--wi-panel-2); }
+  .explain { margin-top:9px; font-size:.85rem; color:var(--wi-ink-strong); min-height:2.6em; line-height:1.45; }
+
+  /* --- stage --- */
+  .stage { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(340px,.95fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .col-main { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-size:.95em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius);
+                 width:100%; touch-action:none; }
+
+  /* --- the theorem, centre piece --- */
+  .recbox { border:1px solid var(--wi-border); background:var(--wi-panel-2); border-radius:var(--wi-radius);
+            padding:9px 13px; font-size:.95rem; margin-bottom:12px; text-align:center; }
+  .dcases { display:inline-grid; grid-template-columns:auto auto; gap:1px 14px; text-align:left;
+            border-left:2px solid var(--wi-ink); padding-left:9px; vertical-align:middle;
+            font-size:.92em; }
+  .dcases .cond { color:var(--wi-ink-faint); font-size:.86em; }
+  .thm { border:1px solid var(--wi-border-soft); border-left:3px solid var(--wi-accent);
+         background:var(--wi-panel-2); border-radius:var(--wi-radius); padding:10px 13px; }
+  .thm h3 { font-size:.74rem; text-transform:uppercase; letter-spacing:.1em; color:var(--wi-accent);
+            margin:0 0 7px; }
+  .thmlead { font-size:.86rem; margin-bottom:8px; }
+  .thmcase { display:grid; grid-template-columns:1.6em 1fr; gap:0 6px; padding:6px 8px; border-radius:3px;
+             font-size:.86rem; border:1px solid transparent; cursor:default; }
+  .thmcase + .thmcase { margin-top:3px; }
+  .thmcase .tag { color:var(--wi-ink-faint); }
+  .thmcase.on { background:#f6e6df; border-color:var(--wi-accent-soft); }
+  .thmcase.off { opacity:.5; }
+  .thmcase .check { grid-column:2; font-size:.84em; margin-top:3px; color:var(--wi-ink-soft); display:block; }
+  .thmcase.on .check { color:var(--wi-accent-dark); }
+  .verdict { font-size:1.05rem; text-align:center; padding:6px 0 2px; }
+  .verdict .big { font-size:1.25rem; }
+  .vnote { font-size:.78rem; color:var(--wi-ink-soft); text-align:center; margin-top:5px; line-height:1.45; }
+  .warn { border-left:3px solid var(--wi-active); background:#f7ece8; padding:7px 11px;
+          border-radius:3px; font-size:.8rem; margin-top:9px; color:var(--wi-ink-strong); }
+
+  /* --- tables --- */
+  table.led { border-collapse:collapse; width:100%; font-size:.76rem; font-family:var(--wi-font-mono); }
+  table.led th { font-family:var(--wi-font-head); font-size:.66rem; text-transform:uppercase;
+                 letter-spacing:.07em; color:var(--wi-ink-faint); font-weight:normal;
+                 text-align:right; padding:2px 5px; border-bottom:1px solid var(--wi-border-soft); }
+  table.led th:first-child, table.led td:first-child { text-align:left; }
+  table.led td { text-align:right; padding:2px 5px; border-bottom:1px solid #e4dccf; }
+  table.led tr:hover td { background:#f2e7e2; }
+  table.led tr.leafrow td { color:var(--mt-d); }
+  table.led tr.sumrow td { border-top:1px solid var(--wi-border); border-bottom:0;
+                           font-weight:bold; color:var(--wi-ink-strong); }
+  table.led td.share { color:var(--wi-ink-faint); }
+  .scroller { max-height:290px; overflow:auto; }
+
+  /* --- collapsibles --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; margin-top:16px; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .condbody { padding:12px 16px 16px; display:grid; grid-template-columns:1fr 1fr; gap:16px 22px; }
+  @media (max-width:900px) { .condbody { grid-template-columns:1fr; } }
+  .lem { font-size:.84rem; }
+  .lem h4 { font-family:var(--wi-font-head); font-size:.72rem; letter-spacing:.08em; text-transform:uppercase;
+            color:var(--wi-accent); margin:0 0 5px; }
+  .lem p { margin:0 0 7px; }
+  .quant { font-size:.86em; background:var(--wi-panel-2); border:1px solid var(--wi-border-soft);
+           border-radius:3px; padding:6px 9px; display:block; margin:6px 0; }
+  .yes { color:var(--wi-relax); font-weight:bold; }
+  .no { color:var(--wi-active); font-weight:bold; }
+  .maybe { color:var(--wi-examine); font-weight:bold; }
+  details.editor { margin-top:16px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:190px; font-family:var(--wi-font-mono); font-size:.76rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:260px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+
+  .echo { font-size:.82rem; color:var(--wi-ink-soft); font-style:italic; }
+  .echo b { font-style:normal; color:var(--wi-ink-strong); }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.75rem; color:var(--wi-ink-soft);
+            margin-top:8px; }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.8em; height:.8em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.28rem; }
+    .controls { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
+
+  /* ---------- SVG ---------- */
+  svg text { font-family:var(--wi-font-body); fill:var(--wi-ink-strong); }
+  svg .sa { fill:var(--mt-a); font-weight:bold; } svg .sb { fill:var(--mt-b); font-weight:bold; }
+  svg .sf { fill:var(--mt-f); font-weight:bold; } svg .sd { fill:var(--mt-d); font-weight:bold; }
+  svg .sc { fill:var(--mt-c); font-weight:bold; }
+  /* the reveal of the recursion tree is the only place we animate opacity */
+  #mainSvg > g[data-at] { transition:opacity .38s ease; }
+
+  .nd { fill:var(--mt-f-fill); stroke:var(--mt-f); stroke-width:1.1; }
+  .nd.dnode { fill:var(--mt-d-fill); stroke:var(--mt-d); }
+  .ndt { text-anchor:middle; fill:var(--wi-ink-strong); font-style:italic; }
+  .tedge { stroke:var(--wi-ink-soft); stroke-width:.9; }
+  .aarc { fill:none; stroke:var(--wi-ink-soft); stroke-width:.9; }
+  .alab { fill:var(--mt-a); font-weight:bold; font-size:12px; text-anchor:middle; }
+  .subnote { text-anchor:start; font-size:9.5px; fill:var(--wi-ink-faint); font-style:italic; }
+  .dots { text-anchor:middle; fill:var(--wi-ink-faint); font-size:13px; }
+  .depth { stroke:var(--mt-d); stroke-width:1.4; }
+  .depthhead { fill:var(--mt-d); }
+  .depthlab { text-anchor:middle; fill:var(--mt-d); font-size:11.5px; }
+  .brace { fill:none; stroke:var(--mt-d); stroke-width:1.2; }
+  .leaflab { text-anchor:middle; font-size:12px; font-style:italic; }
+  .tot-arrow { stroke:var(--wi-queue); stroke-width:1.2; }
+  .totlab { text-anchor:start; font-size:12.5px; font-style:italic; }
+  .totlab.hot { font-size:13.5px; }
+  .rule { stroke:var(--wi-border); stroke-width:1; }
+  .total { text-anchor:middle; font-size:14px; font-style:italic; }
+  .totalsub { text-anchor:middle; font-size:10.5px; fill:var(--wi-ink-faint); font-style:normal;
+              font-family:var(--wi-font-head); letter-spacing:.03em; }
+
+  .gframe { fill:none; stroke:var(--wi-border-soft); stroke-width:1; stroke-dasharray:3 4; }
+  .gbar { cursor:crosshair; }
+  .gconn { stroke:var(--wi-ink-faint); stroke-width:.5; opacity:.45; }
+  .glvl { text-anchor:end; font-size:10px; fill:var(--wi-ink-faint); font-family:var(--wi-font-mono); }
+  .gval { text-anchor:start; font-size:10.5px; font-family:var(--wi-font-mono); }
+  .gshare { text-anchor:start; font-size:9.5px; fill:var(--wi-ink-faint); font-family:var(--wi-font-mono); }
+  .gside { text-anchor:end; font-size:9.5px; font-family:var(--wi-font-head); letter-spacing:.06em;
+           text-transform:uppercase; }
+  .gside.sf { fill:var(--mt-f); } .gside.sd { fill:var(--mt-d); }
+  .grulelab { text-anchor:middle; font-size:11px; fill:var(--wi-ink-soft); }
+
+  .fulcrum { fill:var(--wi-controls); stroke:var(--wi-border-strong); stroke-width:1.2; }
+  .ground { stroke:var(--wi-border-strong); stroke-width:2; }
+  .beam { stroke:var(--wi-ink); stroke-width:3.5; stroke-linecap:round; transition:none; }
+  .pivot { fill:var(--wi-ink); }
+  .pstring { stroke:var(--wi-ink-soft); stroke-width:1; }
+  .panlab { text-anchor:middle; font-size:10px; font-family:var(--wi-font-head); letter-spacing:.09em;
+            text-transform:uppercase; }
+  .panval { text-anchor:middle; font-size:13px; font-family:var(--wi-font-mono); }
+  .pansub { text-anchor:middle; font-size:12px; font-style:italic; fill:var(--wi-ink-soft); }
+  .scalenote { text-anchor:middle; font-size:11px; fill:var(--wi-ink-faint); }
+
+  .grid { stroke:var(--wi-border-soft); stroke-width:.7; stroke-dasharray:2 4; }
+  .axlab { text-anchor:end; font-size:9.5px; fill:var(--wi-ink-faint); font-family:var(--wi-font-mono); }
+  .axlab.mid { text-anchor:middle; }
+  .axtitle { text-anchor:middle; font-size:10.5px; fill:var(--wi-ink-soft); }
+  .serlab { text-anchor:start; font-size:10px; font-family:var(--wi-font-mono); }
+
+  .rlab { text-anchor:start; font-size:11px; fill:var(--wi-ink-soft); }
+  .rparent { fill:var(--mt-f-fill); stroke:var(--mt-f); stroke-width:1.1; }
+  .rchild { fill:var(--mt-f-fill2); stroke:var(--mt-f); stroke-width:1; }
+  .rchildlab { text-anchor:middle; font-size:10.5px; font-style:italic; }
+  .rgap { fill:#e8dbc4; stroke:var(--wi-accent); stroke-width:1.1; }
+  .rgaplab { text-anchor:middle; font-size:12px; fill:var(--wi-accent); font-weight:bold; }
+  .rmark { stroke:var(--wi-border-strong); stroke-width:.8; stroke-dasharray:2 3; }
+  .rH { text-anchor:end; font-size:14px; fill:var(--wi-accent); font-weight:bold; }
+  .rcurve { fill:none; stroke:var(--mt-f); stroke-width:2; }
+  .rtilde { stroke:var(--wi-accent); stroke-width:1; stroke-dasharray:4 3; }
+  .rtildelab { text-anchor:start; font-size:10.5px; fill:var(--wi-accent); }
+  .ralpha { stroke:var(--wi-queue); stroke-width:1.2; }
+  .rdot { fill:var(--wi-queue); }
+  .rdotlab { text-anchor:start; font-size:11px; fill:var(--wi-queue); }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+  <span>Divide &amp; conquer recurrences</span>
+</div>
+
+<div class="titlebar">
+  <h1 id="h1title">The Master Theorem</h1>
+  <span class="seg" id="modeSeg">
+    <button data-mode="grow" class="on">Intuition</button>
+    <button data-mode="tree">Master theorem</button>
+    <button data-mode="roura">Roura</button>
+  </span>
+</div>
+
+<p class="subtitle" id="sub"></p>
+
+<div class="controls" id="ctlMain">
+  <div class="ctl"><label for="presetSel">Example</label>
+    <select id="presetSel"></select></div>
+  <div class="ctl" data-only="mt"><label>Recurrence</label>
+    <span><span class="m ca">a</span> <input class="tiny" id="inA" value="2"></span>
+    <span><span class="m cb">b</span> <input class="tiny" id="inB" value="2"></span>
+    <span><span class="m cd">d</span> <input class="tiny" id="inD" value="1"></span>
+  </div>
+  <div class="ctl"><label class="mathlabel"><span class="m cf">f</span>(<span class="m">n</span>) =</label>
+    <input class="tiny" id="inFB" value="1" title="leading constant B">
+    <span class="m">n</span><sup><input class="tiny" id="inBeta" value="1" style="width:3.4em" title="exponent &beta;"></sup>
+    <span class="mr">&middot; lg</span><sup><input class="tiny" id="inGam" value="0" style="width:3.4em" title="exponent &gamma;"></sup><span class="m">n</span>
+    <span class="echo" id="fEcho"></span>
+  </div>
+  <div class="ctl" data-only="roura"><label for="inTerms">Terms</label>
+    <input class="mid" id="inTerms" value="2 2" title="one &quot;a b&quot; pair per subproblem size, comma separated">
+    <span class="echo" id="termsEcho"></span></div>
+  <div class="ctl" data-only="tree"><label>Tree</label>
+    <span class="seg" id="symSeg">
+      <button data-sym="1" class="on">symbolic</button>
+      <button data-sym="0">with numbers</button>
+    </span></div>
+  <div class="ctl" data-only="grow"><label for="inK">max <span class="m">k</span></label>
+    <input class="tiny" id="inK" value="12"></div>
+  <div class="ctl" data-only="grow"><label>Bar width</label>
+    <span class="seg" id="normSeg">
+      <button data-norm="share" class="on">share of T(n)</button>
+      <button data-norm="max">widest level</button>
+    </span></div>
+  <div class="ctl"><button id="btnReset">Reset</button></div>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <div class="tbtns">
+      <button id="btnFirst" class="tbtn" title="Back to the first step"
+              aria-label="Back to the first step">&#8634;</button>
+      <button id="btnPrev" class="tbtn" title="One step back (left arrow key)"
+              aria-label="One step back">&#9198;&#65038;</button>
+      <button id="btnNext" class="tbtn" title="One step forward (right arrow key)"
+              aria-label="One step forward">&#9197;&#65038;</button>
+      <button id="playBtn" class="tbtn pri" title="Play (space bar)"
+              aria-label="Play">&#9654;&#65038;</button>
+    </div>
+    <div class="progress">
+      <input type="range" id="slider" min="0" max="1" value="0" step="1">
+      <div class="phasebar" id="phasebar"></div>
+    </div>
+    <span class="stepno" id="stepno"></span>
+  </div>
+  <div class="explain" id="explain"></div>
+</div>
+
+<div class="stage">
+  <div class="col-main">
+    <div class="sim-box">
+      <div class="sim-title"><span id="svgTitle">Recursion tree</span><span class="rhs" id="svgRhs"></span></div>
+      <svg id="mainSvg" class="stagesvg" viewBox="0 0 720 470" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="sim-box" id="scaleBox">
+      <div class="sim-title"><span>The balance</span><span class="rhs" id="scaleRhs"></span></div>
+      <svg id="scaleSvg" class="stagesvg" viewBox="0 0 720 218" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+    <div class="sim-box" id="ratioBox" style="display:none">
+      <div class="sim-title"><span>Is the prediction right?</span><span class="rhs" id="ratioRhs"></span></div>
+      <svg id="ratioSvg" class="stagesvg" viewBox="0 0 720 200" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box" id="thmBox"></div>
+    <div class="sim-box" id="verdictBox"></div>
+    <div class="sim-box" id="ledgerBox"></div>
+  </div>
+</div>
+
+<details class="code" id="condBox" open>
+  <summary>Side conditions &nbsp;&middot;&nbsp; regularity, rounding, and when you may skip both</summary>
+  <div class="condbody">
+    <div class="lem">
+      <h4>The regularity condition</h4>
+      <p>Case (c) needs it, and it is the only genuinely technical part of the theorem:</p>
+      <span class="quant">&exist;<span class="m">n</span><sub>0</sub>, &alpha; &lt; 1 &nbsp;&forall;<span class="m">n</span> &ge; <span class="m">n</span><sub>0</sub> :&nbsp;
+        <span class="m ca">a</span> &middot; <span class="m cf">f</span>(<span class="m">n</span>/<span class="m cb">b</span>) &le; &alpha; <span class="m cf">f</span>(<span class="m">n</span>)</span>
+      <p>It says the children's conquer work is a <em>constant factor smaller</em> than the parent's — so the sum
+         over the levels is a decaying geometric series and the root really does pay for everything.</p>
+      <p><b>Lemma (regularity condition).</b> For <span class="m cf">f</span>(<span class="m">n</span>) =
+         <span class="m">n</span><sup>&beta;</sup> lg<sup>&gamma;</sup>(<span class="m">n</span>) with constants
+         &beta; &gt; log<sub class="cb">b</sub>(<span class="ca">a</span>) and &gamma;, the regularity condition holds.</p>
+      <p id="regReport" class="hint"></p>
+    </div>
+    <div class="lem">
+      <h4>What about rounding?</h4>
+      <p>For general <span class="m">n</span> the subproblems are &lfloor;<span class="m">n</span>/<span class="m cb">b</span>&rfloor;
+         and &lceil;<span class="m">n</span>/<span class="m cb">b</span>&rceil;. In general that matters — but:</p>
+      <p><b>Lemma (polynomial-growth master method).</b> If <span class="m cf">f</span> satisfies the
+         polynomial-growth condition, the &Theta;-class of the solution is the same with or without floors and ceilings.</p>
+      <span class="quant">&exist;<span class="m">n</span><sub>0</sub> &nbsp;&forall;<span class="m">C</span> &ge; 1
+        &nbsp;&exist;<span class="m">D</span> &gt; 1 &nbsp;&forall;<span class="m">n</span> &ge; <span class="m">n</span><sub>0</sub>
+        &nbsp;&forall;<span class="m">t</span> &isin; [1, <span class="m">C</span>] :&nbsp;
+        <sup>1</sup>&frasl;<sub><span class="m">D</span></sub> <span class="m cf">f</span>(<span class="m">n</span>) &le;
+        <span class="m cf">f</span>(<span class="m">t</span> <span class="m">n</span>) &le;
+        <span class="m">D</span> <span class="m cf">f</span>(<span class="m">n</span>)</span>
+      <p class="hint">Growing <span class="m">n</span> by up to a constant factor <span class="m">C</span> changes the
+        function value by at most a constant factor <span class="m">D</span> = <span class="m">D</span>(<span class="m">C</span>),
+        for large enough <span class="m">n</span>. In particular every
+        <span class="m cf">f</span>(<span class="m">n</span>) = &Theta;(<span class="m">n</span><sup>&beta;</sup>
+        log<sup>&gamma;</sup>(<span class="m">n</span>) log log<sup>&delta;</sup>(<span class="m">n</span>)) qualifies —
+        zero exponents allowed. <i>(The lemma's local variable is written</i> <span class="m">t</span>
+        <i>here, to keep it apart from</i> <span class="m cc">c</span> = log<sub class="cb">b</sub><span class="ca">a</span><i>.)</i></p>
+      <p id="pgReport" class="hint"></p>
+    </div>
+    <div class="lem" style="grid-column:1/-1">
+      <h4>Where the master theorem says nothing</h4>
+      <p id="gapNote" class="hint"></p>
+    </div>
+  </div>
+</details>
+
+<details class="code" id="rouraThmBox" open style="display:none">
+  <summary>Roura&rsquo;s discrete master theorem &nbsp;&middot;&nbsp; the statement in full</summary>
+  <div class="condbody" style="grid-template-columns:1fr">
+    <div class="lem">
+      <h4>Theorem (Roura&rsquo;s discrete master theorem)</h4>
+      <p>Let <span class="m">T</span>(<span class="m">n</span>) be recursively defined as</p>
+      <div class="recbox" style="margin:10px 0">
+        <span class="m">T</span>(<span class="m">n</span>) =
+        <span class="dcases">
+          <span><span class="m">b</span><sub><span class="m">n</span></sub></span>
+          <span class="cond">0 &le; <span class="m">n</span> &lt; <span class="m">n</span><sub>0</sub>,</span>
+          <span><span class="m cf">f</span>(<span class="m">n</span>) + &sum;<sub><span class="m">d</span>=1</sub><sup><span class="m">D</span></sup>
+            <span class="m ca">a</span><sub><span class="m">d</span></sub> &middot;
+            <span class="m">T</span>(<span class="m">n</span>/<span class="m cb">b</span><sub><span class="m">d</span></sub> +
+            <span class="m">r</span><sub><span class="m">n</span>,<span class="m">d</span></sub>)</span>
+          <span class="cond"><span class="m">n</span> &ge; <span class="m">n</span><sub>0</sub>,</span>
+        </span>
+      </div>
+      <p>where <span class="m">D</span> &isin; &#8469;, <span class="m ca">a</span><sub><span class="m">d</span></sub> &gt; 0,
+        <span class="m cb">b</span><sub><span class="m">d</span></sub> &gt; 1, for <span class="m">d</span> = 1, &hellip;, <span class="m">D</span>
+        are constants, functions <span class="m">r</span><sub><span class="m">n</span>,<span class="m">d</span></sub> satisfy
+        |<span class="m">r</span><sub><span class="m">n</span>,<span class="m">d</span></sub>| = O(1) as <span class="m">n</span> &rarr; &infin;,
+        and function <span class="m cf">f</span>(<span class="m">n</span>) satisfies
+        <span class="m cf">f</span>(<span class="m">n</span>) ~ <span class="m">B</span> &middot; <span class="m">n</span><sup>&alpha;</sup>(ln <span class="m">n</span>)<sup>&gamma;</sup>
+        for constants <span class="m">B</span> &gt; 0, &alpha;, &gamma;.</p>
+      <p>Set H = 1 &minus; &sum;<sub><span class="m">d</span>=1</sub><sup><span class="m">D</span></sup>
+        <span class="m ca">a</span><sub><span class="m">d</span></sub>(1/<span class="m cb">b</span><sub><span class="m">d</span></sub>)<sup>&alpha;</sup>;
+        then we have:</p>
+      <div id="rouraFull"></div>
+      <p class="hint" style="margin-top:10px">Two things the master theorem cannot do are built in here: the subproblem sizes
+        <span class="m cb">b</span><sub><span class="m">d</span></sub> may differ from each other, and the shift
+        <span class="m">r</span><sub><span class="m">n</span>,<span class="m">d</span></sub> absorbs floors and ceilings, so no separate
+        rounding lemma is needed. The base-case values <span class="m">b</span><sub><span class="m">n</span></sub> are arbitrary; they
+        do not affect the &Theta;-class, though they do affect constants below the leading term.</p>
+      <h4 style="margin-top:14px">Entering a recurrence</h4>
+      <p>The <b>Terms</b> box holds one <code>a&nbsp;b</code> pair per subproblem size, separated by commas &mdash; the
+        <span class="m ca">a</span><sub><span class="m">d</span></sub> and <span class="m cb">b</span><sub><span class="m">d</span></sub>
+        above. Fractions are allowed. So <code>2 2</code> means 2&thinsp;<span class="m">T</span>(<span class="m">n</span>/2),
+        and <code>1 5, 1 10/7</code> means <span class="m">T</span>(<span class="m">n</span>/5) +
+        <span class="m">T</span>(7<span class="m">n</span>/10) &mdash; the median-of-medians recurrence. The
+        <span class="m cf">f</span>(<span class="m">n</span>) boxes then give &alpha; and &gamma;; they are written in lg here and
+        converted to ln internally, which only changes the constant <span class="m">B</span>.</p>
+    </div>
+  </div>
+</details>
+
+<details class="editor">
+  <summary>Load an example &nbsp;&middot;&nbsp; plain-text recurrence format</summary>
+  <div class="editor-body">
+    <div>
+      <div class="hint" style="margin-bottom:8px">One <code>key value</code> per line. Everything is optional;
+        omitted keys keep their current value.</div>
+      <div class="hint" style="font-family:var(--wi-font-mono); font-size:.72rem; line-height:1.6">
+        <code>name</code> label shown in the dropdown<br>
+        <code>a</code> number of subproblems<br>
+        <code>b</code> shrink factor (fractions ok: <code>10/7</code>)<br>
+        <code>d</code> base-case cost<br>
+        <code>f</code> <code>B n^beta lg^gamma</code> as three numbers,<br>
+        &nbsp;&nbsp;&nbsp;e.g. <code>f 1 1 1</code> is <span class="m">n</span> lg <span class="m">n</span><br>
+        <code>terms</code> Roura mode: <code>a b, a b, …</code><br>
+        <code>k</code> largest exponent in “growing <span class="m">n</span>”<br>
+        <code>note</code> a line of commentary
+      </div>
+    </div>
+    <div>
+      <textarea id="ta" spellcheck="false"></textarea>
+      <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap">
+        <button id="btnLoad" class="pri">Load</button>
+        <button id="btnDump">Copy current</button>
+      </div>
+      <div class="err" id="taErr"></div>
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tt"></div>
+
+<script>
+"use strict";
+/* ============================================================================
+   The Master Theorem — three views of one recurrence.
+     mode "tree"  : the symbolic recursion tree (Cormen's picture, animated)
+     mode "grow"  : real numbers; every level is a bar whose width is its share
+                    of the total cost, and n grows by factors of b
+     mode "roura" : Roura's discrete master theorem, which covers the gaps
+   Everything is derived from one parameter block, so switching modes never
+   changes the recurrence under discussion.
+   ========================================================================= */
+
+const el = id => document.getElementById(id);
+const LN2 = Math.LN2;
+const lg = x => Math.log(x) / LN2;
+const clamp = (x, a, b) => x < a ? a : (x > b ? b : x);
+
+/* --- parameters ---------------------------------------------------------- */
+const P = { a:2, b:2, B:1, beta:1, gamma:0, d:1, K:12,
+            terms:[{a:2,b:2}], name:"Mergesort", note:"" };
+let mode = "grow", step = 0, playing = false, timer = null;
+
+const f = x => P.B * Math.pow(x, P.beta) * (P.gamma === 0 ? 1 : Math.pow(lg(x), P.gamma));
+const cExp = () => Math.log(P.a) / Math.log(P.b);          /* c = log_b(a) */
+
+/* --- number formatting --------------------------------------------------- */
+const SUPD = {"0":"\u2070","1":"\u00b9","2":"\u00b2","3":"\u00b3","4":"\u2074",
+              "5":"\u2075","6":"\u2076","7":"\u2077","8":"\u2078","9":"\u2079","-":"\u207b"};
+const supStr = s => String(s).split("").map(ch => SUPD[ch] || ch).join("");
+function sci(x) {
+  const e = Math.floor(Math.log10(Math.abs(x)));
+  const m = x / Math.pow(10, e);
+  return m.toFixed(2) + "\u00b710" + supStr(e);
+}
+function fmt(x) {
+  if (!isFinite(x)) return "\u221e";
+  const a = Math.abs(x);
+  if (a === 0) return "0";
+  if (a >= 1e5 || a < 1e-3) return sci(x);
+  if (a >= 1000) return x.toFixed(0);
+  if (a >= 100) return x.toFixed(1);
+  if (a >= 10) return x.toFixed(2);
+  return x.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+}
+function fmtNum(x) {                       /* for n, which is a whole number */
+  if (x >= 1e6) return sci(x);
+  return (Math.round(x * 1000) / 1000).toLocaleString("en-US");
+}
+/* a number the way you would write it in a formula: 2, 1.585, 4/3 */
+function nice(x) {
+  const r = Math.round(x);
+  if (Math.abs(x - r) < 1e-9) return String(r);
+  for (let q = 2; q <= 12; q++) {
+    const p = x * q;
+    if (Math.abs(p - Math.round(p)) < 1e-9) return Math.round(p) + "/" + q;
+  }
+  return (Math.round(x * 1000) / 1000).toString();
+}
+function frac(s) {
+  s = String(s).trim();
+  const m = s.match(/^(-?[\d.]+)\s*\/\s*(-?[\d.]+)$/);
+  if (m) return parseFloat(m[1]) / parseFloat(m[2]);
+  const v = parseFloat(s);
+  return isNaN(v) ? NaN : v;
+}
+/* superscript / subscript inside an SVG <text> */
+const S_UP = s => '<tspan baseline-shift="super" font-size="70%">' + s + '</tspan>';
+const S_DN = s => '<tspan baseline-shift="sub" font-size="70%">' + s + '</tspan>';
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+/* --- f(n) written out ---------------------------------------------------- */
+function fName(html) {
+  const up = html ? (s => "<sup>" + s + "</sup>") : S_UP;
+  let s = "";
+  if (P.B !== 1 || (P.beta === 0 && P.gamma === 0)) s += nice(P.B);
+  if (P.beta !== 0) s += (s ? "\u2009" : "") + "n" + (P.beta === 1 ? "" : up(nice(P.beta)));
+  if (P.gamma !== 0) s += (s ? "\u2009" : "") + "lg" + (P.gamma === 1 ? "" : up(nice(P.gamma))) + "\u2009n";
+  return s || "1";
+}
+
+/* --- which case of the theorem applies? ---------------------------------- */
+function analyse() {
+  const c = cExp(), eps = P.beta - c, T = 1e-9;
+  if (P.beta < c - T)  return { c:c, kase:"a", eps:c - P.beta,
+    why:"&beta; = " + nice(P.beta) + " &lt; " + fmt(c) + " = <span class='cc'>c</span>, so <span class='cf'>f</span>(n) = O(n<sup><span class='cc'>c</span>&minus;&epsilon;</sup>) with &epsilon; = " + fmt(c - P.beta) };
+  if (Math.abs(eps) < T && P.gamma === 0) return { c:c, kase:"b",
+    why:"&beta; = <span class='cc'>c</span> and &gamma; = 0, so <span class='cf'>f</span>(n) = &Theta;(n<sup><span class='cc'>c</span></sup>) exactly" };
+  if (P.beta > c + T)  return { c:c, kase:"c", eps:P.beta - c,
+    why:"&beta; = " + nice(P.beta) + " &gt; " + fmt(c) + " = <span class='cc'>c</span>, so <span class='cf'>f</span>(n) = &Omega;(n<sup><span class='cc'>c</span>+&epsilon;</sup>) with &epsilon; = " + fmt(P.beta - c) +
+        ", and regularity holds by the lemma" };
+  return { c:c, kase:"-", gap:true,
+    why:"&beta; = <span class='cc'>c</span> but &gamma; = " + nice(P.gamma) + " &ne; 0: <span class='cf'>f</span> is n<sup><span class='cc'>c</span></sup> times a log factor, which is neither " +
+        "O(n<sup><span class='cc'>c</span>&minus;&epsilon;</sup>) nor &Omega;(n<sup><span class='cc'>c</span>+&epsilon;</sup>) nor &Theta;(n<sup><span class='cc'>c</span></sup>)" };
+}
+/* the closed form the theorem promises (or, in the gap, what is really true) */
+function cText() {   /* n^c written for the value of c we actually have */
+  const c = cExp();
+  if (Math.abs(c) < 1e-12) return "";
+  const cs = '<span class="cc">' + (Math.abs(c - Math.round(c)) < 1e-9 ? nice(c) : fmt(c)) + '</span>';
+  return Math.abs(c - 1) < 1e-12 ? "n" : ("n<sup>" + cs + "</sup>");
+}
+function closedForm() {
+  const A = analyse(), c = A.c, nc = cText();
+  if (A.kase === "a") return { form:"\u0398(" + (nc || "1") + ")", tag:"the leaves pay for everything" };
+  if (A.kase === "b") return { form:"\u0398(" + (nc ? nc + "\u2009" : "") + "log n)", tag:"every level costs the same" };
+  if (A.kase === "c") return { form:"\u0398(<span class='cf'>f</span>(n)) = \u0398(" + fName(true) + ")", tag:"the root pays for everything" };
+  /* the gap: beta = c, gamma != 0 — Roura still gives the answer */
+  const g = P.gamma, base = (nc ? nc + "\u2009" : "");
+  if (g > -1) return { form:"\u0398(" + base + "lg<sup>" + nice(g+1) + "</sup> n)", gap:true,
+                       tag:"not covered by the theorem \u2014 Roura's case (b)" };
+  if (Math.abs(g + 1) < 1e-9) return { form:"\u0398(" + base + "log log n)", gap:true,
+                       tag:"not covered by the theorem \u2014 Roura's case (c)" };
+  return { form:"\u0398(" + (nc || "1") + ")", gap:true,
+           tag:"not covered by the theorem \u2014 Roura's case (d)" };
+}
+
+/* --- the levels of the recursion tree for n = b^k ------------------------- */
+function levels(k) {
+  const rows = [];
+  for (let j = 0; j < k; j++) {
+    const size = Math.pow(P.b, k - j), cnt = Math.pow(P.a, j);
+    rows.push({ j:j, size:size, cnt:cnt, each:f(size), cost:cnt * f(size), leaf:false });
+  }
+  const cnt = Math.pow(P.a, k);
+  rows.push({ j:k, size:1, cnt:cnt, each:P.d, cost:cnt * P.d, leaf:true });
+  let tot = 0;
+  for (const r of rows) tot += r.cost;
+  for (const r of rows) r.share = r.cost / tot;
+  return { rows:rows, total:tot, n:Math.pow(P.b, k), k:k };
+}
+
+/* --- examples ------------------------------------------------------------- */
+const PRESETS = [
+ { id:"mergesort", name:"Mergesort \u00b7 2T(n/2) + n", a:2,b:2,B:1,beta:1,gamma:0,d:1,k:12,
+   note:"The textbook balanced case: every level of the tree costs n, and there are lg n of them. Majority by divide &amp; conquer has the same recurrence." },
+ { id:"binsearch", name:"Binary search \u00b7 T(n/2) + 1", a:1,b:2,B:1,beta:0,gamma:0,d:1,k:14,
+   note:"a = 1 makes c = 0, so n^c = 1 and the constant work per level is exactly \u0398(n^c). Case (b) with a degenerate n^c." },
+ { id:"karatsuba", name:"Karatsuba \u00b7 3T(n/2) + n", a:3,b:2,B:1,beta:1,gamma:0,d:1,k:12,
+   note:"Three half-size multiplications instead of four. The tree is bottom-heavy, so the leaves decide: \u0398(n^{lg 3}) \u2248 n^{1.585}." },
+ { id:"dcmult", name:"Schoolbook D&amp;C \u00b7 4T(n/2) + n", a:4,b:2,B:1,beta:1,gamma:0,d:1,k:10,
+   note:"The naive split into four products. Case (a) gives \u0398(n\u00b2) \u2014 no better than long multiplication, which is exactly the hint that the conquer step should do more work." },
+ { id:"matmul", name:"Block matrix mult. \u00b7 8T(n/2) + n\u00b2", a:8,b:2,B:1,beta:2,gamma:0,d:1,k:8,
+   note:"Eight recursive products of half-size matrices. \u0398(n\u00b3), same as the naive algorithm." },
+ { id:"strassen", name:"Strassen \u00b7 7T(n/2) + n\u00b2", a:7,b:2,B:1,beta:2,gamma:0,d:1,k:8,
+   note:"Seven products instead of eight. Still case (a) \u2014 the leaves win \u2014 but the leaf count drops to n^{lg 7} \u2248 n^{2.808}." },
+ { id:"quickselect", name:"Quickselect (analysis) \u00b7 T(3n/4) + 2n", a:1,b:4/3,B:2,beta:1,gamma:0,d:1,k:16,
+   note:"One recursive call on three quarters of the input. Here c = 0 and f(n) = 2n dominates: case (c), the root pays, \u0398(n)." },
+ { id:"closest0", name:"Closest pair, first version \u00b7 2T(n/2) + n lg n", a:2,b:2,B:1,beta:1,gamma:1,d:1,k:12,
+   note:"Sorting inside the conquer step. \u03b2 = c but there is an extra log factor \u2014 the master theorem does not apply. The recursion tree still answers it: every level costs about n lg n, and there are lg n levels." },
+ { id:"closest1", name:"Closest pair, sorted once \u00b7 2T(n/2) + n", a:2,b:2,B:1,beta:1,gamma:0,d:1,k:12,
+   note:"Sorting once up front and keeping the order through the recursion removes the log factor from f and lands back in case (b)." },
+ { id:"gap", name:"The gap \u00b7 2T(n/2) + n/lg n", a:2,b:2,B:1,beta:1,gamma:-1,d:1,k:14,
+   note:"f is smaller than n^c, but only by a log factor \u2014 not polynomially. No case applies. The level bars still tell the truth: they grow very slowly downwards, and the sum is \u0398(n log log n)." },
+ { id:"flat", name:"Play: 2T(n/2) + n^\u03b2", a:2,b:2,B:1,beta:1.3,gamma:0,d:1,k:12,
+   note:"Drag \u03b2 through 1 = c and watch the tree flip from bottom-heavy to top-heavy. That crossing is the whole theorem." }
+];
+const ROURA_PRESETS = [
+ { id:"r-closest", name:"Closest pair \u00b7 2T(n/2) + n lg n", terms:[{a:2,b:2}], B:1,beta:1,gamma:1,d:1,
+   note:"The master theorem has nothing to say here; Roura gives T(n) ~ \u00bd n lg\u00b2 n." },
+ { id:"r-mom", name:"Median of medians \u00b7 T(n/5) + T(7n/10) + n", terms:[{a:1,b:5},{a:1,b:10/7}], B:1,beta:1,gamma:0,d:1,
+   note:"Two recursive calls of different sizes \u2014 outside the master theorem entirely. H = 1 \u2212 1/5 \u2212 7/10 = 1/10 > 0, so T(n) ~ f(n)/H = 10n." },
+ { id:"r-quickselect", name:"Quickselect \u00b7 T(3n/4) + 2n", terms:[{a:1,b:4/3}], B:2,beta:1,gamma:0,d:1,
+   note:"H = 1 \u2212 3/4 = 1/4, so T(n) ~ 2n/(1/4) = 8n \u2014 a constant, not just a \u0398." },
+ { id:"r-mergesort", name:"Mergesort \u00b7 2T(n/2) + n", terms:[{a:2,b:2}], B:1,beta:1,gamma:0,d:1,
+   note:"H = 0 and \u03b3 = 0 > \u22121: case (b) gives T(n) ~ n lg n, sharpening the \u0398 of the master theorem to the constant." },
+ { id:"r-gap", name:"The gap \u00b7 2T(n/2) + n/lg n", terms:[{a:2,b:2}], B:1,beta:1,gamma:-1,d:1,
+   note:"H = 0 and \u03b3 = \u22121 exactly: case (c), T(n) ~ n ln ln n. This is the recurrence the master theorem cannot touch." },
+ { id:"r-strassen", name:"Strassen \u00b7 7T(n/2) + n\u00b2", terms:[{a:7,b:2}], B:1,beta:2,gamma:0,d:1,
+   note:"H = 1 \u2212 7/4 < 0: case (a), T(n) = O(n^\u03b1\u0303) where \u03b1\u0303 is where H would vanish \u2014 that is lg 7." }
+];
+/* ==========================================================================
+   MODE "tree" — the recursion tree behind the theorem.
+   SYM decides whether the labels carry the letters of the theorem or the
+   numbers of the chosen example; the geometry is identical either way.
+   Every group carries data-at="<step>"; a step change only re-sets opacity,
+   so the browser animates the reveal instead of us redrawing.
+   ========================================================================= */
+let SYM = true;
+
+const TREE_STEPS = [
+  { ph:"Unfold",  t:"The root of the recursion does <span class='cf'>f</span>(n) work of its own \u2014 everything else is delegated to the recursive calls." },
+  { ph:"Unfold",  t:"The root makes <span class='ca'>a</span> calls on inputs of size n/<span class='cb'>b</span>. Together this level costs <span class='ca'>a</span>\u2009<span class='cf'>f</span>(n/<span class='cb'>b</span>)." },
+  { ph:"Unfold",  t:"Each of those does the same, so level 2 holds <span class='ca'>a</span>\u00b2 subproblems of size n/<span class='cb'>b</span>\u00b2. In general level j costs <span class='ca'>a</span><sup>j</sup>\u2009<span class='cf'>f</span>(n/<span class='cb'>b</span><sup>j</sup>)." },
+  { ph:"Depth",   t:"Sizes shrink by a factor <span class='cb'>b</span> per level, so after log<sub class='cb'>b</sub> n levels they reach 1. That is the height of the tree." },
+  { ph:"Leaves",  t:"The bottom level holds <span class='ca'>a</span><sup>log<sub class='cb'>b</sub> n</sup> = n<sup class='cc'>c</sup> base cases, each costing <span class='cd'>d</span>. This is where the exponent <span class='cc'>c</span> = log<sub class='cb'>b</sub>(<span class='ca'>a</span>) comes from: it counts leaves." },
+  { ph:"Total",   t:"The total is the leaves plus the sum over all internal levels. The master theorem is a statement about which end of that sum dominates." },
+  { ph:"Compare", t:"So put the two ends on a balance: the root's own work <span class='cf'>f</span>(n) against the total leaf cost <span class='cd'>d</span>\u2009n<sup class='cc'>c</sup>. The theorem compares only their <em>exponents</em>." },
+  { ph:"Verdict", t:"" }
+];
+
+/* --- label atoms: letters in symbolic mode, values otherwise -------------- */
+const cNum = () => { const c = cExp(); return Math.abs(c - Math.round(c)) < 1e-9 ? nice(c) : fmt(c); };
+const T_a = () => '<tspan class="sa">' + (SYM ? "a" : nice(P.a)) + '</tspan>';
+const T_b = () => '<tspan class="sb">' + (SYM ? "b" : nice(P.b)) + '</tspan>';
+const T_d = () => '<tspan class="sd">' + (SYM ? "d" : nice(P.d)) + '</tspan>';
+const T_c = () => '<tspan class="sc">' + (SYM ? "c" : cNum()) + '</tspan>';
+const T_logb = () => "log" + S_DN('<tspan class="sb">' + (SYM ? "b" : nice(P.b)) + '</tspan>') + " n";
+function T_size(j) {
+  if (j === 0) return "n";
+  if (SYM) return "n/" + T_b() + (j > 1 ? S_UP(j) : "");
+  return "n/" + '<tspan class="sb">' + nice(Math.pow(P.b, j)) + '</tspan>';
+}
+function T_cnt(j) {
+  if (j === 0) return "";
+  if (SYM) return T_a() + (j > 1 ? S_UP(j) : "");
+  return '<tspan class="sa">' + nice(Math.pow(P.a, j)) + '</tspan>';
+}
+const T_f = j => "<tspan class='sf'>f</tspan>(" + T_size(j) + ")";
+const T_nc = () => "n" + S_UP(T_c());
+
+function buildTree() {
+  const svg = el("mainSvg");
+  svg.setAttribute("viewBox", "0 0 720 470");
+  const a = P.a;
+  /* symbolic mode draws a generic fan: a is a variable there, so the picture
+     must not commit to a particular number of children */
+  const aInt = SYM ? 0 : (Math.abs(a - Math.round(a)) < 1e-9 ? Math.round(a) : 0);
+  const xL = 78, xR = 548, xc = (xL + xR) / 2;
+  const y0 = 46, y1 = 120, y2 = 196, yE = 250, yLf = 316;
+  const g = [];
+
+  /* ---- helper: one node box -------------------------------------------- */
+  function node(cx, cy, w, h, label, cls, fs) {
+    return '<g><rect x="' + (cx - w / 2) + '" y="' + (cy - h / 2) + '" width="' + w + '" height="' + h +
+      '" rx="3" class="nd ' + cls + '"/><text x="' + cx + '" y="' + (cy + 4) + '" class="ndt ' + cls +
+      '" font-size="' + fs + '">' + label + '</text></g>';
+  }
+  function edge(x1, y1_, x2, y2_) {
+    return '<line x1="' + x1 + '" y1="' + y1_ + '" x2="' + x2 + '" y2="' + y2_ + '" class="tedge"/>';
+  }
+  /* the "a" arc of Cormen's figure: a shallow arc across the child edges */
+  function arc(cxp, cyp, xs, y) {
+    const t = 0.46, yy = cyp + (y - cyp) * t;
+    const l = cxp + (xs[0] - cxp) * t, r = cxp + (xs[xs.length - 1] - cxp) * t, m = (l + r) / 2;
+    if (Math.abs(r - l) < 6)                       /* a = 1: no fan to span */
+      return '<text x="' + (m + 9) + '" y="' + (yy + 4) + '" class="alab">' + (SYM ? "a" : nice(a)) + '</text>';
+    return '<path d="M ' + l + ' ' + yy + ' Q ' + m + ' ' + (yy + 15) + ' ' + r + ' ' + yy + '" class="aarc"/>' +
+      '<text x="' + m + '" y="' + (yy + 20) + '" class="alab">' + (SYM ? "a" : nice(a)) + '</text>';
+  }
+  /* evenly spaced centres inside [lo,hi] */
+  function spread(lo, hi, k) {
+    if (k === 1) return [(lo + hi) / 2];
+    const out = [], step_ = (hi - lo) / (k - 1);
+    for (let i = 0; i < k; i++) out.push(lo + i * step_);
+    return out;
+  }
+
+  /* ---- level 0 ---------------------------------------------------------- */
+  g.push('<g data-at="0">' + node(xc, y0, 74, 27, T_f(0), "fnode", 14) + '</g>');
+
+  /* ---- level 1 ---------------------------------------------------------- */
+  const n1 = aInt === 0 ? 3 : Math.min(aInt, 4);
+  const xs1 = spread(xL + 46, xR - 46, n1);
+  let s1 = '<g data-at="1">';
+  xs1.forEach(x => { s1 += edge(xc, y0 + 13, x, y1 - 13); });
+  s1 += arc(xc, y0 + 13, xs1, y1 - 13);
+  xs1.forEach(x => { s1 += node(x, y1, 78, 25, T_f(1), "fnode", 12.5); });
+  if (aInt === 0 || aInt > 4)
+    s1 += '<text x="' + ((xs1[1] + xs1[2]) / 2) + '" y="' + (y1 + 5) + '" class="dots">\u00b7\u00b7\u00b7</text>';
+  s1 += '</g>';
+  g.push(s1);
+
+  /* ---- level 2 ---------------------------------------------------------- */
+  const n2 = aInt === 0 ? 3 : Math.min(aInt, 3);
+  let s2 = '<g data-at="2">';
+  const slot = (xR - xL) / n1 * 0.80;
+  /* every parent gets the same child width, set by the most cramped one */
+  let minHalf = Infinity;
+  xs1.forEach(px => { minHalf = Math.min(minHalf, slot / 2, px - xL, xR - px); });
+  const bw2 = Math.max(13, Math.min(52, 2 * minHalf / n2 - 7));
+  xs1.forEach((px, i) => {
+    /* the outermost parents must not push their children past the tree area */
+    const xs2 = spread(px - minHalf + bw2 / 2, px + minHalf - bw2 / 2, n2);
+    xs2.forEach(x => { s2 += edge(px, y1 + 12, x, y2 - 11); });
+    if (i === 0) s2 += arc(px, y1 + 12, xs2, y2 - 11);
+    xs2.forEach(x => { s2 += node(x, y2, bw2, 21, bw2 >= 34 ? T_f(2) : "", "fnode", 8.6); });
+    if (bw2 < 34 && i === 0)
+      s2 += '<text x="' + xL + '" y="' + (y2 + 32) + '" class="subnote">level 2: ' + T_cnt(2) +
+            ' nodes, each ' + T_f(2) + '</text>';
+    if ((aInt === 0 || aInt > 3) && bw2 >= 34)
+      s2 += '<text x="' + ((xs2[n2 - 2] + xs2[n2 - 1]) / 2) + '" y="' + (y2 + 4) + '" class="dots" font-size="10">\u00b7\u00b7\u00b7</text>';
+    /* the dangling edges towards the next level */
+    xs2.forEach(x => {
+      s2 += aInt === 1 ? edge(x, y2 + 10, x, y2 + 22)
+                       : edge(x, y2 + 10, x - 7, y2 + 22) + edge(x, y2 + 10, x + 7, y2 + 22);
+    });
+  });
+  s2 += '</g>';
+  g.push(s2);
+
+  /* ---- vertical dots + the depth measure -------------------------------- */
+  let s3 = '<g data-at="3">';
+  spread(xL + 24, xR - 24, n1 * n2).forEach(x => {
+    s3 += '<text x="' + x + '" y="' + yE + '" class="dots">\u22ee</text>';
+  });
+  s3 += '<line x1="34" y1="' + (y0 - 16) + '" x2="34" y2="' + (yLf + 14) + '" class="depth"/>' +
+    '<path d="M34 ' + (y0 - 20) + ' l-4 8 h8 z" class="depthhead"/>' +
+    '<path d="M34 ' + (yLf + 18) + ' l-4 -8 h8 z" class="depthhead"/>' +
+    '<text x="24" y="' + ((y0 + yLf) / 2) + '" class="depthlab" transform="rotate(-90 24 ' + ((y0 + yLf) / 2) + ')">' +
+    T_logb() + ' + 1 levels</text>';
+  s3 += '</g>';
+  g.push(s3);
+
+  /* ---- leaves ----------------------------------------------------------- */
+  let s4 = '<g data-at="4">';
+  const nlf = (aInt === 1 ? 1 : 11), xsl = spread(xL + 14, xR - 14, nlf);
+  xsl.forEach((x, i) => {
+    if (nlf > 1 && i === 5) { s4 += '<text x="' + x + '" y="' + (yLf + 4) + '" class="dots">\u00b7\u00b7\u00b7</text>'; return; }
+    s4 += node(x, yLf, 30, 20, T_d(), "dnode", 11.5);
+  });
+  const bL = nlf === 1 ? xc - 62 : xL + 2, bR = nlf === 1 ? xc + 62 : xR - 2;
+  s4 += '<path d="M' + bL + ' ' + (yLf + 15) + ' q0 9 9 9 H' + (xc - 9) + ' q9 0 9 9 q0 -9 9 -9 H' +
+    (bR - 9) + ' q9 0 9 -9" class="brace"/>' +
+    '<text x="' + xc + '" y="' + (yLf + 46) + '" class="leaflab">' + T_a() + S_UP(T_logb()) +
+    ' = ' + T_nc() + ' leaves, ' + T_d() + ' each</text>';
+  s4 += '</g>';
+  g.push(s4);
+
+  /* ---- the per-level totals down the right-hand side --------------------- */
+  const rows = [
+    { y:y0,  at:0, lab:T_f(0) },
+    { y:y1,  at:1, lab:T_cnt(1) + "\u2009" + T_f(1) },
+    { y:y2,  at:2, lab:T_cnt(2) + "\u2009" + T_f(2) },
+    { y:yE,  at:3, lab:"\u22ee" },
+    { y:yLf, at:4, lab:T_d() + "\u2009" + T_nc() }
+  ];
+  rows.forEach(r => {
+    g.push('<g data-at="' + r.at + '"><line x1="' + (xR + 14) + '" y1="' + r.y + '" x2="' + (xR + 32) +
+      '" y2="' + r.y + '" class="tot-arrow" marker-end="url(#ah)"/><text x="' + (xR + 38) + '" y="' + (r.y + 4) +
+      '" class="totlab' + (r.at === 0 ? ' rootlab' : (r.at === 4 ? ' leaftot' : '')) + '">' + r.lab + '</text></g>');
+  });
+
+  /* ---- the total -------------------------------------------------------- */
+  g.push('<g data-at="5"><line x1="66" y1="392" x2="654" y2="392" class="rule"/>' +
+    '<text x="360" y="418" class="total">T(n) &#160;=&#160; ' + T_d() + '\u2009' + T_nc() +
+    ' &#160;+&#160; \u2211 ' + T_a() + S_UP("j") + ' <tspan class="sf">f</tspan>(n/' + T_b() + S_UP("j") + ')</text>' +
+    '<text x="360" y="440" class="totalsub">the sum runs over j = 0 \u2026 ' + T_logb() +
+    ' \u2212 1; the theorem asks which of its two ends wins</text></g>');
+
+  svg.innerHTML =
+    '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">' +
+    '<path d="M0 0 L10 5 L0 10 z" fill="var(--wi-queue)"/></marker></defs>' + g.join("");
+}
+
+function updateTree() {
+  const svg = el("mainSvg");
+  svg.querySelectorAll("[data-at]").forEach(n => {
+    const at = +n.getAttribute("data-at");
+    n.style.opacity = step >= at ? 1 : 0;
+  });
+  const cmp = step >= 6;
+  svg.querySelectorAll(".rootlab, .leaftot").forEach(n => n.classList.toggle("hot", cmp));
+}
+/* ==========================================================================
+   MODE "grow" — the same tree, but with numbers.
+   Level j is drawn as a bar whose WIDTH is its share of the total cost, so the
+   picture is a shape rather than a size: bottom-heavy = case (a), rectangle =
+   case (b), top-heavy = case (c). Growing n by a factor b adds one row of
+   leaves at the bottom and squeezes everything else to fit.
+   ========================================================================= */
+const GW = 468, GH = 356, GX0 = 78, GYT = 34;
+/* "share": the whole width is T(n), so every bar is its share of the total —
+   the picture keeps a constant area and the shape is all that changes.
+   "max":   the widest level fills the frame, which shows the level costs
+            themselves on one common scale. */
+let NORM = "share";
+
+function geo(k) {
+  const L = levels(k), xc = GX0 + GW / 2;
+  const rowH = Math.min(38, GH / L.rows.length);
+  L.rowH = rowH;
+  let mx = 0;
+  L.rows.forEach(r => { if (r.cost > mx) mx = r.cost; });
+  L.rows.forEach((r, i) => {
+    r.h = rowH; r.y = GYT + i * rowH;
+    r.w = Math.max(1.6, GW * (NORM === "max" ? r.cost / mx : r.share)); r.x = xc - r.w / 2;
+    r.leafness = r.leaf ? 1 : 0;
+  });
+  L.bottom = GYT + L.rows.length * rowH;
+  return L;
+}
+
+const AINT = () => (Math.abs(P.a - Math.round(P.a)) < 1e-9 ? Math.round(P.a) : 0);
+function boxable(cnt, w) { return AINT() && cnt <= 24 && w / cnt >= 4.5; }
+
+function mixCol(t) {                        /* violet (internal) -> orange (leaf) */
+  const A = [128, 0, 128], B = [194, 94, 0];
+  return "rgb(" + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",") + ")";
+}
+function mixFill(t) {
+  const A = [230, 211, 230], B = [242, 221, 194];
+  return "rgb(" + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",") + ")";
+}
+
+function drawGrowRows(rows, meta) {
+  const out = [], xc = GX0 + GW / 2;
+  /* the frame the bars are measured against */
+  out.push('<rect x="' + GX0 + '" y="' + (GYT - 8) + '" width="' + GW + '" height="' + (meta.bottom - GYT + 16) +
+    '" class="gframe"/>');
+
+  rows.forEach((r, i) => {
+    const col = mixCol(r.leafness), fill = mixFill(r.leafness);
+    const gap = 1.5;
+    if (r.h > 1.2 && boxable(r.cnt, r.w)) {
+      const bw = (r.w - gap * (r.cnt - 1)) / r.cnt;
+      for (let q = 0; q < r.cnt; q++)
+        out.push('<rect x="' + (r.x + q * (bw + gap)) + '" y="' + (r.y + 1) + '" width="' + bw +
+          '" height="' + Math.max(1, r.h - 3) + '" rx="1.5" fill="' + fill + '" stroke="' + col +
+          '" stroke-width=".9" class="gbar" data-row="' + i + '"/>');
+      r.boxed = true; r.bw = bw; r.gap = gap;
+    } else {
+      out.push('<rect x="' + r.x + '" y="' + (r.y + 1) + '" width="' + r.w + '" height="' + Math.max(1, r.h - 3) +
+        '" rx="1.5" fill="' + fill + '" stroke="' + col + '" stroke-width=".9" class="gbar" data-row="' + i + '"/>');
+      r.boxed = false;
+    }
+  });
+  /* connectors, only where both rows are drawn as individual nodes */
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const p = rows[i], c = rows[i + 1];
+    if (!p.boxed || !c.boxed || c.cnt > 24) continue;
+    const aa = Math.round(c.cnt / p.cnt);
+    for (let q = 0; q < p.cnt; q++) {
+      const px = p.x + q * (p.bw + p.gap) + p.bw / 2;
+      for (let s = 0; s < aa; s++) {
+        const idx = q * aa + s;
+        if (idx >= c.cnt) break;
+        const cx2 = c.x + idx * (c.bw + c.gap) + c.bw / 2;
+        out.push('<line x1="' + px + '" y1="' + (p.y + p.h - 2) + '" x2="' + cx2 + '" y2="' + (c.y + 1) +
+          '" class="gconn"/>');
+      }
+    }
+  }
+  /* labels */
+  rows.forEach((r, i) => {
+    if (r.h < 11 || r.ghost) return;
+    const col = mixCol(r.leafness);
+    out.push('<text x="' + (GX0 - 10) + '" y="' + (r.y + r.h / 2 + 3.5) + '" class="glvl">' + r.j + '</text>');
+    out.push('<text x="' + (GX0 + GW + 12) + '" y="' + (r.y + r.h / 2 + 3.5) + '" class="gval" fill="' + col + '">' +
+      fmt(r.cost) + '</text>');
+    if (r.h >= 15)
+      out.push('<text x="' + (GX0 + GW + 96) + '" y="' + (r.y + r.h / 2 + 3.5) + '" class="gshare">' +
+        (r.share * 100).toFixed(r.share < 0.001 ? 3 : 1) + "%</text>");
+  });
+  /* who is who */
+  const first = rows[0], last = rows[rows.length - 1];
+  if (first && first.h >= 11)
+    out.push('<text x="' + (GX0 - 26) + '" y="' + (first.y + first.h / 2 + 3.5) + '" class="gside sf">root</text>');
+  if (last && last.h >= 11)
+    out.push('<text x="' + (GX0 - 26) + '" y="' + (last.y + last.h / 2 + 3.5) + '" class="gside sd">leaves</text>');
+
+  /* the ruler: the whole width is T(n) */
+  const yb = meta.bottom + 16;
+  out.push('<line x1="' + GX0 + '" y1="' + yb + '" x2="' + (GX0 + GW) + '" y2="' + yb + '" class="rule"/>' +
+    '<line x1="' + GX0 + '" y1="' + (yb - 4) + '" x2="' + GX0 + '" y2="' + (yb + 4) + '" class="rule"/>' +
+    '<line x1="' + (GX0 + GW) + '" y1="' + (yb - 4) + '" x2="' + (GX0 + GW) + '" y2="' + (yb + 4) + '" class="rule"/>' +
+    '<text x="' + (GX0 + GW / 2) + '" y="' + (yb + 19) + '" class="grulelab">' + (NORM === "max"
+      ? 'widest level = ' + fmt(meta.maxCost) + ';  T(n) = ' + fmt(meta.total) +
+        ' \u2014 all rows at one common scale'
+      : 'total cost T(n) = ' + fmt(meta.total) +
+        ' \u2014 the same total width at every n, so each row shows its <tspan font-style="italic">share</tspan>') +
+    '</text>');
+  return out.join("");
+}
+
+let growFrom = null, growRaf = null, growTo = null;
+function growSnapshot(k) {
+  const L = geo(k);
+  return { rows:L.rows.map(r => ({ j:r.j, y:r.y, h:r.h, x:r.x, w:r.w, cnt:r.cnt, cost:r.cost,
+                                   share:r.share, size:r.size, leafness:r.leafness })),
+           bottom:L.bottom, total:L.total, n:L.n, k:k,
+           maxCost:L.rows.reduce((m, r) => Math.max(m, r.cost), 0) };
+}
+function paintGrow(snap) {
+  const svg = el("mainSvg");
+  svg.setAttribute("viewBox", "0 0 720 470");
+  svg.innerHTML = drawGrowRows(snap.rows, snap);
+}
+/* morph between two snapshots: rows are matched by level index j, the new
+   bottom row grows out of the old bottom edge */
+function morphGrow(k0, k1, done) {
+  const A = growSnapshot(k0), B = growSnapshot(k1);
+  const idx = s => { const m = {}; s.rows.forEach(r => m[r.j] = r); return m; };
+  const ma = idx(A), mb = idx(B);
+  const js = Object.keys(mb).map(Number).sort((x, y) => x - y);
+  const pairs = js.map(j => {
+    const to = mb[j];
+    const from = ma[j] || { j:j, y:A.bottom, h:0, x:GX0 + GW / 2, w:0, cnt:to.cnt, cost:to.cost,
+                            share:to.share, size:to.size, leafness:to.leafness };
+    return { from:from, to:to };
+  });
+  /* rows that vanish (shrinking n) fade into the bottom edge */
+  Object.keys(ma).map(Number).forEach(j => {
+    if (!mb[j]) pairs.push({ from:ma[j], to:{ j:j, y:B.bottom, h:0, x:GX0 + GW / 2, w:0, cnt:ma[j].cnt,
+                                              cost:0, share:0, size:1, leafness:ma[j].leafness, ghost:true } });
+  });
+  const t0 = performance.now(), dur = 520;
+  if (growRaf) cancelAnimationFrame(growRaf);
+  function frame(now) {
+    const u = clamp((now - t0) / dur, 0, 1), e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    const rows = pairs.map(p => ({
+      j:p.to.j,
+      y:p.from.y + (p.to.y - p.from.y) * e,
+      h:p.from.h + (p.to.h - p.from.h) * e,
+      w:p.from.w + (p.to.w - p.from.w) * e,
+      x:p.from.x + (p.to.x - p.from.x) * e,
+      leafness:p.from.leafness + (p.to.leafness - p.from.leafness) * e,
+      cnt:p.to.cnt, cost:p.to.cost, share:p.to.share, size:p.to.size, ghost:p.to.ghost && u < 1
+    })).sort((r, s) => r.j - s.j);
+    paintGrow({ rows:rows, bottom:B.bottom, total:B.total, n:B.n, k:B.k, maxCost:B.maxCost });
+    if (u < 1) growRaf = requestAnimationFrame(frame);
+    else { growRaf = null; paintGrow(B); if (done) done(); }
+  }
+  growRaf = requestAnimationFrame(frame);
+}
+
+/* ==========================================================================
+   The balance: the root's own work against the total cost of the leaves.
+   In the master-theorem mode the pans carry the two exponents, because that
+   is all the theorem ever compares; in the intuition mode they carry the
+   actual costs at the current n.
+   ========================================================================= */
+const MAXTILT = 12;
+function drawScale(o) {
+  const svg = el("scaleSvg");
+  const px = 360, py = 86, half = 200;
+  const th = clamp(o.tilt, -MAXTILT, MAXTILT), rad = -th * Math.PI / 180;
+  const lx = px - half * Math.cos(rad), ly = py - half * Math.sin(rad);
+  const rx = px + half * Math.cos(rad), ry = py + half * Math.sin(rad);
+  function pan(x, y, col, fill, top, mid, bot) {
+    return '<line x1="' + x + '" y1="' + y + '" x2="' + x + '" y2="' + (y + 28) + '" class="pstring"/>' +
+      '<path d="M' + (x - 52) + ' ' + (y + 28) + ' q52 26 104 0 z" fill="' + fill + '" stroke="' + col + '" stroke-width="1.2"/>' +
+      '<text x="' + x + '" y="' + (y - 30) + '" class="panlab" fill="' + col + '">' + top + '</text>' +
+      '<text x="' + x + '" y="' + (y - 11) + '" class="panval" fill="' + col + '">' + mid + '</text>' +
+      '<text x="' + x + '" y="' + (y + 62) + '" class="pansub">' + bot + '</text>';
+  }
+  svg.innerHTML =
+    '<path d="M' + (px - 26) + ' 176 L' + px + ' 92 L' + (px + 26) + ' 176 z" class="fulcrum"/>' +
+    '<line x1="' + (px - 60) + '" y1="176" x2="' + (px + 60) + '" y2="176" class="ground"/>' +
+    '<line x1="' + lx + '" y1="' + ly + '" x2="' + rx + '" y2="' + ry + '" class="beam"/>' +
+    '<circle cx="' + px + '" cy="' + py + '" r="4.5" class="pivot"/>' +
+    pan(lx, ly, "var(--mt-d)", "var(--mt-d-fill)", "leaves", o.lVal, o.lSub) +
+    pan(rx, ry, "var(--mt-f)", "var(--mt-f-fill)", "root", o.rVal, o.rSub) +
+    '<text x="360" y="210" class="scalenote">' + o.note + '</text>';
+  el("scaleRhs").innerHTML = o.rhs;
+}
+/* how far the beam tips, from a ratio that may be 0 or infinite */
+function tiltFromRatio(leaf, root) {
+  if (!(root > 0) && !(leaf > 0)) return 0;
+  if (!(root > 0)) return MAXTILT;
+  if (!(leaf > 0)) return -MAXTILT;
+  return MAXTILT * Math.tanh(Math.log(leaf / root) / 2.2);
+}
+
+/* ==========================================================================
+   A small log-scale chart of ratios: whichever curve goes flat is the truth.
+   ========================================================================= */
+function drawRatio(series, xs, xlab) {
+  const svg = el("ratioSvg");
+  const X0 = 58, X1 = 636, Y0 = 26, Y1 = 152;
+  let lo = Infinity, hi = -Infinity;
+  series.forEach(s => s.pts.forEach(p => {
+    if (!isFinite(p) || p <= 0) return;
+    const v = Math.log10(p); if (v < lo) lo = v; if (v > hi) hi = v;
+  }));
+  if (!isFinite(lo)) { svg.innerHTML = ""; return; }
+  if (hi - lo < .6) { const m = (hi + lo) / 2; lo = m - .3; hi = m + .3; }
+  const pad = (hi - lo) * .12; lo -= pad; hi += pad;
+  const sx = i => X0 + (X1 - X0) * (xs.length === 1 ? .5 : i / (xs.length - 1));
+  const sy = v => Y1 - (Y1 - Y0) * (Math.log10(v) - lo) / (hi - lo);
+  const out = [];
+  /* horizontal guides at powers of ten */
+  for (let e = Math.ceil(lo); e <= Math.floor(hi); e++) {
+    const y = Y1 - (Y1 - Y0) * (e - lo) / (hi - lo);
+    out.push('<line x1="' + X0 + '" y1="' + y + '" x2="' + X1 + '" y2="' + y + '" class="grid"/>' +
+      '<text x="' + (X0 - 6) + '" y="' + (y + 3.5) + '" class="axlab">10' + supStr(e) + '</text>');
+  }
+  out.push('<line x1="' + X0 + '" y1="' + Y1 + '" x2="' + X1 + '" y2="' + Y1 + '" class="rule"/>');
+  xs.forEach((x, i) => {
+    if (xs.length > 16 && i % 2) return;
+    out.push('<text x="' + sx(i) + '" y="' + (Y1 + 16) + '" class="axlab mid">' + x + '</text>');
+  });
+  out.push('<text x="' + ((X0 + X1) / 2) + '" y="' + (Y1 + 33) + '" class="axtitle">' + xlab + '</text>');
+  series.forEach(s => {
+    let dd = "", started = false;
+    s.pts.forEach((p, i) => {
+      if (!isFinite(p) || p <= 0) return;
+      dd += (started ? " L" : "M") + sx(i) + " " + sy(p); started = true;
+    });
+    if (!dd) return;
+    out.push('<path d="' + dd + '" fill="none" stroke="' + s.color + '" stroke-width="' + (s.bold ? 2.4 : 1.2) +
+      '" opacity="' + (s.bold ? 1 : .5) + '"/>');
+    const last = s.pts.map((p, i) => [p, i]).filter(q => isFinite(q[0]) && q[0] > 0).pop();
+    if (last) {
+      const room = X1 - sx(last[1]) > 108;          /* keep the label inside the frame */
+      out.push('<text x="' + (room ? sx(last[1]) + 7 : X1) + '" y="' + (sy(last[0]) + (room ? 3.5 : -9)) +
+        '" class="serlab" style="text-anchor:' + (room ? "start" : "end") + '" fill="' + s.color +
+        '" opacity="' + (s.bold ? 1 : .6) + '">' + s.label + '</text>');
+    }
+  });
+  svg.innerHTML = out.join("");
+}
+/* ==========================================================================
+   MODE "roura" — the discrete master theorem.
+   Everything hangs off one number: H = 1 - sum_d a_d (1/b_d)^alpha, the
+   deficit between the parent's alpha-weight and its children's.
+   ========================================================================= */
+const Hof = al => { let s = 0; for (const t of P.terms) s += t.a * Math.pow(1 / t.b, al); return 1 - s; };
+function alphaTilde() {
+  let lo = -10, hi = 80;
+  if (Hof(lo) > 0 || Hof(hi) < 0) return NaN;
+  for (let i = 0; i < 120; i++) { const m = (lo + hi) / 2; if (Hof(m) < 0) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+function rouraCase() {
+  const al = P.beta, g = P.gamma, H = Hof(al), T = 1e-9;
+  const wsum = () => { let s = 0; for (const t of P.terms) s += t.a * Math.pow(t.b, -al) * Math.log(t.b); return s; };
+  if (H < -T) return { k:"a", H:H, at:alphaTilde() };
+  if (H > T)  return { k:"e", H:H };
+  if (g > -1 + T) return { k:"b", H:H, Ht:(g + 1) * wsum() };
+  if (Math.abs(g + 1) < T) return { k:"c", H:H, Hh:wsum() };
+  return { k:"d", H:H };
+}
+function rouraForm() {
+  const R = rouraCase(), fn = fName(true);
+  if (R.k === "a") return { form:"= O(n<sup>" + fmt(R.at) + "</sup>)",
+    tag:"H &lt; 0 \u2014 the subproblems outweigh the parent, so the leaves rule" };
+  if (R.k === "e") return { form:"~ <span class='cf'>f</span>(n)/H = " + fmt(1 / R.H) + "\u2009&middot;\u2009" + fn,
+    tag:"H &gt; 0 \u2014 a convergent geometric sum; even the constant comes out" };
+  if (R.k === "b") return { form:"~ <span class='cf'>f</span>(n)\u2009ln n / " + fmt(R.Ht),
+    tag:"H = 0, &gamma; &gt; \u22121 \u2014 all levels contribute comparably" };
+  if (R.k === "c") return { form:"~ <span class='cf'>f</span>(n)\u2009ln n\u2009ln ln n / " + fmt(R.Hh),
+    tag:"H = 0, &gamma; = \u22121 \u2014 the harmonic borderline" };
+  return { form:"= O(n<sup>" + nice(P.beta) + "</sup>)", tag:"H = 0, &gamma; &lt; \u22121 \u2014 the sum converges after all" };
+}
+function rouraPredict(n) {
+  const R = rouraCase();
+  if (R.k === "a") return Math.pow(n, R.at);
+  if (R.k === "e") return f(n) / R.H;
+  if (R.k === "b") return f(n) * Math.log(n) / R.Ht;
+  if (R.k === "c") return f(n) * Math.log(n) * Math.log(Math.log(n)) / R.Hh;
+  return Math.pow(n, P.beta);
+}
+/* exact solution of the rounded recurrence, by dynamic programming */
+let dpCache = null, dpKey = "";
+function dpSolve(N) {
+  const key = JSON.stringify([P.terms, P.B, P.beta, P.gamma, P.d, N]);
+  if (key === dpKey) return dpCache;
+  const T = new Float64Array(N + 1);
+  T[0] = P.d; T[1] = P.d;
+  for (let n = 2; n <= N; n++) {
+    let s = f(n);
+    for (const t of P.terms) s += t.a * T[Math.floor(n / t.b)];
+    T[n] = s;
+  }
+  dpKey = key; dpCache = T; return T;
+}
+
+const ROURA_STEPS = [
+  { ph:"Shape", t:"Roura's theorem allows any number of recursive calls, of any sizes. Draw the parent as a bar of weight 1 and each child as a bar of weight (1/<span class='cb'>b</span><sub>d</sub>)<sup>&alpha;</sup>. What is left over is H." },
+  { ph:"H(&alpha;)", t:"H depends on the exponent &alpha; of <span class='cf'>f</span>. It falls from 1\u2212&sum;a<sub>d</sub> at &alpha; = \u2212&infin; and increases towards 1; where it crosses zero sits the critical exponent &alpha;\u0303 \u2014 the analogue of <span class='cc'>c</span> = log<sub class='cb'>b</sub>(<span class='ca'>a</span>)." },
+  { ph:"Case", t:"The sign of H at our &alpha; picks the case. H &lt; 0: leaves win. H &gt; 0: root wins. H = 0: everything is balanced and the log exponent &gamma; decides how the levels add up." },
+  { ph:"Constant", t:"Unlike the master theorem, the answer comes with its constant \u2014 the result is an asymptotic equivalence ~, not just a &Theta;." },
+  { ph:"Check", t:"Solving the recurrence numerically (with real floors, as an implementation would meet it) and dividing by the prediction: the ratio should settle at 1." }
+];
+
+function drawRoura() {
+  const svg = el("mainSvg");
+  svg.setAttribute("viewBox", "0 0 720 470");
+  const out = [], al = P.beta, H = Hof(al), at = alphaTilde();
+
+  /* ---- the weight picture ---------------------------------------------- */
+  const X0 = 74, W = 470, yP = 58, yC = 118, hB = 26;
+  out.push('<text x="' + X0 + '" y="' + (yP - 16) + '" class="rlab">one problem of size n, weight 1</text>');
+  out.push('<rect x="' + X0 + '" y="' + yP + '" width="' + W + '" height="' + hB + '" rx="3" class="rparent"/>');
+  let x = X0, i = 0;
+  for (const t of P.terms) {
+    const w = W * Math.pow(1 / t.b, al);
+    for (let q = 0; q < Math.min(t.a, 12); q++) {
+      out.push('<rect x="' + x + '" y="' + yC + '" width="' + Math.max(1, w - 2) + '" height="' + hB +
+        '" rx="3" class="rchild"/>');
+      if (w > 44) {
+        const inv = nice(1 / t.b), fr = inv.split("/");
+        const lab = fr.length === 2 ? fr[0] + "n/" + fr[1] : (Math.abs(t.b - Math.round(t.b)) < 1e-9 ?
+                    "n/" + nice(t.b) : inv + "n");
+        out.push('<text x="' + (x + w / 2 - 1) + '" y="' + (yC + 17) + '" class="rchildlab">' + lab + '</text>');
+      }
+      x += w;
+      if (x > X0 + W + 60) break;
+    }
+    i++;
+  }
+  const used = x - X0;
+  if (used < W - 1) {
+    out.push('<rect x="' + x + '" y="' + yC + '" width="' + (W - used) + '" height="' + hB + '" class="rgap"/>');
+    out.push('<text x="' + (x + (W - used) / 2) + '" y="' + (yC + 17) + '" class="rgaplab">H</text>');
+  }
+  out.push('<line x1="' + (X0 + W) + '" y1="' + (yP - 6) + '" x2="' + (X0 + W) + '" y2="' + (yC + hB + 8) + '" class="rmark"/>');
+  out.push('<text x="' + X0 + '" y="' + (yC + hB + 22) + '" class="rlab">children, total weight ' +
+    fmt(1 - H) + (used > W ? ' \u2014 more than the parent, so H &lt; 0' : '') + '</text>');
+  out.push('<text x="' + (X0 + W) + '" y="' + (yP - 16) + '" class="rH" text-anchor="end">H = ' + fmt(H) + '</text>');
+
+  /* ---- H as a function of alpha ---------------------------------------- */
+  const gx0 = 74, gx1 = 544, gy0 = 208, gy1 = 400;
+  const lo = Math.min(al, isFinite(at) ? at : al) - 1.3, hi = Math.max(al, isFinite(at) ? at : al) + 1.3;
+  let ymin = -1.6, ymax = 1.05;
+  const sx = v => gx0 + (gx1 - gx0) * (v - lo) / (hi - lo);
+  const sy = v => gy1 - (gy1 - gy0) * (clamp(v, ymin, ymax) - ymin) / (ymax - ymin);
+  let d = "", pen = false;
+  for (let q = 0; q <= 240; q++) {
+    const v = lo + (hi - lo) * q / 240, h = Hof(v);
+    if (h < ymin || h > ymax) { pen = false; continue; }
+    d += (pen ? " L" : "M") + sx(v) + " " + sy(h); pen = true;
+  }
+  out.push('<g data-at="1">');
+  out.push('<line x1="' + gx0 + '" y1="' + sy(0) + '" x2="' + gx1 + '" y2="' + sy(0) + '" class="rule"/>');
+  out.push('<line x1="' + gx0 + '" y1="' + gy0 + '" x2="' + gx0 + '" y2="' + gy1 + '" class="rule"/>');
+  out.push('<text x="' + (gx0 - 8) + '" y="' + (sy(0) + 3.5) + '" class="axlab">0</text>');
+  out.push('<text x="' + (gx0 - 8) + '" y="' + (sy(1) + 3.5) + '" class="axlab">1</text>');
+  out.push('<path d="' + d + '" class="rcurve"/>');
+  for (let e = Math.ceil(lo); e <= Math.floor(hi); e++)
+    out.push('<text x="' + sx(e) + '" y="' + (gy1 + 16) + '" class="axlab mid">' + e + '</text>');
+  out.push('<text x="' + ((gx0 + gx1) / 2) + '" y="' + (gy1 + 34) + '" class="axtitle">exponent \u03b1 of f</text>');
+  if (isFinite(at)) {
+    out.push('<line x1="' + sx(at) + '" y1="' + gy0 + '" x2="' + sx(at) + '" y2="' + gy1 + '" class="rtilde"/>' +
+      '<text x="' + (sx(at) + (at <= al ? -5 : 5)) + '" y="' + (gy0 + 12) + '" class="rtildelab" text-anchor="' +
+      (at <= al ? "end" : "start") + '">\u03b1\u0303 = ' + fmt(at) + '</text>');
+  }
+  out.push('<line x1="' + sx(al) + '" y1="' + gy0 + '" x2="' + sx(al) + '" y2="' + gy1 + '" class="ralpha"/>' +
+    '<circle cx="' + sx(al) + '" cy="' + sy(H) + '" r="5" class="rdot"/>' +
+    '<text x="' + (sx(al) + 7) + '" y="' + (sy(H) - 8) + '" class="rdotlab">\u03b1 = ' + nice(al) +
+    ', H = ' + fmt(H) + '</text>');
+  out.push('</g>');
+  svg.innerHTML = out.join("");
+  svg.querySelectorAll('[data-at]').forEach(n => n.style.opacity = step >= +n.getAttribute("data-at") ? 1 : 0);
+}
+
+/* ==========================================================================
+   Panels
+   ========================================================================= */
+function sizeText(b) {
+  const inv = nice(1 / b), fr = inv.split("/");
+  if (Math.abs(b - Math.round(b)) < 1e-9) return "n/" + nice(b);
+  return fr.length === 2 ? fr[0] + "n/" + fr[1] : inv + "n";
+}
+function recBox() {
+  const t = P.terms.map(t => '<span class="ca">' + nice(t.a) + '</span>\u2009T(n/<span class="cb">' + nice(t.b) +
+    '</span>)').join(" + ");
+  const rhs = mode === "roura" ? t + " + <span class='cf'>" + fName(true) + "</span>"
+    : '<span class="ca">' + nice(P.a) + '</span>\u2009&middot;\u2009T(<span class="m">n</span>/<span class="cb">' +
+      nice(P.b) + '</span>) + <span class="cf">' + fName(true) + '</span>';
+  return '<div class="recbox"><span class="m">T</span>(<span class="m">n</span>) =&nbsp;' +
+    '<span class="dcases"><span>' + rhs + '</span><span class="cond"><span class="m">n</span> &gt; 1</span>' +
+    '<span class="cd">' + nice(P.d) + '</span><span class="cond"><span class="m">n</span> &le; 1</span></span></div>';
+}
+function rouraRows() {
+  return [
+      ["a", "T(n) = O(n<sup>&alpha;&#771;</sup>), where &alpha;&#771;&nbsp;is the unique &alpha; that would make H = 0", "H &lt; 0"],
+      ["b", "T(n) ~ <span class='cf'>f</span>(n) ln(n)/H&#771;,&nbsp; H&#771; = (&gamma;+1)&sum;<sub>d</sub> a<sub>d</sub> b<sub>d</sub><sup>&minus;&alpha;</sup> ln(b<sub>d</sub>)", "H = 0 and &gamma; &gt; &minus;1"],
+      ["c", "T(n) ~ <span class='cf'>f</span>(n) ln(n) ln(ln(n))/H&#770;,&nbsp; H&#770; = &sum;<sub>d</sub> a<sub>d</sub> b<sub>d</sub><sup>&minus;&alpha;</sup> ln(b<sub>d</sub>)", "H = 0 and &gamma; = &minus;1"],
+      ["d", "T(n) = O(n<sup>&alpha;</sup>)", "H = 0 and &gamma; &lt; &minus;1"],
+      ["e", "T(n) ~ <span class='cf'>f</span>(n)/H", "H &gt; 0"]
+  ];
+}
+function thmPanel() {
+  const A = analyse(), C = closedForm(), reveal = (mode === "tree" ? step >= 6 : true);
+  if (mode === "roura") {
+    const R = rouraCase(), rows = rouraRows();
+    return recBox() + '<div class="thm"><h3>Roura\u2019s discrete master theorem</h3>' +
+      '<div class="thmlead">With <span class="m cf">f</span>(<span class="m">n</span>) ~ ' +
+      '<span class="m">B</span>&thinsp;<span class="m">n</span><sup>&alpha;</sup>(ln <span class="m">n</span>)<sup>&gamma;</sup>' +
+      ' and H = 1 &minus; &sum;<sub>d</sub> <span class="ca">a</span><sub>d</sub>(1/<span class="cb">b</span><sub>d</sub>)<sup>&alpha;</sup> = <b>' +
+      fmt(Hof(P.beta)) + '</b>:</div>' +
+      rows.map(r => '<div class="thmcase ' + (R.k === r[0] ? "on" : "off") + '"><span class="tag">(' + r[0] +
+        ')</span><span>' + r[1] + '<span class="check">if ' + r[2] + '</span></span></div>').join("") +
+      '</div>';
+  }
+  const c = A.c, cs = '<span class="cc">c</span>', cv = (Math.abs(c - Math.round(c)) < 1e-9 ? nice(c) : fmt(c));
+  const yn = k => (A.kase === k ? "\u2713 " : "\u2717 ");
+  const checks = {
+    a: yn("a") + "&beta; = " + nice(P.beta) + (A.kase === "a" ? " &lt; " : " &nleq; ") + cv +
+       (A.kase === "a" ? ", so &epsilon; = " + fmt(A.eps) + " works" : ""),
+    b: yn("b") + "<span class='cf'>f</span>(n) " + (A.kase === "b" ? "=" : "&ne;") + " &Theta;(n<sup>" + cv + "</sup>)" +
+       (P.gamma !== 0 && Math.abs(P.beta - c) < 1e-9 ? " &mdash; the lg factor spoils it" : ""),
+    c: yn("c") + "&beta; = " + nice(P.beta) + (A.kase === "c" ? " &gt; " : " &ngeq; ") + cv +
+       (A.kase === "c" ? ", so &epsilon; = " + fmt(A.eps) + " works; regularity \u2713 by the lemma" : "")
+  };
+  const row = (k, body) => '<div class="thmcase ' + (!reveal ? "" : (A.kase === k ? "on" : "off")) +
+    '" data-case="' + k + '"><span class="tag">(' + k + ')</span><span>' + body +
+    '<span class="check">' + (reveal ? checks[k] : "") + '</span></span></div>';
+  return recBox() + '<div class="thm"><h3>Theorem &nbsp;(Master Theorem)</h3>' +
+    '<div class="thmlead">With <span class="m cc">c</span> := log<sub class="cb">b</sub>(<span class="ca">a</span>) = ' +
+    cv + ', we have for the above recurrence:</div>' +
+    row("a", "<span class='m'>T</span>(n) = &Theta;(n<sup>" + cs + "</sup>) &nbsp;if <span class='cf'>f</span>(n) = O(n<sup>" +
+      cs + "&minus;&epsilon;</sup>) for constant &epsilon; &gt; 0.") +
+    row("b", "<span class='m'>T</span>(n) = &Theta;(n<sup>" + cs + "</sup> log n) &nbsp;if <span class='cf'>f</span>(n) = &Theta;(n<sup>" +
+      cs + "</sup>).") +
+    row("c", "<span class='m'>T</span>(n) = &Theta;(<span class='cf'>f</span>(n)) &nbsp;if <span class='cf'>f</span>(n) = &Omega;(n<sup>" +
+      cs + "+&epsilon;</sup>) for constant &epsilon; &gt; 0 <b>and</b> <span class='cf'>f</span> satisfies the regularity condition " +
+      "&exist;n<sub>0</sub>, &alpha; &lt; 1 &forall;n &ge; n<sub>0</sub> : <span class='ca'>a</span>&middot;<span class='cf'>f</span>(n/<span class='cb'>b</span>) &le; &alpha;<span class='cf'>f</span>(n).") +
+    '</div>';
+}
+const noteHTML = t => String(t || "").replace(/\^\{([^}]*)\}/g, "<sup>$1</sup>");
+function verdictPanel() {
+  if (mode === "roura") {
+    const F = rouraForm();
+    return '<div class="sim-title"><span>Verdict</span><span class="rhs">case (' + rouraCase().k +
+      ')</span></div><div class="verdict"><span class="m">T</span>(<span class="m">n</span>) <span class="big">' +
+      F.form + '</span></div><div class="vnote">' + F.tag + '</div>' +
+      (P.note ? '<div class="vnote" style="margin-top:8px">' + noteHTML(P.note) + '</div>' : "");
+  }
+  const A = analyse(), C = closedForm();
+  let s = '<div class="sim-title"><span>Verdict</span><span class="rhs">' +
+    (A.gap ? "no case applies" : "case (" + A.kase + ")") + '</span></div>' +
+    '<div class="verdict"><span class="m">T</span>(<span class="m">n</span>) = <span class="big">' + C.form + '</span></div>' +
+    '<div class="vnote">' + C.tag + '</div>' +
+    '<div class="vnote" style="margin-top:7px">' + A.why + '</div>';
+  if (P.terms.length > 1) s += '<div class="warn">This example has ' + P.terms.length +
+    ' differently sized subproblems, so the master theorem does not apply to it at all \u2014 these two modes are ' +
+    'showing only the first one, <span class="ca">a</span> = ' + nice(P.a) + ', <span class="cb">b</span> = ' +
+    nice(P.b) + '. Switch to the Roura mode for the real recurrence.</div>';
+  if (A.gap) s += '<div class="warn">The master theorem gives <b>no</b> answer here \u2014 the three cases do not cover ' +
+    'everything. The value above is what the level sum really is; Roura\u2019s theorem proves it.</div>';
+  if (P.note) s += '<div class="vnote" style="margin-top:9px; text-align:left">' + noteHTML(P.note) + '</div>';
+  return s;
+}
+function ledgerPanel() {
+  if (mode === "grow") {
+    const L = levels(step);
+    let s = '<div class="sim-title"><span>Level by level</span><span class="rhs">n = ' + fmtNum(L.n) + '</span></div>' +
+      '<div class="scroller"><table class="led"><tr><th>level</th><th>count</th><th>size</th><th>each</th><th>level cost</th><th>share</th></tr>';
+    L.rows.forEach(r => {
+      s += '<tr class="' + (r.leaf ? "leafrow" : "") + '"><td>' + r.j + '</td><td>' + fmtNum(r.cnt) + '</td><td>' +
+        fmtNum(r.size) + '</td><td>' + fmt(r.each) + '</td><td>' + fmt(r.cost) + '</td><td class="share">' +
+        (r.share * 100).toFixed(2) + '%</td></tr>';
+    });
+    s += '<tr class="sumrow"><td>T(n)</td><td></td><td></td><td></td><td>' + fmt(L.total) + '</td><td></td></tr>';
+    s += '</table></div>';
+    return s;
+  }
+  if (mode === "roura") {
+    const al = P.beta;
+    let s = '<div class="sim-title"><span>The terms</span><span class="rhs">&alpha; = ' + nice(al) + '</span></div>' +
+      '<table class="led"><tr><th>d</th><th>a<sub>d</sub></th><th>b<sub>d</sub></th><th>a<sub>d</sub>b<sub>d</sub><sup>&minus;&alpha;</sup></th></tr>';
+    let sum = 0;
+    P.terms.forEach((t, i) => {
+      const w = t.a * Math.pow(t.b, -al); sum += w;
+      s += '<tr><td>' + (i + 1) + '</td><td>' + nice(t.a) + '</td><td>' + nice(t.b) + '</td><td>' + fmt(w) + '</td></tr>';
+    });
+    s += '<tr class="sumrow"><td>H = 1 &minus; &sum;</td><td></td><td></td><td>' + fmt(1 - sum) + '</td></tr></table>' +
+      '<div class="vnote" style="text-align:left; margin-top:9px">In the master-theorem special case D = 1 this is ' +
+      'H = 1 &minus; <span class="ca">a</span><span class="cb">b</span><sup>&minus;&alpha;</sup>, which vanishes exactly ' +
+      'when &alpha; = log<sub class="cb">b</sub>(<span class="ca">a</span>) = <span class="cc">c</span>. So &alpha;&#771;&nbsp;' +
+      '&nbsp;is the general form of <span class="cc">c</span>, and the sign of H is the case distinction.</div>';
+    return s;
+  }
+  /* tree mode: the geometric series behind the picture */
+  const c = cExp(), r = P.a / Math.pow(P.b, P.beta);
+  const dir = r > 1.0000001 ? "grow towards the leaves" : (r < .9999999 ? "shrink towards the leaves" : "are all equal");
+  return '<div class="sim-title"><span>The level sum</span><span class="rhs">ratio r = ' + fmt(r) + '</span></div>' +
+    '<table class="led"><tr><th>level</th><th>count</th><th>size</th><th>level cost</th></tr>' +
+    '<tr><td>0</td><td>1</td><td>n</td><td>f(n)</td></tr>' +
+    '<tr><td>1</td><td>a</td><td>n/b</td><td>a f(n/b)</td></tr>' +
+    '<tr><td>j</td><td>a<sup>j</sup></td><td>n/b<sup>j</sup></td><td>a<sup>j</sup> f(n/b<sup>j</sup>)</td></tr>' +
+    '<tr class="leafrow"><td>log<sub>b</sub>n</td><td>n<sup>c</sup></td><td>1</td><td>d&thinsp;n<sup>c</sup></td></tr>' +
+    '</table>' +
+    '<div class="vnote" style="text-align:left; margin-top:9px">For <span class="cf">f</span>(n) = n<sup>&beta;</sup> the ' +
+    'level costs form a geometric series with ratio <b>r = <span class="ca">a</span>/<span class="cb">b</span><sup>&beta;</sup> = ' +
+    fmt(r) + '</b>: consecutive levels ' + dir + '. r &gt; 1 is case (a), r = 1 is case (b), r &lt; 1 is case (c) \u2014 ' +
+    'and r = 1 is the same as &beta; = <span class="cc">c</span>.</div>';
+}
+
+/* --- the side-condition reports ------------------------------------------ */
+function condReports() {
+  const c = cExp(), lim = P.a / Math.pow(P.b, P.beta), ok = P.beta > c + 1e-12;
+  /* for f(n) = B n^beta lg^gamma n the ratio is an identity, not a measurement */
+  el("regReport").innerHTML =
+    'For <span class="m cf">f</span>(n) = <span class="m">B</span> n<sup>&beta;</sup>lg<sup>&gamma;</sup>n the ratio is ' +
+    'an <b>identity</b>, not a measurement: <span class="m ca">a</span>\u2009<span class="m cf">f</span>(n/<span class="m cb">b</span>)' +
+    '/<span class="m cf">f</span>(n) = (<span class="ca">a</span>/<span class="cb">b</span><sup>&beta;</sup>)' +
+    '&middot;(1 &minus; lg <span class="cb">b</span>/lg n)<sup>&gamma;</sup>, which tends to ' +
+    '<span class="ca">a</span>/<span class="cb">b</span><sup>&beta;</sup> = <span class="cb">b</span><sup><span class="cc">c</span>&minus;&beta;</sup> = <b>' +
+    fmt(lim) + '</b>. ' +
+    (ok ? 'Since &beta; &gt; <span class="cc">c</span>, that limit is below 1 and the lemma applies: ' +
+          '<span class="yes">the regularity condition holds</span> \u2014 proved, not observed. Any &alpha; with ' +
+          fmt(lim) + ' &lt; &alpha; &lt; 1 serves, for n large enough.'
+        : 'Since &beta; &le; <span class="cc">c</span>, the ratio is at least 1 (or, for &gamma; &gt; 0, approaches 1 from ' +
+          'below), so no constant &alpha; &lt; 1 can bound it: <span class="maybe">the regularity condition does not hold ' +
+          'here</span>. Only case (c) ever needs it, and case (c) does not apply either, so nothing is lost.');
+
+  let D = 0;
+  for (let k = 3; k <= 26; k++) { const n = Math.pow(P.b, k); D = Math.max(D, f(2 * n) / f(n), f(n) / f(2 * n)); }
+  el("pgReport").innerHTML = 'Here <span class="m cf">f</span>(n) = ' + fName(true) + ' has exactly the shape ' +
+    '&Theta;(n<sup>&beta;</sup>log<sup>&gamma;</sup>n) named in the lemma, so ' +
+    '<span class="yes">the condition holds</span> and floors and ceilings may be ignored \u2014 again by the lemma, ' +
+    'not by inspection. Concretely <span class="m cf">f</span>(tn)/<span class="m cf">f</span>(n) &rarr; t<sup>&beta;</sup>, ' +
+    'so for C = 2 any D &gt; max(2<sup>&beta;</sup>, 2<sup>&minus;&beta;</sup>) = ' + fmt(Math.max(Math.pow(2, P.beta), Math.pow(2, -P.beta))) +
+    ' works for large n; sampling the quotient up to n = ' + fmt(Math.pow(P.b, 26)) + ' gives at most ' + fmt(D) +
+    ', which is an illustration of that, not a proof.';
+
+  const A = analyse();
+  el("gapNote").innerHTML = A.gap
+    ? 'This recurrence sits in the gap: <span class="m cf">f</span> and n<sup class="cc">c</sup> differ by a log factor, ' +
+      'which is less than any n<sup>&epsilon;</sup>. Cases (a) and (c) need a <em>polynomial</em> separation and case (b) needs ' +
+      'exact equality, so nothing applies. The recursion tree is unbothered \u2014 the level costs still form a perfectly ' +
+      'well-behaved sum, as the intuition mode shows \u2014 and Roura\u2019s theorem turns that into a proof.'
+    : 'The three cases leave a gap. Multiply <span class="m cf">f</span> by lg n \u2014 or divide by it \u2014 and this ' +
+      'recurrence falls straight out of the theorem, because n<sup class="cc">c</sup>\u2009lg n is neither ' +
+      'O(n<sup class="cc">c</sup><sup>&minus;&epsilon;</sup>) nor &Omega;(n<sup class="cc">c</sup><sup>+&epsilon;</sup>) nor ' +
+      '&Theta;(n<sup class="cc">c</sup>). Try the example <i>Closest pair, first version</i> or <i>The gap</i>.';
+}
+
+/* ==========================================================================
+   Steps, phases, rendering
+   ========================================================================= */
+function stepCount() { return mode === "tree" ? TREE_STEPS.length : (mode === "grow" ? P.K + 1 : ROURA_STEPS.length); }
+function phaseList() {
+  if (mode === "grow") {
+    const out = [];
+    for (let k = 0; k <= P.K; k++) out.push({ label:String(k), from:k, to:k, title:"n = " + fmtNum(Math.pow(P.b, k)) });
+    return out;
+  }
+  const src = mode === "tree" ? TREE_STEPS : ROURA_STEPS, out = [];
+  src.forEach((s, i) => {
+    if (out.length && out[out.length - 1].label === s.ph) out[out.length - 1].to = i;
+    else out.push({ label:s.ph, from:i, to:i });
+  });
+  return out;
+}
+function renderPhases() {
+  const ph = phaseList(), bar = el("phasebar");
+  bar.innerHTML = ph.map((p, i) => '<button class="phasebtn' + (step >= p.from && step <= p.to ? " on" :
+    (step > p.to ? " past" : "")) + '" data-goto="' + p.from + '" title="' + (p.title || p.label) + '">' +
+    p.label + '</button>').join("");
+  bar.querySelectorAll("[data-goto]").forEach(b =>
+    b.onclick = () => setStep(+b.getAttribute("data-goto")));
+  ph.forEach((p, i) => { bar.children[i].style.flexGrow = (p.to - p.from + 1); });
+}
+
+function explainText() {
+  if (mode === "tree") {
+    if (step === 7) {
+      const A = analyse(), C = closedForm();
+      return A.gap ? "None of the three cases applies: <span class='cf'>f</span> and n<sup class='cc'>c</sup> are separated " +
+          "only by a log factor, never by a power of n. The sum is still perfectly computable \u2014 see the other two modes."
+        : "Case (" + A.kase + ") applies, so <span class='m'>T</span>(n) = " + C.form + " \u2014 " + C.tag + ".";
+    }
+    return TREE_STEPS[step].t;
+  }
+  if (mode === "roura") return ROURA_STEPS[step].t;
+  const L = levels(step), rt = L.rows[0], lf = L.rows[L.rows.length - 1];
+  if (step === 0) return "n = 1: there is nothing but the base case, T(1) = <span class='cd'>" + nice(P.d) + "</span>.";
+  const rp = (rt.share * 100), lp = (lf.share * 100);
+  const A = analyse();
+  let tail = "";
+  if (step === P.K) tail = A.kase === "a" ? " Extrapolate: the leaf row swallows the whole picture, which is what \u0398(n<sup class='cc'>c</sup>) means."
+    : A.kase === "b" ? " The picture has stopped changing shape \u2014 a rectangle, log<sub class='cb'>b</sub>n rows of equal width. That is the extra log factor."
+    : A.kase === "c" ? " Extrapolate: the root row swallows the whole picture, which is what \u0398(<span class='cf'>f</span>(n)) means."
+    : " The shape keeps drifting, but slowly \u2014 no power of n separates the ends. That is exactly the gap in the theorem.";
+  return "n = " + (P.b === Math.round(P.b) ? nice(P.b) + "<sup>" + step + "</sup> = " : "") + fmtNum(L.n) +
+    ". The root now carries <b>" + rp.toFixed(rp < .1 ? 3 : 1) + "%</b> of the total, the leaves <b>" +
+    lp.toFixed(lp < .1 ? 3 : 1) + "%</b>." + tail;
+}
+
+function render(opts) {
+  opts = opts || {};
+  el("modeSeg").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.mode === mode));
+  document.querySelectorAll("[data-only]").forEach(n => {
+    const m = n.getAttribute("data-only");
+    n.style.display = (m === "mt" ? mode !== "roura" : mode === m) ? "" : "none";
+  });
+  el("condBox").style.display = mode === "roura" ? "none" : "";
+  el("rouraThmBox").style.display = mode === "roura" ? "" : "none";
+  el("fEcho").innerHTML = "&nbsp;&rarr;&nbsp; <b><span class='cf'>f</span>(n) = " + fName(true) + "</b>";
+  el("termsEcho").innerHTML = mode === "roura"
+    ? "= <b>" + P.terms.map(t => (t.a === 1 ? "" : nice(t.a) + "\u2009") + "T(" + sizeText(t.b) + ")").join(" + ") +
+      "</b>" : "";
+  el("scaleBox").style.display = mode === "roura" ? "none" : "";
+  el("ratioBox").style.display = mode === "tree" ? "none" : "";
+  el("svgTitle").textContent = mode === "tree" ? "Recursion tree" : mode === "grow" ?
+    "Cost by level, drawn to scale" : "Weights and the function H";
+  if (mode === "roura") el("rouraFull").innerHTML = rouraRows().map(r =>
+    '<div class="thmcase ' + (rouraCase().k === r[0] ? "on" : "") + '"><span class="tag">(' + r[0] + ')</span><span>' +
+    r[1] + '<span class="check">if ' + r[2] + '</span></span></div>').join("");
+  el("sub").innerHTML = mode === "tree"
+    ? "The recursion unfolded into a tree and added up level by level. The theorem compares the two ends of that sum: the single call at the root, and the n<sup class='cc'>c</sup> base cases at the bottom."
+    : mode === "grow"
+    ? "Before the theorem: what actually happens as n grows. Each level of the recursion is a bar whose <b>width is its share of the total cost</b>, and the picture is rescaled so the total width never changes. Grow n by a factor <span class='cb'>b</span> and one row of leaves is added at the bottom \u2014 watch where the width goes."
+    : "The master theorem needs all subproblems to have the same size, and it says nothing when <span class='cf'>f</span> sits within a log factor of n<sup class='cc'>c</sup>. Roura\u2019s theorem has neither restriction, and returns constants rather than \u0398-classes.";
+
+  el("slider").max = stepCount() - 1;
+  el("slider").value = step;
+  el("stepno").innerHTML = mode === "grow" ? "k = " + step + " / " + P.K : "step " + (step + 1) + " / " + stepCount();
+  renderPhases();
+  syncTransport();
+  el("explain").innerHTML = explainText();
+  el("thmBox").innerHTML = thmPanel();
+  el("verdictBox").innerHTML = verdictPanel();
+  el("ledgerBox").innerHTML = ledgerPanel();
+  el("legend").innerHTML = mode === "roura" ? "" :
+    '<span class="item"><span class="sw" style="background:var(--mt-f-fill); border-color:var(--mt-f)"></span> conquer work <span class="m cf">f</span></span>' +
+    '<span class="item"><span class="sw" style="background:var(--mt-d-fill); border-color:var(--mt-d)"></span> base cases <span class="m cd">d</span></span>' +
+    (mode === "grow" ? '<span class="item">width = share of the total cost</span>' : '');
+  condReports();
+
+  if (mode === "tree") {
+    if (!opts.keepSvg) buildTree();
+    updateTree();
+    el("svgRhs").innerHTML = "<span class='ca'>a</span> = " + nice(P.a) + " &nbsp; <span class='cb'>b</span> = " +
+      nice(P.b) + " &nbsp; <span class='cc'>c</span> = " + fmt(cExp());
+    const c = cExp(), cs = cNum();
+    const fpow = "n" + (P.beta === 1 ? "" : "<tspan baseline-shift=\"super\" font-size=\"70%\">" + nice(P.beta) + "</tspan>") +
+      (P.gamma === 0 ? "" : " lg" + (P.gamma === 1 ? "" : "<tspan baseline-shift=\"super\" font-size=\"70%\">" +
+        nice(P.gamma) + "</tspan>") + " n");
+    const npow = c === 0 ? "1" : ("n" + (Math.abs(c - 1) < 1e-9 ? "" :
+      "<tspan baseline-shift=\"super\" font-size=\"70%\">" + cs + "</tspan>"));
+    let tilt = MAXTILT * Math.tanh((c - P.beta) * 1.15);
+    if (Math.abs(c - P.beta) < 1e-9 && P.gamma !== 0) tilt = -Math.sign(P.gamma) * 2.2;
+    drawScale({ lVal:npow, lSub:'<tspan class="sd">' + (SYM ? "d" : nice(P.d)) + '</tspan>\u2009n' +
+        S_UP('<tspan class="sc">' + (SYM ? "c" : cs) + '</tspan>'),
+      rVal:fpow, rSub:'<tspan class="sf">f</tspan>(n)', tilt:tilt,
+      note:"only the exponents count: <tspan class=\"sc\">c</tspan> = " + cs + " against \u03b2 = " + nice(P.beta) +
+        (Math.abs(c - P.beta) < 1e-9 && P.gamma !== 0 ?
+          " \u2014 equal, and a log factor is too little to tip the theorem" : ""),
+      rhs:"leaves n<sup>" + cs + "</sup> against root " + fName(true) });
+  } else if (mode === "grow") {
+    if (!opts.morphed) paintGrow(growSnapshot(step));
+    const L = levels(step);
+    el("svgRhs").innerHTML = "n = " + fmtNum(L.n) + " &nbsp; T(n) = " + fmt(L.total);
+    const rootC = L.rows[0].cost, leafC = L.rows[L.rows.length - 1].cost;
+    drawScale({ lVal:fmt(leafC), lSub:'<tspan class="sd">d</tspan>\u2009n' + S_UP('<tspan class="sc">c</tspan>'),
+      rVal:fmt(rootC), rSub:'<tspan class="sf">f</tspan>(n)', tilt:tiltFromRatio(leafC, rootC),
+      note:"the top and bottom rows of the picture above, weighed against each other",
+      rhs:"leaves : root = " + (leafC >= rootC ? (rootC > 0 ? fmt(leafC / rootC) : "\u221e") + "\u2009:\u20091"
+                                              : "1\u2009:\u2009" + (leafC > 0 ? fmt(rootC / leafC) : "\u221e")) });
+    growRatio();
+  } else {
+    drawRoura();
+    el("svgRhs").innerHTML = "&alpha; = " + nice(P.beta) + " &nbsp; &gamma; = " + nice(P.gamma) +
+      " &nbsp; H = " + fmt(Hof(P.beta));
+    rouraRatio();
+  }
+}
+
+function growRatio() {
+  const A = analyse(), c = cExp(), xs = [], t = [], r1 = [], r2 = [], r3 = [];
+  for (let k = 1; k <= P.K; k++) {
+    const L = levels(k), n = L.n;
+    xs.push(k); t.push(L.total);
+    r1.push(L.total / Math.pow(n, c));
+    r2.push(L.total / (Math.pow(n, c) * lg(n)));
+    r3.push(L.total / f(n));
+  }
+  drawRatio([
+    { label:"T/n\u1d9c", color:"var(--mt-d)", pts:r1, bold:A.kase === "a" },
+    { label:"T/(n\u1d9c lg n)", color:"var(--wi-queue)", pts:r2, bold:A.kase === "b" },
+    { label:"T/f(n)", color:"var(--mt-f)", pts:r3, bold:A.kase === "c" }
+  ], xs, "k, where n = " + nice(P.b) + supStr("k"));
+  el("ratioRhs").innerHTML = analyse().gap
+    ? "none of the three settles \u2014 that is the gap"
+    : "the flat one is the answer: case (" + analyse().kase + ")";
+}
+function rouraRatio() {
+  const N = 40000, T = dpSolve(N), xs = [], pts = [];
+  for (let i = 0; i < 26; i++) {
+    const n = Math.round(Math.pow(N / 8, i / 25) * 8);
+    if (n > N) break;
+    xs.push(n >= 1000 ? Math.round(n / 1000) + "k" : String(n));
+    pts.push(T[n] / rouraPredict(n));
+  }
+  drawRatio([{ label:"T(n) / prediction", color:"var(--wi-accent)", pts:pts, bold:true }], xs, "n");
+  const RK = rouraCase().k;
+  el("ratioRhs").innerHTML = "solved exactly with \u230an/b\u230b, divided by the prediction \u2014 " +
+    (RK === "a" || RK === "d" ? "cases (a) and (d) promise only O(\u00b7), so a flat curve is all we should expect"
+     : "it should settle at 1" + (RK === "c" ? ", though very slowly here" : ""));
+}
+
+/* ==========================================================================
+   Interaction
+   ========================================================================= */
+function setStep(s, opts) {
+  s = clamp(s, 0, stepCount() - 1);
+  const old = step;
+  if (mode === "grow" && Math.abs(s - old) === 1 && !(opts && opts.noAnim)) {
+    step = s;
+    morphGrow(old, s, null);
+    render({ morphed:true, keepSvg:true });
+    return;
+  }
+  step = s;
+  render({ keepSvg: mode === "tree" && !(opts && opts.rebuild) });
+}
+/* --- transport ----------------------------------------------------------- */
+function setPlayGlyph(running) {
+  const b = el("playBtn");
+  b.innerHTML = running ? "\u23f8\ufe0e" : "\u25b6\ufe0e";
+  b.title = running ? "Pause (space bar)" : "Play (space bar)";
+  b.setAttribute("aria-label", running ? "Pause" : "Play");
+}
+function syncTransport() {
+  const last = stepCount() - 1;
+  el("btnFirst").disabled = step <= 0;
+  el("btnPrev").disabled = step <= 0;
+  el("btnNext").disabled = step >= last;
+}
+function stop() { playing = false; if (timer) clearInterval(timer); timer = null; setPlayGlyph(false); }
+function play() {
+  if (playing) { stop(); return; }
+  if (step >= stepCount() - 1) { step = 0; render({ rebuild:true }); }
+  playing = true; setPlayGlyph(true);
+  const ms = mode === "grow" ? 900 : (mode === "tree" ? 1500 : 2200);
+  timer = setInterval(() => {
+    if (step >= stepCount() - 1) { stop(); return; }
+    setStep(step + 1);
+  }, ms);
+}
+
+function readInputs() {
+  const g = (id, def) => { const v = frac(el(id).value); return isNaN(v) ? def : v; };
+  P.a = Math.max(1e-6, g("inA", P.a));
+  P.b = Math.max(1.0001, g("inB", P.b));
+  P.d = Math.max(0, g("inD", P.d));
+  P.B = g("inFB", P.B);
+  P.beta = g("inBeta", P.beta);
+  P.gamma = g("inGam", P.gamma);
+  P.K = clamp(Math.round(g("inK", P.K)), 1, 24);
+  if (mode === "roura") {
+    const ts = el("inTerms").value.split(",").map(s => s.trim()).filter(Boolean).map(s => {
+      const p = s.split(/\s+/); return { a:frac(p[0]), b:frac(p[1]) };
+    }).filter(t => isFinite(t.a) && isFinite(t.b) && t.b > 1);
+    if (ts.length) P.terms = ts;
+  }
+}
+function writeInputs() {
+  el("inA").value = nice(P.a); el("inB").value = nice(P.b); el("inD").value = nice(P.d);
+  el("inFB").value = nice(P.B); el("inBeta").value = nice(P.beta); el("inGam").value = nice(P.gamma);
+  el("inK").value = P.K;
+  el("inTerms").value = P.terms.map(t => nice(t.a) + " " + nice(t.b)).join(", ");
+}
+function applyPreset(id) {
+  const src = (mode === "roura" ? ROURA_PRESETS : PRESETS).find(p => p.id === id);
+  if (!src) return;
+  P.B = src.B; P.beta = src.beta; P.gamma = src.gamma; P.d = src.d; P.note = src.note || "";
+  if (src.terms) { P.terms = src.terms.map(t => ({ a:t.a, b:t.b })); P.a = src.terms[0].a; P.b = src.terms[0].b; }
+  else { P.a = src.a; P.b = src.b; P.terms = [{ a:src.a, b:src.b }]; }
+  if (src.k) P.K = src.k;
+  writeInputs();
+  step = mode === "grow" ? Math.min(4, P.K) : 0;
+  render({ rebuild:true });
+}
+function matchPreset() {
+  const list = mode === "roura" ? ROURA_PRESETS : PRESETS, eq = (x, y) => Math.abs(x - y) < 1e-9;
+  const hit = list.find(p => {
+    if (!(eq(p.B, P.B) && eq(p.beta, P.beta) && eq(p.gamma, P.gamma) && eq(p.d, P.d))) return false;
+    if (mode === "roura") {
+      const t = p.terms || [{ a:p.a, b:p.b }];
+      return t.length === P.terms.length && t.every((q, i) => eq(q.a, P.terms[i].a) && eq(q.b, P.terms[i].b));
+    }
+    return eq(p.a, P.a) && eq(p.b, P.b) && P.terms.length === 1;
+  });
+  el("presetSel").value = hit ? hit.id : "";
+  if (hit) P.note = hit.note || "";
+}
+function fillPresets() {
+  const list = mode === "roura" ? ROURA_PRESETS : PRESETS;
+  el("presetSel").innerHTML = list.map(p => '<option value="' + p.id + '">' + p.name + '</option>').join("") +
+    '<option value="">(custom)</option>';
+}
+function dump() {
+  const L = ["name " + (P.name || "custom"), "a " + nice(P.a), "b " + nice(P.b), "d " + nice(P.d),
+    "f " + nice(P.B) + " " + nice(P.beta) + " " + nice(P.gamma),
+    "terms " + P.terms.map(t => nice(t.a) + " " + nice(t.b)).join(", "), "k " + P.K];
+  if (P.note) L.push("note " + P.note.replace(/<[^>]*>/g, ""));
+  el("ta").value = L.join("\n");
+}
+function loadText() {
+  const err = el("taErr"); err.textContent = "";
+  try {
+    el("ta").value.split(/\n+/).forEach(line => {
+      const m = line.trim().match(/^(\w+)\s+(.*)$/); if (!m) return;
+      const k = m[1].toLowerCase(), v = m[2].trim();
+      if (k === "a") P.a = frac(v);
+      else if (k === "b") P.b = frac(v);
+      else if (k === "d") P.d = frac(v);
+      else if (k === "k") P.K = clamp(Math.round(frac(v)), 1, 24);
+      else if (k === "name") P.name = v;
+      else if (k === "note") P.note = v;
+      else if (k === "f") { const p = v.split(/\s+/); P.B = frac(p[0]); P.beta = frac(p[1] || "0"); P.gamma = frac(p[2] || "0"); }
+      else if (k === "terms") P.terms = v.split(",").map(s => s.trim().split(/\s+/)).map(p => ({ a:frac(p[0]), b:frac(p[1]) }));
+    });
+    if (!(P.b > 1)) throw new Error("b must be greater than 1");
+    if (!(P.a > 0)) throw new Error("a must be positive");
+    if (mode !== "roura") P.terms = [{ a:P.a, b:P.b }];
+    writeInputs(); el("presetSel").value = "";
+    step = 0; render({ rebuild:true });
+  } catch (e) { err.textContent = String(e.message || e); }
+}
+
+/* --- tooltips ------------------------------------------------------------ */
+const tt = () => el("tt");
+function showTip(ev, html) {
+  const t = tt(); t.innerHTML = html; t.style.display = "block";
+  const r = t.getBoundingClientRect();
+  t.style.left = Math.min(ev.clientX + 14, window.innerWidth - r.width - 10) + "px";
+  t.style.top = Math.max(8, ev.clientY - r.height - 12) + "px";
+}
+const hideTip = () => { tt().style.display = "none"; };
+
+function init() {
+  fillPresets();
+  el("modeSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    stop(); mode = b.dataset.mode;      /* the recurrence is shared; only the view changes */
+    fillPresets(); matchPreset();
+    step = clamp(step, 0, stepCount() - 1);
+    render({ rebuild:true });
+  });
+  el("symSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    SYM = b.dataset.sym === "1";
+    el("symSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", (x.dataset.sym === "1") === SYM));
+    render({ rebuild:true });
+  });
+  el("presetSel").onchange = e => { stop(); applyPreset(e.target.value); };
+  el("normSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    NORM = b.dataset.norm;
+    el("normSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.norm === NORM));
+    render({ rebuild:true });
+  });
+  ["inA", "inB", "inD", "inFB", "inBeta", "inGam", "inK", "inTerms"].forEach(id => {
+    el(id).addEventListener("input", () => {
+      stop();
+      if (mode !== "roura" && (id === "inA" || id === "inB")) P.terms = [{ a:P.a, b:P.b }];
+      readInputs();
+      if (mode !== "roura" && (id === "inA" || id === "inB")) P.terms = [{ a:P.a, b:P.b }];
+      el("presetSel").value = ""; P.note = "";
+      step = clamp(step, 0, stepCount() - 1);
+      render({ rebuild:true });
+    });
+  });
+  el("slider").addEventListener("input", e => { stop(); setStep(+e.target.value); });
+  el("btnFirst").onclick = () => { stop(); setStep(0); };
+  el("btnPrev").onclick = () => { stop(); setStep(step - 1); };
+  el("btnNext").onclick = () => { stop(); setStep(step + 1); };
+  el("playBtn").onclick = play;
+  el("btnReset").onclick = () => { stop(); el("presetSel").value = PRESETS[0].id; applyPreset(PRESETS[0].id); };
+  el("btnLoad").onclick = loadText;
+  el("btnDump").onclick = dump;
+  document.addEventListener("keydown", e => {
+    if (/input|textarea|select/i.test(e.target.tagName)) return;
+    if (e.key === "ArrowRight") { stop(); setStep(step + 1); }
+    if (e.key === "ArrowLeft") { stop(); setStep(step - 1); }
+    if (e.key === " ") { e.preventDefault(); play(); }
+  });
+  /* hover: the level bars carry their own numbers */
+  el("mainSvg").addEventListener("mousemove", ev => {
+    const g = ev.target.closest ? ev.target.closest("[data-row]") : null;
+    if (!g || mode !== "grow") { hideTip(); return; }
+    const L = levels(step), r = L.rows[+g.getAttribute("data-row")];
+    if (!r) { hideTip(); return; }
+    showTip(ev, '<span class="tt-h">level ' + r.j + (r.leaf ? " \u00b7 base cases" : "") + '</span><br>' +
+      fmt(r.cnt) + ' subproblem' + (r.cnt === 1 ? '' : 's') + ' of size ' + fmtNum(r.size) + '<br>' +
+      (r.leaf ? 'd' : 'f(' + fmtNum(r.size) + ')') + ' = ' + fmt(r.each) + ' each<br>' +
+      '<b>' + fmt(r.cost) + '</b> = ' + (r.share * 100).toFixed(2) + '% of T(n)');
+  });
+  el("mainSvg").addEventListener("mouseleave", hideTip);
+  el("thmBox").addEventListener("mousemove", ev => {
+    const c = ev.target.closest ? ev.target.closest("[data-case]") : null;
+    if (!c || mode === "roura") { hideTip(); return; }
+    const A = analyse(), k = c.getAttribute("data-case");
+    showTip(ev, '<span class="tt-h">case (' + k + ')</span><br>' +
+      (A.kase === k ? "applies here: " + A.why : "does not apply: " + A.why));
+  });
+  el("thmBox").addEventListener("mouseleave", hideTip);
+
+  el("presetSel").value = PRESETS[0].id;
+  applyPreset(PRESETS[0].id);
+  step = Math.min(4, P.K);
+  render({ rebuild:true });
+  dump();
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

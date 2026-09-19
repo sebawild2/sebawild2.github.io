@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Edit distance · dynamic programming, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  /* transport icons: text presentation, never the colour-emoji forms */
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.str { font-family:var(--wi-font-mono); font-size:.8rem; width:11em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* --- operation bar --- */
+  .opbar { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:10px 18px;
+           background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+           border-radius:var(--wi-radius-lg); margin-bottom:14px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+
+  /* --- transport: slider + phase bar --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  /* the slider thumb's centre cannot reach the very ends of the track: it stops
+     half a thumb short on each side. Inset the phase strip by the same amount,
+     or its segment boundaries drift away from the thumb they describe. */
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  /* the phase strip sits flush under the scrubber, same width, each segment as
+     wide as the share of steps it covers -- so the fill inside it is a second
+     reading of the slider position: which phase, and how far into it */
+  .phasebar { display:flex; margin:5px var(--thumb) 0;
+              width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden;
+              flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage --- */
+  .stage { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(330px,1fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-box + .sim-box { margin-top:14px; }
+  .col-side .sim-box + .sim-box { margin-top:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:88px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status code, .status .ch { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-panel-2);
+                 padding:1px 4px; border-radius:3px; }
+  .status .k-del { color:var(--wi-examine); font-weight:bold; }
+  .status .k-ins { color:var(--wi-queue); font-weight:bold; }
+  .status .k-sub { color:var(--wi-active); font-weight:bold; }
+  .status .k-match { color:var(--wi-relax); font-weight:bold; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem;
+            color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  /* --- alignment panel: the notation of the lecture, one column per position --- */
+  .alignwrap { overflow-x:auto; padding-bottom:4px; }
+  .alignrows { display:inline-flex; flex-direction:column; gap:1px; min-width:100%; }
+  .alignrow { display:flex; justify-content:flex-end; }
+  /* every column is the same fixed width in all three rows -- the width must
+     not depend on the row's font-size (em) or the rows drift apart, and the
+     columns must not shrink: the wrapper scrolls instead */
+  .acol { flex:0 0 1.4rem; width:1.4rem; text-align:center; font-family:var(--wi-font-mono); font-size:1.02rem;
+          line-height:1.35; color:var(--wi-ink-strong); }
+  .arow-op .acol { font-size:.95rem; }
+  .acol.gap { color:var(--wi-ink-faint); }
+  .acol.op-match { color:var(--wi-relax); }
+  .acol.op-sub   { color:var(--wi-active); }
+  .acol.op-del   { color:var(--wi-examine); }
+  .acol.op-ins   { color:var(--wi-queue); }
+  .acol.hot { background:#f6e6df; border-radius:2px; }
+  .alignnote { font-size:.74rem; color:var(--wi-ink-faint); margin-top:8px; line-height:1.45; }
+  .script { list-style:none; margin:0; padding:0; font-size:.85rem; }
+  .script li { padding:3px 0; border-bottom:1px solid var(--wi-border-soft); display:flex; gap:9px; }
+  .script li:last-child { border-bottom:0; }
+  .script .no { color:var(--wi-ink-faint); font-family:var(--wi-font-mono); font-size:.8rem; min-width:1.6em; }
+  .script .ch { font-family:var(--wi-font-mono); background:var(--wi-panel-2); padding:0 4px; border-radius:3px; }
+  .script li.fresh { background:#f6e6df; border-radius:3px; }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+
+  /* --- pseudocode --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent;
+           white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em;
+              text-transform:uppercase; color:var(--wi-ink-faint); padding:10px 12px 3px;
+              border-top:1px solid var(--wi-border-soft); margin-top:6px; }
+  .sublabel:first-child { border-top:0; margin-top:0; padding-top:2px; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  /* --- editor --- */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,260px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:150px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:270px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+
+  .mobile-note { display:none; background:var(--wi-controls); border:1px solid var(--wi-accent-soft);
+                 border-radius:var(--wi-radius-lg); padding:11px 15px; font-size:.82rem;
+                 color:var(--wi-ink-strong); margin-bottom:14px; }
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls, .opbar { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; border-radius:var(--wi-radius); }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .stepno { font-size:.7rem; }
+    .mobile-note { display:block; }
+    .desk-only { display:none !important; }
+  }
+
+  /* --- SVG classes --- */
+  .cellbg { fill:var(--wi-panel-2); stroke:var(--wi-border-soft); stroke-width:1; }
+  .cellbg.base { fill:var(--wi-controls); }
+  .cellbg.empty { fill:var(--wi-bg); stroke:var(--wi-border-soft); stroke-dasharray:2 3; }
+  .cellbg.pred { fill:#f7edd9; stroke:var(--wi-examine); stroke-width:1.6; }
+  .cellbg.best { fill:#e8f0e2; stroke:var(--wi-relax); stroke-width:1.8; }
+  .cellbg.cur  { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2.2; }
+  .cellbg.path { fill:#f0d7cd; stroke:var(--wi-accent); stroke-width:1.8; }
+  .cellbg.sel  { stroke:var(--wi-accent-dark); stroke-width:2.6; }
+  .cellbg.gone { fill:var(--wi-bg); stroke:var(--wi-border-soft); stroke-dasharray:2 3; opacity:.7; }
+  .cellval { font-family:var(--wi-font-mono); font-size:15px; fill:var(--wi-ink-strong);
+             text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .cellval.dim { opacity:.30; }
+  .cellval.big { font-weight:bold; fill:var(--wi-accent-dark); }
+  .hdrch { font-family:var(--wi-font-mono); font-size:16px; fill:var(--wi-ink-strong);
+           text-anchor:middle; dominant-baseline:central; }
+  .hdrch.hot { fill:var(--wi-accent); font-weight:bold; }
+  .hdrix { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint);
+           text-anchor:middle; dominant-baseline:central; }
+  .hdrname { font-family:var(--wi-font-body); font-size:14px; fill:var(--wi-ink-soft); font-style:italic; }
+  .arr { fill:none; stroke-width:2.2; pointer-events:none; }
+  .arrlab, .hdrch, .hdrix, .hdrname { pointer-events:none; }
+  .arr.cand  { stroke:var(--wi-examine); }
+  .arr.best  { stroke:var(--wi-relax); stroke-width:3; }
+  .arr.taken { stroke:var(--wi-accent); stroke-width:3.4; }
+  .arr.faint { stroke:var(--wi-inert); stroke-width:1.6; opacity:.75; }
+  .arrlab { font-family:var(--wi-font-mono); font-size:11px; text-anchor:middle; dominant-baseline:central; }
+  .arrlab.cand { fill:var(--wi-examine); }
+  .arrlab.best { fill:var(--wi-relax); font-weight:bold; }
+  .arrlab.taken { fill:var(--wi-accent); font-weight:bold; }
+  .hit { fill:transparent; cursor:pointer; }
+
+  @keyframes cellpop { from { opacity:0; transform:translateY(-8px) scale(.65); }
+                       to   { opacity:1; transform:none; } }
+  .pop { animation:cellpop .34s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box;
+         transform-origin:center; }
+  @keyframes arrdraw { from { stroke-dashoffset:var(--len); } to { stroke-dashoffset:0; } }
+  .drawin { stroke-dasharray:var(--len); animation:arrdraw .38s ease-out both; }
+  @keyframes colin { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  .acol.fresh { animation:colin .3s ease-out both; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>Edit distance &nbsp;·&nbsp; the DP table, step by step</h1>
+</div>
+
+<p class="subtitle">
+  How many single-character <b>insertions</b>, <b>deletions</b> and <b>substitutions</b> does it take to turn
+  <i>A</i> into <i>B</i>?  Guess what happens at the last positions, and the answer follows from three smaller
+  subproblems.  The table below is <i>D</i>(<i>i</i>,<i>j</i>) = <i>d</i><sub>edit</sub>(<i>A</i>[0..<i>i</i>),
+  <i>B</i>[0..<i>j</i>)); every cell is the minimum over three incoming arrows.  The table gives only the
+  <i>cost</i> — the <b>backtrace</b> at the end recovers an actual edit script.
+  Hover a cell to see its prefixes; <b>click a cell to align exactly those prefixes</b>.
+</p>
+
+<div class="mobile-note">
+  <b>Small screen:</b> this is the compact demo — the table, the scrubber and the alignment. The pseudocode
+  with live line highlighting is on the desktop version.
+</div>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <label for="inA">A</label>
+    <input type="text" id="inA" class="str" spellcheck="false">
+    <label for="inB">B</label>
+    <input type="text" id="inB" class="str" spellcheck="false">
+    <button id="applyBtn" class="pri">Set</button>
+    <button id="swapBtn" title="exchange A and B">A ⇄ B</button>
+    <button id="randBtn">Random pair</button>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Detail</span>
+    <span class="seg" id="granSeg">
+      <button id="granCoarse" class="on">One step per cell</button>
+      <button id="granFine">Every guess</button>
+    </span>
+  </div>
+  <div class="ctl">
+    <label class="chk"><input type="checkbox" id="allOptChk"> all optimal arrows</label>
+    <label class="chk"><input type="checkbox" id="liveChk"> keep only two rows</label>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="traceNote"></span>
+  <button id="wholeBtn" style="display:none">Back to the whole strings</button>
+  <span class="opnote" style="margin-left:auto">Arrow keys step; click any cell to align its prefixes.</span>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">— / —</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="60" max="1400" value="420" style="width:88px">
+      <span class="stepno" id="speedVal">420ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The table D</span><span class="rhs" id="tabMeta"></span></div>
+      <div class="svgscroll"><svg id="gridSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> current cell</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> candidate</span>
+        <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> attains the minimum</span>
+        <span class="item"><span class="sw" style="background:#f0d7cd;border-color:var(--wi-accent)"></span> backtrace path</span>
+        <span class="item"><span class="sw" style="background:var(--wi-controls)"></span> base case</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Alignment</span><span class="rhs" id="alignMeta"></span></div>
+      <div id="alignBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Edit script</span><span class="rhs" id="scriptMeta"></span></div>
+      <div id="scriptBox"></div>
+    </div>
+  </div>
+</div>
+
+<details class="code desk-only" id="codeBox" open style="margin-top:18px">
+  <summary>Recurrence &amp; pseudocode</summary>
+  <div class="codebody" id="codeBody"></div>
+  <div class="codenote" id="codeNote"></div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      Two non-empty lines: the first is <i>A</i>, the second is <i>B</i>. Lines starting with
+      <code>#</code> are ignored, so a file can carry several examples with comments.
+      Spaces inside a line are kept and drawn as <code>␣</code>, which makes word-level examples
+      (<code>the quick fox</code>) work as well as character-level ones.
+      <br><br>
+      Anything longer than 40 characters is refused: the table would be unreadable and the point of the
+      picture is lost. For the asymptotics that is irrelevant anyway — the algorithm is <i>Θ</i>(<i>mn</i>)
+      whatever the strings look like.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Edit distance by dynamic programming.
+
+   D(i,j) = d_edit(A[0..i), B[0..j)), computed exactly by the recurrence
+
+       D(i,j) =  i                                     if j = 0
+                 j                                     if i = 0
+                 min { D(i-1,j) + 1,                      otherwise
+                       D(i,j-1) + 1,
+                       D(i-1,j-1) + [A[i-1] != B[j-1]] }
+
+   Conventions on this page
+     * i counts characters of A consumed, j characters of B; both 0-based
+       half-open, so cell (i,j) sits *after* A[i-1] and B[j-1].
+     * the backtrace tries delete, then insert, then (mis)match -- the same
+       order in which the three cases appear in the recurrence.  Other orders
+       give other optimal alignments; ties are pointed out as they occur.
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const vis = c => c === " " ? "\u2423" : c;                 /* open box for a space */
+const ch  = c => '<span class="ch">' + esc(vis(c)) + "</span>";
+
+/* ---------- presets ------------------------------------------------------ */
+
+const PRESETS = {
+  lecture:  { name: "algorithm / logarithm", a: "algorithm",  b: "logarithm" },
+  kitten:   { name: "kitten / sitting",      a: "kitten",     b: "sitting" },
+  intention:{ name: "intention / execution", a: "intention",  b: "execution" },
+  diff:     { name: "words: sorted lists",   a: "sort the list", b: "sorted lists" },
+  same:     { name: "equal strings",         a: "abracadabra", b: "abracadabra" },
+  empty:    { name: "empty A",               a: "",           b: "greedy" },
+  disjoint: { name: "nothing in common",     a: "aaaa",       b: "bbb" },
+  ties:     { name: "many ties",             a: "abab",       b: "baba" },
+  dna:      { name: "DNA fragment",          a: "GATTACA",    b: "GCATGCT" }
+};
+
+/* ---------- state -------------------------------------------------------- */
+
+let A = "algorithm", B = "logarithm";
+let m = 0, n = 0, D = [];
+let order = [], ordOf = [];
+let steps = [], phases = [], cur = 0;
+let gran = 0;                 /* 0 = one step per cell, 1 = one step per guess */
+let traceFrom = null;         /* [i,j] the backtrace starts from; null = (m,n) */
+let selCell = null;
+let showAll = false, liveRows = false;
+let timer = null;
+
+/* ---------- the table ---------------------------------------------------- */
+
+function computeTable() {
+  m = A.length; n = B.length;
+  D = [];
+  for (let i = 0; i <= m; i++) D.push(new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) D[i][0] = i;
+  for (let j = 0; j <= n; j++) D[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      D[i][j] = Math.min(D[i - 1][j] + 1, D[i][j - 1] + 1,
+                         D[i - 1][j - 1] + (A[i - 1] !== B[j - 1] ? 1 : 0));
+
+  /* the order in which cells become visible: base column, base row, then row-major */
+  order = []; ordOf = [];
+  for (let i = 0; i <= m; i++) ordOf.push(new Array(n + 1).fill(-1));
+  const push = (i, j) => { ordOf[i][j] = order.length; order.push([i, j]); };
+  push(0, 0);
+  for (let i = 1; i <= m; i++) push(i, 0);
+  for (let j = 1; j <= n; j++) push(0, j);
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) push(i, j);
+}
+
+/* the three guesses for cell (i,j), in the order of the recurrence */
+function guesses(i, j) {
+  const eq = A[i - 1] === B[j - 1];
+  return [
+    { kind: "del",            pi: i - 1, pj: j,     add: 1,           val: D[i - 1][j] + 1 },
+    { kind: "ins",            pi: i,     pj: j - 1, add: 1,           val: D[i][j - 1] + 1 },
+    { kind: eq ? "match" : "sub",
+                              pi: i - 1, pj: j - 1, add: eq ? 0 : 1,  val: D[i - 1][j - 1] + (eq ? 0 : 1) }
+  ];
+}
+const KINDNAME = { del: "delete", ins: "insert", sub: "substitute", match: "match" };
+const KEYOF    = { del: "del", ins: "ins", sub: "diag", match: "diag" };
+
+function whyOf(g, i, j) {
+  if (g.kind === "del")   return 'delete <span class="k-del">' + ch(A[i - 1]) + "</span>";
+  if (g.kind === "ins")   return 'insert <span class="k-ins">' + ch(B[j - 1]) + "</span>";
+  if (g.kind === "sub")   return 'replace <span class="k-sub">' + ch(A[i - 1]) + "</span> by " +
+                                 '<span class="k-sub">' + ch(B[j - 1]) + "</span>";
+  return 'keep <span class="k-match">' + ch(A[i - 1]) + "</span> (they match)";
+}
+
+/* ---------- step generation ---------------------------------------------- */
+
+function mkPhase(name) { phases.push({ name: name, from: steps.length, to: steps.length }); }
+function add(o) {
+  o.ph = phases.length - 1;
+  o.hl = o.hl || [];
+  steps.push(o);
+  phases[phases.length - 1].to = steps.length - 1;
+}
+
+const cellsOf = (list, cls) => { const o = {}; list.forEach(c => o[c[0] + "," + c[1]] = cls); return o; };
+
+function build() {
+  computeTable();
+  steps = []; phases = []; cur = 0;
+  const ti = traceFrom ? traceFrom[0] : m, tj = traceFrom ? traceFrom[1] : n;
+
+  /* --- phase: base cases ------------------------------------------------ */
+  mkPhase("Base cases");
+  add({ filled: 0, txt: "<b>Subproblem (i,j)</b>: the edit distance of the two <i>prefixes</i> " +
+         "<code>A[0..i)</code> and <code>B[0..j)</code>. The original problem is the bottom-right corner " +
+         "(" + m + "," + n + "). Every cell will be filled from three neighbours, so the two base cases " +
+         "along the border come first.",
+        hl: ["head"] });
+  add({ filled: 1, write: [[0, 0]], cells: cellsOf([[0, 0]], "cur"),
+        txt: "Both prefixes are empty, so nothing has to be done: <code>D(0,0) = 0</code>.",
+        hl: ["base_i", "base_j"] });
+  const col = []; for (let i = 1; i <= m; i++) col.push([i, 0]);
+  add({ filled: 1 + m, write: col, cells: cellsOf(col, "cur"),
+        txt: "<b>j = 0</b>: turning <code>A[0..i)</code> into the <i>empty</i> string can only be done by " +
+             "deleting all of it &mdash; <code>D(i,0) = i</code>, <i>i</i> deletions.",
+        hl: ["base_i"], hlp: ["p_basei"] });
+  const row = []; for (let j = 1; j <= n; j++) row.push([0, j]);
+  add({ filled: 1 + m + n, write: row, cells: cellsOf(row, "cur"),
+        txt: "<b>i = 0</b>: building <code>B[0..j)</code> out of nothing needs one insertion per character " +
+             "&mdash; <code>D(0,j) = j</code>, <i>j</i> insertions.",
+        hl: ["base_j"], hlp: ["p_basej"] });
+
+  /* --- phases: one per row (grouped if the string is long) --------------- */
+  const grp = m <= 12 ? 1 : Math.ceil(m / 10);
+  for (let i = 1; i <= m; i++) {
+    if ((i - 1) % grp === 0) {
+      const hi = Math.min(m, i + grp - 1);
+      mkPhase(grp === 1 ? "i = " + i + " · " + vis(A[i - 1])
+                        : "rows " + i + "–" + hi);
+    }
+    for (let j = 1; j <= n; j++) {
+      const g = guesses(i, j), best = D[i][j];
+      const pre = ordOf[i][j];                        /* cell not yet written */
+      const arrowsAll = g.map(x => ({ from: [x.pi, x.pj], to: [i, j], kind: x.kind,
+                                      lab: "+" + x.add, cls: x.val === best ? "best" : "cand" }));
+      const predCells = {};
+      g.forEach(x => predCells[x.pi + "," + x.pj] = x.val === best ? "best" : "pred");
+
+      if (gran === 1) {
+        g.forEach((x, k) => {
+          const c = Object.assign({}, predCells); /* keep the others visible but neutral */
+          Object.keys(c).forEach(key => { if (key !== x.pi + "," + x.pj) delete c[key]; });
+          c[x.pi + "," + x.pj] = "pred"; c[i + "," + j] = "cur";
+          add({ filled: pre, cell: [i, j], cells: c,
+                arrows: [{ from: [x.pi, x.pj], to: [i, j], kind: x.kind, lab: "+" + x.add, cls: "cand" }],
+                txt: "<b>D(" + i + "," + j + ")</b>, guess " + (k + 1) + " of 3: " + whyOf(x, i, j) +
+                     ", then solve <code>D(" + x.pi + "," + x.pj + ") = " + D[x.pi][x.pj] + "</code>. " +
+                     "Cost <code>" + D[x.pi][x.pj] + " + " + x.add + " = " + x.val + "</code>.",
+                hl: [KEYOF[x.kind]], hlp: ["p_" + KEYOF[x.kind]] });
+        });
+      }
+
+      const win = g.filter(x => x.val === best);
+      const cells = Object.assign({}, predCells); cells[i + "," + j] = "cur";
+      add({ filled: pre + 1, cell: [i, j], write: [[i, j]], cells: cells, arrows: arrowsAll,
+            txt: "<b>D(" + i + "," + j + ") = " + best + "</b>: the best of " +
+                 g.map(x => x.val).join(", ") + " &mdash; " +
+                 win.map(x => whyOf(x, i, j)).join(" <i>or</i> ") + "." +
+                 (win.length > 1 ? " <i>Two guesses tie, so this cell has more than one optimal " +
+                                   "alignment.</i>" : ""),
+            hl: ["del", "ins", "diag"], hlp: ["p_del", "p_ins", "p_diag"] });
+    }
+  }
+
+  /* --- phase: backtrace, or the reason there cannot be one ---------------- */
+  const full = 1 + m + n + m * n;
+
+  if (liveRows) {
+    /* Two rows give the cost and nothing else: by the time D(m,n) is known,
+       every row that a backtrace would have to read has been overwritten. */
+    mkPhase("Result");
+    add({ filled: full, cell: [m, n], cells: cellsOf([[m, n]], "cur"), noTrace: true,
+          txt: "Row <i>i</i> only ever reads row <i>i</i>−1, so two rows suffice to compute the " +
+               "<b>cost</b> &mdash; Θ(min{m,n}) space instead of Θ(mn). But the price is exactly the " +
+               "backtrace: every row it would have to read has been overwritten, so <b>no edit script " +
+               "can be recovered</b> here. Switch the two-row mode off to get it back.",
+          ans: "d_edit(" + (esc(A) || "ε") + ", " + (esc(B) || "ε") + ") = " + D[m][n],
+          hl: ["head"], hlp: ["p_ret"] });
+    return;
+  }
+
+  mkPhase("Backtrace");
+  let i = ti, j = tj, ops = [], path = [[ti, tj]];
+  const whole = (ti === m && tj === n);
+  add({ filled: full, cells: cellsOf(path, "path"), path: path.slice(), ops: [],
+        txt: "The table holds the cost only. Retrace the recurrence from <b>(" + ti + "," + tj + ")</b>" +
+             (whole ? "" : " &mdash; the corner you clicked") + ": at each cell, ask which of the three " +
+             "guesses attained the minimum, and take that arrow back. That reconstructs an optimal " +
+             "edit script, backwards.",
+        hl: ["head"], hlp: ["t_head", "t_init"], trace: true });
+
+  let guard = 0;
+  while ((i > 0 || j > 0) && guard++ < 4000) {
+    let pick = null, alts = [];
+    if (i > 0 && j > 0) {
+      const g = guesses(i, j);
+      g.forEach(x => { if (x.val === D[i][j]) alts.push(x); });
+      pick = alts[0];
+    } else if (i > 0) {
+      pick = { kind: "del", pi: i - 1, pj: j, add: 1, val: D[i][j] }; alts = [pick];
+    } else {
+      pick = { kind: "ins", pi: i, pj: j - 1, add: 1, val: D[i][j] }; alts = [pick];
+    }
+    const op = { kind: pick.kind, a: (pick.kind === "ins" ? null : A[i - 1]),
+                 b: (pick.kind === "del" ? null : B[j - 1]), i: i, j: j };
+    ops = [op].concat(ops);
+    path = path.concat([[pick.pi, pick.pj]]);
+    const cells = cellsOf(path, "path"); cells[i + "," + j] = "cur";
+    add({ filled: full, cell: [i, j], cells: cells, path: path.slice(), ops: ops.slice(),
+          arrows: [{ from: [pick.pi, pick.pj], to: [i, j], kind: pick.kind,
+                     lab: "+" + pick.add, cls: "taken" }],
+          txt: "<code>D(" + i + "," + j + ") = " + D[i][j] + " = D(" + pick.pi + "," + pick.pj + ") + " +
+               pick.add + "</code>, so " + whyOf(pick, i, j) + "." +
+               (alts.length > 1 ? " <i>(" + (alts.length - 1) + " other guess" +
+                (alts.length > 2 ? "es" : "") + " tie" + (alts.length > 2 ? "" : "s") +
+                " here; the code takes the first one in the order of the recurrence.)</i>" : ""),
+          hl: [KEYOF[pick.kind]], hlp: ["t_" + KEYOF[pick.kind]], trace: true, fresh: true });
+    i = pick.pi; j = pick.pj;
+  }
+
+  const cost = D[ti][tj];
+  add({ filled: full, cells: cellsOf(path, "path"), path: path.slice(), ops: ops.slice(),
+        txt: "Both prefixes are used up. The script above is optimal: " +
+             "<b>" + cost + "</b> operation" + (cost === 1 ? "" : "s") + ".",
+        ans: "d_edit(" + (esc(whole ? A : A.slice(0, ti)) || "ε") + ", " +
+             (esc(whole ? B : B.slice(0, tj)) || "ε") + ") = " + cost,
+        hl: ["head"], hlp: ["t_ret"], trace: true, done: true });
+}
+
+/* ---------- geometry ----------------------------------------------------- */
+
+let CS = 52;
+const X0 = 66, Y0 = 56;
+const cxOf = j => X0 + j * CS + CS / 2;
+const cyOf = i => Y0 + i * CS + CS / 2;
+
+/* keep the table on screen without letting the digits shrink out of scale
+   with the running text: wide tables scroll instead */
+function sizeCells() {
+  CS = Math.max(32, Math.min(52, Math.round(900 / (n + 1))));
+}
+
+/* ---------- drawing ------------------------------------------------------ */
+
+let hitBoxes = [];
+
+function arrowPath(a) {
+  const x2 = cxOf(a.to[1]), y2 = cyOf(a.to[0]);
+  const x1 = cxOf(a.from[1]), y1 = cyOf(a.from[0]);
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy);
+  const ux = dx / L, uy = dy / L, pad = CS * 0.27, pad2 = CS * 0.30;
+  return { x1: x1 + ux * pad, y1: y1 + uy * pad, x2: x2 - ux * pad2, y2: y2 - uy * pad2,
+           mx: (x1 + x2) / 2, my: (y1 + y2) / 2, len: L - pad - pad2 };
+}
+
+function drawGrid() {
+  const st = steps[cur] || {};
+  const svg = el("gridSvg");
+  sizeCells();
+  const W = X0 + (n + 1) * CS + 24, H = Y0 + (m + 1) * CS + 24;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+  const cells = st.cells || {}, writes = st.write || [];
+  const wroteKey = {}; writes.forEach(c => wroteKey[c[0] + "," + c[1]] = 1);
+  const liveI = st.cell ? st.cell[0] : -1;
+  const out = [];
+  hitBoxes = [];
+
+  out.push('<defs>');
+  [["cand", "var(--wi-examine)"], ["best", "var(--wi-relax)"],
+   ["taken", "var(--wi-accent)"], ["faint", "var(--wi-inert)"]].forEach(p => {
+    out.push('<marker id="ah-' + p[0] + '" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" ' +
+             'markerHeight="5.5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="' + p[1] + '"/></marker>');
+  });
+  out.push('</defs>');
+
+  /* string names */
+  out.push('<text class="hdrname" x="6" y="' + (Y0 - 34) + '">B →</text>');
+  out.push('<text class="hdrname" x="6" y="' + (Y0 - 14) + '">A ↓</text>');
+
+  /* column headers */
+  for (let j = 0; j <= n; j++) {
+    out.push('<text class="hdrix" x="' + cxOf(j) + '" y="' + (Y0 - 34) + '">' + j + "</text>");
+    if (j >= 1) {
+      const hot = st.cell && st.cell[1] === j;
+      out.push('<text class="hdrch' + (hot ? " hot" : "") + '" x="' + cxOf(j) + '" y="' + (Y0 - 14) +
+               '">' + esc(vis(B[j - 1])) + "</text>");
+    }
+  }
+  /* row headers */
+  for (let i = 0; i <= m; i++) {
+    out.push('<text class="hdrix" x="' + (X0 - 44) + '" y="' + cyOf(i) + '">' + i + "</text>");
+    if (i >= 1) {
+      const hot = st.cell && st.cell[0] === i;
+      out.push('<text class="hdrch' + (hot ? " hot" : "") + '" x="' + (X0 - 20) + '" y="' + cyOf(i) +
+               '">' + esc(vis(A[i - 1])) + "</text>");
+    }
+  }
+
+  /* cells */
+  for (let i = 0; i <= m; i++) for (let j = 0; j <= n; j++) {
+    const key = i + "," + j;
+    const shown = ordOf[i][j] < (st.filled === undefined ? order.length : st.filled);
+    let cls = "cellbg";
+    if (!shown) cls += " empty";
+    else if (i === 0 || j === 0) cls += " base";
+    if (cells[key]) cls += " " + cells[key];
+    if (selCell && selCell[0] === i && selCell[1] === j) cls += " sel";
+    const gone = liveRows && liveI > 0 && shown && i < liveI - 1;
+    if (gone) cls += " gone";
+    const x = X0 + j * CS, y = Y0 + i * CS;
+    out.push('<rect class="' + cls + '" x="' + x + '" y="' + y + '" width="' + CS + '" height="' + CS +
+             '" rx="3"/>');
+    if (shown && !gone) {
+      const pop = wroteKey[key] ? " pop" : "";
+      const big = cells[key] === "cur" || cells[key] === "path" ? " big" : "";
+      out.push('<text class="cellval' + pop + big + '" x="' + cxOf(j) + '" y="' +
+               cyOf(i) + '">' + D[i][j] + "</text>");
+    }
+    hitBoxes.push({ i: i, j: j, x: x, y: y });
+    out.push('<rect class="hit" data-i="' + i + '" data-j="' + j + '" x="' + x + '" y="' + y +
+             '" width="' + CS + '" height="' + CS + '"/>');
+  }
+
+  /* every optimal arrow in the whole table (the DAG of all optimal alignments) */
+  if (showAll) {
+    for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+      if (ordOf[i][j] >= (st.filled === undefined ? order.length : st.filled)) continue;
+      if (liveRows && liveI > 0 && i < liveI - 1) continue;   /* that row is gone */
+      guesses(i, j).forEach(g => {
+        if (g.val !== D[i][j]) return;
+        const p = arrowPath({ from: [g.pi, g.pj], to: [i, j] });
+        out.push('<line class="arr faint" x1="' + p.x1 + '" y1="' + p.y1 + '" x2="' + p.x2 + '" y2="' +
+                 p.y2 + '" marker-end="url(#ah-faint)"/>');
+      });
+    }
+  }
+
+  /* the route taken so far, as one line through the cell centres */
+  if (st.path && st.path.length > 1) {
+    const pts = st.path.map(c => cxOf(c[1]) + "," + cyOf(c[0])).join(" ");
+    out.push('<polyline class="arr taken" style="opacity:.45" points="' + pts + '"/>');
+  }
+
+  /* the arrows of this step */
+  (st.arrows || []).forEach(a => {
+    const p = arrowPath(a);
+    out.push('<line class="arr ' + a.cls + ' drawin" style="--len:' + p.len.toFixed(1) + '" x1="' + p.x1 +
+             '" y1="' + p.y1 + '" x2="' + p.x2 + '" y2="' + p.y2 + '" marker-end="url(#ah-' + a.cls + ')"/>');
+    /* the three arrows all converge on the target cell, so the labels go into
+       three different free corners rather than onto the arrows themselves */
+    const tx = cxOf(a.to[1]), ty = cyOf(a.to[0]);
+    const lp = a.kind === "del"  ? [tx + CS * 0.30, ty - CS * 0.55]
+             : a.kind === "ins"  ? [tx - CS * 0.55, ty + CS * 0.30]
+             :                     [tx - CS * 0.28, ty - CS * 0.72];
+    out.push('<text class="arrlab ' + a.cls + '" x="' + lp[0] + '" y="' + lp[1] + '">' + a.lab + "</text>");
+  });
+
+  svg.innerHTML = out.join("");
+}
+
+/* ---------- alignment & script ------------------------------------------- */
+
+const OPSYM = { del: "-", ins: "+", sub: "X", match: "|" };
+
+function renderAlign() {
+  const st = steps[cur] || {};
+  const box = el("alignBox");
+  if (!st.trace) {
+    box.innerHTML = st.noTrace
+      ? '<div class="placeholder">Nothing to show: with only two rows in memory the table is gone by ' +
+        "the time the cost is known, and an alignment cannot be reconstructed from a number. " +
+        "Recovering one in linear space is possible, but it takes a different, divide-and-conquer " +
+        "algorithm (Hirschberg's) rather than a backtrace through this table.</div>"
+      : '<div class="placeholder">The table computes the <i>cost</i> only. ' +
+        "Once it is filled, the backtrace walks back through the recurrence and the alignment appears " +
+        "here, one column per step &mdash; right to left.</div>";
+    el("alignMeta").textContent = st.noTrace ? "unavailable" : "";
+    return;
+  }
+  const ops = st.ops || [];
+  const rowsA = [], rowsO = [], rowsB = [];
+  ops.forEach((o, k) => {
+    const fresh = (st.fresh && k === 0) ? " fresh" : "";
+    const hot = (st.fresh && k === 0) ? " hot" : "";
+    rowsA.push('<span class="acol' + (o.a === null ? " gap" : "") + fresh + hot + '">' +
+               (o.a === null ? "·" : esc(vis(o.a))) + "</span>");
+    rowsO.push('<span class="acol op-' + o.kind + fresh + hot + '">' + OPSYM[o.kind] + "</span>");
+    rowsB.push('<span class="acol' + (o.b === null ? " gap" : "") + fresh + hot + '">' +
+               (o.b === null ? "·" : esc(vis(o.b))) + "</span>");
+  });
+  box.innerHTML =
+    '<div class="alignwrap"><div class="alignrows">' +
+      '<div class="alignrow">' + rowsA.join("") + "</div>" +
+      '<div class="alignrow arow-op">' + rowsO.join("") + "</div>" +
+      '<div class="alignrow">' + rowsB.join("") + "</div>" +
+    "</div></div>" +
+    '<div class="alignnote"><b>·</b> a gap &nbsp;·&nbsp; <span class="acol op-del" style="flex:none;width:auto">-</span> delete' +
+    ' &nbsp;·&nbsp; <span class="acol op-ins" style="flex:none;width:auto">+</span> insert' +
+    ' &nbsp;·&nbsp; <span class="acol op-sub" style="flex:none;width:auto">X</span> substitute' +
+    ' &nbsp;·&nbsp; <span class="acol op-match" style="flex:none;width:auto">|</span> match (free)</div>';
+  const cost = ops.filter(o => o.kind !== "match").length;
+  el("alignMeta").textContent = ops.length + " column" + (ops.length === 1 ? "" : "s") +
+                                " · cost " + cost;
+}
+
+function renderScript() {
+  const st = steps[cur] || {};
+  const box = el("scriptBox");
+  const ops = (st.ops || []).filter(o => o.kind !== "match");
+  if (!st.trace) {
+    box.innerHTML = st.noTrace
+      ? '<div class="placeholder">No script &mdash; see above.</div>'
+      : '<div class="placeholder">Every non-match column of the alignment is one operation ' +
+        "of the edit script.</div>";
+    el("scriptMeta").textContent = "";
+    return;
+  }
+  if (!ops.length) {
+    box.innerHTML = '<div class="placeholder">No operation needed so far &mdash; every column matched.</div>';
+    el("scriptMeta").textContent = "0 operations";
+    return;
+  }
+  const li = ops.map((o, k) => {
+    const fresh = (st.fresh && st.ops[0] === o) ? " fresh" : "";
+    let t;
+    if (o.kind === "del")      t = "delete " + ch(o.a);
+    else if (o.kind === "ins") t = "insert " + ch(o.b);
+    else                       t = "replace " + ch(o.a) + " by " + ch(o.b);
+    return '<li class="' + fresh.trim() + '"><span class="no">' + (k + 1) + ".</span><span>" + t + "</span></li>";
+  });
+  box.innerHTML = '<ul class="script">' + li.join("") + "</ul>";
+  el("scriptMeta").textContent = ops.length + " operation" + (ops.length === 1 ? "" : "s");
+}
+
+/* ---------- pseudocode --------------------------------------------------- */
+
+const K = s => '<span class="kw">' + s + "</span>";
+const C = s => '<span class="cm">' + s + "</span>";
+
+/* The lecture states the recurrence; the two procedures below are the
+   cookie-cutter steps 5 and 6 spelled out for it. */
+const REC = [
+  { k: "head",   t: "D(i,j) =" },
+  { k: "base_i", t: "    i                                    " + C("// i deletions") + "        if j = 0" },
+  { k: "base_j", t: "    j                                    " + C("// j insertions") + "       if i = 0" },
+  { k: "del",    t: "    min { D(i−1, j)   + 1,                                    otherwise" },
+  { k: "ins",    t: "          D(i, j−1)   + 1," },
+  { k: "diag",   t: "          D(i−1, j−1) + [ A[i−1] ≠ B[j−1] ] }" }
+];
+const PROC = [
+  { k: "p_head",  t: K("procedure") + " editDistance(A[0..m), B[0..n)):" },
+  { k: "p_init",  t: "    D[0..m][0..n] := 0" },
+  { k: "p_basei", t: "    " + K("for") + " i := 0, …, m:  D[i][0] := i" },
+  { k: "p_basej", t: "    " + K("for") + " j := 0, …, n:  D[0][j] := j" },
+  { k: "p_loop",  t: "    " + K("for") + " i := 1, …, m" },
+  { k: "p_loop",  t: "        " + K("for") + " j := 1, …, n" },
+  { k: "p_del",   t: "            D[i][j] := min{ D[i−1][j] + 1," },
+  { k: "p_ins",   t: "                           D[i][j−1] + 1," },
+  { k: "p_diag",  t: "                           D[i−1][j−1] + [A[i−1] ≠ B[j−1]] }" },
+  { k: "p_ret",   t: "    " + K("return") + " D[m][n]" }
+];
+const TRACE = [
+  { k: "t_head", t: K("procedure") + " traceback(D, A[0..m), B[0..n)):" },
+  { k: "t_init", t: "    (i, j) := (m, n);  script := ε" },
+  { k: "t_init", t: "    " + K("while") + " i > 0 " + K("or") + " j > 0" },
+  { k: "t_del",  t: "        " + K("if") + " i > 0 ∧ D[i][j] == D[i−1][j] + 1" },
+  { k: "t_del",  t: "            script := (delete A[i−1]) · script;   i := i − 1" },
+  { k: "t_ins",  t: "        " + K("else if") + " j > 0 ∧ D[i][j] == D[i][j−1] + 1" },
+  { k: "t_ins",  t: "            script := (insert B[j−1]) · script;   j := j − 1" },
+  { k: "t_diag", t: "        " + K("else") + "        " + C("// (mis)match") },
+  { k: "t_diag", t: "            script := (A[i−1] → B[j−1]) · script; i := i − 1; j := j − 1" },
+  { k: "t_ret",  t: "    " + K("return") + " script" }
+];
+
+function renderCode() {
+  const st = steps[cur] || {};
+  const hl = new Set(st.hl || []), hlp = new Set(st.hlp || []);
+  const block = (label, lines, numbered, act) => {
+    const out = ['<div class="sublabel">' + label + "</div>"];
+    lines.forEach((l, k) => {
+      const on = act.has(l.k) ? " on" : "";
+      out.push('<div class="cline' + on + '">' + (numbered ? '<span class="ln">' + (k + 1) + "</span>" : "") +
+               "<span>" + l.t + "</span></div>");
+    });
+    return out.join("");
+  };
+  el("codeBody").innerHTML =
+    block("Recurrence", REC, false, hl) +
+    (st.trace ? block("Step 6 · backtracing", TRACE, true, hlp)
+              : block("Step 5 · bottom-up table filling", PROC, true, hlp));
+  el("codeNote").innerHTML = st.trace
+    ? "The three tests are tried <b>in the order of the recurrence</b>: delete, insert, then (mis)match. " +
+      "When several attain the minimum, any of them starts an equally optimal alignment &mdash; a different " +
+      "order simply produces a different one."
+    : liveRows
+    ? "Two rows, Θ(min{m,n}) space &mdash; and <code>traceback</code> is <b>not applicable</b>: it reads " +
+      "<code>D[i−1][j]</code> and <code>D[i−1][j−1]</code> all the way back to the origin, and those rows " +
+      "no longer exist. Keeping the full table is what buys the edit script."
+    : "Θ(<i>mn</i>) time and space. Since row <i>i</i> only ever reads row <i>i</i>−1, two rows suffice for " +
+      "the <i>cost</i> &mdash; switch on <b>keep only two rows</b> above to watch the rest be overwritten, " +
+      "and to see what that costs.";
+}
+
+/* ---------- transport / render pass -------------------------------------- */
+
+function renderPhases() {
+  const bar = el("phaseBar");
+  bar.innerHTML = "";
+  phases.forEach(p => {
+    const span = p.to - p.from + 1;
+    const pct = cur > p.to ? 100 : cur < p.from ? 0 : ((cur - p.from + 1) / span) * 100;
+    const b = document.createElement("button");
+    b.className = "phasebtn" + (cur >= p.from && cur <= p.to ? " on" : (cur > p.to ? " past" : ""));
+    b.style.flexGrow = String(Math.max(1, span));
+    b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' +
+                  pct.toFixed(2) + '%"></span><span class="lab">' + esc(p.name) + "</span>";
+    b.title = p.name + " — steps " + (p.from + 1) + "–" + (p.to + 1);
+    b.addEventListener("click", () => { stopPlay(); cur = p.from; render(); });
+    bar.appendChild(b);
+  });
+}
+
+function render() {
+  const st = steps[cur] || {};
+  drawGrid(); renderAlign(); renderScript(); renderPhases();
+  if (window.innerWidth > 760) renderCode();
+  el("statusBox").innerHTML = (st.txt || "") + (st.ans ? '<b class="ans">' + st.ans + "</b>" : "");
+  el("phaseName").textContent = phases[st.ph] ? phases[st.ph].name : "";
+  el("tabMeta").textContent = "|A| = " + m + " · |B| = " + n + " · d_edit = " + (D.length ? D[m][n] : "—");
+  el("scrubber").max = String(Math.max(0, steps.length - 1));
+  el("scrubber").value = String(cur);
+  el("stepNo").textContent = steps.length ? (cur + 1) + " / " + steps.length : "— / —";
+  el("backBtn").disabled = cur <= 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+  const whole = !traceFrom || (traceFrom[0] === m && traceFrom[1] === n);
+  el("wholeBtn").style.display = (whole || liveRows) ? "none" : "";
+  el("traceNote").innerHTML = liveRows
+    ? "Only rows <i>i</i>−1 and <i>i</i> are stored &mdash; <b>no backtrace</b>, the cost is all you get."
+    : whole
+    ? "Backtracing from <b>(" + m + "," + n + ")</b> — the whole strings."
+    : "Backtracing from <b>(" + traceFrom[0] + "," + traceFrom[1] + ")</b>: aligning <code>" +
+      esc(A.slice(0, traceFrom[0]) || "ε") + "</code> with <code>" +
+      esc(B.slice(0, traceFrom[1]) || "ε") + "</code>.";
+}
+
+const PLAY = "\u25B6\uFE0E", PAUSE = "\u23F8\uFE0E";
+
+function stepFwd() { if (cur < steps.length - 1) { cur++; render(); } else stopPlay(); }
+function stepBack() { if (cur > 0) { cur--; render(); } }
+function stopPlay() {
+  if (timer) {
+    clearInterval(timer); timer = null;
+    el("playBtn").textContent = PLAY; el("playBtn").setAttribute("aria-label", "Play");
+  }
+}
+function togglePlay() {
+  if (timer) { stopPlay(); return; }
+  el("playBtn").textContent = PAUSE; el("playBtn").setAttribute("aria-label", "Pause");
+  timer = setInterval(stepFwd, Number(el("speed").value));
+}
+
+/* ---------- tooltips ------------------------------------------------------ */
+
+function tipFor(i, j) {
+  const pa = A.slice(0, i), pb = B.slice(0, j);
+  let h = '<span class="tt-h">D(' + i + ", " + j + ") = " + D[i][j] + "</span><br>" +
+          '<span class="tt-s">A[0..' + i + ") =</span> <code>" + (esc(pa) || "ε") + "</code><br>" +
+          '<span class="tt-s">B[0..' + j + ") =</span> <code>" + (esc(pb) || "ε") + "</code>";
+  if (i === 0 || j === 0) {
+    h += "<br>" + (i === 0 ? j + " insertion" + (j === 1 ? "" : "s") : i + " deletion" + (i === 1 ? "" : "s"));
+  } else {
+    const g = guesses(i, j).filter(x => x.val === D[i][j]);
+    h += "<br>attained by " + g.map(x => KINDNAME[x.kind]).join(" and ");
+  }
+  h += '<br><span class="tt-s">click: ' +
+       (liveRows ? "jump to this cell" : "align these prefixes") + "</span>";
+  return h;
+}
+function moveTip(ev) {
+  const t = el("tooltip");
+  const x = Math.min(ev.clientX + 14, window.innerWidth - t.offsetWidth - 10);
+  const y = Math.min(ev.clientY + 16, window.innerHeight - t.offsetHeight - 10);
+  t.style.left = x + "px"; t.style.top = y + "px";
+}
+function hideTip() { el("tooltip").style.display = "none"; }
+
+/* ---------- input --------------------------------------------------------- */
+
+function fillPresets() {
+  const s = el("presetSel");
+  s.innerHTML = "";
+  Object.keys(PRESETS).forEach(k => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = PRESETS[k].name; s.appendChild(o);
+  });
+}
+function refreshInputs() {
+  el("inA").value = A; el("inB").value = B;
+  el("inputText").value = "# first line: A, second line: B\n" + A + "\n" + B;
+}
+function setStrings(a, b, keepPos) {
+  const err = el("parseErr");
+  if (a.length > 40 || b.length > 40) { err.textContent = "At most 40 characters per string."; return false; }
+  if (!a.length && !b.length) { err.textContent = "At least one of the two strings must be non-empty."; return false; }
+  err.textContent = "";
+  A = a; B = b; traceFrom = null; selCell = null;
+  const keep = keepPos ? cur : 0;
+  build();
+  cur = Math.min(keep, steps.length - 1);
+  refreshInputs(); render();
+  return true;
+}
+function loadFromText() {
+  const lines = el("inputText").value.split(/\r?\n/).filter(l => !/^\s*#/.test(l));
+  const nonEmpty = lines.filter(l => l.length > 0);
+  if (nonEmpty.length < 2) { el("parseErr").textContent = "Need two non-empty lines (A and B)."; return; }
+  setStrings(nonEmpty[0], nonEmpty[1], false);
+}
+function randomPair() {
+  const words = ["algorithm", "recurrence", "subproblem", "memoization", "backtrace", "alphabetic",
+                 "knapsack", "shortest", "distance", "sequence", "prefix", "greedy"];
+  const a = words[Math.floor(Math.random() * words.length)];
+  let b = a.split("");
+  const k = 1 + Math.floor(Math.random() * 4);
+  const alpha = "abcdefghijklmnopqrstuvwxyz";
+  for (let t = 0; t < k; t++) {
+    const p = Math.floor(Math.random() * Math.max(1, b.length));
+    const c = alpha[Math.floor(Math.random() * 26)];
+    const op = Math.floor(Math.random() * 3);
+    if (op === 0 && b.length > 1) b.splice(p, 1);
+    else if (op === 1) b.splice(p, 0, c);
+    else b[p] = c;
+  }
+  setStrings(a, b.join(""), false);
+}
+
+/* ---------- init ---------------------------------------------------------- */
+
+function init() {
+  fillPresets();
+  el("presetSel").addEventListener("change", e => {
+    const p = PRESETS[e.target.value];
+    if (p) setStrings(p.a, p.b, false);
+  });
+  el("applyBtn").addEventListener("click", () => setStrings(el("inA").value, el("inB").value, false));
+  [el("inA"), el("inB")].forEach(x => x.addEventListener("keydown", ev => {
+    if (ev.key === "Enter") setStrings(el("inA").value, el("inB").value, false);
+  }));
+  el("swapBtn").addEventListener("click", () => setStrings(B, A, false));
+  el("randBtn").addEventListener("click", randomPair);
+  el("loadBtn").addEventListener("click", loadFromText);
+
+  el("granCoarse").addEventListener("click", () => setGran(0));
+  el("granFine").addEventListener("click", () => setGran(1));
+  el("allOptChk").addEventListener("change", e => { showAll = e.target.checked; render(); });
+  el("liveChk").addEventListener("change", e => {
+    stopPlay();
+    liveRows = e.target.checked;
+    if (liveRows) { traceFrom = null; selCell = null; }
+    const ph = (steps[cur] || {}).ph || 0;
+    build();
+    cur = phases[Math.min(ph, phases.length - 1)].from;
+    render();
+  });
+
+  el("stepBtn").addEventListener("click", () => { stopPlay(); stepFwd(); });
+  el("backBtn").addEventListener("click", () => { stopPlay(); stepBack(); });
+  el("playBtn").addEventListener("click", togglePlay);
+  el("resetBtn").addEventListener("click", () => { stopPlay(); cur = 0; render(); });
+  el("scrubber").addEventListener("input", e => { stopPlay(); cur = Number(e.target.value); render(); });
+  el("speed").addEventListener("input", e => {
+    el("speedVal").textContent = e.target.value + "ms";
+    if (timer) { stopPlay(); togglePlay(); }
+  });
+  el("wholeBtn").addEventListener("click", () => {
+    traceFrom = null; selCell = null; build();
+    cur = phases[phases.length - 1].from; render();
+  });
+
+  const svg = el("gridSvg");
+  svg.addEventListener("mousemove", ev => {
+    const t = ev.target;
+    if (t && t.classList.contains("hit")) {
+      const i = Number(t.dataset.i), j = Number(t.dataset.j);
+      const tip = el("tooltip");
+      tip.innerHTML = tipFor(i, j); tip.style.display = "block"; moveTip(ev);
+    } else hideTip();
+  });
+  svg.addEventListener("mouseleave", hideTip);
+  svg.addEventListener("click", ev => {
+    const t = ev.target;
+    if (!t || !t.classList.contains("hit")) return;
+    const i = Number(t.dataset.i), j = Number(t.dataset.j);
+    stopPlay();
+    selCell = [i, j];
+    if (liveRows) {                       /* no backtrace to jump to: show the cell being computed */
+      const want = ordOf[i][j];
+      let k = 0;
+      for (let s = 0; s < steps.length; s++)
+        if (steps[s].write && steps[s].write.some(c => c[0] === i && c[1] === j)) { k = s; break; }
+      cur = k || cur;
+      render();
+      return;
+    }
+    traceFrom = (i === m && j === n) ? null : [i, j];
+    build();
+    cur = phases[phases.length - 1].from;
+    render();
+  });
+
+  window.addEventListener("resize", () => render());
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT") return;
+    if (ev.key === "ArrowRight") { stopPlay(); stepFwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft")  { stopPlay(); stepBack(); ev.preventDefault(); }
+  });
+
+  el("presetSel").value = "lecture";
+  setStrings(PRESETS.lecture.a, PRESETS.lecture.b, false);
+}
+
+function setGran(g) {
+  gran = g;
+  el("granCoarse").classList.toggle("on", g === 0);
+  el("granFine").classList.toggle("on", g === 1);
+  const keepPhase = (steps[cur] || {}).ph || 0;
+  build();
+  cur = phases[Math.min(keepPhase, phases.length - 1)].from;
+  render();
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

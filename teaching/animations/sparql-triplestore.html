@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPARQL on a triple store · matching a basic graph pattern, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --wi-radius:4px; --wi-radius-lg:5px;
+    --c-cand:#f7edd9; --c-match:#f6e6df; --c-res:#e8f0e2; --c-drop:#eee6de;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:96ch; line-height:1.5; }
+  .subtitle code, .hint code, .status code { background:var(--wi-controls); padding:1px 5px; border-radius:3px;
+                 font-size:.85em; font-family:var(--wi-font-mono); }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  .seg.small button { padding:2px 9px; font-size:.7rem; font-family:var(--wi-font-mono); }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* --- transport: slider + phase bar --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0; width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden; flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px;
+              font-size:.68rem; line-height:1.3; font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-left-width:0;
+              border-radius:0; color:var(--wi-ink-faint); cursor:pointer; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage --- */
+  .stage { --left:56%; display:grid; grid-template-columns:minmax(0,var(--left)) 14px minmax(0,1fr); gap:0 6px; align-items:start; }
+  .gutter { align-self:stretch; cursor:col-resize; border-radius:3px; position:relative; }
+  .gutter::after { content:""; position:absolute; left:5px; right:5px; top:0; bottom:0; border-radius:2px;
+                   background:var(--wi-border-soft); opacity:.55; transition:opacity .15s, background .15s; }
+  .gutter:hover::after, .gutter.active::after { opacity:1; background:var(--wi-accent-soft); }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } .gutter { display:none; } }
+  body.resizing { cursor:col-resize; user-select:none; }
+  body.resizing-v { cursor:row-resize; user-select:none; }
+  .graphwrap { position:relative; }
+  svg#graphSvg { width:100%; height:380px; cursor:grab; touch-action:none; }
+  svg#graphSvg.panning { cursor:grabbing; }
+  svg#graphSvg .node { cursor:move; }
+  .hresize { height:9px; margin:4px 0 0; cursor:row-resize; border-radius:3px; position:relative; }
+  .hresize::after { content:""; position:absolute; left:40%; right:40%; top:3px; height:3px; border-radius:2px;
+                    background:var(--wi-border-soft); opacity:.7; }
+  .hresize:hover::after, .hresize.active::after { background:var(--wi-accent-soft); opacity:1; }
+  .viewbtns { position:absolute; right:8px; top:8px; display:flex; gap:4px; }
+  .viewbtns button { padding:2px 7px; font-size:.7rem; background:var(--wi-panel); opacity:.85; }
+  .viewbtns button:hover { opacity:1; }
+  .col { display:flex; flex-direction:column; gap:14px; min-width:0; }
+  .duo { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+  @media (max-width:640px) { .duo { grid-template-columns:1fr; } }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; min-width:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:92px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status .k-cand { color:var(--wi-examine); font-weight:bold; }
+  .status .k-match { color:var(--wi-accent); font-weight:bold; }
+  .status .k-res { color:var(--wi-relax); font-weight:bold; }
+  .status .k-drop { color:var(--wi-ink-faint); text-decoration:line-through; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem; color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:1.5em; height:0; border-top:3px solid var(--wi-border-strong); display:inline-block; }
+  .sw.cand { border-color:var(--wi-examine); } .sw.match { border-color:var(--wi-accent); }
+  .sw.res { border-color:var(--wi-relax); } .sw.inert { border-color:var(--wi-inert); }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+  .note { font-size:.74rem; color:var(--wi-ink-faint); margin-top:8px; line-height:1.45; }
+  .note b { color:var(--wi-accent); }
+
+  /* --- tables (triples, index, bindings) --- */
+  .tblwrap { overflow-x:auto; }
+  table.tt { border-collapse:collapse; font-family:var(--wi-font-mono); font-size:.76rem; width:100%; }
+  table.tt th { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em; text-transform:uppercase;
+                color:var(--wi-ink-faint); text-align:left; padding:2px 8px 4px; border-bottom:1px solid var(--wi-border-soft);
+                font-weight:normal; white-space:nowrap; }
+  table.tt th.bound { color:var(--wi-accent); font-weight:bold; }
+  table.tt th.sel { color:var(--wi-ink-strong); font-weight:bold; }
+  table.tt th.sel, table.tt th.proj { text-transform:none; font-family:var(--wi-font-mono); letter-spacing:0; font-size:.76rem; }
+  table.tt th.proj { font-style:italic; }
+  table.tt th.pos { color:var(--wi-ink-faint); font-family:var(--wi-font-mono); text-transform:none; letter-spacing:0; }
+  table.tt td { padding:1px 8px; border-bottom:1px solid var(--wi-panel-2); color:var(--wi-ink-strong); white-space:nowrap;
+                line-height:1.55; }
+  table.tt tr.hoverable { cursor:default; }
+  table.tt tr.cand td { background:var(--c-cand); }
+  table.tt tr.match td { background:var(--c-match); color:var(--wi-accent-dark); font-weight:bold; }
+  table.tt tr.res td { background:var(--c-res); }
+  table.tt tr.hov td { background:#f0d7cd !important; }
+  table.tt tr.rng-lo td { border-top:2px solid var(--wi-examine); }
+  table.tt tr.rng-hi td { border-bottom:2px solid var(--wi-examine); }
+  table.tt td.no { color:var(--wi-ink-faint); font-size:.9em; text-align:right; padding-right:4px; }
+  table.tt td.free { color:var(--wi-ink-faint); }
+  table.tt td.newval { color:var(--wi-accent-dark); font-weight:bold; }
+  /* bindings table row states */
+  table.tt tr.b-cur td { background:var(--c-match); }
+  table.tt tr.b-cur td.no { color:var(--wi-accent); font-weight:bold; }
+  table.tt tr.b-new td { background:var(--c-match); }
+  table.tt tr.b-pend td { color:var(--wi-ink-soft); }
+  table.tt tr.b-drop td { background:var(--c-drop); color:var(--wi-ink-faint); text-decoration:line-through; }
+  table.tt tr.b-res td { background:var(--c-res); }
+  table.tt tr.b-res td.projout { color:var(--wi-ink-faint); text-decoration:line-through; text-decoration-color:var(--wi-border); }
+  table.tt tr.pop td { animation:rowin .3s ease-out both; }
+  @keyframes rowin { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:none; } }
+  .tt .emptyrow td { color:var(--wi-ink-faint); font-style:italic; font-family:var(--wi-font-body); }
+  .idxkey { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-soft); margin:0 0 6px; min-height:1.3em; }
+  .idxkey b { color:var(--wi-accent); }
+  .idxkey .dot { color:var(--wi-ink-faint); }
+
+  /* --- query panel --- */
+  .qcode { font-family:var(--wi-font-mono); font-size:.76rem; line-height:1.6; color:var(--wi-ink-strong); margin:0 0 8px; }
+  .qline { display:flex; gap:9px; padding:1px 8px; border-left:3px solid transparent; white-space:pre; align-items:baseline; }
+  .qline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .qline.past { color:var(--wi-ink-soft); }
+  .qline.past .ord { color:var(--wi-relax); }
+  .qline .kw { color:var(--wi-accent); }
+  .qline .var { color:var(--wi-queue); }
+  .qline .ord { display:inline-block; min-width:1.5em; text-align:right; color:var(--wi-ink-faint); font-size:.9em; }
+  .qline.on .ord { color:var(--wi-active); font-weight:bold; }
+  .sizes { font-family:var(--wi-font-mono); font-size:.74rem; color:var(--wi-ink-soft); margin-top:6px; }
+  .sizes b { color:var(--wi-accent); }
+  .sizes .arr { color:var(--wi-ink-faint); }
+
+  /* --- editor --- */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr);
+                 gap:16px; align-items:start; }
+  @media (max-width:900px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:230px; font-family:var(--wi-font-mono); font-size:.76rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  textarea.q { height:130px; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .hint p { margin:0 0 8px; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:280px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-mono); color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; border-radius:var(--wi-radius); }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .stepno { font-size:.7rem; }
+    .desk-only { display:none !important; }
+  }
+
+  /* --- SVG classes (data graph and pattern graph) --- */
+  .node rect, .node ellipse { fill:var(--wi-panel-2); stroke:var(--wi-border-strong); stroke-width:1.4; }
+  .node.var rect { stroke-dasharray:4 3; fill:var(--wi-panel); }
+  .node.bound rect { stroke:var(--wi-accent); stroke-width:2.2; fill:#f6e6df; }
+  .node.res rect { stroke:var(--wi-relax); stroke-width:2; fill:#e8f0e2; }
+  .node.cand rect { stroke:var(--wi-examine); stroke-width:2; }
+  .node.dim rect { stroke:var(--wi-inert); }
+  .node.dim text { fill:var(--wi-ink-faint); }
+  .nlab { font-family:var(--wi-font-body); font-size:15px; fill:var(--wi-ink-strong); text-anchor:middle;
+          dominant-baseline:central; pointer-events:none; }
+  .node.var .nlab { font-family:var(--wi-font-mono); font-size:14px; fill:var(--wi-queue); }
+  .node.bound .nlab, .node.res .nlab { font-weight:bold; }
+  .vval { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-accent); text-anchor:middle; pointer-events:none; }
+  .edge path.line { fill:none; stroke:var(--wi-border-strong); stroke-width:1.8; }
+  .edge.dim path.line { stroke:var(--wi-inert); stroke-width:1.5; opacity:.8; }
+  .edge.cand path.line { stroke:var(--wi-examine); stroke-width:3; }
+  .edge.match path.line { stroke:var(--wi-accent); stroke-width:3.4; }
+  .edge.res path.line { stroke:var(--wi-relax); stroke-width:3.2; }
+  .edge.hov path.line { stroke:var(--wi-active); stroke-width:4; }
+  .edge.on path.line { stroke:var(--wi-examine); stroke-width:3.4; }
+  .edge path.hit { fill:none; stroke:transparent; stroke-width:14; cursor:default; }
+  .elab { font-family:var(--wi-font-body); font-style:italic; font-size:12.5px; fill:var(--wi-ink-soft);
+          text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .elab.var { font-family:var(--wi-font-mono); font-style:normal; fill:var(--wi-queue); }
+  .edge.dim .elab { fill:var(--wi-ink-faint); }
+  .edge.cand .elab { fill:var(--wi-examine); font-weight:bold; }
+  .edge.match .elab, .edge.hov .elab { fill:var(--wi-accent); font-weight:bold; }
+  .edge.on .elab { fill:var(--wi-examine); font-weight:bold; }
+  .edge.res .elab { fill:var(--wi-relax); font-weight:bold; }
+  .elabbg { fill:var(--wi-bg); stroke:none; pointer-events:none; }
+  .pat .elabbg { fill:var(--wi-panel); }
+  @keyframes edgein { from { stroke-dashoffset:var(--len); } to { stroke-dashoffset:0; } }
+  .edge.match.fresh path.line { stroke-dasharray:var(--len); animation:edgein .4s ease-out both; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption { font-family: var(--wi-font-head); letter-spacing: .05em; }
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>SPARQL on a triple store &nbsp;·&nbsp; matching a graph pattern, step by step</h1>
+</div>
+
+<p class="subtitle">
+  A graph database stores its graph as a set of <b>triples</b> (subject, predicate, object) — one row per edge.
+  A SPARQL query is a small <b>pattern graph</b> with variables; answering it means finding every way to fit the
+  pattern into the data.  The core algorithm is simple: take the triple patterns one at a time, turn each into a
+  <b>range lookup</b> in a sorted copy of the triples, and grow a table of <b>variable bindings</b>, one pattern
+  per column-set.  Rows that find no continuation die; the rows that survive all patterns are the answers.
+  Hover triples, edges and binding rows to see how they correspond; drag nodes, zoom with the wheel, and drag the divider between the columns to make room.
+</p>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <label for="orderSel">Pattern order</label>
+    <select id="orderSel">
+      <option value="written">as written in the query</option>
+      <option value="greedy">greedy: fewest lookups first</option>
+      <option value="reverse">reverse of written order</option>
+    </select>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Detail</span>
+    <span class="seg" id="granSeg">
+      <button id="granFine" class="on">Every binding row</button>
+      <button id="granCoarse">One step per pattern</button>
+    </span>
+  </div>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <div class="ctl">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </div>
+    <div class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </div>
+    <span class="stepno" id="stepNo">— / —</span>
+    <div class="ctl">
+      <label for="speed">Speed</label>
+      <input type="range" id="speed" min="200" max="2600" value="1100" style="width:88px">
+      <span class="stepno" id="speedVal">1100ms</span>
+    </div>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="col">
+    <div class="sim-box">
+      <div class="sim-title"><span>The data graph</span><span class="rhs" id="graphMeta"></span></div>
+      <div class="graphwrap">
+        <svg id="graphSvg" class="stagesvg" viewBox="0 0 640 380"></svg>
+        <div class="viewbtns">
+          <button id="zoomOut" title="zoom out">−</button><button id="zoomIn" title="zoom in">+</button>
+          <button id="fitBtn" title="fit the whole graph into the panel">fit</button>
+          <button id="oneBtn" title="1:1 — the nominal font size of the page">1:1</button>
+          <button id="posBtn" title="rewrite the @pos lines in the editor from the current picture">positions → editor</button>
+        </div>
+      </div>
+      <div class="hresize" id="hResize" title="drag to change the height"></div>
+      <div class="legend">
+        <span class="item"><span class="sw cand"></span> candidates in the lookup range</span>
+        <span class="item"><span class="sw match"></span> matched by the current binding row</span>
+        <span class="item"><span class="sw res"></span> a complete match (answer)</span>
+        <span class="item"><span class="sw inert"></span> not involved</span>
+        <span class="item desk-only" style="margin-left:auto">drag nodes · wheel zooms · drag background pans</span>
+      </div>
+    </div>
+    <div class="duo">
+      <div class="sim-box">
+        <div class="sim-title"><span>… stored as triples</span><span class="rhs" id="tripMeta"></span></div>
+        <div class="tblwrap"><table class="tt" id="tripTbl"></table></div>
+        <div class="note">The same information as the picture: one row per edge, in insertion order.  Nothing here knows about “paths” — every question must be answered from rows.</div>
+      </div>
+      <div class="sim-box">
+        <div class="sim-title"><span>Index: sorted copy</span>
+          <span class="seg small" id="permSeg"><button data-perm="SPO">SPO</button><button data-perm="POS">POS</button><button data-perm="OSP">OSP</button></span></div>
+        <div class="idxkey" id="idxKey"></div>
+        <div class="tblwrap"><table class="tt" id="idxTbl"></table></div>
+        <div class="note" id="idxNote"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gutter" id="gutter" title="drag to change the column widths"></div>
+  <div class="col">
+    <div class="sim-box">
+      <div class="sim-title"><span>The query</span><span class="rhs" id="qMeta"></span></div>
+      <div class="qcode" id="qCode"></div>
+      <div class="svgscroll"><svg id="patSvg" class="stagesvg pat" width="500" height="210" viewBox="0 0 500 210"></svg></div>
+      <div class="sizes" id="sizes"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Bindings table</span><span class="rhs" id="bindMeta"></span></div>
+      <div class="tblwrap"><table class="tt" id="bindTbl"></table></div>
+      <div class="note" id="bindNote"></div>
+    </div>
+  </div>
+</div>
+
+<details class="editor" id="editor">
+  <summary>Prepare your own data and query</summary>
+  <div class="editor-body">
+    <div>
+      <div class="lbl" style="margin-bottom:6px">Triples (one per line)</div>
+      <textarea id="dataText" spellcheck="false"></textarea>
+    </div>
+    <div>
+      <div class="lbl" style="margin-bottom:6px">SPARQL query</div>
+      <textarea id="queryText" class="q" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      <p><b>Data:</b> one triple per line, <code>subject predicate object</code>, an optional trailing <code>.</code>
+        (N-Triples / Turtle style, prefixed names such as <code>:Alice</code> or <code>ex:Alice</code>, literals in
+        <code>"quotes"</code>).  Lines starting with <code>#</code> are comments.  Only the part after the last
+        <code>:</code> is drawn as the label.</p>
+      <p><b>Drawing:</b> add <code>@pos :Alice 120 40</code> lines to fix where a node is drawn (any units, y grows
+        downwards; the picture is rescaled to fit).  Nodes without a position are laid out automatically.</p>
+      <p><b>Query:</b> <code>SELECT ?x ?y WHERE { s p o . s p o . }</code> — a basic graph pattern only, no
+        <code>FILTER</code>, <code>OPTIONAL</code> or <code>UNION</code>.  Any of the three positions may be a
+        variable, including the predicate.  <code>SELECT *</code> selects all variables.  The order of the patterns
+        in the text is the “as written” execution order.</p>
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+/* ========================================================================== *
+ *  SPARQL basic-graph-pattern matching over a triple store
+ *  – data graph = set of (s,p,o) triples, three sorted permutations as indexes
+ *  – query = SELECT vars WHERE { tp1 . tp2 . … }
+ *  – evaluation = index nested-loop join over a bindings table
+ * ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const isVar = t => t.length > 1 && t[0] === "?";
+function local(t) {
+  if (!t) return "";
+  if (t[0] === '"' || isVar(t)) return t;
+  const i = t.lastIndexOf(":");
+  if (i >= 0 && i < t.length - 1) return t.slice(i + 1);
+  return t;
+}
+
+/* ---------- presets --------------------------------------------------------- */
+
+const FRIENDS = `# people, where they live, and where those cities are
+:Alice  :knows    :Bob .
+:Alice  :knows    :Frank .
+:Bob    :knows    :Dave .
+:Frank  :knows    :Dave .
+:Dave   :knows    :Carol .
+:Dave   :knows    :Eve .
+:Alice  :livesIn  :Paris .
+:Frank  :livesIn  :Paris .
+:Frank  :livesIn  :Berlin .
+:Dave   :livesIn  :Berlin .
+:Bob    :livesIn  :Tokyo .
+:Carol  :livesIn  :Tokyo .
+:Eve    :livesIn  :Tokyo .
+:Paris  :in       :Europe .
+:Berlin :in       :Europe .
+:Tokyo  :in       :Asia .
+
+# where to draw the nodes (optional; drag nodes in the picture and
+# press "positions → editor" to update these lines)
+@pos :Alice   60  40
+@pos :Frank  200 110
+@pos :Dave   200 220
+@pos :Bob     60 260
+@pos :Carol  200 330
+@pos :Eve    330 250
+@pos :Paris  400  60
+@pos :Berlin 400 200
+@pos :Tokyo  400 330
+@pos :Europe 580 130
+@pos :Asia   580 330`;
+
+const MOVIES = `:Nolan     :directed  :Inception .
+:Nolan     :directed  :Interstellar .
+:Villeneuve :directed :Arrival .
+:DiCaprio  :actedIn   :Inception .
+:Hardy     :actedIn   :Inception .
+:Hathaway  :actedIn   :Interstellar .
+:Adams     :actedIn   :Arrival .
+:Hardy     :actedIn   :Dunkirk .
+:Nolan     :directed  :Dunkirk .
+:Inception :year      "2010" .
+:Dunkirk   :year      "2017" .
+
+@pos :Nolan        30 200
+@pos :Villeneuve  520 330
+@pos :Inception   230  80
+@pos :Interstellar 260 200
+@pos :Dunkirk     230 330
+@pos :DiCaprio    440  40
+@pos :Hardy       440 200
+@pos :Hathaway    440 120
+@pos :Adams       640 330
+@pos :Arrival     640 200
+@pos "2010"       440 -30
+@pos "2017"       30 330`;
+
+const PRESETS = {
+  chain: { name: "Who knows someone living in Europe? (chain of 3 patterns)", data: FRIENDS,
+    query: `SELECT ?x ?c WHERE {
+  ?x :knows   ?y .
+  ?y :livesIn ?c .
+  ?c :in      :Europe .
+}` },
+  star: { name: "Both live in Berlin (a cycle via ?x twice)", data: FRIENDS,
+    query: `SELECT ?x ?y WHERE {
+  ?x :livesIn :Berlin .
+  ?x :knows   ?y .
+  ?y :livesIn :Berlin .
+}` },
+  pred: { name: "Which relation? (variable predicate)", data: FRIENDS,
+    query: `SELECT ?p ?z WHERE {
+  :Dave ?p ?z .
+}` },
+  movies: { name: "Nolan's actors (constant subject)", data: MOVIES,
+    query: `SELECT ?a WHERE {
+  ?a     :actedIn  ?m .
+  :Nolan :directed ?m .
+}` },
+  none: { name: "No answer (rows die out)", data: FRIENDS,
+    query: `SELECT ?x WHERE {
+  ?x :livesIn :Tokyo .
+  ?x :knows   ?y .
+  ?y :livesIn :Paris .
+}` }
+};
+
+/* ---------- parsing --------------------------------------------------------- */
+
+function tokens(line) { return line.match(/"[^"]*"|<[^>]*>|\S+/g) || []; }
+
+function parseData(text) {
+  const triples = [], pos = {}, seen = new Set();
+  text.split(/\r?\n/).forEach((raw, ln) => {
+    const line = raw.trim();
+    if (!line || line[0] === "#") return;
+    const t = tokens(line);
+    if (/^@pos$/i.test(t[0])) {
+      if (t.length < 4) throw new Error("Line " + (ln + 1) + ": @pos needs a node and two numbers.");
+      const x = parseFloat(t[2]), y = parseFloat(t[3]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("Line " + (ln + 1) + ": bad coordinates.");
+      pos[t[1]] = { x, y }; return;
+    }
+    if (/^@prefix$/i.test(t[0]) || /^PREFIX$/i.test(t[0]) || /^@base$/i.test(t[0])) return;
+    if (t[t.length - 1] === ".") t.pop();
+    else if (t.length === 3 && t[2].length > 1 && t[2].endsWith(".") && t[2][0] !== '"') t[2] = t[2].slice(0, -1);
+    if (t.length !== 3) throw new Error("Line " + (ln + 1) + ": expected exactly three terms, found " + t.length + ".");
+    const key = t.join(" ");
+    if (seen.has(key)) return;               // a set: duplicates are one triple
+    seen.add(key);
+    triples.push({ s: t[0], p: t[1], o: t[2], idx: triples.length });
+  });
+  if (!triples.length) throw new Error("No triples found.");
+  if (triples.length > 60) throw new Error("At most 60 triples, please — this is a teaching picture.");
+  return { triples, pos };
+}
+
+function parseQuery(text) {
+  let src = text.replace(/#[^\n]*/g, " ").replace(/[{}]/g, m => " " + m + " ");
+  const raw = src.match(/"[^"]*"|<[^>]*>|\S+/g) || [];
+  const toks = [];
+  raw.forEach(t => {
+    if (t === ".") { toks.push("."); return; }
+    if (t[0] !== '"' && t.length > 1 && t.endsWith(".")) { toks.push(t.slice(0, -1)); toks.push("."); return; }
+    toks.push(t);
+  });
+  let i = 0;
+  const up = () => (toks[i] || "").toUpperCase();
+  while (up() === "PREFIX" || up() === "BASE") i += (up() === "PREFIX" ? 3 : 2);
+  if (up() !== "SELECT") throw new Error("Query must start with SELECT (after optional PREFIX lines).");
+  i++;
+  const select = [];
+  let star = false;
+  while (i < toks.length && up() !== "WHERE" && toks[i] !== "{") {
+    if (up() === "DISTINCT") { i++; continue; }
+    if (toks[i] === "*") star = true;
+    else if (isVar(toks[i])) select.push(toks[i]);
+    else throw new Error("Unexpected token in SELECT clause: " + toks[i]);
+    i++;
+  }
+  if (up() === "WHERE") i++;
+  if (toks[i] !== "{") throw new Error("Expected { after SELECT … WHERE.");
+  i++;
+  const patterns = [];
+  while (i < toks.length && toks[i] !== "}") {
+    if (toks[i] === ".") { i++; continue; }
+    if (i + 2 >= toks.length || toks[i + 1] === "}" || toks[i + 2] === "}" || toks[i + 1] === "." || toks[i + 2] === ".")
+      throw new Error("Triple pattern " + (patterns.length + 1) + " does not have three terms.");
+    const tp = [toks[i], toks[i + 1], toks[i + 2]];
+    if (/^(FILTER|OPTIONAL|UNION|MINUS|GRAPH|BIND|VALUES)$/i.test(tp[0]))
+      throw new Error(tp[0].toUpperCase() + " is not supported — basic graph patterns only.");
+    patterns.push(tp); i += 3;
+  }
+  if (toks[i] !== "}") throw new Error("Missing closing }.");
+  if (!patterns.length) throw new Error("The WHERE clause needs at least one triple pattern.");
+  if (patterns.length > 6) throw new Error("At most 6 triple patterns, please.");
+  const vars = [];
+  patterns.forEach(tp => tp.forEach(t => { if (isVar(t) && !vars.includes(t)) vars.push(t); }));
+  if (star) select.splice(0, select.length, ...vars);
+  select.forEach(v => { if (!vars.includes(v)) throw new Error("Selected variable " + v + " does not occur in the pattern."); });
+  if (!select.length) throw new Error("SELECT at least one variable (or *).");
+  return { select, patterns, vars };
+}
+
+/* ---------- indexes: three sorted permutations ------------------------------ */
+
+const PERMS = { SPO: [0, 1, 2], POS: [1, 2, 0], OSP: [2, 0, 1] };
+const POSNAME = ["S", "P", "O"];
+const comp = t => [t.s, t.p, t.o];
+
+function buildIndexes(triples) {
+  const idx = {};
+  Object.keys(PERMS).forEach(name => {
+    const order = PERMS[name];
+    idx[name] = triples.map(t => t.idx).sort((a, b) => {
+      const ca = comp(triples[a]), cb = comp(triples[b]);
+      for (const k of order) { if (ca[k] < cb[k]) return -1; if (ca[k] > cb[k]) return 1; }
+      return 0;
+    });
+  });
+  return idx;
+}
+/* the bound positions of a pattern must be a prefix of the permutation */
+function choosePerm(bound) {
+  const n = bound.filter(Boolean).length;
+  for (const name of Object.keys(PERMS)) {
+    const order = PERMS[name];
+    if (order.slice(0, n).every(k => bound[k])) return name;
+  }
+  return "SPO";
+}
+/* rows of the sorted array whose first n components equal the key (scan; a real store binary-searches) */
+function rangeOf(sorted, triples, perm, key) {
+  const order = PERMS[perm];
+  let lo = -1, hi = -1;
+  for (let i = 0; i < sorted.length; i++) {
+    const c = comp(triples[sorted[i]]);
+    if (key.every((v, j) => c[order[j]] === v)) { if (lo < 0) lo = i; hi = i; }
+    else if (lo >= 0) break;
+  }
+  return [lo, hi];
+}
+
+/* ---------- state ------------------------------------------------------------- */
+
+let D = null;            // { triples, pos, nodes, layout, idx }
+let Q = null;            // { select, patterns, vars }
+let steps = [], phases = [], cur = 0, timer = null;
+let fine = true, orderMode = "written";
+let viewPerm = null;     // null = follow the step
+let lastStepKey = null;
+
+/* ---------- evaluation → steps ----------------------------------------------- */
+
+function lookup(row, tp) {
+  const subst = tp.map(t => isVar(t) ? (row.b[t] !== undefined ? row.b[t] : null) : t);
+  const bound = subst.map(x => x !== null);
+  const perm = choosePerm(bound);
+  const order = PERMS[perm];
+  const n = bound.filter(Boolean).length;
+  const key = order.slice(0, n).map(k => subst[k]);
+  const sorted = D.idx[perm];
+  const [lo, hi] = rangeOf(sorted, D.triples, perm, key);
+  const cands = lo < 0 ? [] : sorted.slice(lo, hi + 1);
+  /* a free variable that occurs twice in the pattern must get the same value */
+  const matches = cands.filter(ti => {
+    const c = comp(D.triples[ti]), seen = {};
+    for (let k = 0; k < 3; k++) {
+      if (isVar(tp[k]) && !bound[k]) {
+        if (seen[tp[k]] !== undefined && seen[tp[k]] !== c[k]) return false;
+        seen[tp[k]] = c[k];
+      }
+    }
+    return true;
+  });
+  return { subst, bound, perm, key, lo, hi, cands, matches };
+}
+function extend(row, ti, tp) {
+  const c = comp(D.triples[ti]), b = Object.assign({}, row.b);
+  for (let k = 0; k < 3; k++) if (isVar(tp[k])) b[tp[k]] = c[k];
+  return { b, m: row.m.concat([ti]) };
+}
+const rowsTxt = (lo, hi) => lo === hi ? "row " + (lo + 1) : "rows " + (lo + 1) + "–" + (hi + 1);
+const tpHtml = (tp, look) => tp.map((t, k) => {
+  if (!isVar(t)) return "<code>" + esc(local(t)) + "</code>";
+  if (look && look.bound[k]) return "<code>" + esc(t) + "=" + esc(local(look.subst[k])) + "</code>";
+  return "<code>" + esc(t) + "</code>";
+}).join(" ");
+
+function build() {
+  steps = []; phases = [];
+  const P = Q.patterns.length;
+  const phase = name => phases.push({ name, from: steps.length, to: steps.length });
+  const add = s => { s.ph = phases.length - 1; phases[s.ph].to = steps.length; steps.push(s); };
+  const disp = (rows, st) => rows.map(r => ({ b: r.b, m: r.m, st }));
+
+  phase("Data");
+  add({ kind: "data", k: -1, rows: [{ b: {}, m: [], st: "pend" }], exec: [], sizes: [1], hl: {},
+        txt: "The graph is stored as <b>" + D.triples.length + " triples</b> — the table under the picture.  " +
+             "Each triple is one directed, labelled edge.  Vertices are whatever appears as a subject or object; " +
+             "there is no separate vertex table.  Besides the plain list, the store keeps <b>sorted copies</b> " +
+             "of the triples (the index panel): sorted by subject, by predicate, by object — so that every triple " +
+             "with a given prefix sits in one contiguous block." });
+  phase("Query");
+  add({ kind: "query", k: -1, rows: [{ b: {}, m: [], st: "pend" }], exec: [], sizes: [1], hl: {},
+        txt: "The query is a <b>pattern graph</b>: " + P + " triple pattern" + (P > 1 ? "s" : "") + " over the variables " +
+             Q.vars.map(v => "<code>" + esc(v) + "</code>").join(", ") + " (dashed) and some constants (solid).  " +
+             "An <b>answer</b> is an assignment of data nodes to the variables such that every pattern edge becomes a " +
+             "data triple.  We build these assignments in the <b>bindings table</b>: it starts with one row that binds nothing, " +
+             "and each pattern extends the rows." });
+
+  let rows = [{ b: {}, m: [] }];
+  let remaining = Q.patterns.map((_, i) => i);
+  const exec = [], sizes = [1];
+  let died = false;
+  for (let k = 0; k < P; k++) {
+    let pi;
+    let greedyNote = "";
+    if (orderMode === "greedy") {
+      let best = null;
+      const costs = remaining.map(j => ({ j, cost: rows.reduce((a, r) => a + lookup(r, Q.patterns[j]).cands.length, 0) }));
+      costs.forEach(c => { if (!best || c.cost < best.cost) best = c; });
+      pi = best.j;
+      greedyNote = "  <i>Greedy choice:</i> " + costs.map(c => "pattern " + (c.j + 1) + " would touch " + c.cost + " row" + (c.cost === 1 ? "" : "s"))
+                   .join(", ") + ".";
+    } else if (orderMode === "reverse") pi = remaining[remaining.length - 1];
+    else pi = remaining[0];
+    remaining = remaining.filter(j => j !== pi);
+    exec.push(pi);
+    const tp = Q.patterns[pi];
+    const lk0 = lookup(rows[0], tp);
+    const nb = lk0.bound.filter(Boolean).length;
+    const boundDesc = nb === 0 ? "nothing is bound — a full scan of all triples" :
+      "bound: " + lk0.bound.map((b, j) => b ? POSNAME[j] + " = " + (isVar(tp[j]) ? "<code>" + esc(tp[j]) + "</code> from an earlier pattern" : "<code>" + esc(local(tp[j])) + "</code>") : null)
+        .filter(Boolean).join(", ");
+    phase("Pattern " + (pi + 1));
+    const R = rows.length;
+    add({ kind: "intro", k, pi, exec: exec.slice(), sizes: sizes.slice(), perm: lk0.perm, look: null,
+          rows: disp(rows, "pend"), hl: {},
+          txt: "<b>Next pattern:</b> " + tpHtml(tp) + " &nbsp;(" + boundDesc + ").  " +
+               "Its constants" + (nb > 0 && lk0.bound.some((b, j) => b && isVar(tp[j])) ? " and already-bound variables" : "") +
+               " form the search key, so we use the index sorted <b>" + lk0.perm + "</b>: all matching triples are one contiguous " +
+               "range there.  " + (R === 1 && Object.keys(rows[0].b).length === 0 ? "There is one (empty) row to extend." :
+               "Each of the <b>" + R + " rows</b> makes its own lookup: its bound values fill in the pattern.") + greedyNote });
+    const newRows = [];
+    let touched = 0, born = 0, dropped = 0;
+    rows.forEach((r, ri) => {
+      const lk = lookup(r, tp);
+      touched += lk.cands.length;
+      const before = disp(newRows, "done"), after = disp(rows.slice(ri + 1), "pend");
+      if (fine) {
+        add({ kind: "lookup", k, pi, exec: exec.slice(), sizes: sizes.slice(), perm: lk.perm, look: lk, curRow: r,
+              rows: before.concat([{ b: r.b, m: r.m, st: "cur" }], after),
+              hl: { cand: lk.cands, match: r.m, nodes: Object.values(r.b) },
+              txt: "Row " + (before.length + 1) + " of the table" + (Object.keys(r.b).length ? " binds " +
+                   Object.keys(r.b).map(v => "<code>" + esc(v) + "=" + esc(local(r.b[v])) + "</code>").join(", ") : " binds nothing yet") +
+                   ".  Substituting gives the key <b>(" + lk.key.map(local).map(esc).concat(["·", "·", "·"].slice(lk.key.length)).join(", ") +
+                   ")</b> in the " + lk.perm + " index" + (lk.lo < 0 ? ": <span class=\"k-drop\">an empty range</span>" :
+                   ": " + rowsTxt(lk.lo, lk.hi) + ", <span class=\"k-cand\">" + lk.cands.length + " candidate" + (lk.cands.length === 1 ? "" : "s") + "</span>") +
+                   ".  " + (lk.matches.length < lk.cands.length ? (lk.cands.length - lk.matches.length) + " of them fail because a repeated variable must take the same value twice.  " : "") +
+                   "Highlighted in the picture: the candidates, and the edges this row has already matched." });
+      }
+      const ext = lk.matches.map(ti => extend(r, ti, tp));
+      born += ext.length; if (!ext.length) dropped++;
+      if (fine) {
+        add({ kind: "extend", k, pi, exec: exec.slice(), sizes: sizes.slice(), perm: lk.perm, look: lk, curRow: r,
+              rows: before.concat(ext.length ? ext.map(x => ({ b: x.b, m: x.m, st: "new" })) : [{ b: r.b, m: r.m, st: "drop" }], after),
+              hl: { match: r.m.concat(lk.matches), fresh: lk.matches, nodes: Object.values(r.b) },
+              txt: ext.length === 0 ?
+                   "No candidate — this row has <span class=\"k-drop\">no continuation</span> and is deleted.  Every answer that started this way is impossible." :
+                   ext.length === 1 ?
+                   (tp.some((t, j) => isVar(t) && !lk.bound[j]) ?
+                     "Exactly one match: the row is <span class=\"k-match\">extended</span> by " + tp.filter((t, j) => isVar(t) && !lk.bound[j]).map(t => "<code>" + esc(t) + "=" + esc(local(ext[0].b[t])) + "</code>").join(", ") + "." :
+                     "The triple exists — nothing new to bind, the row simply <span class=\"k-match\">survives</span> the check.") :
+                   "<span class=\"k-match\">" + ext.length + " matches</span>: the row is replaced by " + ext.length + " rows, one per match — the table <b>branches</b>." });
+      }
+      newRows.push(...ext);
+    });
+    sizes.push(newRows.length);
+    if (!fine) {
+      add({ kind: "coarse", k, pi, exec: exec.slice(), sizes: sizes.slice(), perm: lk0.perm, look: R === 1 ? lk0 : null,
+            rows: disp(newRows, "new"),
+            hl: { match: [].concat(...newRows.map(r => r.m)), fresh: [].concat(...newRows.map(r => r.m[r.m.length - 1])) },
+            txt: "Pattern " + tpHtml(tp) + ": for each of the " + R + " row" + (R === 1 ? "" : "s") + " we substituted its bindings, looked up the range in the " +
+                 lk0.perm + " index (<span class=\"k-cand\">" + touched + " candidate" + (touched === 1 ? "" : "s") + "</span> in total), and replaced the row by one row per match.  " +
+                 (dropped ? dropped + " row" + (dropped === 1 ? "" : "s") + " found <span class=\"k-drop\">no continuation</span>.  " : "") +
+                 "<b>" + R + " → " + newRows.length + " row" + (newRows.length === 1 ? "" : "s") + ".</b>" });
+    }
+    rows = newRows;
+    if (!rows.length) { died = true; break; }
+  }
+  phase("Result");
+  const resM = [].concat(...rows.map(r => r.m));
+  add({ kind: "result", k: P, pi: -1, exec: exec.slice(), sizes: sizes.slice(), perm: null, look: null,
+        rows: disp(rows, "res"), hl: { res: resM, nodesRes: [].concat(...rows.map(r => Object.values(r.b))) },
+        txt: rows.length === 0 ?
+             "The table is <b>empty</b>" + (died && exec.length < P ? " — the remaining pattern" + (P - exec.length === 1 ? "" : "s") + " were never looked at" : "") +
+             ".  The query has <span class=\"k-drop\">no answer</span>." :
+             "Every surviving row satisfies all " + P + " pattern" + (P > 1 ? "s" : "") + ": <span class=\"k-res\">" + rows.length + " answer" + (rows.length === 1 ? "" : "s") + "</span>.  " +
+             "The <code>SELECT</code> clause keeps the columns " + Q.select.map(v => "<code>" + esc(v) + "</code>").join(", ") + " and drops the rest (projection).  " +
+             (new Set(rows.map(r => Q.select.map(v => r.b[v]).join("\u0001"))).size < rows.length ?
+               "Some answers coincide after projection; SPARQL keeps such duplicates unless you write <code>SELECT DISTINCT</code>.  " : "") +
+             "Table sizes along the way: " + sizes.join(" → ") + " — " + (sizes.length > 2 ? "the pattern order decides how big the intermediate tables get; try another order above." : "with a single pattern there is nothing to reorder."),
+        ans: rows.length ? Q.select.join(" ") + ":  " + rows.map(r => Q.select.map(v => local(r.b[v])).join(" ")).map(esc).join("  ·  ") : "" });
+}
+
+/* ---------- layout (force-directed on the unit square, pinned nodes stay) --- */
+
+function mulberry(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function layout(nodes, edges, pinned, springL) {
+  const n = nodes.length, rnd = mulberry(7);
+  const P = nodes.map((id, i) => pinned[id] ? { x: pinned[id].x, y: pinned[id].y, pin: true } :
+    { x: 0.5 + 0.35 * Math.cos(2 * Math.PI * i / n) + 0.02 * rnd(), y: 0.5 + 0.35 * Math.sin(2 * Math.PI * i / n) + 0.02 * rnd(), pin: false });
+  const ix = {}; nodes.forEach((id, i) => ix[id] = i);
+  if (P.some(p => !p.pin) && n > 1) {
+    const L = springL || Math.min(0.42, 1.1 / Math.sqrt(n));
+    for (let it = 0; it < 500; it++) {
+      const T = 0.06 * (1 - it / 500) + 0.002;
+      const F = P.map(() => ({ x: 0, y: 0 }));
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+        let dx = P[i].x - P[j].x, dy = P[i].y - P[j].y, d2 = dx * dx + dy * dy + 1e-4, d = Math.sqrt(d2);
+        const f = (L * L) / d2 * 0.6;
+        F[i].x += dx / d * f; F[i].y += dy / d * f; F[j].x -= dx / d * f; F[j].y -= dy / d * f;
+      }
+      edges.forEach(([a, b]) => {
+        const i = ix[a], j = ix[b]; if (i === j) return;
+        let dx = P[i].x - P[j].x, dy = P[i].y - P[j].y, d = Math.sqrt(dx * dx + dy * dy) + 1e-6;
+        const f = (d - L) * 0.5;
+        F[i].x -= dx / d * f; F[i].y -= dy / d * f; F[j].x += dx / d * f; F[j].y += dy / d * f;
+      });
+      P.forEach((p, i) => {
+        if (p.pin) return;
+        const m = Math.sqrt(F[i].x * F[i].x + F[i].y * F[i].y) + 1e-9, s = Math.min(m, T) / m;
+        p.x += F[i].x * s; p.y += F[i].y * s;
+        if (!springL) { p.x -= (p.x - 0.5) * 0.01; p.y -= (p.y - 0.5) * 0.01; }   // mild pull to the centre
+      });
+    }
+  }
+  return P;
+}
+function normalize(P) {
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  P.forEach(p => { minx = Math.min(minx, p.x); miny = Math.min(miny, p.y); maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); });
+  const w = Math.max(maxx - minx, 1e-6), h = Math.max(maxy - miny, 1e-6);
+  const m = Math.max(w, h);            // uniform scale: keep the drawing's proportions
+  return P.map(p => ({ x: (p.x - minx) / m, y: (p.y - miny) / m, pin: p.pin }));
+}
+/* rotate (optionally) so the principal axis is horizontal, then fit into W×H keeping the aspect ratio */
+function fitBox(P, W, H, padX, padY, rotate) {
+  if (P.length === 1) return [{ x: W / 2, y: H / 2 }];
+  const cx = P.reduce((a, p) => a + p.x, 0) / P.length, cy = P.reduce((a, p) => a + p.y, 0) / P.length;
+  let ang = 0;
+  if (rotate) {
+    let sxx = 0, syy = 0, sxy = 0;
+    P.forEach(p => { sxx += (p.x - cx) ** 2; syy += (p.y - cy) ** 2; sxy += (p.x - cx) * (p.y - cy); });
+    ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  }
+  const R = P.map(p => ({ x: (p.x - cx) * Math.cos(-ang) - (p.y - cy) * Math.sin(-ang), y: (p.x - cx) * Math.sin(-ang) + (p.y - cy) * Math.cos(-ang) }));
+  if (rotate && R[0].x > R[R.length - 1].x) R.forEach(p => { p.x = -p.x; });
+  const xs = R.map(p => p.x), ys = R.map(p => p.y);
+  const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+  const availW = W - 2 * padX, availH = H - 2 * padY;
+  const sc = Math.min(w > 1e-6 ? availW / w : Infinity, h > 1e-6 ? availH / h : Infinity, 4 * availW);
+  const mx = (Math.max(...xs) + Math.min(...xs)) / 2, my = (Math.max(...ys) + Math.min(...ys)) / 2;
+  return R.map(p => ({ x: W / 2 + (p.x - mx) * sc, y: H / 2 + (p.y - my) * sc, w: w * sc, h: h * sc }));
+}
+function nodeSet(triples) {
+  const nodes = [];
+  triples.forEach(t => { [t.s, t.o].forEach(x => { if (!nodes.includes(x)) nodes.push(x); }); });
+  return nodes;
+}
+
+/* ---------- SVG drawing ------------------------------------------------------- */
+
+const SVG = "http://www.w3.org/2000/svg";
+function mk(tag, attrs, parent) {
+  const e = document.createElementNS(SVG, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const pillW = (label, mono) => Math.max(44, label.length * (mono ? 8.4 : 7.4) + 20);
+const PILL_H = 28;
+
+/* point on the pill boundary in direction of (tx,ty) */
+function boundary(c, w, h, tx, ty) {
+  const dx = tx - c.x, dy = ty - c.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / d, uy = dy / d;
+  const t = Math.min(w / 2 / (Math.abs(ux) || 1e-9), h / 2 / (Math.abs(uy) || 1e-9));
+  return { x: c.x + ux * (t + 1.5), y: c.y + uy * (t + 1.5) };
+}
+function markers(svg) {
+  const defs = mk("defs", {}, svg);
+  [["plain", "var(--wi-border-strong)"], ["dim", "var(--wi-inert)"], ["cand", "var(--wi-examine)"], ["match", "var(--wi-accent)"],
+   ["res", "var(--wi-relax)"], ["hov", "var(--wi-active)"], ["on", "var(--wi-examine)"]].forEach(([n, col]) => {
+    const m = mk("marker", { id: svg.id + "-ah-" + n, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6",
+                             orient: "auto-start-reverse", markerUnits: "userSpaceOnUse" }, defs);
+    m.setAttribute("markerWidth", "8"); m.setAttribute("markerHeight", "8");
+    mk("path", { d: "M0,0.5 L10,5 L0,9.5 Z", fill: col }, m);
+  });
+}
+
+/* Generic graph renderer used for both the data graph and the pattern graph.
+   nodes: [{id,label,isVar,cls,sub}] with positions; edges: [{key,s,o,label,isVar,cls,fresh}] */
+function drawGraph(svg, W, H, nodes, edges, opts) {
+  svg.innerHTML = "";
+  markers(svg);
+  const gE = mk("g", {}, svg), gN = mk("g", {}, svg);
+  const N = {}; nodes.forEach(n => { n.w = pillW(n.label, n.isVar); n.h = PILL_H; N[n.id] = n; });
+  /* group parallel edges (either direction) to fan them out */
+  const groups = {};
+  edges.forEach(e => { const k = [e.s, e.o].sort().join("\u0001"); (groups[k] = groups[k] || []).push(e); });
+  Object.values(groups).forEach(g => g.forEach((e, i) => { e.off = (i - (g.length - 1) / 2) * 30; e.canon = e.s <= e.o; }));
+  edges.forEach(e => {
+    const a = N[e.s], b = N[e.o];
+    if (!a || !b) return;
+    const grp = mk("g", { class: "edge " + (e.cls || ""), "data-t": e.key }, gE);
+    let d, lx, ly, len;
+    if (a === b) {                                     // self loop
+      const p0 = { x: a.x + 10, y: a.y - a.h / 2 }, p1 = { x: a.x - 10, y: a.y - a.h / 2 };
+      const c0 = { x: a.x + 34, y: a.y - a.h / 2 - 40 }, c1 = { x: a.x - 34, y: a.y - a.h / 2 - 40 };
+      d = "M" + p0.x + "," + p0.y + " C" + c0.x + "," + c0.y + " " + c1.x + "," + c1.y + " " + p1.x + "," + p1.y;
+      lx = a.x; ly = a.y - a.h / 2 - 36; len = 120;
+    } else {
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      let dx = b.x - a.x, dy = b.y - a.y; const L = Math.sqrt(dx * dx + dy * dy) || 1;
+      const sgn = e.canon ? 1 : -1;
+      const nx = -dy / L * sgn, ny = dx / L * sgn;
+      const c = { x: mx + nx * e.off, y: my + ny * e.off };
+      const p0 = boundary(a, a.w, a.h, c.x, c.y), p1 = boundary(b, b.w, b.h, c.x, c.y);
+      /* control point so the curve passes through c at t = .5 */
+      const q = { x: 2 * c.x - (p0.x + p1.x) / 2, y: 2 * c.y - (p0.y + p1.y) / 2 };
+      d = "M" + p0.x.toFixed(1) + "," + p0.y.toFixed(1) + " Q" + q.x.toFixed(1) + "," + q.y.toFixed(1) + " " + p1.x.toFixed(1) + "," + p1.y.toFixed(1);
+      lx = c.x; ly = c.y; len = Math.hypot(p1.x - p0.x, p1.y - p0.y) + Math.abs(e.off) * 1.2;
+    }
+    const cls = (e.cls || "plain").split(" ")[0];
+    const line = mk("path", { class: "line", d, "marker-end": "url(#" + svg.id + "-ah-" + (cls === "fresh" ? "match" : cls) + ")" }, grp);
+    line.style.setProperty("--len", (len + 10).toFixed(0));
+    mk("path", { class: "hit", d }, grp);
+    if (e.label) {
+      const lw = e.label.length * (e.isVar ? 7.4 : 6.3) + 8;
+      mk("rect", { class: "elabbg", x: lx - lw / 2, y: ly - 8, width: lw, height: 16, rx: 3 }, grp);
+      const t = mk("text", { class: "elab" + (e.isVar ? " var" : ""), x: lx, y: ly }, grp);
+      t.textContent = e.label;
+    }
+    if (opts && opts.onEdge) opts.onEdge(grp, e);
+  });
+  nodes.forEach(n => {
+    const g = mk("g", { class: "node " + (n.isVar ? "var " : "") + (n.cls || ""), "data-n": n.id }, gN);
+    mk("rect", { x: n.x - n.w / 2, y: n.y - n.h / 2, width: n.w, height: n.h, rx: n.h / 2 }, g);
+    const t = mk("text", { class: "nlab", x: n.x, y: n.y }, g); t.textContent = n.label;
+    if (n.sub) { const s = mk("text", { class: "vval", x: n.x, y: n.y + n.h / 2 + 13 }, g); s.textContent = n.sub; }
+    if (opts && opts.onNode) opts.onNode(g, n);
+  });
+}
+
+/* ---- the data graph ---- */
+/* camera: world coordinates are the nominal 640×380 layout space; the viewBox
+   shows W/z × H/z world units in a W × H pixel box, so z = 1 means the nominal font size */
+const cam = { x: 320, y: 190, z: 1, auto: true };   // auto: re-fit when the panel is resized
+function svgSize() { const r = el("graphSvg").getBoundingClientRect(); return { W: Math.max(50, r.width), H: Math.max(50, r.height) }; }
+function applyCam() {
+  const { W, H } = svgSize(), vw = W / cam.z, vh = H / cam.z;
+  el("graphSvg").setAttribute("viewBox", (cam.x - vw / 2).toFixed(2) + " " + (cam.y - vh / 2).toFixed(2) + " " + vw.toFixed(2) + " " + vh.toFixed(2));
+}
+function graphBBox() {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  D.nodes.forEach((id, i) => { const p = D.layout[i], w = pillW(local(id), false) / 2 + 8;
+    x0 = Math.min(x0, p.x - w); x1 = Math.max(x1, p.x + w); y0 = Math.min(y0, p.y - 40); y1 = Math.max(y1, p.y + 24); });
+  return { x0, y0, x1, y1 };
+}
+function fitView(cap) {
+  const b = graphBBox(), { W, H } = svgSize();
+  cam.x = (b.x0 + b.x1) / 2; cam.y = (b.y0 + b.y1) / 2;
+  cam.z = Math.min(W / (b.x1 - b.x0), H / (b.y1 - b.y0));
+  if (cap) cam.z = Math.min(cam.z, 1);
+  applyCam();
+}
+function zoomAt(f, px, py) {                  // keep the world point under (px,py) fixed
+  const { W, H } = svgSize();
+  const wx = cam.x + (px - W / 2) / cam.z, wy = cam.y + (py - H / 2) / cam.z;
+  cam.z = Math.min(4, Math.max(0.2, cam.z * f)); cam.auto = false;
+  cam.x = wx - (px - W / 2) / cam.z; cam.y = wy - (py - H / 2) / cam.z;
+  applyCam();
+}
+function renderGraph(st) {
+  const svg = el("graphSvg"), W = 640, H = 380;
+  const hl = st.hl || {};
+  const cand = new Set(hl.cand || []), match = new Set(hl.match || []), res = new Set(hl.res || []), fresh = new Set(hl.fresh || []);
+  const any = cand.size || match.size || res.size;
+  const boundNodes = new Set(hl.nodes || []), resNodes = new Set();
+  match.forEach(ti => { boundNodes.add(D.triples[ti].s); boundNodes.add(D.triples[ti].o); });
+  res.forEach(ti => { resNodes.add(D.triples[ti].s); resNodes.add(D.triples[ti].o); });
+  const nodes = D.nodes.map((id, i) => {
+    const p = D.layout[i];
+    let cls = "";
+    if (resNodes.has(id)) cls = "res"; else if (boundNodes.has(id)) cls = "bound"; else if (any) cls = "dim";
+    return { id, label: local(id), isVar: false, cls, x: p.x, y: p.y };
+  });
+  const edges = D.triples.map(t => {
+    let cls = "plain";
+    if (match.has(t.idx)) cls = "match" + (fresh.has(t.idx) ? " fresh" : "");
+    else if (res.has(t.idx)) cls = "res"; else if (cand.has(t.idx)) cls = "cand"; else if (any) cls = "dim";
+    return { key: String(t.idx), s: t.s, o: t.o, label: local(t.p), isVar: false, cls };
+  });
+  drawGraph(svg, W, H, nodes, edges, {
+    onEdge: (g, e) => {
+      const t = D.triples[+e.key];
+      g.addEventListener("mouseenter", ev => { if (!drag) { hoverTriple(t.idx, true); showTip(ev, tipTriple(t)); } });
+      g.addEventListener("mousemove", ev => { if (!drag) moveTip(ev); });
+      g.addEventListener("mouseleave", () => { hoverTriple(t.idx, false); hideTip(); });
+    },
+    onNode: (g, n) => { g.addEventListener("pointerdown", ev => startNodeDrag(ev, D.nodes.indexOf(n.id))); }
+  });
+  applyCam();
+}
+
+/* ---- zoom, pan, node dragging ---- */
+let drag = null;
+function ptr(ev) { const r = el("graphSvg").getBoundingClientRect(); return { px: ev.clientX - r.left, py: ev.clientY - r.top }; }
+function toWorld(px, py) { const { W, H } = svgSize(); return { x: cam.x + (px - W / 2) / cam.z, y: cam.y + (py - H / 2) / cam.z }; }
+function startNodeDrag(ev, i) {
+  if (ev.button !== 0) return;
+  ev.stopPropagation(); ev.preventDefault(); hideTip();
+  const { px, py } = ptr(ev), w = toWorld(px, py);
+  drag = { kind: "node", i, dx: D.layout[i].x - w.x, dy: D.layout[i].y - w.y, moved: false };
+  el("graphSvg").setPointerCapture(ev.pointerId);
+}
+el("graphSvg").addEventListener("pointerdown", ev => {
+  if (ev.button !== 0 || drag) return;
+  ev.preventDefault();
+  drag = { kind: "pan", px: ev.clientX, py: ev.clientY, cx: cam.x, cy: cam.y };
+  el("graphSvg").classList.add("panning");
+  el("graphSvg").setPointerCapture(ev.pointerId);
+});
+el("graphSvg").addEventListener("pointermove", ev => {
+  if (!drag) return;
+  if (drag.kind === "pan") {
+    cam.x = drag.cx - (ev.clientX - drag.px) / cam.z; cam.y = drag.cy - (ev.clientY - drag.py) / cam.z; cam.auto = false; applyCam();
+  } else {
+    const { px, py } = ptr(ev), w = toWorld(px, py);
+    D.layout[drag.i] = { x: w.x + drag.dx, y: w.y + drag.dy }; drag.moved = true;
+    renderGraph(steps[cur] || {});
+  }
+});
+function endDrag() { if (!drag) return; drag = null; el("graphSvg").classList.remove("panning"); }
+el("graphSvg").addEventListener("pointerup", endDrag);
+el("graphSvg").addEventListener("pointercancel", endDrag);
+el("graphSvg").addEventListener("wheel", ev => {
+  ev.preventDefault(); hideTip();
+  const { px, py } = ptr(ev);
+  zoomAt(Math.exp(-ev.deltaY * 0.0015), px, py);
+}, { passive: false });
+el("zoomIn").addEventListener("click", () => { const { W, H } = svgSize(); zoomAt(1.25, W / 2, H / 2); });
+el("zoomOut").addEventListener("click", () => { const { W, H } = svgSize(); zoomAt(0.8, W / 2, H / 2); });
+el("fitBtn").addEventListener("click", () => { fitView(false); cam.auto = false; });
+el("oneBtn").addEventListener("click", () => { fitView(false); cam.z = 1; cam.auto = false; applyCam(); });
+el("posBtn").addEventListener("click", () => {
+  const lines = el("dataText").value.split(/\r?\n/).filter(l => !/^\s*@pos\b/i.test(l) && l.trim() !== "# node positions from the picture");
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  const wmax = Math.max(...D.nodes.map(n => n.length));
+  lines.push("", "# node positions from the picture");
+  D.nodes.forEach((id, i) => lines.push("@pos " + id.padEnd(wmax) + " " + Math.round(D.layout[i].x).toString().padStart(4) + " " + Math.round(D.layout[i].y).toString().padStart(4)));
+  el("dataText").value = lines.join("\n");
+  el("editor").open = true;
+  el("parseErr").textContent = "";
+  el("dataText").scrollTop = el("dataText").scrollHeight;
+});
+new ResizeObserver(() => { if (D) { if (cam.auto) fitView(true); else applyCam(); } }).observe(el("graphSvg"));
+
+/* ---- splitters ---- */
+(function () {
+  const stage = el("stage"), gut = el("gutter");
+  gut.addEventListener("pointerdown", ev => {
+    ev.preventDefault(); gut.classList.add("active"); document.body.classList.add("resizing");
+    const move = e => {
+      const r = stage.getBoundingClientRect();
+      const pct = Math.min(78, Math.max(22, (e.clientX - r.left) / r.width * 100));
+      stage.style.setProperty("--left", pct.toFixed(2) + "%");
+    };
+    const up = () => { gut.classList.remove("active"); document.body.classList.remove("resizing");
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  });
+  const h = el("hResize"), svg = el("graphSvg");
+  h.addEventListener("pointerdown", ev => {
+    ev.preventDefault(); h.classList.add("active"); document.body.classList.add("resizing-v");
+    const y0 = ev.clientY, h0 = svg.getBoundingClientRect().height;
+    const move = e => { svg.style.height = Math.min(1200, Math.max(200, h0 + e.clientY - y0)) + "px"; };
+    const up = () => { h.classList.remove("active"); document.body.classList.remove("resizing-v");
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  });
+})();
+
+/* ---- the pattern graph in the query panel ---- */
+let patLayout = null;
+function renderPattern(st) {
+  const svg = el("patSvg"), W = 500, H = 210;
+  const ids = [];
+  Q.patterns.forEach(tp => [tp[0], tp[2]].forEach(x => { if (!ids.includes(x)) ids.push(x); }));
+  if (!patLayout) {
+    /* force layout, rotated so the principal axis is horizontal: a chain becomes a row */
+    const P = fitBox(layout(ids, Q.patterns.map(tp => [tp[0], tp[2]]), {}, 0.7), W, H, 75, 48, true);
+    const usedH = Math.max(110, Math.min(H, (P[0].h || 0) + 96));
+    svg.setAttribute("height", usedH); svg.setAttribute("viewBox", "0 0 " + W + " " + usedH);
+    patLayout = P.map(p => ({ x: p.x, y: p.y - (H - usedH) / 2 - 6 }));
+  }
+  const bind = st.curRow ? st.curRow.b : (st.kind === "result" && st.rows.length === 1 ? st.rows[0].b : {});
+  const exec = st.exec || [], curPi = st.pi;
+  const one = ids.length === 1;
+  const nodes = ids.map((id, i) => {
+    const p = patLayout[i];
+    const v = isVar(id);
+    let cls = "";
+    if (v && bind[id] !== undefined) cls = "bound";
+    return { id, label: v ? id : local(id), isVar: v, cls, sub: v && bind[id] !== undefined ? "= " + local(bind[id]) : null,
+             x: p.x, y: p.y };
+  });
+  const edges = Q.patterns.map((tp, j) => {
+    let cls = "plain";
+    if (j === curPi && st.kind !== "result") cls = "on";
+    else if (exec.includes(j) && st.kind !== "result") cls = "match";
+    else if (st.kind === "result") cls = st.rows.length ? "res" : "dim";
+    return { key: "p" + j, s: tp[0], o: tp[2], label: isVar(tp[1]) ? (bind[tp[1]] !== undefined ? tp[1] + "=" + local(bind[tp[1]]) : tp[1]) : local(tp[1]), isVar: isVar(tp[1]), cls };
+  });
+  drawGraph(svg, W, H, nodes, edges, {});
+}
+
+/* ---------- tables ------------------------------------------------------------ */
+
+function hoverTriple(ti, on) {
+  document.querySelectorAll('[data-t="' + ti + '"]').forEach(e => e.classList.toggle("hov", on));
+}
+function hoverMany(list, on) { list.forEach(ti => hoverTriple(ti, on)); }
+function tipTriple(t) {
+  return '<span class="tt-h">' + esc(t.s) + " " + esc(t.p) + " " + esc(t.o) + '</span><br><span class="tt-s">triple #' + (t.idx + 1) + "</span>";
+}
+function rowHover(tr, ti, t) {
+  tr.className += " hoverable";
+  tr.addEventListener("mouseenter", ev => { hoverTriple(ti, true); showTip(ev, tipTriple(t)); });
+  tr.addEventListener("mousemove", moveTip);
+  tr.addEventListener("mouseleave", () => { hoverTriple(ti, false); hideTip(); });
+}
+function edgeClass(ti, st) {
+  const hl = st.hl || {};
+  if ((hl.match || []).includes(ti)) return "match";
+  if ((hl.res || []).includes(ti)) return "res";
+  if ((hl.cand || []).includes(ti)) return "cand";
+  return "";
+}
+
+function renderTriples(st) {
+  const tb = el("tripTbl");
+  let h = "<thead><tr><th class=\"pos\">#</th><th>subject</th><th>predicate</th><th>object</th></tr></thead><tbody>";
+  D.triples.forEach(t => {
+    h += '<tr class="' + edgeClass(t.idx, st) + '" data-t="' + t.idx + '"><td class="no">' + (t.idx + 1) + "</td><td>" +
+         esc(local(t.s)) + "</td><td>" + esc(local(t.p)) + "</td><td>" + esc(local(t.o)) + "</td></tr>";
+  });
+  tb.innerHTML = h + "</tbody>";
+  tb.querySelectorAll("tbody tr").forEach(tr => rowHover(tr, +tr.dataset.t, D.triples[+tr.dataset.t]));
+  el("tripMeta").textContent = D.triples.length + " triples · " + D.nodes.length + " nodes";
+}
+
+function renderIndex(st) {
+  const perm = viewPerm || st.perm || "SPO";
+  const following = !viewPerm;
+  el("permSeg").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.perm === perm));
+  const order = PERMS[perm], sorted = D.idx[perm];
+  const lk = st.look && st.look.perm === perm ? st.look : null;
+  const tb = el("idxTbl");
+  let h = "<thead><tr><th class=\"pos\">#</th>" + order.map((k, j) => '<th class="' + (lk && j < lk.key.length ? "bound" : "") + '">' +
+          ["subject", "predicate", "object"][k] + "</th>").join("") + "</tr></thead><tbody>";
+  sorted.forEach((ti, i) => {
+    const t = D.triples[ti], c = comp(t);
+    let cls = "";
+    if (lk && i >= lk.lo && i <= lk.hi && lk.lo >= 0) cls = lk.matches.includes(ti) ? "match" : "cand";
+    else if (!lk) cls = edgeClass(ti, st);
+    if (lk && i === lk.lo) cls += " rng-lo";
+    if (lk && i === lk.hi) cls += " rng-hi";
+    h += '<tr class="' + cls + '" data-t="' + ti + '"><td class="no">' + (i + 1) + "</td>" +
+         order.map(k => "<td>" + esc(local(c[k])) + "</td>").join("") + "</tr>";
+  });
+  tb.innerHTML = h + "</tbody>";
+  tb.querySelectorAll("tbody tr").forEach(tr => rowHover(tr, +tr.dataset.t, D.triples[+tr.dataset.t]));
+  const keyEl = el("idxKey");
+  if (lk) {
+    keyEl.innerHTML = "lookup key: (" + order.map((k, j) => j < lk.key.length ? "<b>" + esc(local(lk.key[j])) + "</b>" : '<span class="dot">·</span>').join(", ") + ")" +
+      (lk.lo < 0 ? " → empty range" : " → " + rowsTxt(lk.lo, lk.hi));
+  } else if (st.perm && st.perm === perm && st.kind === "intro") {
+    keyEl.innerHTML = "this pattern will use the " + perm + " index";
+  } else keyEl.innerHTML = following ? "<span class=\"dot\">sorted by " + perm.split("").join(", then ") + "</span>" :
+    "<span class=\"dot\">sorted by " + perm.split("").join(", then ") + " (pinned — click again to follow the steps)</span>";
+  el("idxNote").innerHTML = "The triples sorted lexicographically by <b>" + perm.split("").join(" → ") +
+    "</b>.  A pattern whose bound positions are a prefix of this order (" + prefixList(perm) + ") is one contiguous range here — found by binary search, " +
+    "not by scanning.  Three cyclic orders SPO, POS, OSP cover every combination of bound positions; real stores keep all six.";
+}
+function prefixList(perm) {
+  const p = perm.split("");
+  return [p[0], p[0] + p[1], perm].map(x => x.split("").join("+")).join(", ");
+}
+
+function renderBindings(st) {
+  const tb = el("bindTbl");
+  const vars = Q.vars;
+  const isRes = st.kind === "result";
+  let h = "<thead><tr><th class=\"pos\">#</th>" + vars.map(v => '<th class="' + (Q.select.includes(v) ? "sel" : "proj") + '">' + esc(v) + "</th>").join("") + "</tr></thead><tbody>";
+  const newVars = st.look ? Q.patterns[st.pi].filter((t, j) => isVar(t) && !st.look.bound[j]) : [];
+  const stepKey = st.kind + ":" + cur;
+  const animate = stepKey !== lastStepKey;
+  st.rows.forEach((r, i) => {
+    const empty = Object.keys(r.b).length === 0;
+    const pop = animate && (r.st === "new") ? " pop" : "";
+    h += '<tr class="b-' + r.st + pop + (empty ? " emptyrow" : "") + '" data-row="' + i + '"><td class="no">' + (i + 1) + "</td>";
+    if (empty) h += '<td colspan="' + vars.length + '">' + (r.st === "drop" ? "the empty binding — no continuation" : "the empty binding (nothing bound yet)") + "</td>";
+    else vars.forEach(v => {
+      const val = r.b[v];
+      const cls = val === undefined ? "free" : (r.st === "new" && newVars.includes(v) ? "newval" : (isRes && !Q.select.includes(v) ? "projout" : ""));
+      h += '<td class="' + cls + '">' + (val === undefined ? "·" : esc(local(val))) + "</td>";
+    });
+    h += "</tr>";
+  });
+  if (!st.rows.length) h += '<tr class="emptyrow"><td colspan="' + (vars.length + 1) + '">no rows — the query has no answer</td></tr>';
+  tb.innerHTML = h + "</tbody>";
+  tb.querySelectorAll("tbody tr[data-row]").forEach(tr => {
+    const r = st.rows[+tr.dataset.row];
+    tr.addEventListener("mouseenter", () => hoverMany(r.m, true));
+    tr.addEventListener("mouseleave", () => hoverMany(r.m, false));
+  });
+  const live = st.rows.filter(r => r.st !== "drop").length;
+  el("bindMeta").textContent = isRes ? live + " answer" + (live === 1 ? "" : "s") : live + " row" + (live === 1 ? "" : "s");
+  el("bindNote").innerHTML = isRes
+    ? "Bold columns are the <code>SELECT</code>ed ones; struck-through values are projected away.  Hover a row to see its match in the picture."
+    : "Each row is one partial answer.  Bold values were just added; <i>·</i> means the variable is not bound yet.  Hover a row to see the edges it has matched so far.";
+}
+
+function renderQuery(st) {
+  const exec = st.exec || [];
+  const writtenOrder = orderMode === "written";
+  let h = '<div class="qline"><span class="ord"></span><span><span class="kw">SELECT</span> ' + Q.select.map(v => '<span class="var">' + esc(v) + "</span>").join(" ") + ' <span class="kw">WHERE</span> {</span></div>';
+  Q.patterns.forEach((tp, j) => {
+    const pos = exec.indexOf(j);
+    const on = st.pi === j && st.kind !== "result", past = pos >= 0 && !on && st.kind !== "result";
+    const ord = writtenOrder ? "" : (pos >= 0 ? (pos + 1) + "." : "");
+    h += '<div class="qline' + (on ? " on" : past ? " past" : "") + '"><span class="ord">' + ord + "</span><span>  " +
+         tp.map(t => isVar(t) ? '<span class="var">' + esc(t) + "</span>" : esc(t)).join(" ") + " .</span></div>";
+  });
+  h += '<div class="qline"><span class="ord"></span><span>}</span></div>';
+  el("qCode").innerHTML = h;
+  el("qMeta").textContent = Q.patterns.length + " pattern" + (Q.patterns.length === 1 ? "" : "s") + " · " + Q.vars.length + " variable" + (Q.vars.length === 1 ? "" : "s");
+  const sizes = st.sizes || [1];
+  const shown = sizes.map((s, i) => (i === sizes.length - 1 && st.kind !== "intro" && st.kind !== "data" && st.kind !== "query") ? "<b>" + s + "</b>" : String(s));
+  el("sizes").innerHTML = "rows in the bindings table: " + shown.join(' <span class="arr">→</span> ') +
+    (st.kind === "result" ? "" : (st.kind === "lookup" || st.kind === "extend") ? ' <span class="arr">→ …</span>' : "");
+}
+
+/* ---------- transport / render pass ------------------------------------------ */
+
+function renderPhases() {
+  const bar = el("phaseBar");
+  bar.innerHTML = "";
+  phases.forEach(p => {
+    const span = p.to - p.from + 1;
+    const pct = cur > p.to ? 100 : cur < p.from ? 0 : ((cur - p.from + 1) / span) * 100;
+    const b = document.createElement("button");
+    b.className = "phasebtn" + (cur >= p.from && cur <= p.to ? " on" : (cur > p.to ? " past" : ""));
+    b.style.flexGrow = String(Math.max(2, span));
+    b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' + pct.toFixed(2) + '%"></span><span class="lab">' + esc(p.name) + "</span>";
+    b.title = p.name + " — steps " + (p.from + 1) + "–" + (p.to + 1);
+    b.addEventListener("click", () => { stopPlay(); cur = p.from; render(); });
+    bar.appendChild(b);
+  });
+}
+
+function render() {
+  const st = steps[cur] || {};
+  renderGraph(st); renderPattern(st); renderQuery(st); renderTriples(st); renderIndex(st); renderBindings(st); renderPhases();
+  lastStepKey = st.kind + ":" + cur;
+  el("statusBox").innerHTML = (st.txt || "") + (st.ans ? '<b class="ans">' + st.ans + "</b>" : "");
+  el("phaseName").textContent = phases[st.ph] ? phases[st.ph].name : "";
+  el("graphMeta").textContent = st.kind === "result" ? (st.rows.length + " match" + (st.rows.length === 1 ? "" : "es")) :
+    (st.kind === "lookup" ? "range lookup" : st.kind === "extend" ? "extending a row" : "");
+  el("scrubber").max = String(Math.max(0, steps.length - 1));
+  el("scrubber").value = String(cur);
+  el("stepNo").textContent = steps.length ? (cur + 1) + " / " + steps.length : "— / —";
+  el("backBtn").disabled = cur <= 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+}
+
+const PLAY = "\u25B6\uFE0E", PAUSE = "\u23F8\uFE0E";
+function stepFwd() { if (cur < steps.length - 1) { cur++; render(); } else stopPlay(); }
+function stepBack() { if (cur > 0) { cur--; render(); } }
+function stopPlay() {
+  if (timer) { clearInterval(timer); timer = null; el("playBtn").textContent = PLAY; el("playBtn").setAttribute("aria-label", "Play"); }
+}
+function togglePlay() {
+  if (timer) { stopPlay(); return; }
+  if (cur >= steps.length - 1) cur = 0;
+  el("playBtn").textContent = PAUSE; el("playBtn").setAttribute("aria-label", "Pause");
+  timer = setInterval(stepFwd, Number(el("speed").value));
+}
+
+/* ---------- tooltips ------------------------------------------------------------ */
+function showTip(ev, html) { const t = el("tooltip"); t.innerHTML = html; t.style.display = "block"; moveTip(ev); }
+function moveTip(ev) {
+  const t = el("tooltip");
+  const x = Math.min(ev.clientX + 14, window.innerWidth - t.offsetWidth - 10);
+  const y = Math.min(ev.clientY + 16, window.innerHeight - t.offsetHeight - 10);
+  t.style.left = x + "px"; t.style.top = y + "px";
+}
+function hideTip() { el("tooltip").style.display = "none"; }
+
+/* ---------- input ----------------------------------------------------------------- */
+
+function fillPresets() {
+  const s = el("presetSel");
+  Object.keys(PRESETS).forEach(k => { const o = document.createElement("option"); o.value = k; o.textContent = PRESETS[k].name; s.appendChild(o); });
+}
+function load(dataText, queryText) {
+  const err = el("parseErr");
+  let data, q;
+  try { data = parseData(dataText); q = parseQuery(queryText); }
+  catch (e) { err.textContent = e.message; return false; }
+  err.textContent = "";
+  const nodes = nodeSet(data.triples);
+  const pinned = {};
+  nodes.forEach(id => { if (data.pos[id]) pinned[id] = data.pos[id]; });
+  const anyPin = Object.keys(pinned).length > 0;
+  let pinNorm = {};
+  if (anyPin) {                       // bring the given coordinates to the unit square first
+    const ids = Object.keys(pinned), norm = normalize(ids.map(id => pinned[id]));
+    ids.forEach((id, j) => pinNorm[id] = norm[j]);
+  }
+  const hasLoop = data.triples.some(t => t.s === t.o);
+  const lay = fitBox(layout(nodes, data.triples.map(t => [t.s, t.o]), pinNorm), 640, 380, 72, hasLoop ? 62 : 34, !anyPin);
+  D = { triples: data.triples, pos: data.pos, nodes, layout: lay, idx: buildIndexes(data.triples) };
+  Q = q; patLayout = null; viewPerm = null;
+  cam.auto = true; fitView(true);
+  el("dataText").value = dataText; el("queryText").value = queryText;
+  rebuild(false);
+  return true;
+}
+function rebuild(keepPos) {
+  stopPlay();
+  const keep = keepPos ? cur : 0;
+  build();
+  cur = Math.min(keep, steps.length - 1);
+  render();
+}
+
+/* ---------- wiring --------------------------------------------------------------- */
+
+fillPresets();
+el("presetSel").addEventListener("change", () => { const p = PRESETS[el("presetSel").value]; load(p.data, p.query); });
+el("orderSel").addEventListener("change", () => { orderMode = el("orderSel").value; rebuild(false); });
+el("granFine").addEventListener("click", () => { fine = true; el("granFine").classList.add("on"); el("granCoarse").classList.remove("on"); rebuild(false); });
+el("granCoarse").addEventListener("click", () => { fine = false; el("granCoarse").classList.add("on"); el("granFine").classList.remove("on"); rebuild(false); });
+el("permSeg").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+  viewPerm = viewPerm === b.dataset.perm ? null : b.dataset.perm; renderIndex(steps[cur] || {});
+}));
+el("loadBtn").addEventListener("click", () => load(el("dataText").value, el("queryText").value));
+el("resetBtn").addEventListener("click", () => { stopPlay(); cur = 0; render(); });
+el("backBtn").addEventListener("click", () => { stopPlay(); stepBack(); });
+el("stepBtn").addEventListener("click", () => { stopPlay(); stepFwd(); });
+el("playBtn").addEventListener("click", togglePlay);
+el("scrubber").addEventListener("input", () => { stopPlay(); cur = Number(el("scrubber").value); render(); });
+el("speed").addEventListener("input", () => {
+  el("speedVal").textContent = el("speed").value + "ms";
+  if (timer) { clearInterval(timer); timer = setInterval(stepFwd, Number(el("speed").value)); }
+});
+document.addEventListener("keydown", ev => {
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
+  if (ev.key === "ArrowRight") { stopPlay(); stepFwd(); ev.preventDefault(); }
+  else if (ev.key === "ArrowLeft") { stopPlay(); stepBack(); ev.preventDefault(); }
+  else if (ev.key === " ") { togglePlay(); ev.preventDefault(); }
+});
+
+load(PRESETS.chain.data, PRESETS.chain.query);
+</script>
+</body>
+</html>

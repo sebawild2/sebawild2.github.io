@@ -10,10 +10,10 @@
 <title>Space-Efficient Hierholzer — step-by-step</title>
 <style>
 :root{
-  --parch:#F1EED9;
+  --parch:#f5ebd9;
   --panel:#fdfaf0;
   --panel-2:#f2e9d2;
-  --rule:#ddd6a8;
+  --rule:#ddcaa8;
   --rule-soft:#e8dcbe;
   --ink:#332f28;
   --ink-2:#544c3f;
@@ -61,7 +61,7 @@ button,select,input[type=text],input[type=number]{
   background:var(--panel);border:1px solid #c3b48e;border-radius:3px;
   padding:5px 11px;cursor:pointer;transition:background .15s,border-color .15s,color .15s;
 }
-button:hover:not(:disabled),select:hover{background:#fbfaf4;border-color:var(--soft)}
+button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--soft)}
 button:disabled{opacity:.38;cursor:default}
 button.primary{background:var(--red);color:#fdf6e8;border-color:var(--red)}
 button.primary:hover:not(:disabled){background:#962522;border-color:#962522}
@@ -96,7 +96,7 @@ svg#graph{display:block;width:100%;height:auto;max-height:56vh;min-height:230px;
 .vdisc{stroke:#4a4136;stroke-width:1.7;transition:fill .22s}
 .vring{stroke:#4a4136;stroke-width:1.5;transition:stroke-opacity .22s}
 .vlabel{font-family:var(--serif);font-size:14px;fill:var(--ink);pointer-events:none}
-.vstart{font-family:var(--serif);font-size:11px;font-style:italic;fill:var(--red);stroke:#f7f0dd;stroke-width:3.2px;paint-order:stroke;stroke-linejoin:round}
+.vstart{font-family:var(--serif);font-size:11px;font-style:italic;fill:var(--red);stroke:#f5ebd9;stroke-width:3.2px;paint-order:stroke;stroke-linejoin:round}
 .ebadge circle{fill:#fdfaf0;stroke:#902015;stroke-width:1.2}
 .ebadge text{font-family:var(--serif);fill:#902015;font-weight:700}
 .ebadge{transition:opacity .25s}
@@ -983,7 +983,7 @@ function paint(animate) {
             r.halo.setAttribute('stroke-width', 11);
             r.halo.setAttribute('stroke-opacity', .34);
         } else if (F.colour[i] === OUT) {
-            r.halo.setAttribute('stroke', '#f7f0dd');
+            r.halo.setAttribute('stroke', '#f5ebd9');
             r.halo.setAttribute('stroke-width', 7);
             r.halo.setAttribute('stroke-opacity', 1);
         } else r.halo.setAttribute('stroke-opacity', 0);

@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fat-Pivot Radix Quicksort — Animated</title>
+<style>
+    :root{
+        --bg:#f5ebd9; --panel:#faf6ed; --panel-border:#d4c5b4;
+        --controls-bg:#ecddc5; --controls-border:#d4c5b4;
+        --ink:#6b675c; --ink-strong:#46433a; --title-muted:#8b8779;
+        --btn:#faf6ed; --btn-border:#b9a793; --btn-border-hover:#9c866d;
+        --heading:#6d180f;         /* headingscolor of the slides */
+        --heading-deep:#902015;
+        --pivot-fill:#e3c4b9;      /* headingscolor!30!backcolor */
+        --grey-prefix:#b6a98d;     /* already-known common prefix */
+        --sentinel:#3f7d86;
+        --less:#3f7d86; --equal:#b07d18; --greater:#5f7f36;
+        --less-bg:#dcebed; --equal-bg:#f6e6c6; --greater-bg:#e3ecd5;
+        --box:#b9a793;
+        --active:#cc2f22;
+    }
+    *{box-sizing:border-box}
+    body{background:var(--bg);color:var(--ink);
+        font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;
+        margin:0;padding:22px 26px 46px;min-height:100vh}
+    h1{font-size:1.6rem;font-weight:600;margin:0 0 4px;letter-spacing:.3px;color:var(--ink-strong)}
+    .subtitle{font-size:.92rem;color:var(--title-muted);margin:0 0 18px;max-width:62em;line-height:1.5}
+    .subtitle code{background:#ecddc5;padding:1px 6px;border-radius:3px}
+
+    /* ---------- controls ---------- */
+    .controls{display:flex;flex-wrap:wrap;gap:18px 22px;align-items:center;
+        background:var(--controls-bg);padding:12px 20px;border-radius:6px;
+        border:1px solid var(--controls-border);margin-bottom:16px}
+    .ctl-group{display:flex;align-items:center;gap:9px}
+    .ctl-group>label{font-size:.78rem;color:var(--ink-strong);font-weight:600;
+        text-transform:uppercase;letter-spacing:.6px}
+    button,select,input[type=text]{background:var(--btn);color:var(--ink-strong);
+        border:1px solid var(--btn-border);padding:7px 14px;font-size:.88rem;border-radius:4px;
+        cursor:pointer;font-weight:500;font-family:inherit;transition:background .15s,border-color .15s}
+    input[type=text]{cursor:text;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--btn-border-hover)}
+    button:disabled{opacity:.4;cursor:not-allowed}
+    button.primary{background:#f0d9cd;border-color:#c28577}
+    button.primary:hover:not(:disabled){background:#fcf9f3}
+    .seg{display:flex;border:1px solid var(--btn-border);border-radius:4px;overflow:hidden}
+    .seg button{border:none;border-radius:0;padding:7px 13px;background:var(--btn)}
+    .seg button+button{border-left:1px solid var(--btn-border)}
+    .seg button.on{background:#e3c4b9;color:#46433a;font-weight:600}
+    input[type=range]{accent-color:#cc2f22;cursor:pointer;vertical-align:middle}
+    .slider-wrap{display:flex;align-items:center;gap:10px;flex:1 1 320px;min-width:260px}
+    .slider-wrap input[type=range]{flex:1}
+    .stepcount{font-size:.8rem;color:var(--title-muted);min-width:92px;text-align:right;
+        font-variant-numeric:tabular-nums}
+
+    /* ---------- layout ---------- */
+    .stage{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(320px,.95fr);gap:18px;align-items:start}
+    .stage>div{min-width:0}
+    .sim-box{max-width:100%}
+    @media (max-width:1000px){.stage{grid-template-columns:1fr}}
+    .sim-box{background:var(--panel);border:1px solid var(--panel-border);border-radius:6px;
+        padding:13px 16px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+    .sim-title{font-size:.76rem;text-transform:uppercase;letter-spacing:1px;color:var(--title-muted);
+        margin:0 0 10px;font-weight:700}
+    .side{display:flex;flex-direction:column;gap:16px}
+
+    .status{background:#ecddc5;border:1px solid var(--panel-border);border-radius:5px;
+        padding:10px 13px;font-size:.92rem;color:var(--ink-strong);min-height:52px;line-height:1.45}
+    .status b{color:var(--heading)}
+    .status .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    /* ---------- array view ---------- */
+    #arrayView{position:relative;overflow-x:auto;max-width:100%}
+    .arr-wrap{position:relative;margin:4px 0 0}
+    .gutter-l{position:absolute;left:0;top:14px;width:32px}
+    .boxes{position:absolute;left:30px;top:14px;right:0;pointer-events:none}
+    .rows{position:absolute;left:46px;top:14px;right:96px}
+    .gutter-r{position:absolute;right:0;top:14px;width:92px}
+    .pos-lbl,.row,.ptr-lbl{position:absolute;left:0;right:0;transition:transform .34s cubic-bezier(.4,.05,.2,1)}
+    .pos-lbl{font-size:.72rem;color:var(--title-muted);text-align:right;padding-right:9px;
+        font-variant-numeric:tabular-nums;line-height:24px}
+    .row{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.95rem;
+        line-height:24px;height:24px;white-space:pre;padding-left:9px;border-radius:3px}
+    .row .pre,.lrow .pre{color:var(--grey-prefix)}
+    .row .cur,.lrow .cur{color:var(--heading);font-weight:700}
+    .row .cur.sent,.lrow .cur.sent{color:var(--sentinel)}
+    .row .idx,.lrow .idx{color:var(--title-muted);font-size:.78rem}
+    .row.pivot{background:var(--pivot-fill)}
+    .row.focus{outline:2px solid var(--active);outline-offset:-1px;border-radius:3px}
+    .row.cls-lt{background:var(--less-bg)}
+    .row.cls-eq{background:var(--equal-bg)}
+    .row.cls-gt{background:var(--greater-bg)}
+    .row.finished{color:var(--ink-strong)}
+    .ptr-lbl{font-size:.78rem;line-height:24px;height:24px;font-weight:700;padding-left:6px;
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .ptr-lbl .lt{color:var(--less)}
+    .ptr-lbl .gt{color:var(--greater)}
+    .ptr-lbl .ii{color:var(--active)}
+    .box{position:absolute;border:1px solid var(--box);border-radius:4px;
+        transition:transform .34s cubic-bezier(.4,.05,.2,1),height .34s;left:0;right:10px}
+    .box.cur{border:2px solid var(--heading)}
+    .box.seg-lt{border-color:var(--less)}
+    .box.seg-eq{border-color:var(--equal)}
+    .box.seg-gt{border-color:var(--greater)}
+    .box.fin{border-style:dashed;border-color:#c3b79a}
+    .box-tag{position:absolute;top:-9px;left:8px;background:var(--panel);padding:0 5px;
+        font-size:.66rem;color:var(--title-muted);font-family:ui-monospace,monospace}
+    .box.cur .box-tag{color:var(--heading)}
+
+    /* ---------- slide (levels) view ---------- */
+    #levelView{overflow-x:auto;max-width:100%;padding-bottom:6px}
+    .levels{display:flex;gap:26px;align-items:flex-start;min-width:min-content}
+    .lvl{position:relative}
+    .lvl-head{font-size:.7rem;color:var(--title-muted);text-transform:uppercase;letter-spacing:.7px;
+        margin-bottom:6px;height:14px}
+    .lvl-body{position:relative}
+    .lrow{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem;
+        line-height:22px;height:22px;white-space:pre;padding:0 6px}
+    .lvl.hidden{opacity:.12}
+    .lgrp{position:absolute;border:1px solid var(--box);border-radius:4px;left:0;right:0}
+    .lrow{border-radius:3px}
+    .lgrp.new{border-color:var(--heading);border-width:2px}
+    .lgrp.fin{border-style:dashed;border-color:#c9bda0}
+
+    /* ---------- code ---------- */
+    .code-section{border:1px solid #d4c5b4;border-radius:6px;overflow:hidden;background:#fbf8f0}
+    .code-head{font-size:.72rem;font-weight:600;color:#8b8779;padding:5px 10px;background:#f0e7d0;
+        border-bottom:1px solid #d4c5b4;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    pre.code{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        font-size:.735rem;line-height:1.6;color:#46433a;overflow-x:auto}
+    pre.code .ln{display:block;padding:0 10px;white-space:pre;border-left:3px solid transparent}
+    pre.code .ln.hot{background:#f6dfd8;border-left-color:var(--heading)}
+    pre.code .cm{color:#a1937c}
+    .code-note{font-size:.73rem;color:var(--title-muted);margin-top:8px;line-height:1.5}
+    .code-note code{background:#ecddc5;padding:0 4px;border-radius:3px}
+
+    /* ---------- stack & cost ---------- */
+    table.stk{width:100%;border-collapse:collapse;font-size:.82rem;
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    table.stk td,table.stk th{padding:3px 6px;text-align:right;border-bottom:1px dashed #ecddc5}
+    table.stk th{font-size:.68rem;color:var(--title-muted);text-transform:uppercase;letter-spacing:.5px;
+        font-family:inherit;font-weight:700}
+    table.stk tr.top td{background:#f3e7d2;font-weight:700;color:var(--ink-strong)}
+    table.stk td:first-child,table.stk th:first-child{text-align:left}
+    .empty-note{color:var(--title-muted);font-style:italic;font-size:.85rem}
+    .cost{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:.85rem}
+    .cost .k{color:var(--ink)}
+    .cost .v{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-strong)}
+    .cost .sub{padding-left:14px;font-size:.8rem;color:var(--title-muted)}
+    .cost hr{grid-column:1/-1;border:none;border-top:1px dashed #deceb2;margin:4px 0}
+
+    .legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.78rem;color:var(--ink)}
+    .legend .item{display:flex;align-items:center;gap:6px}
+    .sw{width:15px;height:15px;border-radius:3px;border:1.5px solid}
+    .sw-piv{background:var(--pivot-fill);border-color:#c28577}
+    .sw-lt{background:var(--less-bg);border-color:var(--less)}
+    .sw-eq{background:var(--equal-bg);border-color:var(--equal)}
+    .sw-gt{background:var(--greater-bg);border-color:var(--greater)}
+    .sw-pre{background:#faf6ed;border-color:var(--grey-prefix)}
+
+    details.editor{margin-top:22px}
+    details.editor summary{cursor:pointer;font-size:.82rem;color:var(--title-muted);font-weight:600;
+        text-transform:uppercase;letter-spacing:.6px}
+    .editor-body{margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+    textarea{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.84rem;
+        background:var(--panel);color:var(--ink-strong);border:1px solid var(--panel-border);
+        border-radius:5px;padding:10px;width:340px;height:190px;resize:vertical}
+    .editor-help{font-size:.82rem;color:var(--ink);max-width:520px;line-height:1.55}
+    .editor-help code{background:#ecddc5;padding:1px 5px;border-radius:3px}
+    .err{color:#6d180f;font-weight:600;font-size:.82rem;min-height:18px}
+    .result{font-family:ui-monospace,monospace;font-size:.82rem;color:var(--ink-strong);
+        line-height:1.5;word-break:break-all}
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<h1>Fat-Pivot Radix Quicksort</h1>
+<p class="subtitle">
+    Three-way string quicksort: partition an array of strings by their <em>d</em>th character only,
+    then recurse on <span style="color:var(--less)">smaller</span> and
+    <span style="color:var(--greater)">larger</span> with the same <code>d</code> and on
+    <span style="color:var(--equal)">equal</span> with <code>d+1</code> &mdash; so equal prefixes are never
+    compared twice. Applied to all suffixes of a text, it computes the suffix array.
+</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="preset">Input</label>
+        <select id="preset"></select>
+    </div>
+    <div class="ctl-group">
+        <label>Partition</label>
+        <div class="seg" id="modeSeg">
+            <button data-mode="stable" class="on">stable (slide)</button>
+            <button data-mode="inplace">in-place (algs4)</button>
+        </div>
+    </div>
+    <div class="ctl-group">
+        <label>Shuffle</label>
+        <div class="seg" id="shufSeg">
+            <button data-shuf="0" class="on">off</button>
+            <button data-shuf="1">on</button>
+        </div>
+        <button id="btnReshuffle" title="draw a new random permutation" disabled>&#8635;</button>
+    </div>
+    <div class="ctl-group">
+        <label>View</label>
+        <div class="seg" id="viewSeg">
+            <button data-view="exec" class="on">execution</button>
+            <button data-view="levels">levels (slide)</button>
+        </div>
+    </div>
+    <div class="ctl-group">
+        <button id="btnFirst">|&lt;</button>
+        <button id="btnPrev">&lt;</button>
+        <button id="btnPlay" class="primary">Play</button>
+        <button id="btnNext">&gt;</button>
+        <button id="btnLast">&gt;|</button>
+    </div>
+    <div class="slider-wrap">
+        <input type="range" id="slider" min="0" max="0" value="0">
+        <span class="stepcount" id="stepCount">0 / 0</span>
+    </div>
+    <div class="ctl-group">
+        <label for="speed">Speed</label>
+        <input type="range" id="speed" min="1" max="10" value="5" style="width:90px">
+    </div>
+</div>
+
+<div class="stage">
+    <div>
+        <div class="sim-box">
+            <p class="sim-title" id="viewTitle">Array</p>
+            <div id="arrayView"><div class="arr-wrap" id="arrWrap">
+                <div class="gutter-l" id="gutterL"></div>
+                <div class="boxes" id="boxes"></div>
+                <div class="rows" id="rows"></div>
+                <div class="gutter-r" id="gutterR"></div>
+            </div></div>
+            <div id="levelView" style="display:none"><div class="levels" id="levels"></div></div>
+        </div>
+        <div class="sim-box" style="margin-top:16px">
+            <p class="sim-title">Legend</p>
+            <div class="legend">
+                <div class="item"><span class="sw sw-piv"></span> pivot element <span class="mono">a[lo]</span></div>
+                <div class="item"><span class="sw sw-lt"></span> <em>d</em>th char &lt; pivot char</div>
+                <div class="item"><span class="sw sw-eq"></span> = pivot char</div>
+                <div class="item"><span class="sw sw-gt"></span> &gt; pivot char</div>
+                <div class="item"><span class="sw sw-pre"></span> <span style="color:var(--grey-prefix)">grey</span> = known common prefix</div>
+                <div class="item"><span style="color:var(--sentinel);font-family:monospace;font-weight:700">$</span> = end of string (<span class="mono">charAt = &minus;1</span>)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="side">
+        <div class="status" id="status"></div>
+
+        <div class="sim-box">
+            <p class="sim-title">Recursion stack</p>
+            <div id="stack"></div>
+        </div>
+
+        <div class="sim-box">
+            <p class="sim-title">Cost</p>
+            <div class="cost" id="cost"></div>
+        </div>
+
+        <div class="sim-box">
+            <p class="sim-title">Code</p>
+            <div class="code-section" id="codeSec">
+                <div class="code-head" id="codeHead">sort(a, lo, hi, d)</div>
+                <pre class="code" id="code"></pre>
+            </div>
+            <div class="code-note" id="codeNote"></div>
+        </div>
+    </div>
+</div>
+
+<details class="editor" id="editor">
+    <summary>Input editor</summary>
+    <div class="editor-body">
+        <div>
+            <textarea id="ta" spellcheck="false"></textarea>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+                <button id="btnLoad" class="primary">Load</button>
+                <span class="err" id="err"></span>
+            </div>
+        </div>
+        <div class="editor-help">
+            <p style="margin-top:0"><b>Format.</b> Two kinds of input:</p>
+            <ul style="margin:6px 0 10px;padding-left:18px;line-height:1.6">
+                <li><b>list of strings</b> &mdash; whitespace-separated tokens, exactly the
+                    <code>algs4</code> format (e.g. the contents of <code>shells.txt</code>).</li>
+                <li><b>suffixes of a text</b> &mdash; a first line <code>text: bananaban$</code>.
+                    All suffixes <code>T<sub>0</sub>,…,T<sub>n</sub></code> become the input array,
+                    so the sorted result is the suffix array <code>L[0..n]</code>.
+                    Use <code>_</code> for a blank in the text.</li>
+            </ul>
+            <p style="margin:0 0 6px"><b>Result</b></p>
+            <div class="result" id="result"></div>
+        </div>
+    </div>
+</details>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   ENGINE START   (pure; no DOM access — unit-testable)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* charAt(s,d) = -1 if d == |s|, else the code of s[d].  -1 is drawn as '$'. */
+function charAt(s, d) { return d === s.length ? -1 : s.charCodeAt(d); }
+
+/* ---- code listings; line indices are referenced by the trace ------------- */
+const CODE = {
+inplace: [
+ "sort(a, lo, hi, d):",
+ "    if (hi <= lo) return;",
+ "    lt = lo;  gt = hi;",
+ "    v = charAt(a[lo], d);",
+ "    i = lo + 1;",
+ "    while (i <= gt) {",
+ "        t = charAt(a[i], d);",
+ "        if      (t < v)  exch(a, lt++, i++);",
+ "        else if (t > v)  exch(a, i, gt--);",
+ "        else             i++;",
+ "    }",
+ "    // a[lo..lt-1] < v = a[lt..gt] < a[gt+1..hi]",
+ "    sort(a, lo,     lt-1, d);",
+ "    if (v >= 0) sort(a, lt, gt, d+1);",
+ "    sort(a, gt+1,   hi,   d);"
+],
+stable: [
+ "sort(a, lo, hi, d):",
+ "    if (hi <= lo) return;",
+ "    v = charAt(a[lo], d);            // pivot character",
+ "    less    = [ s in a[lo..hi] : charAt(s,d) <  v ]",
+ "    equal   = [ s in a[lo..hi] : charAt(s,d) == v ]",
+ "    greater = [ s in a[lo..hi] : charAt(s,d) >  v ]",
+ "    a[lo..hi] = less ++ equal ++ greater;   // stable",
+ "    lt = lo + |less|;  gt = lt + |equal| - 1;",
+ "    sort(a, lo,     lt-1, d);",
+ "    if (v >= 0) sort(a, lt, gt, d+1);",
+ "    sort(a, gt+1,   hi,   d);"
+]
+};
+
+/* --------------------------------------------------------------------------
+   buildTrace(items, mode)
+     items : array of { s: string, tag: string|null }
+     mode  : "inplace" | "stable"
+   returns { steps, code, sorted }
+   Each step is a full snapshot so the slider can jump anywhere.
+   -------------------------------------------------------------------------- */
+function buildTrace(items, mode) {
+    const n = items.length;
+    const a = items.map((_, k) => k);        // a[pos] = item index
+    const dOf = new Array(n).fill(0);        // known common prefix length per position
+    const fin = new Array(n).fill(false);    // position is finally placed
+    const steps = [];
+    const stack = [];                        // [{lo,hi,d}] innermost last
+    const cnt = { dec: 0, lcp: 0, exch: 0, calls: 0, moves: 0 };
+    if (n === 0) return { steps: [{ arr: [], dOf: [], fin: [], stack: [], ptr: null,
+        cls: [], segs: [], focus: -1, msg: "Empty input.", code: [], counts: { ...cnt } }],
+        code: CODE[mode], sorted: [] };
+
+    const snap = (o) => {
+        steps.push({
+            arr: a.slice(), dOf: dOf.slice(), fin: fin.slice(),
+            stack: stack.map(f => ({ ...f })),
+            ptr: o.ptr || null, cls: o.cls ? o.cls.slice() : null,
+            segs: o.segs || null, focus: (o.focus === undefined ? -1 : o.focus),
+            msg: o.msg, code: o.code || [], counts: { ...cnt }
+        });
+    };
+    const str = (pos) => items[a[pos]].s;
+    const chr = (c) => c < 0 ? "$" : String.fromCharCode(c);
+
+    function sort(lo, hi, d) {
+        stack.push({ lo, hi, d });
+        cnt.calls++;
+        for (let p = lo; p <= hi; p++) dOf[p] = d;
+        if (hi <= lo) {
+            if (hi === lo) fin[lo] = true;
+            snap({ code: [0, 1], msg: hi < lo
+                ? `<b>sort(${lo}..${hi}, d=${d})</b> — empty subarray, nothing to do.`
+                : `<b>sort(${lo}..${hi}, d=${d})</b> — single string, already in place.` });
+            stack.pop();
+            return;
+        }
+        snap({ code: [0], msg: `<b>sort(${lo}..${hi}, d=${d})</b> — sort ${hi - lo + 1} strings, ` +
+            `first ${d} character${d === 1 ? "" : "s"} known to be equal.` });
+
+        const v = charAt(str(lo), d);
+        let lt, gt;
+
+        if (mode === "inplace") {
+            lt = lo; gt = hi;
+            let i = lo + 1;
+            snap({ ptr: { lo, hi, d, lt, gt, i, v }, code: [2, 3, 4],
+                msg: `Pivot is <span class="mono">a[lo]</span>; its ${ord(d)} character is ` +
+                     `<b class="mono">${chr(v)}</b>. Set <span class="mono">lt=lo, gt=hi, i=lo+1</span>.` });
+            while (i <= gt) {
+                const t = charAt(str(i), d);
+                const rel = t < v ? "&lt;" : (t > v ? "&gt;" : "=");
+                snap({ ptr: { lo, hi, d, lt, gt, i, v }, focus: i, code: [5, 6],
+                    msg: `<span class="mono">t = charAt(a[${i}], ${d}) = ${chr(t)}</span> ` +
+                         `${rel} <span class="mono">${chr(v)} = v</span>` });
+                if (t < v) { cnt.dec++; exch(lt, i); lt++; i++;
+                    snap({ ptr: { lo, hi, d, lt, gt, i, v }, code: [7],
+                        msg: `<b class="mono">${chr(t)} &lt; ${chr(v)}</b>: swap into the smaller part, ` +
+                             `<span class="mono">lt++, i++</span>.` });
+                } else if (t > v) { cnt.dec++; exch(i, gt); gt--;
+                    snap({ ptr: { lo, hi, d, lt, gt, i, v }, code: [8],
+                        msg: `<b class="mono">${chr(t)} &gt; ${chr(v)}</b>: swap into the larger part, ` +
+                             `<span class="mono">gt--</span> (<span class="mono">i</span> stays).` });
+                } else { cnt.lcp++; i++;
+                    snap({ ptr: { lo, hi, d, lt, gt, i, v }, code: [9],
+                        msg: `<b class="mono">${chr(t)} = ${chr(v)}</b>: keep it in the equal part, ` +
+                             `<span class="mono">i++</span>.` });
+                }
+            }
+            snap({ ptr: { lo, hi, d, lt, gt, i, v }, code: [10, 11],
+                segs: segsOf(lo, lt, gt, hi),
+                msg: `Partitioned: <span class="mono">a[${lo}..${lt - 1}] &lt; ${chr(v)} = a[${lt}..${gt}] &lt; a[${gt + 1}..${hi}]</span>.` });
+        } else {
+            /* stable three-way partition */
+            const cls = new Array(n).fill(null);
+            snap({ ptr: { lo, hi, d, lt: null, gt: null, i: null, v }, cls, code: [2],
+                msg: `Pivot is <span class="mono">a[lo]</span>; its ${ord(d)} character is ` +
+                     `<b class="mono">${chr(v)}</b>.` });
+            const less = [], equal = [], greater = [];
+            for (let p = lo; p <= hi; p++) {
+                const t = charAt(str(p), d);
+                const rel = t < v ? "&lt;" : (t > v ? "&gt;" : "=");
+                if (p === lo) { equal.push(a[p]); cls[p] = "eq"; }
+                else if (t < v) { cnt.dec++; less.push(a[p]); cls[p] = "lt"; }
+                else if (t > v) { cnt.dec++; greater.push(a[p]); cls[p] = "gt"; }
+                else { cnt.lcp++; equal.push(a[p]); cls[p] = "eq"; }
+                snap({ ptr: { lo, hi, d, lt: null, gt: null, i: p, v }, cls, focus: p,
+                    code: [3, 4, 5],
+                    msg: p === lo
+                        ? `The pivot itself belongs to the equal part.`
+                        : `<span class="mono">charAt(a[${p}], ${d}) = ${chr(t)}</span> ${rel} ` +
+                          `<span class="mono">${chr(v)}</span> &rarr; ` +
+                          (t < v ? `<span style="color:var(--less)">smaller</span>` :
+                           t > v ? `<span style="color:var(--greater)">larger</span>` :
+                                   `<span style="color:var(--equal)">equal</span>`) + ` part.` });
+            }
+            const merged = less.concat(equal, greater);
+            for (let p = lo; p <= hi; p++) { if (a[p] !== merged[p - lo]) cnt.moves++; a[p] = merged[p - lo]; }
+            lt = lo + less.length; gt = lt + equal.length - 1;
+            snap({ ptr: { lo, hi, d, lt, gt, i: null, v }, cls, code: [6, 7],
+                segs: segsOf(lo, lt, gt, hi),
+                msg: `Rearranged (stably): <span class="mono">a[${lo}..${lt - 1}] &lt; ${chr(v)} = a[${lt}..${gt}] &lt; a[${gt + 1}..${hi}]</span>.` });
+        }
+
+        const cLo = mode === "inplace" ? 12 : 8;
+        snap({ code: [cLo], segs: segsOf(lo, lt, gt, hi),
+            msg: `Recurse on the <span style="color:var(--less)">smaller</span> part ` +
+                 `<span class="mono">a[${lo}..${lt - 1}]</span> with the same <span class="mono">d = ${d}</span>.` });
+        sort(lo, lt - 1, d);
+
+        if (v >= 0) {
+            snap({ code: [cLo + 1], segs: segsOf(lo, lt, gt, hi),
+                msg: `Recurse on the <span style="color:var(--equal)">equal</span> part ` +
+                     `<span class="mono">a[${lt}..${gt}]</span> with <span class="mono">d+1 = ${d + 1}</span> — ` +
+                     `the first ${d + 1} characters are now known to agree.` });
+            sort(lt, gt, d + 1);
+        } else {
+            for (let p = lt; p <= gt; p++) fin[p] = true;
+            snap({ code: [cLo + 1], segs: segsOf(lo, lt, gt, hi),
+                msg: `<span class="mono">v = $</span> (&minus;1): all strings in ` +
+                     `<span class="mono">a[${lt}..${gt}]</span> have ended — they are equal, no recursion.` });
+        }
+
+        snap({ code: [cLo + 2], segs: segsOf(lo, lt, gt, hi),
+            msg: `Recurse on the <span style="color:var(--greater)">larger</span> part ` +
+                 `<span class="mono">a[${gt + 1}..${hi}]</span> with the same <span class="mono">d = ${d}</span>.` });
+        sort(gt + 1, hi, d);
+
+        stack.pop();
+    }
+    function segsOf(lo, lt, gt, hi) {
+        const r = [];
+        if (lt - 1 >= lo) r.push({ lo, hi: lt - 1, cls: "lt" });
+        if (gt >= lt) r.push({ lo: lt, hi: gt, cls: "eq" });
+        if (hi >= gt + 1) r.push({ lo: gt + 1, hi, cls: "gt" });
+        return r;
+    }
+    function exch(p, q) { if (p !== q) { const t = a[p]; a[p] = a[q]; a[q] = t; cnt.exch++; } }
+    function ord(d) { return d === 0 ? "0th" : d === 1 ? "1st" : d === 2 ? "2nd" : d === 3 ? "3rd" : d + "th"; }
+
+    sort(0, n - 1, 0);
+    for (let p = 0; p < n; p++) fin[p] = true;
+    snap({ code: [], msg: `<b>Done.</b> All ${n} strings are in sorted order.` });
+
+    return { steps, code: CODE[mode], sorted: a.map(k => items[k]) };
+}
+
+/* --------------------------------------------------------------------------
+   buildLevels(items, mode) — the picture from the slide:
+   one column per level of the recursion tree.  Regions at the same level are
+   disjoint, so the array after "all calls of depth < k" is well defined.
+   -------------------------------------------------------------------------- */
+function buildLevels(items, mode, maxLevels = 24) {
+    const n = items.length;
+    let a = items.map((_, k) => k);
+    if (n === 0) return [];
+    let regions = [{ lo: 0, hi: n - 1, d: 0, done: n <= 1 }];
+    const cols = [{ arr: a.slice(), regions: regions.map(r => ({ ...r, isNew: true })) }];
+    let level = 0;
+    while (level < maxLevels && regions.some(r => !r.done)) {
+        const next = [];
+        for (const r of regions) {
+            if (r.done) { next.push({ ...r }); continue; }
+            const { lo, hi, d } = r;
+            const v = charAt(items[a[lo]].s, d);
+            let lt, gt;
+            if (mode === "inplace") {
+                lt = lo; gt = hi; let i = lo + 1;
+                while (i <= gt) {
+                    const t = charAt(items[a[i]].s, d);
+                    if (t < v) { const x = a[lt]; a[lt] = a[i]; a[i] = x; lt++; i++; }
+                    else if (t > v) { const x = a[i]; a[i] = a[gt]; a[gt] = x; gt--; }
+                    else i++;
+                }
+            } else {
+                const less = [], equal = [], greater = [];
+                for (let p = lo; p <= hi; p++) {
+                    const t = charAt(items[a[p]].s, d);
+                    if (p === lo || t === v) equal.push(a[p]);
+                    else if (t < v) less.push(a[p]);
+                    else greater.push(a[p]);
+                }
+                const m = less.concat(equal, greater);
+                for (let p = lo; p <= hi; p++) a[p] = m[p - lo];
+                lt = lo + less.length; gt = lt + equal.length - 1;
+            }
+            if (lt - 1 >= lo) next.push({ lo, hi: lt - 1, d, done: lt - 1 === lo });
+            if (gt >= lt) next.push({ lo: lt, hi: gt, d: v >= 0 ? d + 1 : d, done: v < 0 || gt === lt });
+            if (hi >= gt + 1) next.push({ lo: gt + 1, hi, d, done: hi === gt + 1 });
+        }
+        regions = next;
+        const prev = cols[cols.length - 1].regions;
+        cols.push({
+            arr: a.slice(),
+            regions: regions.map(r => ({ ...r,
+                isNew: !prev.some(p => p.lo === r.lo && p.hi === r.hi && p.d === r.d) }))
+        });
+        level++;
+    }
+    return cols;
+}
+
+/* --------------------------------------------------------------------------
+   parseInput(text) -> { items, isSuffix, text }
+   -------------------------------------------------------------------------- */
+function parseInput(raw) {
+    const lines = raw.split("\n");
+    const first = (lines[0] || "").trim();
+    const m = /^text\s*:\s*(.*)$/i.exec(first);
+    if (m) {
+        let t = m[1].replace(/\s+/g, "");
+        t = t.replace(/_/g, "\u2423");                       // visible blank
+        if (t.length === 0) throw new Error("empty text");
+        const items = [];
+        for (let i = 0; i < t.length; i++) items.push({ s: t.slice(i), tag: String(i) });
+        return { items, isSuffix: true, text: t };
+    }
+    const toks = raw.split(/\s+/).filter(x => x.length > 0);
+    if (toks.length === 0) throw new Error("no strings given");
+    return { items: toks.map(s => ({ s, tag: null })), isSuffix: false, text: null };
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   ENGINE END
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ---------------------------------------------------------------- presets */
+const PRESETS = [
+    { name: "shells.txt  (Sedgewick–Wayne)",
+      text: "she sells seashells by the sea shore the shells she sells are surely seashells" },
+    { name: "suffixes of  bananaban$", text: "text: bananaban$" },
+    { name: "suffixes of  hannahbansbananasman$", text: "text: hannahbansbananasman$" },
+    { name: "suffixes of  mississippi$", text: "text: mississippi$" },
+    { name: "suffixes of  aaaaaaaa$   (worst case)", text: "text: aaaaaaaa$" },
+    { name: "suffixes of  alf_eats_alfalfa$", text: "text: alf_eats_alfalfa$" },
+    { name: "words with long common prefixes",
+      text: "algorithm algorithms algo alga algebra all always alp alpine alpha" },
+    { name: "binary strings", text: "0110 011 0 1101 11 1 0111 1100 010 101" }
+];
+
+/* ---------------------------------------------------------------- state */
+let ST = { items: [], base: [], isSuffix: false, mode: "stable", view: "exec", shuffle: false,
+           steps: [], code: [], cols: [], reveals: [], idx: 0, timer: null, lcpBound: 0 };
+
+const $ = id => document.getElementById(id);
+const ROW = 24, LROW = 26;
+
+function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+/* render one string with grey prefix / highlighted dth char, windowed */
+function strHTML(s, d, opts) {
+    opts = opts || {};
+    const plain = !!opts.plain;
+    const MAX = 34;
+    let start = 0, lead = "";
+    if (!plain && s.length > MAX && d > 14) { start = d - 12; lead = "…"; }
+    const show = s.slice(start);
+    const cut = show.length > MAX;
+    const tail = cut ? "…" : "";
+    if (plain) return `<span>${lead}${esc(show.slice(0, MAX))}${tail}</span>`;
+    const pre = s.slice(start, Math.min(d, s.length));
+    const isSent = d >= s.length;
+    const ch = isSent ? "$" : s[d];
+    const rest = isSent ? "" : s.slice(d + 1);
+    let out = `<span class="pre">${lead}${esc(pre)}</span>` +
+              `<span class="cur${isSent ? " sent" : ""}">${esc(ch)}</span>`;
+    const roomLeft = MAX - pre.length - 1;
+    out += `<span>${esc(rest.slice(0, Math.max(0, roomLeft)))}${rest.length > roomLeft ? "…" : ""}</span>`;
+    return out;
+}
+
+/* ---------------------------------------------------------------- build */
+function loadFrom(raw) {
+    let p;
+    try { p = parseInput(raw); } catch (e) { $("err").textContent = e.message; return; }
+    if (p.items.length > 80) { $("err").textContent = "please use at most 80 strings"; return; }
+    $("err").textContent = "";
+    ST.base = p.items; ST.isSuffix = p.isSuffix;
+    applyOrder();
+    rebuild(0);
+}
+function applyOrder() {
+    ST.items = ST.base.slice();
+    if (ST.shuffle) {                       /* Knuth-Fisher-Yates */
+        for (let i = ST.items.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const t = ST.items[i]; ST.items[i] = ST.items[j]; ST.items[j] = t;
+        }
+    }
+}
+/* LCP of two strings, each terminated by the end-of-string marker $ */
+function lcp(a, b) { a += "\u0000"; b += "\u0000";
+    let k = 0; while (k < a.length && k < b.length && a[k] === b[k]) k++; return k; }
+function rebuild(keepIdx) {
+    const t = buildTrace(ST.items, ST.mode);
+    ST.steps = t.steps; ST.code = t.code;
+    ST.lcpBound = 0;
+    for (let r = 1; r < t.sorted.length; r++) ST.lcpBound += lcp(t.sorted[r - 1].s, t.sorted[r].s);
+    ST.cols = buildLevels(ST.items, ST.mode);
+    ST.reveals = [];
+    ST.cols.forEach((c, k) => {
+        if (k === 0) { ST.reveals.push({ col: 0, upto: 1e9 }); return; }
+        const news = c.regions.filter(r => r.isNew).sort((x, y) => x.lo - y.lo);
+        if (news.length === 0) { ST.reveals.push({ col: k, upto: 1e9 }); return; }
+        news.forEach(r => ST.reveals.push({ col: k, upto: r.hi }));
+    });
+    renderCode();
+    renderResult(t.sorted);
+    renderLevelsStatic();
+    setIdx(Math.min(keepIdx || 0, maxIdx()));
+}
+function maxIdx() { return (ST.view === "exec" ? ST.steps.length : ST.reveals.length) - 1; }
+
+/* ---------------------------------------------------------------- code */
+function renderCode() {
+    const pre = $("code");
+    pre.innerHTML = ST.code.map((l, i) => {
+        const c = l.indexOf("//");
+        const h = c >= 0 ? esc(l.slice(0, c)) + `<span class="cm">${esc(l.slice(c))}</span>` : esc(l);
+        return `<span class="ln" data-l="${i}">${h}</span>`;
+    }).join("");
+    $("codeNote").innerHTML = ST.mode === "inplace"
+        ? `<code>charAt(s,d)</code> returns <code>&minus;1</code> (drawn <code>$</code>) when <code>d = |s|</code>. ` +
+          `This is <code>Quick3string.java</code> of <em>Algorithms, 4th ed.</em>, without the initial shuffle ` +
+          `and with the insertion-sort cutoff set to&nbsp;0.`
+        : `<code>charAt(s,d)</code> returns <code>&minus;1</code> (drawn <code>$</code>) when <code>d = |s|</code>. ` +
+          `This variant partitions <em>stably</em>, which keeps the picture readable; the in-place ` +
+          `variant does the same partition with exchanges.`;
+}
+function hilite(lines) {
+    $("code").querySelectorAll(".ln").forEach(e => e.classList.remove("hot"));
+    (lines || []).forEach(i => {
+        const e = $("code").querySelector(`.ln[data-l="${i}"]`);
+        if (e) e.classList.add("hot");
+    });
+}
+
+/* ---------------------------------------------------------------- exec view */
+function renderExec() {
+    const s = ST.steps[ST.idx]; if (!s) return;
+    const n = ST.items.length;
+    const H = n * ROW + 10;
+    $("arrWrap").style.height = (H + 16) + "px";
+    $("gutterL").style.height = $("boxes").style.height = $("rows").style.height =
+        $("gutterR").style.height = H + "px";
+
+    /* position labels */
+    const gl = $("gutterL");
+    if (gl.childElementCount !== n) {
+        gl.innerHTML = "";
+        for (let p = 0; p < n; p++) {
+            const e = document.createElement("div");
+            e.className = "pos-lbl"; e.textContent = p;
+            e.style.transform = `translateY(${p * ROW}px)`;
+            gl.appendChild(e);
+        }
+    }
+    /* rows (persistent elements per item → CSS animates the motion) */
+    const rows = $("rows");
+    if (rows.childElementCount !== n) {
+        rows.innerHTML = "";
+        for (let k = 0; k < n; k++) {
+            const e = document.createElement("div");
+            e.className = "row"; e.dataset.item = k;
+            rows.appendChild(e);
+        }
+    }
+    const top = s.stack.length ? s.stack[s.stack.length - 1] : null;
+    for (let p = 0; p < n; p++) {
+        const k = s.arr[p];
+        const e = rows.querySelector(`.row[data-item="${k}"]`);
+        e.style.transform = `translateY(${p * ROW}px)`;
+        const it = ST.items[k];
+        const inCur = top && p >= top.lo && p <= top.hi;
+        const plain = s.fin[p] && !(s.ptr && inCur);
+        const tag = it.tag !== null ? `<span class="idx">T${sub(it.tag)} </span>` : "";
+        e.innerHTML = tag + strHTML(it.s, s.dOf[p], { plain });
+        e.className = "row" + (plain ? " finished" : "");
+        if (s.ptr && p === s.ptr.lo) e.classList.add("pivot");
+        if (s.cls && s.cls[p]) e.classList.add("cls-" + s.cls[p]);
+        if (p === s.focus) e.classList.add("focus");
+    }
+    /* pointer gutter */
+    const gr = $("gutterR");
+    gr.innerHTML = "";
+    if (s.ptr) {
+        const marks = {};
+        const add = (p, html) => { if (p === null || p === undefined || p < 0 || p >= n) return;
+            (marks[p] = marks[p] || []).push(html); };
+        if (ST.mode === "inplace") {
+            add(s.ptr.lt, `<span class="lt">lt</span>`);
+            add(s.ptr.i, `<span class="ii">i</span>`);
+            add(s.ptr.gt, `<span class="gt">gt</span>`);
+        } else if (s.ptr.i !== null && s.ptr.i !== undefined) {
+            add(s.ptr.i, `<span class="ii">▸</span>`);
+        }
+        for (const p in marks) {
+            const e = document.createElement("div");
+            e.className = "ptr-lbl"; e.innerHTML = marks[p].join(" ");
+            e.style.transform = `translateY(${p * ROW}px)`;
+            gr.appendChild(e);
+        }
+    }
+    /* boxes: stack frames + segments */
+    const bx = $("boxes"); bx.innerHTML = "";
+    const mk = (lo, hi, cls, tag) => {
+        const e = document.createElement("div");
+        e.className = "box " + cls;
+        e.style.transform = `translateY(${lo * ROW - 2}px)`;
+        e.style.height = ((hi - lo + 1) * ROW + 4) + "px";
+        if (tag) e.innerHTML = `<span class="box-tag">${tag}</span>`;
+        bx.appendChild(e);
+    };
+    s.stack.forEach((f, k) => {
+        const isTop = k === s.stack.length - 1;
+        if (f.hi < f.lo) return;
+        mk(f.lo, f.hi, isTop ? "cur" : "", isTop ? `d = ${f.d}` : "");
+    });
+    if (s.segs) s.segs.forEach(g => mk(g.lo, g.hi, "seg-" + g.cls));
+
+    /* side panels */
+    $("status").innerHTML = s.msg;
+    hilite(s.code);
+    renderStack(s);
+    renderCost(s);
+}
+function sub(t) { return String(t).split("").map(c => "₀₁₂₃₄₅₆₇₈₉"[+c]).join(""); }
+
+function renderStack(s) {
+    const el = $("stack");
+    if (!s.stack.length) { el.innerHTML = `<div class="empty-note">empty — no active call</div>`; return; }
+    let h = `<table class="stk"><tr><th>call</th><th>lo</th><th>hi</th><th>size</th><th>d</th></tr>`;
+    s.stack.forEach((f, k) => {
+        const top = k === s.stack.length - 1;
+        h += `<tr class="${top ? "top" : ""}"><td>${k === 0 ? "root" : "&#8627;"}</td>` +
+             `<td>${f.lo}</td><td>${f.hi}</td><td>${Math.max(0, f.hi - f.lo + 1)}</td><td>${f.d}</td></tr>`;
+    });
+    el.innerHTML = h + `</table>`;
+}
+function renderCost(s) {
+    const c = s.counts, n = ST.items.length;
+    const tot = c.dec + c.lcp;
+    const ref = n > 1 ? (2 * Math.log(2) * n * Math.log2(n)) : 0;
+    $("cost").innerHTML =
+        `<div class="k">character comparisons</div><div class="v">${tot}</div>` +
+        `<div class="k sub">decisive (&lt; or &gt;)</div><div class="v">${c.dec}</div>` +
+        `<div class="k sub">LCP (=)</div><div class="v">${c.lcp}</div>` +
+        `<div class="k sub">&sum; LCP of adjacent sorted strings</div><div class="v">${ST.lcpBound}</div>` +
+        `<div class="k sub" style="grid-column:1/-1;font-size:.75rem">= cost of inserting all strings into a trie &mdash; every string sort must pay this</div>` +
+        `<hr>` +
+        (ST.mode === "inplace"
+            ? `<div class="k">exchanges</div><div class="v">${c.exch}</div>`
+            : `<div class="k">elements moved</div><div class="v">${c.moves}</div>`) +
+        `<div class="k">recursive calls</div><div class="v">${c.calls}</div>` +
+        `<hr>` +
+        `<div class="k sub">2ln2·n lg n (avg. decisive, random order)</div><div class="v">${ref.toFixed(0)}</div>` +
+        `<div class="k sub" style="grid-column:1/-1;padding-top:4px">` +
+        (ST.shuffle ? `input is shuffled &mdash; the average-case bound applies`
+                    : `the average-case bound needs a <b>random permutation</b> of the input &mdash; ` +
+                      `switch <em>Shuffle</em> on`) + `</div>`;
+}
+
+/* ---------------------------------------------------------------- levels view */
+function renderLevelsStatic() {
+    const wrap = $("levels"); wrap.innerHTML = "";
+    const n = ST.items.length;
+    ST.cols.forEach((c, k) => {
+        const col = document.createElement("div");
+        col.className = "lvl"; col.dataset.col = k;
+        const head = document.createElement("div");
+        head.className = "lvl-head"; head.textContent = k === 0 ? "input" : "level " + k;
+        col.appendChild(head);
+        const body = document.createElement("div");
+        body.className = "lvl-body";
+        body.style.height = (n * LROW + 6) + "px";
+        body.style.position = "relative";
+        body.style.width = levelColWidth() + "px";
+        /* region boxes first (behind) */
+        c.regions.forEach(r => {
+            const b = document.createElement("div");
+            b.className = "lgrp" + (r.isNew ? " new" : "") + (r.done ? " fin" : "");
+            b.style.top = (r.lo * LROW + 1) + "px";
+            b.style.height = ((r.hi - r.lo + 1) * LROW - 2) + "px";
+            b.dataset.hi = r.hi;
+            body.appendChild(b);
+        });
+        for (let p = 0; p < n; p++) {
+            const r = c.regions.find(q => p >= q.lo && p <= q.hi);
+            const it = ST.items[c.arr[p]];
+            const e = document.createElement("div");
+            e.className = "lrow";
+            e.style.position = "absolute";
+            e.style.top = (p * LROW + 2) + "px";
+            e.style.left = "3px"; e.style.right = "3px";
+            e.dataset.hi = r ? r.hi : p;
+            const plain = !r || r.done;
+            const tag = it.tag !== null ? `<span class="idx" style="color:var(--title-muted);font-size:.75rem">T${sub(it.tag)} </span>` : "";
+            e.innerHTML = tag + strHTML(it.s, r ? r.d : 0, { plain });
+            if (r && !r.done && p === r.lo) e.style.background = "var(--pivot-fill)";
+            body.appendChild(e);
+        }
+        col.appendChild(body);
+        wrap.appendChild(col);
+    });
+}
+function levelColWidth() {
+    let m = 0;
+    for (const it of ST.items) m = Math.max(m, Math.min(it.s.length, 34) + (it.tag !== null ? it.tag.length + 2 : 0));
+    return Math.round(m * 8.0) + 26;
+}
+function renderLevels() {
+    const rv = ST.reveals[ST.idx];
+    if (!rv) return;
+    $("levels").querySelectorAll(".lvl").forEach(col => {
+        const k = +col.dataset.col;
+        if (k > rv.col) { col.classList.add("hidden"); col.style.visibility = "hidden"; return; }
+        col.classList.remove("hidden"); col.style.visibility = "visible";
+        if (k === rv.col && rv.upto < 1e9) {
+            col.querySelectorAll("[data-hi]").forEach(e => {
+                e.style.visibility = (+e.dataset.hi <= rv.upto) ? "visible" : "hidden";
+            });
+        } else {
+            col.querySelectorAll("[data-hi]").forEach(e => { e.style.visibility = "visible"; });
+        }
+    });
+    $("status").innerHTML = rv.col === 0
+        ? `The input array. Every level partitions each remaining group by <b>one</b> character.`
+        : `<b>Level ${rv.col}</b>: every group of the previous level is split into ` +
+          `<span style="color:var(--less)">smaller</span> / <span style="color:var(--equal)">equal</span> / ` +
+          `<span style="color:var(--greater)">larger</span> by the character shown in ` +
+          `<span style="color:var(--heading)">colour</span>; the grey prefix is already known to be common. ` +
+          `Dashed groups are finished.`;
+    hilite([]);
+    $("stack").innerHTML = `<div class="empty-note">level view — see the execution view for the call stack</div>`;
+    renderCost(ST.steps[ST.steps.length - 1]);
+}
+
+function renderResult(sorted) {
+    const el = $("result");
+    if (!sorted || !sorted.length) { el.textContent = ""; return; }
+    if (ST.isSuffix) {
+        el.innerHTML = `L[0..n] = [ ${sorted.map(x => x.tag).join(", ")} ]`;
+    } else {
+        el.innerHTML = sorted.map(x => esc(x.s)).join("&nbsp; ");
+    }
+}
+
+/* ---------------------------------------------------------------- driver */
+function setIdx(i) {
+    ST.idx = Math.max(0, Math.min(i, maxIdx()));
+    $("slider").max = maxIdx();
+    $("slider").value = ST.idx;
+    $("stepCount").textContent = `${ST.idx} / ${maxIdx()}`;
+    if (ST.view === "exec") renderExec(); else renderLevels();
+    $("btnPrev").disabled = $("btnFirst").disabled = ST.idx === 0;
+    $("btnNext").disabled = $("btnLast").disabled = ST.idx === maxIdx();
+}
+function play() {
+    if (ST.timer) { stop(); return; }
+    if (ST.idx >= maxIdx()) setIdx(0);
+    $("btnPlay").textContent = "Pause";
+    const delay = () => 1100 - 100 * (+$("speed").value);
+    const tick = () => {
+        if (ST.idx >= maxIdx()) { stop(); return; }
+        setIdx(ST.idx + 1);
+        ST.timer = setTimeout(tick, delay());
+    };
+    ST.timer = setTimeout(tick, delay());
+}
+function stop() { if (ST.timer) clearTimeout(ST.timer); ST.timer = null; $("btnPlay").textContent = "Play"; }
+
+/* ---------------------------------------------------------------- wiring */
+(function init() {
+    const sel = $("preset");
+    PRESETS.forEach((p, i) => {
+        const o = document.createElement("option");
+        o.value = i; o.textContent = p.name; sel.appendChild(o);
+    });
+    sel.onchange = () => { stop(); $("ta").value = PRESETS[+sel.value].text; loadFrom($("ta").value); };
+    $("btnLoad").onclick = () => { stop(); loadFrom($("ta").value); };
+    $("modeSeg").onclick = e => {
+        const b = e.target.closest("button"); if (!b) return;
+        stop();
+        [...$("modeSeg").children].forEach(x => x.classList.toggle("on", x === b));
+        ST.mode = b.dataset.mode;
+        rebuild(0);
+    };
+    $("shufSeg").onclick = e => {
+        const b = e.target.closest("button"); if (!b) return;
+        stop();
+        [...$("shufSeg").children].forEach(x => x.classList.toggle("on", x === b));
+        ST.shuffle = b.dataset.shuf === "1";
+        $("btnReshuffle").disabled = !ST.shuffle;
+        applyOrder(); rebuild(0);
+    };
+    $("btnReshuffle").onclick = () => { stop(); applyOrder(); rebuild(0); };
+    $("viewSeg").onclick = e => {
+        const b = e.target.closest("button"); if (!b) return;
+        stop();
+        [...$("viewSeg").children].forEach(x => x.classList.toggle("on", x === b));
+        ST.view = b.dataset.view;
+        $("arrayView").style.display = ST.view === "exec" ? "" : "none";
+        $("levelView").style.display = ST.view === "exec" ? "none" : "";
+        $("viewTitle").textContent = ST.view === "exec" ? "Array" : "One column per level of the recursion";
+        setIdx(0);
+    };
+    $("slider").oninput = () => { stop(); setIdx(+$("slider").value); };
+    $("btnNext").onclick = () => { stop(); setIdx(ST.idx + 1); };
+    $("btnPrev").onclick = () => { stop(); setIdx(ST.idx - 1); };
+    $("btnFirst").onclick = () => { stop(); setIdx(0); };
+    $("btnLast").onclick = () => { stop(); setIdx(maxIdx()); };
+    $("btnPlay").onclick = play;
+    document.addEventListener("keydown", e => {
+        if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+        if (e.key === "ArrowRight") { stop(); setIdx(ST.idx + 1); }
+        else if (e.key === "ArrowLeft") { stop(); setIdx(ST.idx - 1); }
+        else if (e.key === " ") {
+            if (document.activeElement && document.activeElement.tagName === "BUTTON") return;
+            e.preventDefault(); play();
+        }
+    });
+    $("ta").value = PRESETS[0].text;
+    loadFrom($("ta").value);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planar separators · why √n vertices suffice</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:"TeX Gyre Cursor", "Courier Prime", "Courier New", monospace;
+    --wi-radius:4px; --wi-radius-lg:5px;
+    /* page-specific roles */
+    --sep-in:#4a7c3f;  --sep-in-fill:#e3ecd9;     /* inside the cycle / left half   */
+    --sep-out:#2a6a63; --sep-out-fill:#dbe9e6;    /* outside the cycle / right half */
+    --sep-cut:#902015; --sep-cut-fill:#f0cfc4;    /* the separator itself */
+    --sep-band:#b07d18; --sep-band-fill:#f5e6c4;  /* the middle band of levels */
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:96ch; line-height:1.5; }
+  .subtitle code, .hint code, .status code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input[type=number] { width:4.5em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* transport */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0; width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden; flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px;
+              font-size:.68rem; line-height:1.3; font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-left-width:0;
+              border-radius:0; color:var(--wi-ink-faint); cursor:pointer; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* stage */
+  .stage { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; width:100%; height:auto; background:var(--wi-bg); border-radius:var(--wi-radius); }
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:110px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status .k-in { color:var(--sep-in); font-weight:bold; }
+  .status .k-out { color:var(--sep-out); font-weight:bold; }
+  .status .k-cut { color:var(--sep-cut); font-weight:bold; }
+  .status .k-band { color:var(--sep-band); font-weight:bold; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem; color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:50%; border:1.5px solid var(--wi-border); display:inline-block; }
+
+  /* the argument, as a numbered outline with live highlighting */
+  .outline { list-style:none; margin:0; padding:0; font-size:.84rem; counter-reset:step; }
+  .outline li { display:flex; gap:9px; padding:5px 8px 5px 6px; border-left:3px solid transparent;
+                border-bottom:1px solid var(--wi-border-soft); line-height:1.45; color:var(--wi-ink-soft); }
+  .outline li:last-child { border-bottom:0; }
+  .outline li .no { font-family:var(--wi-font-mono); font-size:.78rem; color:var(--wi-ink-faint); min-width:1.6em; padding-top:2px; }
+  .outline li.on { background:#f6e6df; border-left-color:var(--wi-active); color:var(--wi-ink-strong); }
+  .outline li.done { color:var(--wi-ink); }
+  .outline li.done .no::after { content:" ✓"; color:var(--wi-relax); }
+  .outline li .lemma { font-family:var(--wi-font-head); letter-spacing:.06em; font-size:.7rem; text-transform:uppercase;
+                       color:var(--wi-accent); display:block; }
+  .outline li.head { background:var(--wi-panel-2); border-bottom:1px solid var(--wi-border-soft); }
+  .math { font-style:italic; }
+
+  /* editor */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr; gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:190px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:270px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    h1 { font-size:1.3rem; }
+    .controls { gap:8px 12px; padding:10px 12px; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+  }
+
+  /* ---- SVG ---- */
+  .edge { stroke:var(--wi-border); stroke-width:1.6; fill:none; }
+  .edge.faint { stroke:var(--wi-inert); opacity:.45; }
+  .edge.tree { stroke:var(--wi-ink-soft); stroke-width:2.4; }
+  .edge.chord { stroke:var(--wi-examine); stroke-width:1.2; stroke-dasharray:4 3; opacity:.8; }
+  .edge.cyc { stroke:var(--sep-cut); stroke-width:4; }
+  .edge.closing { stroke:var(--wi-active); stroke-width:4; }
+  .edge.gone { opacity:.12; }
+  .edge.path { stroke:var(--sep-in); stroke-width:4; opacity:.85; }
+  .node { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.6; }
+  .node.level { fill:#efe3cc; stroke:var(--wi-border-strong); }
+  .node.cur { fill:#f7d9cf; stroke:var(--wi-active); stroke-width:2.6; }
+  .node.root { stroke:var(--wi-ink-strong); stroke-width:2.6; }
+  .node.cut { fill:var(--sep-cut-fill); stroke:var(--sep-cut); stroke-width:2.6; }
+  .node.inside { fill:var(--sep-in-fill); stroke:var(--sep-in); stroke-width:2; }
+  .node.outside { fill:var(--sep-out-fill); stroke:var(--sep-out); stroke-width:2; }
+  .node.band { fill:var(--sep-band-fill); stroke:var(--sep-band); stroke-width:2; }
+  .node.gone { opacity:.12; }
+  .node.dim { opacity:.35; }
+  .nlab { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-ink-strong); text-anchor:middle;
+          dominant-baseline:central; pointer-events:none; }
+  .nlab.gone { opacity:.12; }
+  .nlab.dim { opacity:.35; }
+  .lvl { font-family:var(--wi-font-head); font-size:11px; fill:var(--wi-ink-faint); text-anchor:middle; pointer-events:none; }
+  .caption { font-family:var(--wi-font-head); font-size:14px; fill:var(--wi-ink-soft); letter-spacing:.04em; }
+  .caption.big { font-size:16px; fill:var(--wi-ink-strong); }
+  .caption.acc { fill:var(--wi-accent); }
+  .region { stroke:none; opacity:.55; }
+  .region.in { fill:var(--sep-in-fill); }
+  .region.out { fill:var(--sep-out-fill); }
+  .cycfill { fill:var(--sep-in-fill); opacity:.6; stroke:none; }
+  .hit { fill:transparent; cursor:pointer; }
+  .bar { stroke:var(--wi-border); stroke-width:1; }
+  .bar.plain { fill:#efe3cc; }
+  .bar.fat { fill:var(--sep-band-fill); stroke:var(--sep-band); }
+  .bar.thin { fill:var(--sep-cut-fill); stroke:var(--sep-cut); }
+  .bar.med { fill:#f7d9cf; stroke:var(--wi-active); stroke-width:1.6; }
+  .bar.in { fill:var(--sep-in-fill); stroke:var(--sep-in); }
+  .bar.out { fill:var(--sep-out-fill); stroke:var(--sep-out); }
+  .bar.cut { fill:var(--sep-cut-fill); stroke:var(--sep-cut); }
+  .bar.ghost { fill:none; stroke:var(--wi-border-soft); stroke-dasharray:2 3; }
+  .guide { stroke:var(--wi-accent); stroke-width:1.2; stroke-dasharray:5 4; fill:none; }
+  .guide.soft { stroke:var(--wi-ink-faint); }
+  .axlab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint); text-anchor:middle; }
+  .axlab.r { text-anchor:start; fill:var(--wi-accent); font-family:var(--wi-font-body); font-style:italic; font-size:12px; }
+  .barval { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-strong); text-anchor:middle; }
+  .scan { fill:none; stroke:var(--wi-active); stroke-width:2; }
+  .pathline { stroke:var(--sep-in); stroke-width:5; fill:none; opacity:.55; stroke-linecap:round; }
+  .pathline.alt { stroke:var(--sep-out); }
+  .gridedge { stroke:var(--wi-border); stroke-width:1.6; }
+  .gridedge.gone { opacity:.1; }
+  .kedge { stroke:var(--wi-border-strong); stroke-width:1.4; opacity:.8; }
+  .kedge.gone { opacity:.06; }
+
+  @keyframes pop { from { opacity:0; transform:scale(.5); } to { opacity:1; transform:none; } }
+  .pop { animation:pop .32s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box; transform-origin:center; }
+  @keyframes drawin { from { stroke-dashoffset:var(--len); } to { stroke-dashoffset:0; } }
+  .drawin { stroke-dasharray:var(--len); animation:drawin .45s ease-out both; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption { font-family: var(--wi-font-head); letter-spacing: .05em; }
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>Planar separators &nbsp;·&nbsp; why √<i>n</i> vertices suffice</h1>
+</div>
+
+<p class="subtitle">
+  Every planar graph on <i>n</i> vertices can be cut into pieces of at most <sup>2</sup>&frasl;<sub>3</sub><i>n</i> vertices by
+  removing only <i>O</i>(√<i>n</i>) of them (Lipton &amp; Tarjan, 1979). The grid shows the number is right;
+  the two lemmas show why it holds in <i>every</i> planar graph:
+  breadth-first search controls the <b>depth</b>, and the Jordan curve theorem turns a short cycle into a <b>cut</b>.
+  Click a vertex to make it the root of the search.
+</p>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <label for="rootIn">Root</label>
+    <input type="number" id="rootIn" min="0" value="0">
+    <button id="rootBtn">Set</button>
+  </div>
+  <div class="ctl">
+    <label for="gridK">Grid</label>
+    <input type="number" id="gridK" min="3" max="12" value="6">
+    <span class="opnote">× <span id="gridK2">6</span></span>
+  </div>
+  <span class="opnote" style="margin-left:auto">Arrow keys step · click a vertex to re-root</span>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">— / —</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="200" max="2600" value="1100" style="width:88px">
+      <span class="stepno" id="speedVal">1100ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span id="stageTitle">The graph</span><span class="rhs" id="stageMeta"></span></div>
+      <svg id="stageSvg" class="stagesvg" viewBox="0 0 760 540"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span id="countTitle">Counting</span><span class="rhs" id="countMeta"></span></div>
+      <svg id="countSvg" class="stagesvg" viewBox="0 0 420 200"></svg>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The argument</span></div>
+      <ol class="outline" id="outline"></ol>
+    </div>
+  </div>
+</div>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      First line <code>V E</code>, then one edge per line <code>u v</code> (a third token, e.g. a weight, is
+      ignored), then exactly <i>V</i> lines <code>x y</code> giving the drawing. The drawing <i>is</i> the
+      planar embedding: edges are drawn as straight segments and the inside of a cycle is computed from this
+      picture, so the coordinates must not make edges cross. Lines starting with <code>#</code> are ignored.
+      <br><br>
+      The same file format is used by the graph editor, so a graph prepared there can be pasted here.
+      The first phase, the grid, is independent of the input; its side length is set above.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Planar separator theorem (Lipton & Tarjan 1979), as an animation.
+
+   Phase 1  the grid: the sqrt(n) is tight and a complete graph shows planarity
+            is needed.
+   Phase 2  Lemma A (levels): BFS levels; the median level; the two thin levels
+            l1 <= m < l2 with |L(l1)|,|L(l2)| <= sqrt(n) found within sqrt(n)
+            levels of m by counting.
+   Phase 3  Lemma B (fundamental cycles): the drawing is triangulated, and the
+            fundamental cycle of a non-tree edge is a closed curve.  Starting
+            from the cycle enclosing the most, the cycle is shifted inward one
+            triangle at a time until the inside holds <= 2n/3 vertices.  The
+            outside never exceeds 2n/3.  Cycle length <= 2*depth + 1.
+
+   Inside/outside are computed geometrically from the given straight-line
+   drawing (point-in-polygon), so what is shown *is* the Jordan curve argument.
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const SVGNS = "http://www.w3.org/2000/svg";
+const W = 760, H = 540;
+
+/* ---------- presets ------------------------------------------------------ */
+const DEMO = `# planar demo graph: 40 vertices, 81 edges (weights = rounded lengths, used by the distance oracle page)
+40 81
+0 1 9
+0 5 8
+0 6 11
+0 12 25
+1 2 11
+1 3 22
+1 6 13
+1 7 9
+2 3 11
+2 7 9
+2 8 11
+3 4 7
+3 8 11
+3 9 12
+4 10 11
+4 11 17
+5 6 7
+5 13 10
+5 14 11
+6 7 10
+6 14 10
+6 15 8
+8 9 6
+8 16 8
+8 17 7
+9 10 11
+9 17 7
+9 18 10
+10 11 8
+10 18 10
+10 19 8
+11 19 8
+11 27 19
+12 13 9
+12 20 9
+12 28 19
+13 14 7
+13 20 12
+13 21 12
+14 15 9
+14 21 11
+15 22 10
+15 23 10
+16 17 6
+16 23 11
+16 24 13
+17 18 11
+18 19 9
+18 26 9
+19 26 10
+20 21 7
+21 28 10
+22 23 11
+22 29 8
+22 30 11
+23 30 13
+23 31 11
+24 25 6
+24 32 6
+25 32 7
+25 33 11
+26 33 12
+26 34 12
+27 34 7
+28 29 14
+28 35 10
+29 30 10
+30 31 6
+30 36 11
+31 32 11
+31 36 13
+32 37 11
+32 38 10
+33 38 6
+33 39 7
+34 39 13
+35 36 19
+36 37 12
+36 39 30
+37 38 10
+38 39 8
+2.02 0.05
+2.94 -0.10
+4.02 0.14
+5.13 -0.05
+5.77 0.16
+1.77 0.80
+2.44 1.12
+3.34 0.73
+4.70 1.00
+5.30 1.12
+6.43 0.99
+7.22 0.99
+0.24 1.81
+1.17 1.63
+1.80 1.86
+2.74 1.83
+4.28 1.65
+4.86 1.64
+5.92 1.85
+6.83 1.72
+0.58 2.66
+1.27 2.77
+2.52 2.80
+3.52 2.46
+4.65 2.88
+5.23 2.87
+6.42 2.65
+7.53 2.87
+0.85 3.65
+2.23 3.58
+3.18 3.69
+3.79 3.52
+4.87 3.45
+5.86 3.74
+7.26 3.47
+1.54 4.37
+3.37 4.75
+4.59 4.47
+5.52 4.25
+6.30 4.28`;
+
+const BIG = `# larger planar graph: 96 vertices
+96 216
+0 1 10
+0 6 28
+0 8 9
+1 2 11
+1 9 8
+2 3 10
+2 5 27
+3 4 6
+3 10 13
+3 11 7
+4 5 12
+4 11 10
+4 12 13
+5 12 14
+5 13 11
+5 14 22
+6 7 13
+6 15 9
+6 16 11
+6 36 32
+7 16 9
+7 17 9
+7 18 15
+8 9 10
+8 18 11
+8 19 11
+9 10 10
+10 11 11
+10 20 8
+10 21 12
+11 12 10
+11 21 11
+11 22 11
+12 22 8
+12 23 10
+13 14 13
+13 23 9
+14 24 10
+14 25 6
+14 57 42
+15 16 11
+15 26 14
+16 17 7
+16 27 12
+17 18 10
+17 27 9
+17 28 10
+18 19 10
+18 28 6
+18 29 10
+19 20 13
+19 29 11
+19 30 10
+20 21 10
+20 30 10
+21 22 7
+21 31 9
+22 23 12
+22 31 10
+22 32 12
+23 24 10
+23 32 12
+23 33 11
+24 25 6
+24 33 11
+24 34 10
+25 34 12
+25 35 12
+26 27 8
+26 37 10
+26 38 7
+27 28 11
+27 38 10
+27 39 8
+28 29 8
+28 39 12
+28 40 11
+29 30 14
+29 40 7
+29 41 8
+30 41 12
+30 42 10
+31 32 9
+31 43 10
+32 33 9
+32 43 11
+32 44 8
+33 34 9
+33 44 10
+34 35 12
+34 45 11
+34 46 11
+35 46 11
+35 47 12
+36 37 11
+36 48 8
+36 58 16
+37 38 8
+37 48 8
+37 49 8
+38 39 10
+38 49 9
+38 50 9
+39 40 10
+39 50 10
+40 41 8
+40 51 10
+41 42 13
+41 51 8
+42 52 12
+42 53 10
+43 44 9
+43 54 13
+43 55 9
+44 55 10
+45 46 12
+45 67 16
+46 47 8
+46 56 9
+47 56 10
+48 49 10
+48 58 12
+49 50 8
+49 60 11
+50 60 9
+51 52 9
+51 61 13
+51 62 13
+52 53 9
+52 62 10
+52 63 11
+53 54 11
+53 63 9
+53 64 13
+54 55 11
+54 64 8
+54 65 8
+55 65 12
+55 66 13
+56 57 13
+56 68 12
+56 69 11
+57 69 8
+57 89 29
+58 59 11
+58 70 12
+59 60 13
+59 70 7
+59 71 6
+60 71 12
+60 72 9
+61 62 9
+61 73 11
+61 82 16
+62 63 10
+62 74 8
+63 64 11
+63 74 12
+63 75 6
+64 65 7
+64 75 11
+64 76 11
+65 66 13
+65 76 11
+65 77 11
+66 67 8
+66 77 13
+67 68 8
+67 78 13
+68 78 10
+69 79 13
+70 71 7
+70 80 14
+71 72 9
+71 80 11
+72 73 11
+72 80 12
+73 81 12
+73 82 7
+74 75 10
+74 83 11
+74 84 13
+75 84 14
+76 77 8
+76 85 11
+76 86 11
+77 86 10
+77 87 9
+78 79 7
+78 89 7
+79 89 8
+80 81 12
+80 90 22
+81 82 9
+81 90 12
+82 90 12
+83 84 6
+83 91 9
+83 92 9
+84 85 12
+84 92 10
+84 93 11
+85 86 12
+85 93 7
+85 94 8
+86 87 9
+86 94 8
+86 95 10
+87 88 8
+88 89 13
+89 95 25
+90 91 11
+90 92 16
+90 95 51
+91 92 6
+93 94 9
+4.14 0.16
+5.12 -0.05
+6.25 -0.23
+7.17 0.05
+7.74 -0.08
+8.93 -0.16
+1.48 0.88
+2.73 0.95
+4.40 1.01
+5.33 0.76
+6.30 1.06
+7.33 0.78
+8.33 1.05
+9.50 0.75
+10.73 1.06
+1.10 1.68
+2.20 1.67
+2.86 1.88
+3.86 1.94
+4.90 1.98
+6.20 1.85
+7.21 1.87
+7.91 1.69
+9.16 1.62
+10.13 1.82
+10.74 1.66
+1.76 2.90
+2.57 2.78
+3.62 2.51
+4.27 2.89
+5.69 2.67
+7.65 2.61
+8.56 2.65
+9.47 2.66
+10.39 2.76
+11.51 2.52
+0.02 3.70
+1.11 3.65
+1.88 3.55
+2.92 3.54
+3.96 3.52
+4.76 3.49
+6.09 3.54
+7.93 3.55
+8.85 3.41
+10.02 3.78
+11.16 3.56
+11.98 3.58
+0.52 4.26
+1.54 4.37
+2.31 4.29
+4.57 4.26
+5.43 4.57
+6.28 4.55
+7.34 4.72
+8.41 4.31
+11.46 4.42
+12.74 4.70
+-0.07 5.33
+1.02 5.61
+2.22 5.23
+4.07 5.51
+5.00 5.49
+6.05 5.45
+7.14 5.48
+7.84 5.36
+9.15 5.31
+9.93 5.35
+10.75 5.38
+12.20 5.29
+0.74 6.23
+1.41 6.10
+2.31 6.12
+3.42 6.40
+5.23 6.28
+6.23 6.06
+7.65 6.46
+8.39 6.33
+10.69 6.41
+11.39 6.34
+1.78 7.15
+2.93 7.45
+3.75 7.07
+5.25 7.39
+5.81 7.43
+7.05 7.38
+8.23 7.37
+9.01 7.00
+9.76 7.29
+11.01 7.07
+3.70 8.30
+4.76 8.16
+5.33 8.26
+6.75 7.99
+7.65 7.98
+8.76 8.22`;
+
+const PRESETS = {
+  demo: { name: "Planar demo graph (40 vertices)", text: DEMO, root: 4 },
+  big:  { name: "Larger planar graph (96 vertices)", text: BIG, root: 68 }
+};
+
+/* ---------- state -------------------------------------------------------- */
+let G = null;            /* { n, adj, edges, pos } */
+let root = 0;
+let gridK = 6;
+let steps = [], phases = [], cur = 0, timer = null;
+
+/* ---------- parsing (graph-editor format) --------------------------------- */
+function tokenizeLines(text) {
+  return text.split("\n").map(l => l.replace(/#.*$/, "").trim().split(/\s+/).filter(s => s.length))
+             .filter(t => t.length > 0);
+}
+function parseGraph(text) {
+  const lines = tokenizeLines(text);
+  if (!lines.length) throw new Error("Empty input.");
+  let li = 0, v, e;
+  if (lines[0].length >= 2) { v = parseInt(lines[0][0], 10); e = parseInt(lines[0][1], 10); li = 1; }
+  else { v = parseInt(lines[0][0], 10); e = parseInt((lines[1] || [])[0], 10); li = 2; }
+  if (!Number.isFinite(v) || v <= 0) throw new Error("V must be a positive integer.");
+  if (!Number.isFinite(e) || e < 0) throw new Error("E must be a non-negative integer.");
+  const adj = Array.from({ length: v }, () => []), edges = [];
+  const seen = new Set();
+  for (let k = 0; k < e; k++) {
+    if (li >= lines.length) throw new Error("Expected " + e + " edge lines, found " + k + ".");
+    const t = lines[li++];
+    const a = parseInt(t[0], 10), b = parseInt(t[1], 10);
+    if (t.length < 2 || !Number.isFinite(a) || !Number.isFinite(b)) throw new Error("Edge " + (k + 1) + ": expected two integers.");
+    if (a < 0 || a >= v || b < 0 || b >= v) throw new Error("Edge " + (k + 1) + ": vertex out of range 0…" + (v - 1) + ".");
+    if (a === b) continue;
+    const key = Math.min(a, b) + "," + Math.max(a, b);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    adj[a].push(b); adj[b].push(a); edges.push([a, b]);
+  }
+  const rem = lines.length - li;
+  if (rem !== v) throw new Error("After the edges, exactly " + v + " coordinate lines are required (found " + rem + "). The drawing is the planar embedding.");
+  const raw = [];
+  for (let i = 0; i < v; i++) {
+    const t = lines[li++];
+    const x = parseFloat(t[0]), y = parseFloat(t[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("Vertex " + i + ": expected \"x y\".");
+    raw.push({ x, y });
+  }
+  /* normalise into the stage, keep aspect ratio */
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  raw.forEach(p => { minx = Math.min(minx, p.x); miny = Math.min(miny, p.y); maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); });
+  const w = Math.max(maxx - minx, 1e-6), h = Math.max(maxy - miny, 1e-6);
+  const pad = 34, s = Math.min((W - 2 * pad) / w, (H - 2 * pad) / h);
+  const offx = (W - w * s) / 2, offy = (H - h * s) / 2;
+  const pos = raw.map(p => ({ x: offx + (p.x - minx) * s, y: offy + (p.y - miny) * s }));
+  /* connectivity */
+  const comp = new Array(v).fill(false); const q = [0]; comp[0] = true; let cnt = 1;
+  while (q.length) { const x = q.pop(); for (const y of adj[x]) if (!comp[y]) { comp[y] = true; cnt++; q.push(y); } }
+  if (cnt !== v) throw new Error("The graph must be connected (found " + (v - cnt) + " unreachable vertices).");
+  /* crossing check: the drawing has to be an embedding */
+  for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
+    const [a, b] = edges[i], [c, d] = edges[j];
+    if (a === c || a === d || b === c || b === d) continue;
+    if (segCross(pos[a], pos[b], pos[c], pos[d])) throw new Error("Edges " + a + "–" + b + " and " + c + "–" + d + " cross in this drawing; the coordinates must give a planar embedding.");
+  }
+  return { n: v, adj, edges, pos };
+}
+
+/* ---------- geometry ----------------------------------------------------- */
+const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+function segCross(p1, p2, p3, p4) {   /* proper crossing of open segments, or touching at an interior point */
+  const d1 = cross(p3, p4, p1), d2 = cross(p3, p4, p2), d3 = cross(p1, p2, p3), d4 = cross(p1, p2, p4);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+  const on = (p, q, r) => Math.abs(cross(p, q, r)) < 1e-9 && Math.min(p.x, q.x) - 1e-9 <= r.x && r.x <= Math.max(p.x, q.x) + 1e-9 && Math.min(p.y, q.y) - 1e-9 <= r.y && r.y <= Math.max(p.y, q.y) + 1e-9;
+  return on(p1, p2, p3) || on(p1, p2, p4) || on(p3, p4, p1) || on(p3, p4, p2);
+}
+function pointInPoly(p, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+function pointInTri(p, a, b, c) {
+  const d1 = cross(a, b, p), d2 = cross(b, c, p), d3 = cross(c, a, p);
+  const neg = d1 < 0 || d2 < 0 || d3 < 0, pos = d1 > 0 || d2 > 0 || d3 > 0;
+  return !(neg && pos);
+}
+
+/* ---------- BFS, tree, levels -------------------------------------------- */
+function bfs(g, r) {
+  const dist = new Array(g.n).fill(-1), par = new Array(g.n).fill(-1), order = [];
+  dist[r] = 0; const q = [r]; let h = 0;
+  while (h < q.length) {
+    const x = q[h++]; order.push(x);
+    const nb = g.adj[x].slice().sort((a, b) => a - b);
+    for (const y of nb) if (dist[y] < 0) { dist[y] = dist[x] + 1; par[y] = x; q.push(y); }
+  }
+  const depth = Math.max(...dist);
+  const levels = Array.from({ length: depth + 1 }, () => []);
+  for (let i = 0; i < g.n; i++) levels[dist[i]].push(i);
+  return { dist, par, levels, depth, order };
+}
+
+/* ---------- triangulate the drawing (greedy, shortest chord first) -------- */
+function triangulate(g) {
+  const has = new Set(g.edges.map(([a, b]) => Math.min(a, b) + "," + Math.max(a, b)));
+  const segs = g.edges.map(([a, b]) => [a, b]);
+  const cand = [];
+  for (let a = 0; a < g.n; a++) for (let b = a + 1; b < g.n; b++) if (!has.has(a + "," + b))
+    cand.push([a, b, Math.hypot(g.pos[a].x - g.pos[b].x, g.pos[a].y - g.pos[b].y)]);
+  cand.sort((u, v) => u[2] - v[2]);
+  const chords = [];
+  for (const [a, b] of cand) {
+    let ok = true;
+    for (const [c, d] of segs) {
+      if (a === c || a === d || b === c || b === d) continue;
+      if (segCross(g.pos[a], g.pos[b], g.pos[c], g.pos[d])) { ok = false; break; }
+    }
+    if (!ok) continue;
+    for (let w = 0; w < g.n && ok; w++) if (w !== a && w !== b) {   /* no vertex on the chord */
+      const p = g.pos[w];
+      if (Math.abs(cross(g.pos[a], g.pos[b], p)) < 1e-6 &&
+          Math.min(g.pos[a].x, g.pos[b].x) <= p.x && p.x <= Math.max(g.pos[a].x, g.pos[b].x) &&
+          Math.min(g.pos[a].y, g.pos[b].y) <= p.y && p.y <= Math.max(g.pos[a].y, g.pos[b].y)) ok = false;
+    }
+    if (!ok) continue;
+    segs.push([a, b]); chords.push([a, b]); has.add(a + "," + b);
+  }
+  const adj = Array.from({ length: g.n }, () => []);
+  for (const [a, b] of segs) { adj[a].push(b); adj[b].push(a); }
+  return { chords, adj, allEdges: segs };
+}
+
+/* fundamental cycle of non-tree edge (u,v) in tree par: vertices in order u ... lca ... v */
+function fundCycle(par, dist, u, v) {
+  const pu = [], pv = [];
+  let a = u, b = v;
+  while (a !== b) {
+    if (dist[a] >= dist[b]) { pu.push(a); a = par[a]; } else { pv.push(b); b = par[b]; }
+  }
+  return pu.concat([a], pv.reverse());   /* u ... lca ... v */
+}
+function cycleInfo(g, T, cyc) {
+  const on = new Set(cyc), poly = cyc.map(i => g.pos[i]);
+  const inside = [], outside = [];
+  for (let i = 0; i < g.n; i++) if (!on.has(i)) (pointInPoly(g.pos[i], poly) ? inside : outside).push(i);
+  return { cyc, on, inside, outside, poly };
+}
+
+/* ---------- build the steps --------------------------------------------- */
+function mkPhase(name) { phases.push({ name, from: steps.length, to: steps.length }); }
+function add(o) { o.ph = phases.length - 1; steps.push(o); phases[phases.length - 1].to = steps.length - 1; }
+
+const frac = (a, b) => "<sup>" + a + "</sup>&frasl;<sub>" + b + "</sub>";
+const SQ = "√<i>n</i>";
+
+function build() {
+  steps = []; phases = []; cur = 0;
+  const n = G.n, sq = Math.sqrt(n), sqF = Math.floor(sq), sqTxt = sq.toFixed(1);
+  const twoThirds = 2 * n / 3;
+
+  /* ===== Phase 1: the grid ============================================ */
+  const k = gridK, gn = k * k;
+  mkPhase("The grid");
+  add({ mode: "grid", grid: {}, hl: ["grid"],
+        txt: "Take a <b>" + k + " × " + k + " grid</b>, <i>n</i> = " + gn + " vertices. How few vertices must be removed " +
+             "to break it into two pieces of comparable size? The honest picture of a planar graph is a piece of paper: " +
+             "<i>n</i> units of area, so about √<i>n</i> units of perimeter. Cut across the paper." });
+  add({ mode: "grid", grid: { cut: true }, hl: ["grid"],
+        txt: "The <span class=\"k-cut\">middle column</span> has just <b>" + k + " = √" + gn + "</b> vertices." });
+  add({ mode: "grid", grid: { cut: true, removed: true }, hl: ["grid"],
+        txt: "Remove it and the grid falls apart into a <span class=\"k-in\">left</span> and a <span class=\"k-out\">right</span> half of " +
+             Math.floor(k / 2) * k + " and " + (k - 1 - Math.floor(k / 2)) * k + " vertices — both at most half. " +
+             "A separator of <b>√<i>n</i> vertices</b>, with no vertex of one side adjacent to a vertex of the other." });
+  add({ mode: "grid", grid: { paths: true }, hl: ["grid_lb"],
+        txt: "And nothing much smaller can work: the " + k + " <span class=\"k-in\">rows</span> are " + k + " vertex-disjoint paths from " +
+             "the left edge to the right edge. Any separator that puts some leftmost vertex and some rightmost vertex on different sides " +
+             "must remove a vertex from each such path — so <b>Ω(√<i>n</i>)</b> is forced too. For grids, √<i>n</i> is exactly the truth." });
+  add({ mode: "grid", grid: { paths: false, k8: 0 }, hl: ["grid_k"],
+        txt: "Is it the truth for <i>every</i> graph? Here is the complete graph <i>K</i><sub>8</sub>: every pair of vertices is adjacent. " +
+             "It is not planar — there is no way to draw it without crossings — and it has <b>no small separator</b> at all." });
+  for (let r = 1; r <= 5; r++)
+    add({ mode: "grid", grid: { k8: r }, hl: ["grid_k"],
+          txt: "Remove " + r + " vertic" + (r === 1 ? "e" : "es") + ": the remaining " + (8 - r) + " are still all adjacent to each other. " +
+               (r < 5 ? "One piece, no progress." :
+                "Only when a single vertex is left does the graph stop being \"one piece\". Separating <i>K</i><sub><i>n</i></sub> costs <i>n</i> − 2 vertices, " +
+                "and expander graphs behave the same way: their separators have Ω(<i>n</i>) vertices. So the proof <b>must use the plane</b> somewhere.") });
+
+  /* ===== Phase 2: Lemma A, BFS levels ================================= */
+  const B = bfs(G, root);
+  const L = B.levels, depth = B.depth;
+  const half = Math.ceil(n / 2);
+  let cum = 0, med = 0;
+  for (let i = 0; i <= depth; i++) { cum += L[i].length; if (cum >= half) { med = i; break; } }
+  const cumBefore = L.slice(0, med).reduce((s, l) => s + l.length, 0);
+
+  mkPhase("Lemma A: levels");
+  add({ mode: "graph", shown: -1, hl: ["A_bfs"],
+        txt: "Now an arbitrary planar graph, <i>n</i> = " + n + " vertices, √<i>n</i> ≈ " + sqTxt + ". " +
+             "<b>Lemma A</b> finds two thin \"horizontal\" cuts. Start a breadth-first search at the <b>root " + root + "</b> " +
+             "(click any vertex to change it). Level <i>L</i>(<i>i</i>) is the set of vertices at distance exactly <i>i</i> from the root." });
+  for (let i = 0; i <= depth; i++)
+    add({ mode: "graph", shown: i, hl: ["A_bfs"],
+          txt: "<b>Level " + i + "</b>: " + L[i].length + " vertic" + (L[i].length === 1 ? "es" : "es") + " at distance " + i +
+               ". Every edge of the graph joins two vertices on the same level or on adjacent levels — that is what makes a level a cut: " +
+               "removing <i>L</i>(<i>i</i>) disconnects everything above it from everything below it." });
+  add({ mode: "graph", shown: depth, median: med, hl: ["A_med"],
+        txt: "The levels partition the vertices, so their sizes add up to <i>n</i>. Walking down from the root, the running total passes " +
+             frac("n", 2) + " = " + (n / 2) + " in <b>level <i>m</i> = " + med + "</b>: " + cumBefore + " vertices lie above it, " +
+             (n - cumBefore - L[med].length) + " below it. Above and below are both at most " + frac("n", 2) + " — but the " +
+             "level itself has <span class=\"k-band\">" + L[med].length + " vertices</span>, and it need not be thin." });
+  /* scan up */
+  let l1 = med; const scanUp = [];
+  while (L[l1].length > sq) { scanUp.push(l1); l1--; }
+  let l2 = med + 1; const scanDown = [];
+  while (l2 <= depth && L[l2].length > sq) { scanDown.push(l2); l2++; }
+  const l2exists = l2 <= depth;   /* if not: below m there is nothing left at all -> "level depth+1" is empty */
+  const stepTxt = (lvl, dir) => "Level " + lvl + " has " + L[lvl].length + " > " + sqTxt + " vertices — too fat, look " + dir + ".";
+  add({ mode: "graph", shown: depth, median: med, scan: [med, med], hl: ["A_l1"],
+        txt: "Look for a thin level <i>l</i><sub>1</sub> ≤ <i>m</i>, one with at most √<i>n</i> ≈ " + sqTxt + " vertices, i.e. at most " + sqF + ". " +
+             (L[med].length <= sq ? "Level <i>m</i> itself qualifies." : stepTxt(med, "upwards")) });
+  for (let i = 1; i < scanUp.length; i++)
+    add({ mode: "graph", shown: depth, median: med, scan: [med - i, med], hl: ["A_l1"], txt: stepTxt(med - i, "upwards") });
+  add({ mode: "graph", shown: depth, median: med, scan: [l1, med], l1, hl: ["A_l1", "A_count"],
+        txt: "<b><i>l</i><sub>1</sub> = " + l1 + "</b> has " + L[l1].length + " ≤ " + sqTxt + " vertices. " +
+             "Why must such a level exist within √<i>n</i> steps? If all of the levels <i>m</i>, <i>m</i>−1, …, <i>m</i>−√<i>n</i> had more than √<i>n</i> " +
+             "vertices each, they alone would hold more than √<i>n</i> · √<i>n</i> = <i>n</i> vertices. Impossible." });
+  add({ mode: "graph", shown: depth, median: med, l1, scan: [med + 1, med + 1], hl: ["A_l2"],
+        txt: "Symmetrically, look for a thin level <i>l</i><sub>2</sub> > <i>m</i>. " +
+             (med + 1 > depth ? "There is nothing below <i>m</i> at all: the empty level " + (depth + 1) + " qualifies, at no cost." :
+              L[med + 1].length <= sq ? "Level " + (med + 1) + " qualifies right away." : stepTxt(med + 1, "downwards")) });
+  for (let i = 1; i < scanDown.length; i++)
+    add({ mode: "graph", shown: depth, median: med, l1, scan: [med + 1, med + 1 + i], hl: ["A_l2"], txt: stepTxt(med + 1 + i, "downwards") });
+  const l2sz = l2exists ? L[l2].length : 0;
+  add({ mode: "graph", shown: depth, median: med, l1, l2, scan: [med + 1, l2], hl: ["A_l2", "A_count"],
+        txt: "<b><i>l</i><sub>2</sub> = " + l2 + "</b>" + (l2exists ? " has " + l2sz + " ≤ " + sqTxt + " vertices" : " is empty") +
+             ". Same counting argument: it lies at most √<i>n</i> levels below <i>m</i>." });
+  const above = L.slice(0, l1).reduce((s, l) => s + l.length, 0);
+  const band = L.slice(l1 + 1, l2).reduce((s, l) => s + l.length, 0);
+  const below = L.slice(l2 + 1).reduce((s, l) => s + l.length, 0);
+  add({ mode: "graph", shown: depth, l1, l2, pieces: true, hl: ["A_cut"],
+        txt: "Remove <span class=\"k-cut\">both thin levels</span>, " + (L[l1].length + l2sz) + " ≤ 2√<i>n</i> vertices. Three pieces remain: " +
+             "<span class=\"k-in\">" + above + " above</span>, <span class=\"k-band\">" + band + " in the band</span>, <span class=\"k-out\">" + below + " below</span>. " +
+             "Above and below are at most " + frac("n", 2) + " each, because <i>l</i><sub>1</sub> ≤ <i>m</i> < <i>l</i><sub>2</sub>.",
+        ans: "Lemma A: two levels of ≤ √n vertices each, with ≤ n/2 vertices above and ≤ n/2 below." });
+  add({ mode: "graph", shown: depth, l1, l2, pieces: true, hl: ["A_band"],
+        txt: "The trouble is the <span class=\"k-band\">band</span>: it may hold almost everything. But it spans only " + (l2 - l1 - 1) +
+             " ≤ 2√<i>n</i> levels: from any vertex of the band one reaches level <i>l</i><sub>1</sub>+1 in at most " + (l2 - l1 - 1) +
+             " tree steps, so if everything above the band is <b>shrunk into a single root vertex</b>, the band has a spanning tree of depth ≤ 2√<i>n</i>. " +
+             "That depth is what Lemma B converts into a short cycle." });
+
+  /* ===== Phase 3: Lemma B, fundamental cycles ========================= */
+  const T = triangulate(G);
+  mkPhase("Lemma B: cycles");
+  add({ mode: "graph", tree: true, hl: ["B_stmt"],
+        txt: "<b>Lemma B.</b> If a planar graph has a spanning tree of depth <i>d</i>, then removing at most 2<i>d</i>+1 vertices — the vertices of one " +
+             "<i>cycle</i> — splits it into pieces of at most " + frac("2n", 3) + " vertices. " +
+             "For the demonstration we use the whole graph and its breadth-first search tree of depth <i>d</i> = " + depth +
+             " (in the theorem, this is applied to the band with the top shrunk into the root, <i>d</i> ≤ 2√<i>n</i>)." });
+  add({ mode: "graph", tree: true, chords: true, hl: ["B_tri"],
+        txt: "First, <b>add edges until every face is a triangle</b> (" + T.chords.length + " dashed edges, drawn without crossings, so the graph stays planar). " +
+             "Extra edges only make cutting <i>harder</i>: a separator of the triangulated graph is a separator of the original." });
+  const isTree = (a, b) => B.par[a] === b || B.par[b] === a;
+  const nonTree = T.allEdges.filter(([a, b]) => !isTree(a, b));
+  const infoOf = ([a, b]) => cycleInfo(G, T, fundCycle(B.par, B.dist, a, b));
+  let start = null, startInfo = null;
+  for (const e of nonTree) {
+    const inf = infoOf(e);
+    if (!startInfo || inf.inside.length > startInfo.inside.length) { start = e; startInfo = inf; }
+  }
+  const ex = nonTree.find(e => e[0] !== start[0] || e[1] !== start[1]) || start;
+  const exInfo = infoOf(ex);
+  add({ mode: "graph", tree: true, chords: true, cyc: exInfo, closing: ex, showIO: false, hl: ["B_fund"],
+        txt: "Every non-tree edge, such as <b>" + ex[0] + "–" + ex[1] + "</b>, closes a <b>fundamental cycle</b> with the tree: up from both endpoints to their " +
+             "common ancestor. It has at most 2<i>d</i>+1 = " + (2 * depth + 1) + " vertices (here " + exInfo.cyc.length + "). " +
+             "Now the plane enters: a cycle in a planar drawing is a <b>closed curve</b>, and by the Jordan curve theorem it has an inside and an outside " +
+             "that no edge can connect without crossing the curve. Removing the cycle's vertices separates them." });
+  add({ mode: "graph", tree: true, chords: true, cyc: exInfo, closing: ex, showIO: true, hl: ["B_fund"],
+        txt: "This one encloses <span class=\"k-in\">" + exInfo.inside.length + "</span> vertices and leaves <span class=\"k-out\">" + exInfo.outside.length +
+             "</span> outside. " + (Math.max(exInfo.inside.length, exInfo.outside.length) <= twoThirds ?
+             "That already happens to be balanced — but we want a rule that always works." :
+             "Not balanced. We need a rule that always finds a balanced one.") });
+  /* the walk */
+  let curE = start, curI = startInfo, guard = 0;
+  add({ mode: "graph", tree: true, chords: true, cyc: curI, closing: curE, showIO: true, hl: ["B_start"],
+        txt: "Start with the fundamental cycle that <b>encloses the most</b>: edge " + curE[0] + "–" + curE[1] + ", <span class=\"k-in\">" + curI.inside.length +
+             " inside</span>, <span class=\"k-out\">" + curI.outside.length + " outside</span>, " + curI.cyc.length + " on the cycle. " +
+             (curI.outside.length <= twoThirds ? "The outside is small, ≤ " + frac("2n", 3) + " = " + twoThirds.toFixed(1) + "; only the inside may be too big." :
+              "Even this cycle leaves more than " + frac("2n", 3) + " outside — the drawing's outer face is too large for the walk to start; the argument needs a triangulated outer face as well.") });
+  while (curI.inside.length > twoThirds && guard++ < 200) {
+    const [u, v] = curE;
+    /* the triangle on the inner side of edge u-v */
+    const cyc = curI.cyc, poly = curI.poly;
+    let area = 0; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; area += a.x * b.y - b.x * a.y; }
+    const ccw = area > 0;
+    /* orientation of u->v along the polygon: cyc = u ... v, closing edge v->u */
+    const cu = cyc[cyc.length - 1], cv = cyc[0];   /* traversal goes cyc[0]..cyc[last], then last->first */
+    const innerLeft = ccw;  /* in SVG coords y down; "left" of travel direction is inside iff signed area > 0 in this orientation */
+    const from = G.pos[cu], to = G.pos[cv];
+    const commons = T.adj[u].filter(w => T.adj[v].includes(w));
+    let w = -1;
+    for (const c of commons) {
+      const side = cross(from, to, G.pos[c]);
+      if ((side > 0) !== innerLeft) continue;
+      let empty = true;
+      for (let z = 0; z < n && empty; z++) if (z !== u && z !== v && z !== c && pointInTri(G.pos[z], G.pos[u], G.pos[v], G.pos[c])) empty = false;
+      if (empty) { w = c; break; }
+    }
+    if (w < 0) break;
+    const tuw = isTree(u, w), tvw = isTree(v, w);
+    let nextE, nextI, why;
+    if (tuw && tvw) break;
+    if (tuw || tvw) {
+      nextE = tuw ? [w, v] : [u, w];
+      nextI = infoOf(nextE);
+      why = "The triangle inside the cycle at edge " + u + "–" + v + " has apex <b>" + w + "</b>. One of its other two sides is a tree edge, so the cycle simply " +
+            "<b>bends around the triangle</b>: replace edge " + u + "–" + v + " by the path through " + w + ". The inside shrinks by " +
+            (curI.inside.length - nextI.inside.length) + ", the outside is unchanged.";
+    } else {
+      const e1 = [u, w], e2 = [w, v], i1 = infoOf(e1), i2 = infoOf(e2);
+      const pick1 = i1.inside.length >= i2.inside.length;
+      nextE = pick1 ? e1 : e2; nextI = pick1 ? i1 : i2;
+      why = "The triangle inside the cycle at edge " + u + "–" + v + " has apex <b>" + w + "</b>, and neither " + u + "–" + w + " nor " + w + "–" + v +
+            " is a tree edge. Their two fundamental cycles <b>split the inside</b> between them (" + i1.inside.length + " and " + i2.inside.length +
+            "). Take the one enclosing more, edge " + nextE[0] + "–" + nextE[1] + ": it keeps at least half of the old inside, i.e. more than about " + frac("n", 3) +
+            " vertices, so fewer than about " + frac("2n", 3) + " can lie outside it. The inside shrank, the walk goes on.";
+    }
+    add({ mode: "graph", tree: true, chords: true, cyc: curI, closing: curE, showIO: true, apex: [u, v, w], hl: ["B_shift"],
+          txt: "<span class=\"k-in\">" + curI.inside.length + " inside</span> > " + frac("2n", 3) + " = " + twoThirds.toFixed(1) + ": too many. " + why });
+    curE = nextE; curI = nextI;
+    add({ mode: "graph", tree: true, chords: true, cyc: curI, closing: curE, showIO: true, hl: ["B_shift"],
+          txt: "New cycle through edge " + curE[0] + "–" + curE[1] + ": <span class=\"k-in\">" + curI.inside.length + " inside</span>, <span class=\"k-out\">" +
+               curI.outside.length + " outside</span>, " + curI.cyc.length + " on the cycle" +
+               (curI.inside.length > twoThirds ? ". Still too many inside — continue." : ".") });
+  }
+  const ok = curI.inside.length <= twoThirds && curI.outside.length <= twoThirds;
+  add({ mode: "graph", tree: true, chords: true, cyc: curI, closing: curE, showIO: true, final: true, hl: ["B_done"],
+        txt: (ok ? "<b>Balanced.</b> " : "<b>The walk stopped.</b> ") + "The cycle has <span class=\"k-cut\">" + curI.cyc.length + " ≤ 2<i>d</i>+1 = " + (2 * depth + 1) +
+             "</span> vertices; removing them leaves <span class=\"k-in\">" + curI.inside.length + "</span> and <span class=\"k-out\">" + curI.outside.length +
+             "</span>, both ≤ " + frac("2n", 3) + " = " + twoThirds.toFixed(1) + ". The two sides share no edge: any such edge would have to cross the curve.",
+        ans: ok ? "Lemma B: a fundamental cycle of ≤ 2d+1 vertices separates the graph into pieces of ≤ 2n/3." :
+                  "In this drawing the outer face is not triangulated, so the walk cannot always balance; the lemma assumes a triangulation of the sphere." });
+
+  /* ===== wrap-up ====================================================== */
+  mkPhase("Together");
+  add({ mode: "graph", shown: depth, l1, l2, pieces: true, hl: ["C_all"],
+        txt: "<b>Putting the lemmas together.</b> Lemma A removes the two thin levels (≤ 2√<i>n</i> vertices). Shrinking everything above the band into one root " +
+             "gives a planar graph with a spanning tree of depth <i>d</i> ≤ 2√<i>n</i>. Lemma B removes a cycle of ≤ 2<i>d</i>+1 ≤ 4√<i>n</i>+1 vertices from it. " +
+             "The pieces — above, below, inside, outside — are each at most " + frac("2n", 3) + "; group them into two sides. " +
+             "Altogether <b>≤ 6√<i>n</i>+1 = <i>O</i>(√<i>n</i>) separator vertices</b> (a more careful count gives 2√2·√<i>n</i> ≈ 2.83√<i>n</i>).",
+        ans: "Theorem: every planar graph has a 2/3-balanced separator of O(√n) vertices." });
+  add({ mode: "graph", shown: depth, l1, l2, pieces: true, hl: ["C_why"],
+        txt: "<b>Why this matters.</b> A separator is a divide-and-conquer tool. Recursing on the pieces, the total separator size along any root-to-leaf branch " +
+             "is √<i>n</i> + √(" + frac("2n", 3) + ") + … = <i>O</i>(√<i>n</i>). That is why Independent Set on planar graphs runs in 2<sup><i>O</i>(√<i>n</i>)</sup> " +
+             "instead of 2<sup><i>O</i>(<i>n</i>)</sup>, why planar shortest paths and exact distance oracles beat their general-graph counterparts, " +
+             "and the reason Baker's approximation schemes exist: NP-hard in theory, but the plane leaves only √<i>n</i> room to be hard." });
+}
+
+/* ---------- SVG helpers -------------------------------------------------- */
+function mk(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function txt(parent, x, y, s, cls, extra) {
+  extra = Object.assign({}, extra || {});
+  const anchor = extra["text-anchor"]; delete extra["text-anchor"];
+  const t = mk("text", Object.assign({ x, y, class: cls }, extra), parent);
+  if (anchor) t.style.textAnchor = anchor;
+  t.textContent = s; return t;
+}
+
+/* ---------- rendering: the grid phase ------------------------------------ */
+function drawGrid(svg, st) {
+  const g = st.grid || {}, k = gridK;
+  /* grid at left, K8 at right */
+  const gridW = 440, cell = Math.min(64, (gridW - 60) / (k - 1)), ox = 56, oy = (H - cell * (k - 1)) / 2;
+  const P = (r, c) => ({ x: ox + c * cell, y: oy + r * cell });
+  const mid = Math.floor(k / 2);
+  const removed = !!g.removed;
+  const gr = mk("g", {}, svg);
+  if (removed) {
+    mk("rect", { x: ox - cell * .45, y: oy - cell * .45, width: cell * (mid - .1), height: cell * (k - 1) + cell * .9, rx: 10, class: "region in" }, gr);
+    mk("rect", { x: ox + cell * (mid + .55), y: oy - cell * .45, width: cell * (k - 1 - mid - .1), height: cell * (k - 1) + cell * .9, rx: 10, class: "region out" }, gr);
+  }
+  for (let r = 0; r < k; r++) for (let c = 0; c < k; c++) {
+    const p = P(r, c);
+    if (c + 1 < k) { const q = P(r, c + 1); mk("line", { x1: p.x, y1: p.y, x2: q.x, y2: q.y, class: "gridedge" + (removed && (c === mid || c + 1 === mid) ? " gone" : "") }, gr); }
+    if (r + 1 < k) { const q = P(r + 1, c); mk("line", { x1: p.x, y1: p.y, x2: q.x, y2: q.y, class: "gridedge" + (removed && c === mid ? " gone" : "") }, gr); }
+  }
+  if (g.paths) for (let r = 0; r < k; r++) {
+    const a = P(r, 0), b = P(r, k - 1);
+    mk("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "pathline" }, gr);
+  }
+  const rad = Math.min(13, cell * .3);
+  for (let r = 0; r < k; r++) for (let c = 0; c < k; c++) {
+    const p = P(r, c);
+    let cls = "node";
+    if (g.cut && c === mid) cls += " cut";
+    if (removed && c === mid) cls += " gone";
+    if (removed && c < mid) cls += " inside";
+    if (removed && c > mid) cls += " outside";
+    mk("circle", { cx: p.x, cy: p.y, r: rad, class: cls }, gr);
+  }
+  txt(gr, ox + cell * (k - 1) / 2, oy - cell * .45 - 16, k + " × " + k + " grid, n = " + (k * k), "caption big", { "text-anchor": "middle" });
+  if (g.cut) txt(gr, ox + cell * mid, oy + cell * (k - 1) + cell * .45 + 22, "|separator| = " + k + " = √n", "caption acc", { "text-anchor": "middle" });
+  if (removed) {
+    txt(gr, ox + cell * (mid - 1) / 2, oy + cell * (k - 1) + cell * .45 + 22, mid * k + " vertices", "caption", { "text-anchor": "middle" });
+    txt(gr, ox + cell * (mid + k) / 2, oy + cell * (k - 1) + cell * .45 + 22, (k - 1 - mid) * k + " vertices", "caption", { "text-anchor": "middle" });
+  }
+  if (g.paths) txt(gr, ox + cell * (k - 1) / 2, oy + cell * (k - 1) + cell * .45 + 22, k + " disjoint left-to-right paths", "caption acc", { "text-anchor": "middle" });
+
+  /* K8 */
+  if (g.k8 !== undefined) {
+    const cx = 610, cy = H / 2, R = 108, m = 8, rem = g.k8;
+    const Q = i => ({ x: cx + R * Math.cos(-Math.PI / 2 + i * 2 * Math.PI / m), y: cy + R * Math.sin(-Math.PI / 2 + i * 2 * Math.PI / m) });
+    const kg = mk("g", {}, svg);
+    for (let i = 0; i < m; i++) for (let j = i + 1; j < m; j++) {
+      const a = Q(i), b = Q(j);
+      mk("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "kedge" + (i < rem || j < rem ? " gone" : "") }, kg);
+    }
+    for (let i = 0; i < m; i++) { const p = Q(i); mk("circle", { cx: p.x, cy: p.y, r: 12, class: "node" + (i < rem ? " cut gone" : (rem ? " inside" : "")) }, kg); }
+    txt(kg, cx, cy - R - 30, "K₈: complete graph, not planar", "caption big", { "text-anchor": "middle" });
+    txt(kg, cx, cy + R + 36, rem ? (8 - rem) + " left, still one piece" : "every pair adjacent", "caption" + (rem ? " acc" : ""), { "text-anchor": "middle" });
+  }
+}
+
+/* ---------- rendering: the graph ----------------------------------------- */
+let Bcache = null, Tcache = null;
+function drawGraph(svg, st) {
+  const n = G.n, pos = G.pos;
+  const B = Bcache, T = Tcache;
+  const shown = st.shown === undefined ? Infinity : st.shown;   /* levels revealed so far (phase 2) */
+  const dist = B.dist;
+  const lvlCls = i => {
+    if (st.pieces) {
+      if (dist[i] === st.l1 || dist[i] === st.l2) return "cut";
+      if (dist[i] < st.l1) return "inside";
+      if (dist[i] > st.l2) return "outside";
+      return "band";
+    }
+    if (st.l1 === dist[i] || st.l2 === dist[i]) return "cut";
+    if (st.scan && dist[i] >= st.scan[0] && dist[i] <= st.scan[1] && st.l2 === undefined) return "band";
+    if (st.median === dist[i] && st.l1 === undefined && st.l2 === undefined) return "cur";
+    if (dist[i] === shown && st.median === undefined) return "cur";
+    if (dist[i] <= shown) return "level";
+    return "";
+  };
+  const hidden = i => dist[i] > shown;
+  const g = mk("g", {}, svg);
+  /* cycle fill */
+  if (st.cyc && st.showIO) {
+    mk("polygon", { points: st.cyc.poly.map(p => p.x + "," + p.y).join(" "), class: "cycfill" }, g);
+  }
+  /* edges */
+  const isTree = (a, b) => B.par[a] === b || B.par[b] === a;
+  const cycEdge = new Set();
+  if (st.cyc) for (let i = 0; i + 1 < st.cyc.cyc.length; i++) { const a = st.cyc.cyc[i], b = st.cyc.cyc[i + 1]; cycEdge.add(Math.min(a, b) + "," + Math.max(a, b)); }
+  const closingKey = st.closing ? Math.min(...st.closing) + "," + Math.max(...st.closing) : null;
+  const drawEdge = (a, b, base) => {
+    const key = Math.min(a, b) + "," + Math.max(a, b);
+    let cls = base;
+    if ((st.tree || st.shown !== undefined) && isTree(a, b)) cls = "edge tree";
+    if (st.tree && !isTree(a, b) && base === "edge") cls = "edge faint";
+    if (st.cyc && cycEdge.has(key)) cls = "edge cyc";
+    if (closingKey === key) cls = "edge closing";
+    if (st.pieces && (dist[a] === st.l1 || dist[a] === st.l2 || dist[b] === st.l1 || dist[b] === st.l2)) cls += " gone";
+    if (st.shown !== undefined && (hidden(a) || hidden(b))) cls += " gone";
+    const e = mk("line", { x1: pos[a].x, y1: pos[a].y, x2: pos[b].x, y2: pos[b].y, class: cls }, g);
+    if (st.shown !== undefined && !st.pieces && (dist[a] === shown || dist[b] === shown) && st.median === undefined) {
+      const len = Math.hypot(pos[a].x - pos[b].x, pos[a].y - pos[b].y);
+      e.style.setProperty("--len", len); e.classList.add("drawin");
+    }
+  };
+  if (st.chords) for (const [a, b] of T.chords) drawEdge(a, b, "edge chord");
+  for (const [a, b] of G.edges) drawEdge(a, b, "edge");
+  /* apex triangle */
+  if (st.apex) {
+    const [u, v, w] = st.apex;
+    mk("polygon", { points: [u, v, w].map(i => pos[i].x + "," + pos[i].y).join(" "), fill: "#f7d9cf", stroke: "var(--wi-active)", "stroke-width": 2.2, "stroke-dasharray": "5 3", opacity: .9 }, g);
+  }
+  /* nodes */
+  for (let i = 0; i < n; i++) {
+    let cls = "node";
+    if (st.cyc && st.showIO) {
+      if (st.cyc.on.has(i)) cls += " cut"; else if (st.cyc.inside.includes(i)) cls += " inside"; else cls += " outside";
+    } else if (st.cyc) {
+      if (st.cyc.on.has(i)) cls += " cut";
+    } else if (st.tree) {
+      /* plain */
+    } else {
+      const c = lvlCls(i); if (c) cls += " " + c;
+      if (st.shown !== undefined && hidden(i)) cls += " gone";
+    }
+    if (i === root && !st.cyc && !st.pieces) cls += " root";
+    if (st.apex && st.apex[2] === i) cls += " cur";
+    const c = mk("circle", { cx: pos[i].x, cy: pos[i].y, r: 13, class: cls }, g);
+    if (st.shown !== undefined && dist[i] === shown && st.median === undefined && !st.pieces) c.classList.add("pop");
+    txt(g, pos[i].x, pos[i].y, String(i), "nlab" + (st.shown !== undefined && hidden(i) ? " gone" : ""));
+    /* level tag while levels are being revealed */
+    if (st.shown !== undefined && !hidden(i) && !st.pieces && st.cyc === undefined) txt(g, pos[i].x, pos[i].y - 17, "L" + dist[i], "lvl");
+    /* hit area for re-rooting + tooltip */
+    const h = mk("circle", { cx: pos[i].x, cy: pos[i].y, r: 16, class: "hit" }, g);
+    h.addEventListener("click", () => setRoot(i));
+    h.addEventListener("mousemove", ev => showTip(ev, tipFor(i, st)));
+    h.addEventListener("mouseleave", hideTip);
+  }
+  /* legend caption on the stage */
+  if (st.cyc && st.showIO) {
+    const lab = "inside " + st.cyc.inside.length + " · cycle " + st.cyc.cyc.length + " · outside " + st.cyc.outside.length;
+    txt(g, W - 14, H - 14, lab, "caption", { "text-anchor": "end" });
+  }
+}
+function tipFor(i, st) {
+  const d = Bcache.dist[i];
+  let h = '<span class="tt-h">vertex ' + i + "</span><br>level " + d + " (distance " + d + " from root " + root + ")";
+  if (st.cyc && st.showIO) h += "<br>" + (st.cyc.on.has(i) ? "on the cycle" : st.cyc.inside.includes(i) ? "inside the cycle" : "outside the cycle");
+  h += "<br><span style=\"color:var(--wi-ink-faint)\">click: make this the root</span>";
+  return h;
+}
+function showTip(ev, html) {
+  const t = el("tooltip"); t.innerHTML = html; t.style.display = "block";
+  const x = Math.min(ev.clientX + 14, window.innerWidth - 280), y = Math.min(ev.clientY + 14, window.innerHeight - 90);
+  t.style.left = x + "px"; t.style.top = y + "px";
+}
+function hideTip() { el("tooltip").style.display = "none"; }
+
+/* ---------- rendering: the counting panel -------------------------------- */
+function drawCount(svg, st) {
+  svg.innerHTML = "";
+  const CW = 420, CH = 200;
+  const n = G.n, sq = Math.sqrt(n);
+  if (st.mode === "grid") {
+    const k = gridK;
+    const items = [["grid " + k + "×" + k, k, k * k, "cut"], ["K₈", st.grid && st.grid.k8 ? st.grid.k8 : 6, 8, "cut"]];
+    el("countTitle").textContent = "Separator size";
+    el("countMeta").textContent = "";
+    const rowH = 60;
+    items.forEach(([name, val, tot, cls], r) => {
+      const y = 30 + r * rowH;
+      txt(svg, 12, y + 14, name, "caption", { "text-anchor": "start" });
+      const x0 = 120, wmax = CW - 140, wv = wmax * val / Math.max(tot, 1);
+      mk("rect", { x: x0, y, width: wmax, height: 22, class: "bar ghost" }, svg);
+      if (r === 1 && !(st.grid && st.grid.k8)) return;
+      mk("rect", { x: x0, y, width: wv, height: 22, class: "bar " + cls }, svg);
+      txt(svg, x0 + wv + 6, y + 15, (r === 0 ? "√n = " + k : val + " removed") + " of " + tot, "axlab r");
+    });
+    txt(svg, 12, 30 + 2 * rowH + 6, "vertices removed before the graph falls apart", "axlab", { "text-anchor": "start" });
+    return;
+  }
+  const B = Bcache, L = B.levels;
+  if (st.cyc !== undefined) {
+    /* inside / cycle / outside bars */
+    el("countTitle").textContent = "Inside · cycle · outside";
+    el("countMeta").textContent = "2n/3 = " + (2 * n / 3).toFixed(1);
+    const vals = st.showIO ? [["inside", st.cyc.inside.length, "in"], ["on the cycle", st.cyc.cyc.length, "cut"], ["outside", st.cyc.outside.length, "out"]]
+                           : [["on the cycle", st.cyc.cyc.length, "cut"]];
+    const x0 = 118, wmax = CW - 140, rowH = 44;
+    vals.forEach(([name, val, cls], r) => {
+      const y = 22 + r * rowH;
+      txt(svg, 12, y + 15, name, "caption", { "text-anchor": "start" });
+      mk("rect", { x: x0, y, width: wmax, height: 24, class: "bar ghost" }, svg);
+      mk("rect", { x: x0, y, width: wmax * val / n, height: 24, class: "bar " + cls }, svg);
+      txt(svg, x0 + wmax * val / n + 6, y + 16, String(val), "axlab r");
+    });
+    const xt = x0 + wmax * 2 / 3;
+    mk("line", { x1: xt, y1: 12, x2: xt, y2: 22 + vals.length * rowH, class: "guide" }, svg);
+    txt(svg, xt, CH - 12, "2n/3", "axlab");
+    const xd = x0 + wmax * (2 * B.depth + 1) / n;
+    if (2 * B.depth + 1 <= n) { mk("line", { x1: xd, y1: 12, x2: xd, y2: 22 + vals.length * rowH, class: "guide soft" }, svg); txt(svg, xd, CH - 12, "2d+1", "axlab"); }
+    txt(svg, x0, CH - 12, "0", "axlab"); txt(svg, x0 + wmax, CH - 12, "n = " + n, "axlab");
+    return;
+  }
+  /* level histogram */
+  el("countTitle").textContent = "Level sizes";
+  el("countMeta").textContent = "√n ≈ " + sq.toFixed(1) + " · n/2 = " + (n / 2);
+  const shown = st.shown === undefined ? B.depth : st.shown;
+  const cnt = L.length, x0 = 40, x1 = CW - 16, bw = (x1 - x0) / cnt, maxv = Math.max(...L.map(l => l.length), sq + 1);
+  const y0 = 24, y1 = CH - 34, sy = (y1 - y0) / maxv;
+  for (let i = 0; i < cnt; i++) {
+    const v = L[i].length, h = v * sy, x = x0 + i * bw + 3;
+    let cls = "plain";
+    if (st.pieces) cls = (i === st.l1 || i === st.l2) ? "cut" : i < st.l1 ? "in" : i > st.l2 ? "out" : "fat";
+    else if (i === st.l1 || i === st.l2) cls = "cut";
+    else if (st.scan && i >= st.scan[0] && i <= st.scan[1]) cls = v > sq ? "fat" : "thin";
+    else if (st.median === i) cls = "med";
+    if (i > shown) mk("rect", { x, y: y1 - h, width: bw - 6, height: h, class: "bar ghost" }, svg);
+    else {
+      mk("rect", { x, y: y1 - h, width: bw - 6, height: h, class: "bar " + cls }, svg);
+      txt(svg, x + (bw - 6) / 2, y1 - h - 4, String(v), "barval");
+    }
+    txt(svg, x + (bw - 6) / 2, y1 + 14, "L" + i, "axlab");
+  }
+  if (st.l2 !== undefined && st.l2 >= cnt) {   /* empty level below */
+    const x = x0 + cnt * bw + 3 - bw; txt(svg, Math.min(x1 - 10, x0 + cnt * bw + bw / 2), y1 + 14, "L" + cnt + " = ∅", "axlab");
+  }
+  const ysq = y1 - sq * sy;
+  mk("line", { x1: x0 - 4, y1: ysq, x2: x1, y2: ysq, class: "guide" }, svg);
+  txt(svg, x0 - 5, ysq - 5, "√n", "axlab r", { "text-anchor": "end" });
+  if (st.median !== undefined && st.shown !== undefined && st.scan === undefined && st.l1 === undefined) {
+    const x = x0 + st.median * bw + bw / 2;
+    txt(svg, x, y0 - 10, "median level m", "axlab r", { "text-anchor": "middle" });
+  }
+  if (st.scan) {
+    const xa = x0 + st.scan[0] * bw, xb = x0 + (st.scan[1] + 1) * bw;
+    mk("rect", { x: xa, y: y0 - 6, width: Math.max(xb - xa, 4), height: y1 - y0 + 10, rx: 4, class: "scan" }, svg);
+  }
+  txt(svg, x1, CH - 4, "levels partition the n = " + n + " vertices", "axlab", { "text-anchor": "end" });
+}
+
+/* ---------- the argument outline ----------------------------------------- */
+const OUTLINE = [
+  ["grid", "Grids: the middle column of a √n × √n grid has √n vertices and splits it in half.", "the number"],
+  ["grid_lb", "Nothing smaller works for grids: √n disjoint left-to-right paths must each lose a vertex."],
+  ["grid_k", "Complete graphs and expanders need Ω(n): the proof has to use planarity."],
+  ["A_bfs", "BFS from a root r; level L(i) = vertices at distance i. Each level is a cut.", "Lemma A · levels"],
+  ["A_med", "Let m be the level in which the running total of level sizes reaches n/2."],
+  ["A_l1", "Find l₁ ≤ m with |L(l₁)| ≤ √n, within √n levels of m."],
+  ["A_l2", "Find l₂ > m with |L(l₂)| ≤ √n, within √n levels of m (an empty level counts)."],
+  ["A_count", "Why they exist: √n consecutive levels of size > √n would hold more than n vertices."],
+  ["A_cut", "Remove L(l₁) ∪ L(l₂): above and below have ≤ n/2 vertices each."],
+  ["A_band", "The band spans ≤ 2√n levels; shrink the top into the root → spanning tree of depth ≤ 2√n."],
+  ["B_stmt", "Planar graph with a spanning tree of depth d ⇒ a cycle of ≤ 2d+1 vertices is a ⅔-separator.", "Lemma B · cycles"],
+  ["B_tri", "Triangulate (extra edges only make separating harder)."],
+  ["B_fund", "A non-tree edge closes a fundamental cycle of ≤ 2d+1 vertices — a closed curve with an inside and an outside."],
+  ["B_start", "Start with the fundamental cycle enclosing the most; its outside is ≤ 2n/3."],
+  ["B_shift", "While the inside is > 2n/3: move to the triangle on the inner side of the closing edge (bend around it, or pick the bigger half)."],
+  ["B_done", "Inside ≤ 2n/3 and outside ≤ 2n/3: done."],
+  ["C_all", "Levels (≤ 2√n) + cycle (≤ 4√n+1) = O(√n) separator with pieces ≤ 2n/3.", "together"],
+  ["C_why", "Separators → divide and conquer: 2^O(√n) exact algorithms, planar distance oracles, PTAS."]
+];
+function renderOutline(st) {
+  const ol = el("outline"); ol.innerHTML = "";
+  const hl = new Set(st.hl || []);
+  const idxOf = {}; OUTLINE.forEach((o, i) => idxOf[o[0]] = i);
+  const curIdx = Math.max(-1, ...[...hl].map(k => idxOf[k]));
+  OUTLINE.forEach(([id, text, lemma], i) => {
+    const li = document.createElement("li");
+    li.className = (hl.has(id) ? "on" : i < curIdx ? "done" : "");
+    li.innerHTML = '<span class="no">' + (i + 1) + '</span><span>' + (lemma ? '<span class="lemma">' + esc(lemma) + '</span>' : "") + esc(text) + "</span>";
+    ol.appendChild(li);
+  });
+}
+
+/* ---------- render pass -------------------------------------------------- */
+function renderPhases() {
+  const bar = el("phaseBar"); bar.innerHTML = "";
+  phases.forEach(p => {
+    const span = p.to - p.from + 1;
+    const pct = cur > p.to ? 100 : cur < p.from ? 0 : ((cur - p.from + 1) / span) * 100;
+    const b = document.createElement("button");
+    b.className = "phasebtn" + (cur >= p.from && cur <= p.to ? " on" : (cur > p.to ? " past" : ""));
+    b.style.flexGrow = String(Math.max(1, span));
+    b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' + pct.toFixed(2) + '%"></span><span class="lab">' + esc(p.name) + "</span>";
+    b.title = p.name + " — steps " + (p.from + 1) + "–" + (p.to + 1);
+    b.addEventListener("click", () => { stopPlay(); cur = p.from; render(); });
+    bar.appendChild(b);
+  });
+}
+const LEGENDS = {
+  grid: [["cut", "separator"], ["inside", "one side"], ["outside", "other side"]],
+  levels: [["root", "root"], ["level", "reached by BFS"], ["cur", "median level"], ["band", "band / too fat"], ["cut", "thin level, removed"], ["inside", "above"], ["outside", "below"]],
+  cyc: [["cut", "on the cycle"], ["inside", "inside"], ["outside", "outside"], ["tree", "tree edge"], ["chord", "added for triangulation"], ["closing", "closing non-tree edge"]]
+};
+function renderLegend(st) {
+  const kind = st.mode === "grid" ? "grid" : st.cyc !== undefined || st.tree ? "cyc" : "levels";
+  const swatch = {
+    cut: "background:var(--sep-cut-fill);border-color:var(--sep-cut)", inside: "background:var(--sep-in-fill);border-color:var(--sep-in)",
+    outside: "background:var(--sep-out-fill);border-color:var(--sep-out)", band: "background:var(--sep-band-fill);border-color:var(--sep-band)",
+    level: "background:#efe3cc;border-color:var(--wi-border-strong)", cur: "background:#f7d9cf;border-color:var(--wi-active)",
+    root: "background:var(--wi-panel-2);border-color:var(--wi-ink-strong);border-width:2.5px",
+    tree: "border-radius:0;height:0;width:1.1em;border:0;border-top:3px solid var(--wi-ink-soft)",
+    chord: "border-radius:0;height:0;width:1.1em;border:0;border-top:2px dashed var(--wi-examine)",
+    closing: "border-radius:0;height:0;width:1.1em;border:0;border-top:3px solid var(--wi-active)"
+  };
+  el("legend").innerHTML = LEGENDS[kind].map(([k, name]) => '<span class="item"><span class="sw" style="' + swatch[k] + '"></span>' + esc(name) + "</span>").join("");
+}
+function render() {
+  const st = steps[cur] || {};
+  const svg = el("stageSvg"); svg.innerHTML = "";
+  if (st.mode === "grid") { drawGrid(svg, st); el("stageTitle").textContent = "Two extremes"; el("stageMeta").textContent = ""; }
+  else {
+    drawGraph(svg, st);
+    el("stageTitle").textContent = st.cyc !== undefined || st.tree ? "The drawing, triangulated, with its BFS tree" : "The graph and its BFS levels";
+    el("stageMeta").textContent = "n = " + G.n + " · " + G.edges.length + " edges · root " + root + " · depth " + Bcache.depth;
+  }
+  drawCount(el("countSvg"), st);
+  renderLegend(st); renderOutline(st); renderPhases();
+  el("statusBox").innerHTML = (st.txt || "") + (st.ans ? '<b class="ans">' + st.ans + "</b>" : "");
+  el("phaseName").textContent = phases[st.ph] ? phases[st.ph].name : "";
+  el("scrubber").max = String(Math.max(0, steps.length - 1));
+  el("scrubber").value = String(cur);
+  el("stepNo").textContent = steps.length ? (cur + 1) + " / " + steps.length : "— / —";
+  el("backBtn").disabled = cur <= 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+}
+
+const PLAY = "\u25B6\uFE0E", PAUSE = "\u23F8\uFE0E";
+function stepFwd() { if (cur < steps.length - 1) { cur++; render(); } else stopPlay(); }
+function stepBack() { if (cur > 0) { cur--; render(); } }
+function stopPlay() { if (timer) { clearInterval(timer); timer = null; el("playBtn").textContent = PLAY; el("playBtn").setAttribute("aria-label", "Play"); } }
+function togglePlay() {
+  if (timer) { stopPlay(); return; }
+  el("playBtn").textContent = PAUSE; el("playBtn").setAttribute("aria-label", "Pause");
+  timer = setInterval(stepFwd, Number(el("speed").value));
+}
+
+/* ---------- loading ------------------------------------------------------ */
+function rebuild(keepPhase) {
+  Bcache = bfs(G, root); Tcache = triangulate(G);
+  const ph = keepPhase ? ((steps[cur] || {}).ph || 0) : 0;
+  const rel = keepPhase && phases[ph] ? (cur - phases[ph].from) : 0;
+  build();
+  const p = phases[Math.min(ph, phases.length - 1)];
+  cur = Math.min(p.from + rel, p.to);
+  render();
+}
+function loadText(text, r, fromEditor) {
+  stopPlay();
+  let g;
+  try { g = parseGraph(text); el("parseErr").textContent = ""; }
+  catch (e) { el("parseErr").textContent = e.message; if (!fromEditor) console.error(e); return; }
+  G = g;
+  root = (r !== undefined && r < g.n) ? r : Math.floor(g.n / 2);
+  el("rootIn").max = String(g.n - 1); el("rootIn").value = String(root);
+  el("inputText").value = text;
+  rebuild(false);
+}
+function setRoot(r) {
+  if (!G || r < 0 || r >= G.n || r === root) return;
+  stopPlay(); root = r; el("rootIn").value = String(r);
+  rebuild(true);
+}
+
+function init() {
+  const sel = el("presetSel");
+  for (const k in PRESETS) { const o = document.createElement("option"); o.value = k; o.textContent = PRESETS[k].name; sel.appendChild(o); }
+  sel.addEventListener("change", () => loadText(PRESETS[sel.value].text, PRESETS[sel.value].root));
+  el("loadBtn").addEventListener("click", () => loadText(el("inputText").value, undefined, true));
+  el("rootBtn").addEventListener("click", () => setRoot(Number(el("rootIn").value)));
+  el("rootIn").addEventListener("keydown", ev => { if (ev.key === "Enter") setRoot(Number(el("rootIn").value)); });
+  el("gridK").addEventListener("change", () => {
+    gridK = Math.max(3, Math.min(12, Number(el("gridK").value) || 6)); el("gridK").value = String(gridK); el("gridK2").textContent = String(gridK);
+    stopPlay(); rebuild(true);
+  });
+  el("stepBtn").addEventListener("click", () => { stopPlay(); stepFwd(); });
+  el("backBtn").addEventListener("click", () => { stopPlay(); stepBack(); });
+  el("playBtn").addEventListener("click", togglePlay);
+  el("resetBtn").addEventListener("click", () => { stopPlay(); cur = 0; render(); });
+  el("scrubber").addEventListener("input", e => { stopPlay(); cur = Number(e.target.value); render(); });
+  el("speed").addEventListener("input", e => {
+    el("speedVal").textContent = e.target.value + "ms";
+    if (timer) { clearInterval(timer); timer = setInterval(stepFwd, Number(e.target.value)); }
+  });
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
+    if (ev.key === "ArrowRight" || ev.key === " ") { stopPlay(); stepFwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft") { stopPlay(); stepBack(); ev.preventDefault(); }
+    if (ev.key === "Home") { stopPlay(); cur = 0; render(); ev.preventDefault(); }
+    if (ev.key === "End") { stopPlay(); cur = steps.length - 1; render(); ev.preventDefault(); }
+  });
+  loadText(PRESETS.demo.text, PRESETS.demo.root);
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

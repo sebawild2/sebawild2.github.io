@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loop Invariant — arrayMax</title>
+<style>
+body{background-color:#f5ebd9;color:#6b675c;font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;margin:0;padding:20px}
+h1{font-size:1.5rem;font-weight:500;margin-bottom:18px;letter-spacing:.5px;color:#46433a;text-transform:uppercase;text-align:center}
+.container{width:100%;max-width:1400px;display:flex;flex-direction:column;align-items:center}
+.card{background-color:#faf6ed;border:1px solid #d4c5b4;border-radius:8px;padding:14px 18px;margin-bottom:14px;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.04);box-sizing:border-box}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row .lbl{font-size:.8rem;color:#8b8779;font-weight:500}
+input[type="text"]{height:32px;padding:0 10px;border:1px solid #b9a793;border-radius:5px;font-size:.85rem;background-color:#faf6ed;color:#46433a;width:260px}
+input:focus{outline:none;border-color:#9c866d;box-shadow:0 0 0 2px rgba(196,51,51,.12)}
+button{background-color:#faf6ed;color:#46433a;border:1px solid #b9a793;padding:7px 14px;font-size:.82rem;border-radius:5px;cursor:pointer;transition:background .2s,border-color .2s;font-weight:500;white-space:nowrap}
+button:hover{background-color:#fcf9f3;border-color:#9c866d}
+button.primary{background-color:#46433a;color:#faf6ed;border-color:#46433a}
+button.small{padding:4px 9px;font-size:.75rem}
+button:focus-visible,input:focus-visible{outline:2px solid #cc2f22;outline-offset:2px}
+.sep{width:1px;height:22px;background-color:#d4c5b4;margin:0 4px}
+#step-slider{flex:1;min-width:200px;accent-color:#cc2f22}
+.split{display:flex;gap:14px;width:100%;align-items:flex-start;flex-wrap:wrap}
+.split>.left{flex:0 0 460px;max-width:100%}
+.split>.right{flex:1;min-width:340px}
+.code-section{border:1px solid #d4c5b4;border-radius:6px;overflow:hidden;background:#fbf8f0}
+.code-head{font-size:.75rem;font-weight:600;color:#8b8779;padding:5px 10px;background:#f0e7d0;border-bottom:1px solid #d4c5b4;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre.code{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.8rem;line-height:1.7;color:#46433a;overflow-x:auto}
+pre.code .ln{display:block;padding:0 10px;white-space:pre;border-left:3px solid transparent}
+pre.code .ln.hot{background:#f6dfd8;border-left-color:#cc2f22}
+pre.code .no{display:inline-block;width:1.4em;color:#b9a793}
+.k{color:#9b2c6f;font-weight:600}
+.f{color:#895a1c}
+.c{color:#a89880;font-style:italic}
+.pt{color:#1f6a70;font-weight:700}
+.canvas-wrap{background-color:#faf6ed;border:1px solid #d4c5b4;border-radius:8px;overflow:hidden;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+svg.stage{display:block;width:100%}
+.log{background-color:#faf6ed;border:1px solid #d4c5b4;border-radius:8px;padding:11px 18px;font-size:.85rem;color:#46433a;width:100%;margin-top:12px;box-sizing:border-box}
+.log b{color:#46433a}
+.inv{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem;line-height:1.9;color:#46433a}
+.inv .head{font-family:var(--wi-font-body)"Segoe UI",sans-serif;font-size:.75rem;font-weight:600;color:#8b8779;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.ok{color:#2f6b3a;font-weight:700}
+.no2{color:#cc2f22;font-weight:700}
+.dim{color:#a89880}
+ol.obl{font-size:.82rem;line-height:1.9;color:#6b5c4e;padding-left:20px;margin:6px 0 0 0}
+ol.obl li.on{color:#cc2f22;font-weight:600}
+.pill{display:inline-block;border:1px solid #b9a793;border-radius:20px;padding:1px 9px;font-size:.75rem;color:#8b8779;background:#faf6ed;margin-left:6px}
+.pill.on{border-color:#1f6a70;color:#1f6a70;background:#e8f1f1}
+.cost{display:flex;gap:22px;flex-wrap:wrap;font-size:.8rem;color:#8b8779}
+.cost b{color:#46433a;font-variant-numeric:tabular-nums}
+.hint{font-size:.75rem;color:#9c866d;margin-top:6px;text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Loop Invariants — arrayMax</h1>
+
+    <div class="card row">
+        <span class="lbl">Array <i>A</i>:</span>
+        <input id="arr-input" type="text" value="5 2 9 3 9 7">
+        <button onclick="applyInput()">Apply</button>
+        <div class="sep"></div>
+        <span class="lbl">Presets:</span>
+        <button class="small" onclick="preset('5 2 9 3 9 7')">5 2 9 3 9 7</button>
+        <button class="small" onclick="preset('1 2 3 4 5')">increasing</button>
+        <button class="small" onclick="preset('9 4 4 1')">max first</button>
+        <button class="small" onclick="preset('7')">n = 1</button>
+        <button class="small" onclick="randomArray()">random</button>
+    </div>
+
+    <div class="card row">
+        <button onclick="stepTo(0)">⏮ First</button>
+        <button onclick="stepBy(-1)">← Prev</button>
+        <button onclick="stepBy(1)">Next →</button>
+        <button onclick="stepTo(1e9)">⏭ Last</button>
+        <button id="btn-play" class="primary" onclick="togglePlay()">▶ Play</button>
+        <div class="sep"></div>
+        <input id="step-slider" type="range" min="0" max="1" step="1" value="0">
+        <span class="lbl" id="step-label"></span>
+        <div class="sep"></div>
+        <span class="lbl">Speed</span>
+        <input id="speed" type="range" min="1" max="10" step="1" value="5" style="width:90px;accent-color:#cc2f22">
+    </div>
+
+    <div class="split">
+        <div class="left">
+            <div class="card" style="padding:12px 14px">
+                <div class="code-section">
+                    <div class="code-head">arrayMax</div>
+                    <pre class="code" id="code"></pre>
+                </div>
+            </div>
+            <div class="card">
+                <div class="head" style="font-size:.75rem;font-weight:600;color:#8b8779;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">We have to prove</div>
+                <ol class="obl" id="obligations">
+                    <li data-o="i">𝐼 holds at (A)</li>
+                    <li data-o="ii">𝐼 ∧ cond at (B) ⇒ 𝐼 at (C)</li>
+                    <li data-o="iii">𝐼 ∧ ¬cond ⇒ post condition</li>
+                </ol>
+            </div>
+        </div>
+        <div class="right">
+            <div class="canvas-wrap"><svg class="stage" id="stage" viewBox="0 0 760 300" preserveAspectRatio="xMidYMid meet"></svg></div>
+            <div class="card" style="margin-top:14px">
+                <div class="inv">
+                    <div class="head">Loop invariant</div>
+                    <div style="margin-bottom:8px">𝐼 ≡ curMax = max<sub>k∈[0..<i>j</i>−1]</sub> <i>A</i>[k] &nbsp;∧&nbsp; <i>j</i> ≤ <i>n</i></div>
+                    <div id="inv-body"></div>
+                </div>
+            </div>
+            <div class="log" id="log"></div>
+            <div class="card cost" style="margin-top:14px">
+                <span>comparisons <i>A</i>[<i>j</i>] &gt; curMax: <b id="c-cmp">0</b> of <b id="c-cmpmax">0</b></span>
+                <span>updates of curMax: <b id="c-upd">0</b></span>
+                <span>total work: <b id="c-tot">Θ(n)</b></span>
+            </div>
+        </div>
+    </div>
+    <div class="hint">← / → step · Home / End jump to start / end · Space plays</div>
+</div>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+    1  procedure arrayMax(A, n)
+    2    // input: array of n elements, n >= 1
+    3    // output: the maximum element in A[0..n-1]
+    4    curMax := A[0];  j := 1
+    5    // (A)
+    6    while j < n do
+    7      // (B)
+    8      if A[j] > curMax
+    9        curMax := A[j]
+   10      j := j + 1
+   11      // (C)
+   12    end while
+   13    // (D)
+   14    return curMax
+   ════════════════════════════════════════════════════════════════ */
+const CODE = [
+ '<span class="k">procedure</span> <span class="f">arrayMax</span>(<i>A</i>, <i>n</i>)',
+ '    <span class="c">// input: array of n elements, n ≥ 1</span>',
+ '    <span class="c">// output: the maximum element in A[0..n − 1]</span>',
+ '    curMax := <i>A</i>[0];  <i>j</i> := 1',
+ '    <span class="pt">// (A)</span>',
+ '    <span class="k">while</span> <i>j</i> &lt; <i>n</i> <span class="k">do</span>',
+ '        <span class="pt">// (B)</span>',
+ '        <span class="k">if</span> <i>A</i>[<i>j</i>] &gt; curMax',
+ '            curMax := <i>A</i>[<i>j</i>]',
+ '        <i>j</i> := <i>j</i> + 1',
+ '        <span class="pt">// (C)</span>',
+ '    <span class="k">end while</span>',
+ '    <span class="pt">// (D)</span>',
+ '    <span class="k">return</span> curMax'
+];
+
+let A = [5, 2, 9, 3, 9, 7], steps = [], step = 0, playing = false;
+
+/* ── build the execution trace ───────────────────────────────── */
+function trace(A) {
+    const n = A.length, S = [];
+    let curMax = A[0], j = 1, cmp = 0, upd = 0;
+    const push = o => S.push(Object.assign({ curMax, j, cmp, upd }, o));
+    push({ line: 4, pt: null, txt: 'curMax := A[0] = ' + A[0] + ',  j := 1' });
+    push({ line: 5, pt: 'A', txt: 'Program point (A): just before the loop.' });
+    for (;;) {
+        const cond = j < n;
+        push({ line: 6, pt: null, cond, txt: 'Loop condition: j &lt; n  ⇔  ' + j + ' &lt; ' + n + '  is <b>' + cond + '</b>.' });
+        if (!cond) break;
+        push({ line: 7, pt: 'B', txt: 'Program point (B): inside the loop, before the body.' });
+        const take = A[j] > curMax; cmp++;
+        push({ line: 8, pt: null, look: j, txt: 'A[' + j + '] &gt; curMax  ⇔  ' + A[j] + ' &gt; ' + curMax + '  is <b>' + take + '</b>.' });
+        if (take) { curMax = A[j]; upd++; push({ line: 9, pt: null, look: j, txt: 'curMax := A[' + j + '] = ' + curMax }); }
+        j++;
+        push({ line: 10, pt: null, txt: 'j := j + 1 = ' + j });
+        push({ line: 11, pt: 'C', txt: 'Program point (C): end of the body. Note that j has grown, so the invariant now speaks about one more element.' });
+    }
+    push({ line: 13, pt: 'D', txt: 'Program point (D): the loop has ended, so ¬cond holds, i.e. j ≥ n.' });
+    push({ line: 14, pt: null, done: true, txt: 'return curMax = <b>' + curMax + '</b>' });
+    return S;
+}
+
+/* ── invariant, evaluated on the concrete state ──────────────── */
+function invariant(st) {
+    const n = A.length, j = st.j, pre = A.slice(0, j);
+    const mx = Math.max(...pre);
+    return { j, n, pre, mx, curMax: st.curMax, okMax: st.curMax === mx, okJ: j <= n, holds: st.curMax === mx && j <= n };
+}
+
+/* ── drawing ─────────────────────────────────────────────────── */
+const NS = 'http://www.w3.org/2000/svg', VW = 760, CELL = 56, GAP = 8;
+const Y_CELL = 108, Y_IDX = 192, Y_BR = 214;
+function el(t, a, p) { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+function cx(i) { const tot = A.length * (CELL + GAP) - GAP; return (VW - tot) / 2 + i * (CELL + GAP); }
+
+function draw() {
+    const st = steps[step], inv = invariant(st), svg = document.getElementById('stage');
+    svg.innerHTML = '';
+    /* curMax box */
+    const bx = VW / 2 - 90;
+    el('rect', { x: bx, y: 26, width: 180, height: 40, rx: 7, fill: '#f7e6e0', stroke: '#cc2f22', 'stroke-width': 1.4 }, svg);
+    el('text', { x: VW / 2, y: 52, 'text-anchor': 'middle', fill: '#cc2f22', 'font-size': 18, 'font-family': 'var(--wi-font-mono)' }, svg).textContent = 'curMax = ' + st.curMax;
+
+    /* cells */
+    A.forEach((v, i) => {
+        const inPrefix = i < st.j, look = st.look === i;
+        el('rect', { x: cx(i), y: Y_CELL, width: CELL, height: CELL, rx: 6, fill: inPrefix ? '#eadfc6' : '#faf6ed', stroke: look ? '#1f6a70' : (inPrefix ? '#b9a97f' : '#d8c8aa'), 'stroke-width': look ? 2.4 : 1.5 }, svg);
+        el('text', { x: cx(i) + CELL / 2, y: Y_CELL + CELL / 2 + 7, 'text-anchor': 'middle', fill: inPrefix ? '#46433a' : '#a89880', 'font-size': 20, 'font-family': 'var(--wi-font-mono)' }, svg).textContent = v;
+        el('text', { x: cx(i) + CELL / 2, y: Y_IDX, 'text-anchor': 'middle', fill: st.j === i ? '#cc2f22' : '#8b8779', 'font-size': 13, 'font-weight': st.j === i ? 700 : 400, 'font-family': 'var(--wi-font-mono)' }, svg).textContent = i;
+        if (inPrefix && v === inv.mx) el('circle', { cx: cx(i) + CELL / 2, cy: Y_CELL - 10, r: 4, fill: '#cc2f22' }, svg);
+    });
+    /* j pointer */
+    if (st.j < A.length) {
+        const g = el('g', { transform: 'translate(' + (cx(st.j) + CELL / 2) + ',' + Y_CELL + ')' }, svg);
+        el('path', { d: 'M0,-8 L7,-22 L-7,-22 Z', fill: '#cc2f22' }, g);
+        el('text', { x: 0, y: -28, 'text-anchor': 'middle', fill: '#cc2f22', 'font-size': 16, 'font-style': 'italic', 'font-family': 'var(--wi-font-mono)' }, g).textContent = 'j';
+    } else {
+        el('text', { x: cx(A.length - 1) + CELL + 26, y: Y_CELL + CELL / 2 + 5, fill: '#cc2f22', 'font-size': 16, 'font-style': 'italic', 'font-family': 'var(--wi-font-mono)' }, svg).textContent = 'j = ' + st.j;
+    }
+    /* bracket over the prefix the invariant talks about */
+    if (st.j > 0) {
+        const x1 = cx(0), x2 = cx(st.j - 1) + CELL;
+        el('path', { d: 'M' + x1 + ',' + (Y_BR - 7) + ' L' + x1 + ',' + Y_BR + ' L' + x2 + ',' + Y_BR + ' L' + x2 + ',' + (Y_BR - 7), fill: 'none', stroke: '#895a1c', 'stroke-width': 1.6 }, svg);
+        el('text', { x: (x1 + x2) / 2, y: Y_BR + 24, 'text-anchor': 'middle', fill: '#895a1c', 'font-size': 14, 'font-family': 'var(--wi-font-mono)' }, svg).textContent =
+            'max over A[0..' + (st.j - 1) + '] = ' + inv.mx;
+    }
+    /* code + panels */
+    document.querySelectorAll('#code .ln').forEach(e => e.classList.toggle('hot', +e.dataset.l === st.line));
+    document.querySelectorAll('#obligations li').forEach(li => li.classList.toggle('on', li.dataset.o === obligation(st)));
+    document.getElementById('step-slider').value = step;
+    document.getElementById('step-label').textContent = 'step ' + step + ' / ' + (steps.length - 1) + (st.pt ? '  ·  at (' + st.pt + ')' : '');
+    document.getElementById('log').innerHTML = st.txt;
+    document.getElementById('c-cmp').textContent = st.cmp;
+    document.getElementById('c-cmpmax').textContent = Math.max(0, A.length - 1);
+    document.getElementById('c-upd').textContent = st.upd;
+    document.getElementById('c-tot').textContent = 'n − 1 = ' + Math.max(0, A.length - 1) + ' comparisons = Θ(n)';
+    drawInvariant(st, inv);
+}
+function obligation(st) {
+    if (st.pt === 'A') return 'i';
+    if (st.pt === 'B' || st.pt === 'C') return 'ii';
+    if (st.pt === 'D' || st.done) return 'iii';
+    return '';
+}
+function drawInvariant(st, inv) {
+    const yes = '<span class="ok">✓</span>', no = '<span class="no2">✗</span>';
+    let h = '';
+    h += '<div>curMax = <b>' + inv.curMax + '</b> &nbsp;·&nbsp; max<sub>k∈[0..' + (inv.j - 1) + ']</sub> A[k] = max{' + inv.pre.join(', ') + '} = <b>' + inv.mx + '</b> &nbsp; ' + (inv.okMax ? yes : no) + '</div>';
+    h += '<div><i>j</i> = <b>' + inv.j + '</b> ≤ <i>n</i> = <b>' + inv.n + '</b> &nbsp; ' + (inv.okJ ? yes : no) + '</div>';
+    h += '<div style="margin-top:6px">𝐼 ' + (inv.holds ? '<span class="ok">holds</span>' : '<span class="no2">is violated</span>') +
+        (st.pt ? ' <span class="pill on">at (' + st.pt + ')</span>' : ' <span class="pill">between program points</span>') + '</div>';
+    if (st.pt === 'D') h += '<div style="margin-top:6px">¬cond gives <i>j</i> ≥ <i>n</i>, together with <i>j</i> ≤ <i>n</i> from 𝐼: <b>j = n</b>, so 𝐼 reads curMax = max<sub>k∈[0..n−1]</sub> A[k] — the post condition.</div>';
+    document.getElementById('inv-body').innerHTML = h;
+}
+
+/* ── controls ────────────────────────────────────────────────── */
+function stepBy(d) { stepTo(step + d); }
+function stepTo(k) { step = Math.max(0, Math.min(steps.length - 1, k)); draw(); }
+function togglePlay() { playing = !playing; document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : '▶ Play'; if (playing) tick(); }
+function tick() {
+    if (!playing) return;
+    if (step >= steps.length - 1) { playing = false; document.getElementById('btn-play').textContent = '▶ Play'; return; }
+    stepBy(1); setTimeout(tick, 1400 / +document.getElementById('speed').value);
+}
+function applyInput() {
+    const v = document.getElementById('arr-input').value.split(/[\s,;]+/).filter(x => x.length).map(Number).filter(x => Number.isFinite(x));
+    A = v.length ? v.slice(0, 12) : [5, 2, 9, 3, 9, 7];
+    document.getElementById('arr-input').value = A.join(' ');
+    steps = trace(A); step = 0;
+    document.getElementById('step-slider').max = steps.length - 1;
+    draw();
+}
+function preset(s) { document.getElementById('arr-input').value = s; applyInput(); }
+function randomArray() {
+    const n = 4 + Math.floor(Math.random() * 5);
+    preset(Array.from({ length: n }, () => 1 + Math.floor(Math.random() * 20)).join(' '));
+}
+document.getElementById('step-slider').addEventListener('input', e => stepTo(+e.target.value));
+document.getElementById('arr-input').addEventListener('keydown', e => { if (e.key === 'Enter') applyInput(); });
+document.addEventListener('keydown', e => {
+    if (/input|textarea/i.test(e.target.tagName)) return;
+    if (e.key === 'ArrowRight') { stepBy(1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { stepBy(-1); e.preventDefault(); }
+    else if (e.key === 'Home') { stepTo(0); e.preventDefault(); }
+    else if (e.key === 'End') { stepTo(1e9); e.preventDefault(); }
+    else if (e.key === ' ') { togglePlay(); e.preventDefault(); }
+});
+document.getElementById('code').innerHTML = CODE.map((l, k) =>
+    '<span class="ln" data-l="' + (k + 1) + '"><span class="no">' + (k + 1) + '</span>' + l + '</span>').join('');
+applyInput();
+</script>
+</body>
+</html>

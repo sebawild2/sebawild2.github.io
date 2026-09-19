@@ -1,0 +1,14 @@
+[
+"maze.txt",
+"maze-large.txt",
+"maze-large2.txt",
+"course-requirements-dag.txt",
+"directed-dfs-all-edge-types.txt",
+"strong-components-small.txt",
+"strong-components-SW.txt",
+"kruskal-SW.txt",
+"kruskal.txt",
+"dijkstra.txt",
+"dijkstra springs.txt",
+"dijkstra-SW.txt"
+]

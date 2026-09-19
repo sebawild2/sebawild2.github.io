@@ -1,0 +1,2154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decision trees of sorting algorithms</title>
+<style>
+  /* Same token values as /css/animations.css, repeated so the page also works when opened directly. */
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#9c866d;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1; --wi-ramp-lo:#e5c0b4; --wi-ramp-hi:#902015;
+    --wi-font-body:texgyrepagella, "TeX Gyre Pagella", Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+
+    /* page-specific tints, all mixed from the palette above */
+    /* step view only — the demo and grid stay in the plain site style */
+    --t-final:#c6e0ad;   /* in final position (green)                  */
+    --t-sorted:#b9d8e4;  /* sorted, but not necessarily final (blue)   */
+    --t-range:#f0d4a0;   /* the subarray currently worked on (sand)    */
+    --t-le:#f2c0ac;      /* partition: <= p (salmon)                   */
+    --t-ge:#bfcbee;      /* partition: >= p (periwinkle)               */
+    --t-run1:#f3c3b8; --t-run2:#cbc1ec;    /* the two runs of a merge  */
+    --t-cand:#ebd98e;    /* binary search: possible target positions   */
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .wi-topbar { display:flex; align-items:baseline; justify-content:space-between; gap:1em; flex-wrap:wrap;
+               margin:0 0 1.1em; padding-bottom:.5em; border-bottom:1px solid var(--wi-border);
+               font-family:var(--wi-font-head); letter-spacing:.03em; }
+  .wi-topbar .wi-home { color:var(--wi-ink-strong); font-size:1.05em; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:14px 22px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 14px; max-width:96ch; line-height:1.5; }
+  .subtitle code, .hint code, .note code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; font-family:var(--wi-font-mono); }
+
+  /* --- chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:12px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:11px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .lbl, .ctl > label:not(.chk) { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer; line-height:1.35;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text; font-size:1.02rem; line-height:1.1;
+                padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.tokens { font-family:var(--wi-font-mono); font-size:.8rem; width:24em; max-width:100%; }
+  input.num { width:4.2em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; flex-wrap:wrap; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  .seg button.on:hover:not(:disabled) { background:var(--wi-accent-dark); color:var(--wi-panel-2); }
+  .modes button { font-size:.9rem; padding:7px 16px; }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  .val { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint); white-space:nowrap; min-width:4.8em; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+  .note { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; margin:10px 2px 0; max-width:110ch; }
+  .note b { color:var(--wi-accent); }
+  .hidden { display:none !important; }
+
+  /* --- demo & grid panels --- */
+  .demo-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; }
+  @media (max-width:1000px) { .demo-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:11px 13px; min-width:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; color:var(--wi-ink-faint);
+               margin:0 0 8px; display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  canvas.bars { display:block; width:100%; background:var(--wi-bg); border-radius:var(--wi-radius); }
+  .counts { font-family:var(--wi-font-mono); font-size:.72rem; color:var(--wi-ink-soft); margin-top:6px;
+            display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .counts .ok { color:var(--wi-relax); font-weight:bold; }
+  .tickno { font-family:var(--wi-font-mono); font-size:.78rem; color:var(--wi-ink-faint); min-width:6em; }
+
+  table.grid { border-collapse:separate; border-spacing:8px 8px; width:100%; table-layout:fixed; margin:-8px 0 0; }
+  table.grid th { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                  color:var(--wi-ink-faint); font-weight:normal; text-align:left; padding:0 4px; }
+  table.grid th.rowh { text-transform:none; letter-spacing:.03em; font-size:.84rem; color:var(--wi-ink-strong);
+                       vertical-align:middle; width:10.5em; line-height:1.3; }
+  table.grid th.rowh .rh { display:flex; align-items:center; gap:8px; }
+  .medal { flex:none; width:1.75em; height:1.75em; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+           font-family:var(--wi-font-mono); font-size:.78rem; font-weight:bold; color:#fcf9f3; background:var(--wi-inert);
+           box-shadow:inset 0 -2px 0 rgba(0,0,0,.18); animation:pop .4s ease-out; }
+  .medal.m1 { background:#bc9b34; } .medal.m2 { background:#a6a49f; } .medal.m3 { background:#b0713f; }
+  .medal.none { background:none; box-shadow:inset 0 0 0 1.5px var(--wi-border-soft); animation:none; }
+  table.grid th.rowh .fin { display:block; font-family:var(--wi-font-mono); font-size:.66rem; color:var(--wi-ink-soft); }
+  .chips { flex-basis:100%; display:flex; flex-wrap:wrap; gap:6px; padding:4px 0 2px; }
+  .chip { border-radius:999px; padding:3px 12px; font-size:.78rem; background:var(--wi-panel); color:var(--wi-ink-soft); border:1px solid var(--wi-border-soft); }
+  .chip.on, .chip.on:hover:not(:disabled) { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  .chip.on:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  table.grid th.rowh small { display:block; font-family:var(--wi-font-body); color:var(--wi-ink-faint); font-size:.72rem; }
+  table.grid td { background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg);
+                  padding:7px 8px 5px; vertical-align:top; }
+  table.grid td .counts { margin-top:4px; font-size:.66rem; }
+  @media (max-width:900px) { table.grid th.rowh { width:6.5em; font-size:.72rem; } }
+
+  /* --- transport (step view) --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:16px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0; width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden; flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px;
+              font-size:.68rem; line-height:1.3; font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-left-width:0;
+              border-radius:0; color:var(--wi-ink-faint); cursor:pointer; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage (step view) --- */
+  .stage { display:grid; grid-template-columns:minmax(0, var(--lf, 1.3fr)) 18px minmax(300px, var(--rf, 1fr)); gap:0; align-items:start; }
+  @media (max-width:900px) { .stage { grid-template-columns:1fr; gap:16px; } .splitter { display:none !important; } }
+  /* draggable divider between the array and the code */
+  .splitter { align-self:stretch; min-height:200px; cursor:col-resize; touch-action:none; display:flex; justify-content:center; }
+  .splitter::before { content:""; width:4px; margin:30px 0; border-radius:2px; background:var(--wi-border-soft); transition:background .15s; }
+  .splitter:hover::before, .splitter.drag::before, .splitter:focus-visible::before { background:var(--wi-accent-soft); }
+  .splitter:focus-visible { outline:none; }
+  .col-main, .col-side { display:flex; flex-direction:column; gap:14px; min-width:0; }
+  @media (min-width:901px) { .col-side { position:sticky; top:10px; } }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); }
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius);
+            padding:9px 13px; font-size:.9rem; color:var(--wi-ink-strong); min-height:78px; }
+  .status code, .vars code, .stack code { font-family:var(--wi-font-mono); font-size:.84em; background:var(--wi-panel-2);
+                 padding:1px 4px; border-radius:3px; }
+  .status .yes { color:var(--wi-relax); font-weight:bold; }
+  .status .no  { color:var(--wi-active); font-weight:bold; }
+  .legend { display:flex; flex-wrap:wrap; gap:4px 16px; margin-top:8px; font-size:.74rem; color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .legend code { font-family:var(--wi-font-mono); font-size:.92em; }
+  .sw { width:.9em; height:.9em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; flex:none; }
+  .vars { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:.82rem; align-items:baseline; }
+  @keyframes chg { from { background:var(--wi-accent-soft); color:var(--wi-panel-2); } to { background:var(--wi-panel-2); } }
+  .vars code.chg { animation:chg var(--dur, 600ms) ease-out; }
+  .vars .k { color:var(--wi-ink-faint); font-family:var(--wi-font-head); font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; }
+  .vars .cnt { margin-left:auto; display:flex; gap:12px; }
+  .stack { font-size:.8rem; line-height:1.9; margin-top:6px; color:var(--wi-ink-soft); }
+  .stack code { white-space:nowrap; }
+  .stack code.top { background:#f6e6df; color:var(--wi-accent); box-shadow:inset 0 0 0 1px var(--wi-accent-soft); }
+  .stack .sep { color:var(--wi-ink-faint); margin:0 3px; }
+
+  /* trace table (one row per pass / merge / partition, as in the Sedgewick–Wayne traces) */
+  .tracewrap { overflow-x:auto; max-height:360px; overflow-y:auto; }
+  table.trace { border-collapse:collapse; font-family:var(--wi-font-mono); font-size:.74rem; }
+  table.trace td { padding:1px 0; text-align:center; color:var(--wi-ink-faint); }
+  table.trace td.c { color:#d8cebd; }        /* untouched in this row: very light, so the touched part stands out */
+  table.trace td.lab { text-align:left; padding:1px 12px 1px 4px; white-space:nowrap; color:var(--wi-ink-soft); font-size:.95em; }
+  table.trace td.c { min-width:var(--cw,1.6em); }
+  table.trace td.c.in { color:var(--wi-ink-strong); }
+  table.trace td.c.chg { color:var(--wi-accent); font-weight:bold; }
+  table.trace tr { cursor:pointer; }
+  table.trace tr:hover td { background:var(--wi-panel-2); }
+  table.trace tr.cur td { background:#f6e6df; }
+  table.trace tr.head td { cursor:default; color:var(--wi-ink-faint); border-bottom:1px solid var(--wi-border-soft); font-size:.9em; }
+  table.trace tr.head:hover td { background:none; }
+  table.trace sub, .status sub, .legend sub { font-size:.7em; }
+
+  /* code panel */
+  .codebox { background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg); }
+  .codebox > .sim-title { padding:10px 15px 0; }
+  .codescroll { position:relative; max-height:calc(100vh - 290px); min-height:200px; overflow:auto; padding:0 6px 10px; }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em; text-transform:uppercase;
+              color:var(--wi-ink-faint); padding:10px 12px 3px; border-top:1px solid var(--wi-border-soft); margin-top:6px;
+              display:flex; justify-content:space-between; gap:10px; }
+  .sublabel:first-child { border-top:0; margin-top:0; padding-top:4px; }
+  .sublabel .src { text-transform:none; letter-spacing:0; font-family:var(--wi-font-body); font-size:1.05em; }
+  .cline { display:flex; gap:9px; padding:1px 9px; font-family:var(--wi-font-mono); font-size:.74rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent; white-space:pre; }
+  @media (max-width:1300px) { .cline { font-size:.68rem; } }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; flex:none; }
+  .cline .tag { margin-left:auto; padding-left:12px; font-family:var(--wi-font-body); font-size:.95em; color:var(--wi-accent-soft); }
+  .cline.caller { background:#f3ebdd; border-left-color:var(--wi-accent-soft); }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .ty { color:var(--wi-queue); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .cline .cm i { font-family:var(--wi-font-body); font-size:1.08em; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:2px 15px 12px; line-height:1.45; }
+  .about { font-size:.8rem; line-height:1.5; color:var(--wi-ink-soft); }
+  .about p { margin:0 0 5px; }
+  .about b { color:var(--wi-ink-strong); font-family:var(--wi-font-head); font-weight:normal; letter-spacing:.04em; font-size:.92em; }
+  .about code { font-family:var(--wi-font-mono); font-size:.86em; }
+
+  /* input editor */
+  details.editor { margin-top:16px; background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,340px) 1fr; gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:150px; font-family:var(--wi-font-mono); font-size:.78rem; background:var(--wi-panel-2);
+             color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    h1 { font-size:1.3rem; }
+    .controls { gap:8px 12px; padding:10px 12px; }
+    .seg button { padding:5px 9px; font-size:.74rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+  }
+
+  /* --- SVG classes (step view) --- */
+  .sv-idx  { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint); text-anchor:middle; }
+  .sv-val  { font-family:var(--wi-font-mono); font-size:14px; fill:var(--wi-ink-strong); text-anchor:middle; }
+  .sv-val.dim { fill:var(--wi-ink-faint); }
+  .sv-row  { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-ink-soft); }
+  .sv-ptr  { font-family:var(--wi-font-mono); font-size:12.5px; font-weight:bold; text-anchor:middle; }
+  .sv-badge{ font-family:var(--wi-font-body); font-size:15px; font-weight:bold; text-anchor:middle; dominant-baseline:central; fill:var(--wi-panel-2); }
+  .sv-note { font-family:var(--wi-font-body); font-size:12.5px; font-style:italic; fill:var(--wi-ink-soft); }
+  @keyframes pop { from { opacity:.25; } to { opacity:1; } }
+  /* a swapped element flies from its old position (offset --dx/--dy) to the new one, on an arc (--lx/--ly) */
+  @keyframes fly { from { transform:translate(var(--dx), var(--dy)); }
+                   50%  { transform:translate(calc(var(--dx) / 2 + var(--lx)), calc(var(--dy) / 2 + var(--ly))); }
+                   to   { transform:translate(0px, 0px); } }
+  .sv-fly { animation:fly var(--dur, 450ms) ease-in-out both; }
+  /* presentation view */
+  .only-p { display:none !important; }
+  body.present .only-p { display:inline-flex !important; }
+  body.present .hide-p { display:none !important; }
+  body.present h1 { font-size:1.9rem; }
+  body.present .titlebar { margin-bottom:14px; }
+  body.present .transport-row { align-items:center; }
+  .exitp { position:fixed; top:10px; right:12px; z-index:20; font-size:.75rem; opacity:.5; }
+  .exitp:hover, .exitp:focus-visible { opacity:1; }
+  .sv-pop { animation:pop .35s ease-out both; }
+  @media (prefers-reduced-motion:reduce) { * { animation-duration:.001ms !important; transition-duration:.001ms !important; } }
+  /* ---------- decision-tree page ---------- */
+  .stats { font-size:.82rem; color:var(--wi-ink-soft); margin:0 2px 10px; display:flex; flex-wrap:wrap; gap:4px 20px; }
+  .stats b { color:var(--wi-ink-strong); font-weight:normal; font-family:var(--wi-font-mono); font-size:.92em; }
+  .stats .bound { color:var(--wi-accent); }
+  .treebox { position:relative; height:clamp(360px, 62vh, 900px); background:var(--wi-bg); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); overflow:hidden; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; }
+  .treebox.drag { cursor:grabbing; }
+  #treeSvg { width:100%; height:100%; display:block; }
+  .zoombar { position:absolute; right:10px; top:10px; display:flex; gap:4px; z-index:4; }
+  .zoombar button { padding:2px 10px; font-size:.8rem; }
+  .zoomval { position:absolute; left:12px; bottom:8px; font-family:var(--wi-font-mono); font-size:.7rem; color:var(--wi-ink-faint); pointer-events:none; }
+  .tip { position:absolute; pointer-events:none; max-width:380px; background:var(--wi-panel-2); border:1px solid var(--wi-border);
+         border-radius:var(--wi-radius); padding:7px 11px; font-size:.78rem; line-height:1.45; color:var(--wi-ink);
+         box-shadow:0 2px 10px rgba(70,60,40,.2); display:none; z-index:5; }
+  .tip code, .info code, .walkstat code { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-controls); padding:0 4px; border-radius:3px; }
+  .tip .h, .info .h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tlegend { display:flex; flex-wrap:wrap; gap:4px 18px; margin:8px 2px 14px; font-size:.74rem; color:var(--wi-ink-soft); align-items:center; }
+  .tlegend span { display:inline-flex; align-items:center; gap:6px; }
+  .stage2 { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(330px,1fr); gap:16px; align-items:start; }
+  @media (max-width:900px) { .stage2 { grid-template-columns:1fr; } }
+  .walkstat { background:var(--wi-controls); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius);
+              padding:9px 13px; font-size:.88rem; color:var(--wi-ink-strong); min-height:70px; margin:10px 0; }
+  .walkstat .yes { color:var(--wi-relax); font-weight:bold; }
+  .info { font-size:.82rem; line-height:1.5; color:var(--wi-ink); min-height:3em; }
+  .info .muted { color:var(--wi-ink-faint); }
+  .cand { display:flex; align-items:center; gap:10px; font-size:.8rem; color:var(--wi-ink-soft); margin-top:4px; }
+  .cand .bar { flex:1; height:8px; background:var(--wi-panel-2); border:1px solid var(--wi-border-soft); border-radius:4px; overflow:hidden; }
+  .cand .bar div { height:100%; background:var(--wi-accent-soft); transition:width .2s; }
+  svg.cells { display:block; }
+
+  /* tree drawing */
+  .te { stroke:var(--wi-ink-faint); stroke-width:1.3; fill:none; }
+  .imp line { stroke:var(--wi-examine); stroke-width:1.2; stroke-dasharray:3 3; }
+  .imp text { font-family:var(--wi-font-body); font-size:12px; fill:var(--wi-examine); text-anchor:middle; dominant-baseline:central; }
+  .elab { font-family:var(--wi-font-body); font-size:13px; fill:var(--wi-ink-soft); text-anchor:middle; dominant-baseline:central; }
+  .tn { cursor:pointer; }
+  .tn .b { fill:var(--wi-controls); stroke:var(--wi-border-strong); stroke-width:1.2; }
+  .tn.red .b { fill:#f0dfb4; stroke:var(--wi-examine); stroke-width:1.5; }
+  .tn.leaf .b { fill:var(--wi-panel-2); stroke:var(--wi-ink-soft); }
+  .tn text { font-family:var(--wi-font-body); font-size:13px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .tn text.lf { font-family:var(--wi-font-mono); font-size:11.5px; }
+  .tn .hit { fill:transparent; stroke:none; }
+  .tn:hover .b { stroke:var(--wi-accent); stroke-width:2.2; }
+  .perms rect { fill:var(--wi-panel); stroke:var(--wi-border-soft); }
+  .perms text { font-family:var(--wi-font-mono); font-size:10px; fill:var(--wi-ink-soft); }
+  .lvl { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint); text-anchor:end; dominant-baseline:central; }
+  .lgline { stroke:var(--wi-accent-soft); stroke-width:1.3; stroke-dasharray:7 5; }
+  .lglab { font-family:var(--wi-font-body); font-size:13px; fill:var(--wi-accent); }
+  .teg.on .te { stroke:var(--wi-active); stroke-width:3.2; }
+  .teg.on .elab { fill:var(--wi-active); font-weight:bold; }
+  .tn.on .b { stroke:var(--wi-active); stroke-width:2.4; }
+  .tn.cur .b { fill:var(--wi-active); stroke:var(--wi-active); stroke-width:2.4; }
+  .tn.cur text { fill:var(--wi-panel-2); }
+  .tn.sel .b { stroke:var(--wi-queue); stroke-width:2.8; }
+  .dim { opacity:.28; }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>Decision trees of sorting algorithms</h1>
+</div>
+<p class="subtitle">
+  Run a sorting algorithm on all <i>n</i>! orderings of its input and merge the runs as long as they
+  get the same answers from <code>less</code>: the result is its comparison (decision) tree.
+  Nodes name the compared elements by their <em>original</em> position in the input, since the tree
+  does not show how the algorithm moves elements around.
+</p>
+
+<div class="controls">
+  <div class="ctl"><span class="lbl">Algorithm</span><span class="seg" id="algoSeg"></span></div>
+  <div class="ctl"><span class="lbl">n</span><span class="seg" id="nSeg"></span></div>
+  <div class="ctl"><span class="lbl">Labels</span>
+    <span class="seg" id="styleSeg">
+      <button data-style="hover" class="on" title="Small nodes; details appear when you hover over a node">on hover</button>
+      <button data-style="slide" title="Labelled boxes as on the slides">as on the slides</button>
+    </span>
+  </div>
+  <label class="chk"><input type="checkbox" id="leafRow"> leaves on one line</label>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="treebox" id="treeBox">
+  <svg id="treeSvg" aria-label="Decision tree"><g id="vp"></g></svg>
+  <div class="zoombar">
+    <button id="zIn" title="Zoom in">+</button><button id="zOut" title="Zoom out">−</button>
+    <button id="zFit" title="Show the whole tree">fit</button><button id="z100" title="Labels at page size">1:1</button>
+  </div>
+  <div class="zoomval" id="zoomVal"></div>
+  <div class="tip" id="tip"></div>
+</div>
+<div class="tlegend" id="tlegend"></div>
+
+<div class="stage2">
+  <div class="col-main">
+    <div class="sim-box">
+      <div class="sim-title"><span>Run one input through the tree</span><span class="rhs" id="walkNo"></span></div>
+      <div class="ctl" style="gap:6px 10px">
+        <input type="text" id="walkIn" class="tokens" style="width:12em" spellcheck="false" aria-label="Input: n distinct values">
+        <button id="walkSet" class="pri">Set</button>
+        <button id="walkRnd">Random</button>
+        <span style="flex:1"></span>
+        <button id="wReset" class="icon" title="Back to the root" aria-label="Back to the root">&#x21BA;</button>
+        <button id="wBack" class="icon" title="One comparison back (←)" aria-label="Back">&#x23EE;&#xFE0E;</button>
+        <button id="wStep" class="icon pri" title="Next comparison (→)" aria-label="Next">&#x23ED;&#xFE0E;</button>
+        <button id="wPlay" class="icon" title="Play / pause (space)" aria-label="Play">&#x25B6;&#xFE0E;</button>
+      </div>
+      <div class="err" id="walkErr"></div>
+      <div class="walkstat" id="walkStat"></div>
+      <div id="cellsWrap"><svg id="cellsSvg" class="cells"></svg></div>
+      <div class="cand" id="cand"></div>
+    </div>
+    <div class="sim-box" style="margin-top:14px">
+      <div class="sim-title"><span>Selected node</span><span class="rhs">click a node to show its details here</span></div>
+      <div class="info" id="info"></div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="codebox">
+      <div class="sim-title"><span>Code</span><span class="rhs" id="codeMeta"></span></div>
+      <div class="codescroll" id="codeScroll"></div>
+    </div>
+  </div>
+</div>
+
+<p class="note" id="aboutNote"></p>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Sorting, step by step.
+
+   Every algorithm below is a JavaScript generator that is a line-by-line
+   transcription of the Java code shown on the slides (also printed in the
+   code panel of the page).  The generator yields once per executed line (or
+   per loop test), and yields separately for each call of less() and of
+   swap() / each element copy.  Nothing is precomputed: the three views only
+   differ in how they consume these steps.
+
+     * Demo / All at once:  lock-step "clock": one global step advances every
+       panel to its next comparison (or its next comparison / swap / copy).
+     * Step by step:        all steps are recorded with a snapshot of the
+       array, so one can scrub back and forth.
+
+   Array positions hold element *ids* (their position in the input); values
+   live in inp.vals[id].  That way equal keys can be told apart (stability).
+   ========================================================================== */
+
+const el  = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- inputs --------------------------------------------------------- */
+
+function cmpVals(a, b) { return a < b ? -1 : a > b ? 1 : 0; }   /* numbers numerically, strings like String.compareTo */
+
+function makeInput(vals, labels) {
+  const n = vals.length;
+  const numeric = vals.every(v => typeof v === "number");
+  let mag;
+  if (numeric) {
+    let mx = -Infinity, mn = Infinity;
+    for (const v of vals) { if (v > mx) mx = v; if (v < mn) mn = v; }
+    if (mn > 0) mag = vals.map(v => v / mx);
+    else mag = vals.map(v => mx === mn ? 1 : 0.06 + 0.94 * (v - mn) / (mx - mn));
+  } else {
+    const dist = [...new Set(vals)].sort(cmpVals);
+    const rk = new Map(dist.map((v, i) => [v, i]));
+    mag = vals.map(v => (rk.get(v) + 1) / dist.length);
+  }
+  labels = labels || vals.map(v => String(v));
+  const tot = new Map(), seen = new Map(), occ = [];
+  vals.forEach(v => tot.set(v, (tot.get(v) || 0) + 1));
+  vals.forEach(v => { const c = (seen.get(v) || 0) + 1; seen.set(v, c); occ.push(tot.get(v) > 1 ? c : 0); });
+  let magLo = Infinity, magHi = -Infinity;
+  for (const m of mag) { if (m < magLo) magLo = m; if (m > magHi) magHi = m; }
+  return { n, vals, numeric, mag, magLo, magHi, labels, occ, hasDup: occ.some(x => x > 0) };
+}
+
+const INPUT_KINDS = [
+  { key: "random",   name: "Random" },
+  { key: "nearly",   name: "Nearly sorted" },
+  { key: "reversed", name: "Reversed" },
+  { key: "few",      name: "Few unique" }
+];
+
+function genVals(kind, n, rng) {
+  let v = [];
+  if (kind === "random") {
+    for (let i = 1; i <= n; i++) v.push(i);
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = v[i]; v[i] = v[j]; v[j] = t; }
+  } else if (kind === "nearly") {                /* sorted, then a few random neighbours exchanged */
+    for (let i = 1; i <= n; i++) v.push(i);
+    const k = Math.max(2, Math.floor(n * 0.12));
+    for (let s = 0; s < k && n > 1; s++) { const i = Math.floor(rng() * (n - 1)); const t = v[i]; v[i] = v[i + 1]; v[i + 1] = t; }
+  } else if (kind === "reversed") {
+    for (let i = n; i >= 1; i--) v.push(i);
+  } else if (kind === "few") {                   /* four distinct keys */
+    for (let i = 0; i < n; i++) v.push(1 + Math.floor(rng() * 4));
+  } else if (kind === "sorted") {
+    for (let i = 1; i <= n; i++) v.push(i);
+  }
+  return v;
+}
+
+/* ---------- the state a running algorithm works on ------------------------ */
+
+class Run {
+  constructor(inp, opts) {
+    opts = opts || {};
+    this.inp = inp;
+    this.vals = inp.vals;
+    this.A = [];
+    for (let i = 0; i < inp.n; i++) this.A.push(i);
+    this.aux = new Array(inp.n).fill(-1);          /* -1: never written */
+    this.nc = 0;                                   /* calls of less()           */
+    this.ns = 0;                                   /* calls of swap()           */
+    this.nm = 0;                                   /* element copies (merge)    */
+    this.rng = mulberry32(opts.seed || 1);
+    this.pivotRule = opts.pivot || "random";
+    this.stack = [];                               /* frames {label, site}; replaced, never mutated */
+    this.final = null;                             /* quicksort: positions known to be final */
+    this.range = null;                             /* [lo, hi] currently worked on (inclusive) */
+    this.pivotId = -1;
+  }
+  less(x, y) { this.nc++; return cmpVals(this.vals[x], this.vals[y]) < 0; }
+  swap(i, j) { this.ns++; const A = this.A, t = A[i]; A[i] = A[j]; A[j] = t; }
+  randInt(k) { return Math.floor(this.rng() * k); }            /* random.nextInt(k) */
+  call(label, site) { this.stack = this.stack.concat([{ label, site }]); }
+  ret() { this.stack = this.stack.slice(0, -1); }
+  setFinal(i) {
+    if (!this.final) this.final = new Uint8Array(this.inp.n);
+    if (this.final[i]) return;
+    this.final = this.final.slice(); this.final[i] = 1;
+  }
+  /* label of an element (id) as HTML, with the occurrence number of equal keys */
+  L(id) {
+    if (id < 0) return "–";
+    const o = TAGS && this.inp.occ[id] ? "<sub>" + this.inp.occ[id] + "</sub>" : "";
+    return esc(this.inp.labels[id]) + o;
+  }
+}
+let TAGS = true;          /* number equal keys (set by the checkbox) */
+
+/* ---------- Java code exactly as on the slides ----------------------------
+   {{x}} in a comment is set as math (italic), **x** bold italic (the slides'
+   step numbers).  A line may carry a tag shown at its right end, as the
+   "copy" / "merge" boxes on the Sedgewick–Wayne slide.                       */
+
+const SW = "after Sedgewick & Wayne";
+const CODE = {
+  sel: { title: "Selectionsort", lines: [
+    "static <Elem> void selectionSort(Elem[] A, Comparator<Elem> c) {",
+    "    int n = A.length;",
+    "    for (int i = 0; i < n; ++i) {",
+    "        Elem min = A[i]; int minPos = i;",
+    "        for (int j = i+1; j < n; ++j)",
+    "            if ( less(A[j], min, c) ) {",
+    "                min = A[j]; minPos = j;",
+    "            }",
+    "        swap(A, i, minPos);",
+    "    }",
+    "}" ] },
+  bub: { title: "Bubblesort", lines: [
+    "static <Elem> void bubbleSort(Elem[] A, Comparator<Elem> c) {",
+    "    int n = A.length;",
+    "    for (int i = 0; i <= n-2; ++i)",
+    "        for (int j = n-1; j >= i+1; --j)",
+    "            if (less(A[j], A[j-1], c)) swap(A, j, j-1);",
+    "}" ] },
+  bi: { title: "Improved Bubblesort", lines: [
+    "static <Elem> void bubbleSortImproved(Elem[] A, Comparator<Elem> c) {",
+    "    int n = A.length; int t = 0;",
+    "    while (t != n) {",
+    "        int i = t; t = n;",
+    "        for (int j = n-1; j >= i+1; --j)",
+    "            if (less(A[j], A[j-1], c)) {",
+    "                swap(A, j, j-1); ",
+    "                t = j;",
+    "            }",
+    "    }",
+    "}" ] },
+  bins: { title: "Binary insertion sort", lines: [
+    "static <Elem> void binaryInsertionSort(Elem[] A, Comparator<Elem> c) {",
+    "    int n = A.length;",
+    "    for (int i = 1; i < n; ++i) {",
+    "        int l = 0, r = i;  // A[i] gehört an eine Position in [l..r]",
+    "        while (l < r) {",
+    "            int m = l + (r - l) / 2;",
+    "            if (less(A[i], A[m], c)) r = m;",
+    "            else l = m + 1;",
+    "        }",
+    "        for (int j = i; j > l; --j) swap(A, j, j-1);",
+    "    }",
+    "}" ] },
+  ins: { title: "Insertionsort", lines: [
+    "static <Elem> void insertionSort(Elem[] A, Comparator<Elem> c) {",
+    "    int n = A.length;",
+    "    for (int i = 1; i < n; ++i)",
+    "        for (int j = i;  j > 0 && less(A[j], A[j-1], c);  --j)",
+    "            swap(A, j, j-1);",
+    "}" ] },
+  ms: { title: "Mergesort", src: SW, lines: [
+    "static void sort(Comparable[] a, Comparable[] aux, int lo, int hi)",
+    "{",
+    "   if (hi <= lo) return;",
+    "   int mid = lo + (hi - lo) / 2;",
+    "   sort(a, aux, lo, mid);",
+    "   sort(a, aux, mid+1, hi);",
+    "   merge(a, aux, lo, mid, hi);",
+    "}",
+    "",
+    "static void sort(Comparable[] a)",
+    "{",
+    "   Comparable[] aux = new Comparable[a.length];",
+    "   sort(a, aux, 0, a.length - 1);",
+    "}" ] },
+  bu: { title: "Bottom-up mergesort", src: SW, lines: [
+    "static void sort(Comparable[] a)",
+    "{",
+    "   int N = a.length;",
+    "   Comparable[] aux = new Comparable[N];",
+    "   for (int sz = 1; sz < N; sz = sz+sz)",
+    "      for (int lo = 0; lo < N-sz; lo += sz+sz)",
+    "         merge(a, aux, lo, lo+sz-1, Math.min(lo+sz+sz-1, N-1));",
+    "}" ] },
+  mg: { title: "Merging", src: SW, tags: { 3: "copy", 7: "merge" }, lines: [
+    "static void merge(Comparable[] a, Comparable[] aux, int lo, int mid, int hi)",
+    "{",
+    "   for (int k = lo; k <= hi; k++)",
+    "      aux[k] = a[k];",
+    "",
+    "   int i = lo, j = mid+1;",
+    "   for (int k = lo; k <= hi; k++)",
+    "   {",
+    "      if      (i > mid)              a[k] = aux[j++];",
+    "      else if (j > hi)               a[k] = aux[i++];",
+    "      else if (less(aux[j], aux[i])) a[k] = aux[j++];",
+    "      else                           a[k] = aux[i++];",
+    "   }",
+    "}" ] },
+  qs: { title: "Quicksort", lines: [
+    "static <Elem> void quicksort(Elem[] A, Comparator<Elem> c) {",
+    "    quicksort(A, 0, A.length, c);",
+    "}",
+    "",
+    "/** Sortiert {{A}}[{{l}}..{{r}}) */",
+    "static <Elem> void quicksort(Elem[] A, int l, int r, ",
+    "                             Comparator<Elem> c) {",
+    "    if (r - l <= 1) return; // {{n}} ≤ 1 -> schon sortiert",
+    "    // **1.** unsortiert",
+    "    int p = partition(A, l, r, c); // Details unten",
+    "    // **2.** partitioniert, {{A}}[{{p}}] an endgültiger Position!",
+    "    quicksort(A, l,   p, c );",
+    "    // **3.** {{A}}[{{l}}..{{p}}] sortiert",
+    "    quicksort(A, p+1, r, c);",
+    "    // **4.** alles sortiert",
+    "}" ] },
+  pt: { title: "Hoare–Sedgewick partitioning", lines: [
+    "static <Elem> int partition(Elem[] A, int l, int r, ",
+    "                            Comparator<Elem> c) {",
+    "    swap(A, l, choosePivot(l, r));",
+    "    int i = l, j = r;",
+    "    while (true) {",
+    "        do ++i; while (i < r && less(A[i], A[l], c));",
+    "        do --j; while (j > l && less(A[l], A[j], c));",
+    "        if (i >= j) break;",
+    "        swap(A, i, j);",
+    "    }",
+    "    swap(A, l, j);",
+    "    return j;",
+    "}" ] },
+  pvR: { title: "Pivot: random position", lines: [
+    "static int choosePivot(int l, int r) {",
+    "    return l + random.nextInt(r - l);",
+    "}" ] },
+  pvB: { title: "Pivot: fixed position", lines: [
+    "static int choosePivotBad(int l, int r) {",
+    "    return l;  // feste Position",
+    "}" ] },
+  pvM: { title: "Pivot: median of 3", lines: [
+    "/** Median of 3 random elements */",
+    "static <Elem> int choosePivot(Elem[] A, int l, int r, Comparator<Elem> c) {",
+    "    int n = r - l;",
+    "    if (n < 10) return l + random.nextInt(n); // few elements: random pivot",
+    "    int i1 = l + random.nextInt(n), i2, i3;",
+    "    do i2 = l + random.nextInt(n); while (i2 == i1);",
+    "    do i3 = l + random.nextInt(n); while (i3 == i1 || i3 == i2);",
+    "    sort3(A, c, i1, i2, i3);",
+    "    return i2; // median is now at i2",
+    "}",
+    "",
+    "static <Elem> void sort3(Elem[] A, Comparator<Elem> c, int i1, int i2, int i3) {",
+    "    if (less(A[i2], A[i1], c)) swap(A,i1,i2);",
+    "    if (less(A[i3], A[i1], c)) swap(A,i1,i3);",
+    "    if (less(A[i3], A[i2], c)) swap(A,i2,i3);",
+    "}" ] }
+};
+
+const KW = /\b(static|void|int|for|if|else|while|do|return|break|true|new|private|public|class|boolean)\b/g;
+const TY = /\b(Elem|Comparator|Comparable)\b/g;
+
+function hlJava(src) {
+  /* split off a trailing comment; there are no string literals in this code */
+  let code = src, cm = "", rest = "";
+  let k = src.indexOf("//");
+  const k2 = src.indexOf("/*");
+  if (k2 >= 0 && (k < 0 || k2 < k)) {
+    k = k2;
+    const e = src.indexOf("*/", k2 + 2);
+    if (e >= 0) { rest = src.slice(e + 2); cm = src.slice(k2, e + 2); }
+    else cm = src.slice(k2);
+    code = src.slice(0, k2);
+  } else if (k >= 0) { code = src.slice(0, k); cm = src.slice(k); }
+  const java = s => esc(s).replace(KW, '<span class="kw">$1</span>').replace(TY, '<span class="ty">$1</span>');
+  let h = java(code);
+  if (cm) {
+    const c = esc(cm).replace(/\{\{(.*?)\}\}/g, "<i>$1</i>").replace(/\*\*(.*?)\*\*/g, "<b><i>$1</i></b>");
+    h += '<span class="cm">' + c + "</span>";
+  }
+  return h + java(rest);
+}
+
+/* ==========================================================================
+   The algorithms.  One generator per slide listing; line keys are
+   "<block>.<line number as printed in the code panel>".
+
+   Fields of a yielded step (all optional except ln):
+     ln     line key                      ev    'cmp' | 'swap' | 'copy' | 'write'
+     cmp    [p, q] positions compared     cin   'aux' if the comparison reads aux[]
+     res    result of that less() call    sw    [p, q] positions swapped
+     mv     { from:[arr,pos], to:[arr,pos] }  one element copied (merge)
+     v      variables to display          ptr / pa   pointers into A / aux
+     reg    [{a, b, cls}] regions [a, b) with a meaning (see REGION)
+     mile   milestone: kept in the coarse view
+     trace  { label, short, range:[lo,hi] }  ends a row of the trace table
+     msg    () => HTML, evaluated right after the yield (state is current then)
+     done   the final step
+   ========================================================================== */
+
+const S = (ln, o) => { o = o || {}; o.ln = ln; return o; };
+const c = s => "<code>" + s + "</code>";
+const YES = '<span class="yes">yes</span>', NO = '<span class="no">no</span>';
+
+/* region classes: colour tint + legend text (with {a},{b} filled in) */
+const REGION = {
+  final:  { tint: "--t-final",  text: "<code>A[{a}..{b})</code> in final position" },
+  sorted: { tint: "--t-sorted", text: "<code>A[{a}..{b})</code> sorted (not yet final)" },
+  cand:   { tint: "--t-cand",  text: "possible target positions of <code>A[i]</code>: <code>[{a}..{b})</code>" },
+  range:  { tint: "--t-range",  text: "the subarray <code>A[{a}..{b})</code> being worked on" },
+  run1:   { tint: "--t-run1",   text: "first run <code>[{a}..{b})</code>" },
+  run2:   { tint: "--t-run2",   text: "second run <code>[{a}..{b})</code>" },
+  le:     { tint: "--t-le",     text: "known <code>≤ p</code>: <code>A[{a}..{b})</code>" },
+  ge:     { tint: "--t-ge",     text: "known <code>≥ p</code>: <code>A[{a}..{b})</code>" }
+};
+
+/* ---- Selectionsort ------------------------------------------------------- */
+function* gSelection(R) {
+  const A = R.A, n = A.length, L = id => R.L(id);
+  R.call("selectionSort(A, c)");
+  yield S("sel.1", { mile: 1, msg: () => "<b>selectionSort</b>: the minimum of a sorted list comes first — so repeatedly find the minimum of the unsorted rest and swap it to the front." });
+  yield S("sel.2", { v: { n }, msg: () => c("n = A.length = " + n) + "." });
+  for (let i = 0; ; ++i) {
+    const reg = [{ a: 0, b: i, cls: "final" }];
+    const go = i < n;
+    yield S("sel.3", { mile: 1, v: { n, i }, ptr: { i }, reg,
+      msg: () => go ? "Outer loop, " + c("i = " + i) + ". Invariant: " + c("A[0.." + i + ")") +
+                      (i ? " contains the " + i + " smallest elements, in sorted order." : " is still empty.")
+                    : c("i = n = " + n) + ": the loop ends — " + c("A[0.." + n + ")") + " is sorted." });
+    if (!go) break;
+    let min = A[i], minPos = i;
+    yield S("sel.4", { v: { n, i, minPos }, ptr: { i, minPos }, reg,
+      msg: () => "Start the search for the minimum of " + c("A[" + i + ".." + n + ")") + " with " + c("min = A[" + i + "] = " + L(min)) + ", " + c("minPos = " + i) + "." });
+    for (let j = i + 1; ; ++j) {
+      const go2 = j < n;
+      yield S("sel.5", { v: { n, i, j, minPos }, ptr: go2 ? { i, minPos, j } : { i, minPos }, reg,
+        msg: () => go2 ? c("j = " + j) + (j === i + 1 ? ": scan the rest of the array." : ".")
+                       : c("j = n") + ": scan complete — the minimum of " + c("A[" + i + ".." + n + ")") + " is " + c(L(min)) + " at position " + minPos + "." });
+      if (!go2) break;
+      const r = R.less(A[j], min);
+      yield S("sel.6", { ev: "cmp", cmp: [minPos, j], res: r, v: { n, i, j, minPos }, ptr: { i, minPos, j }, reg,
+        msg: () => c("less(A[" + j + "], min)") + ": " + L(A[j]) + " &lt; " + L(min) + "? " + (r ? YES + " — a new minimum." : NO + ".") });
+      if (r) {
+        min = A[j]; minPos = j;
+        yield S("sel.7", { v: { n, i, j, minPos }, ptr: { i, minPos, j }, reg,
+          msg: () => c("min = A[j] = " + L(min) + "; minPos = " + j) + "." });
+      }
+    }
+    const self = minPos === i;
+    R.swap(i, minPos);
+    yield S("sel.9", { ev: "swap", sw: [i, minPos], v: { n, i, minPos }, ptr: { i, minPos }, reg: [{ a: 0, b: i + 1, cls: "final" }],
+      trace: { label: "i = " + i, short: "i=" + i, range: [i, n - 1] },
+      msg: () => c("swap(A, " + i + ", " + minPos + ")") + (self ? ": the minimum is already in place (a swap with itself)."
+                 : ": the minimum " + L(A[i]) + " moves to its final position " + i + ".") });
+  }
+  R.ret();
+  yield S("sel.11", { mile: 1, done: 1, reg: [{ a: 0, b: n, cls: "final" }],
+    msg: () => "Sorted. " + c("less") + " was called " + R.nc + " times — always " + c("n(n−1)/2") + ", whatever the input — and " + c("swap") + " " + R.ns + " times." });
+}
+
+/* ---- Bubblesort ---------------------------------------------------------- */
+function* gBubble(R) {
+  const A = R.A, n = A.length, L = id => R.L(id);
+  R.call("bubbleSort(A, c)");
+  yield S("bub.1", { mile: 1, msg: () => "<b>bubbleSort</b>: in pairwise comparisons the lighter element rises like an air bubble. Repeat passes over the input." });
+  yield S("bub.2", { v: { n }, msg: () => c("n = A.length = " + n) + "." });
+  for (let i = 0; ; ++i) {
+    const reg = [{ a: 0, b: i, cls: "final" }];
+    const go = i <= n - 2;
+    yield S("bub.3", { mile: 1, v: { n, i }, ptr: { i }, reg,
+      msg: () => go ? "Outer loop, " + c("i = " + i) + ". " + (i ? "The minima of earlier passes have reached the surface: " + c("A[0.." + i + ")") + " is final." : "Nothing is known yet.")
+                    : c("i = " + i + " > n−2") + ": the loop ends." });
+    if (!go) break;
+    for (let j = n - 1; ; --j) {
+      const go2 = j >= i + 1;
+      yield S("bub.4", { v: { n, i, j }, ptr: go2 ? { i, j } : { i }, reg: go2 ? reg : [{ a: 0, b: i + 1, cls: "final" }],
+        trace: go2 ? null : { label: "i = " + i, short: "i=" + i, range: [i, n - 1] },
+        msg: () => go2 ? c("j = " + j) + (j === n - 1 ? ": start at the bottom." : ".")
+                       : c("j = i = " + i) + ": pass over — the smallest element of " + c("A[" + i + ".." + n + ")") + " has risen to position " + i + "." });
+      if (!go2) break;
+      const r = R.less(A[j], A[j - 1]);
+      yield S("bub.5", { ev: "cmp", cmp: [j - 1, j], res: r, v: { n, i, j }, ptr: { i, j }, reg,
+        msg: () => c("less(A[" + j + "], A[" + (j - 1) + "])") + ": " + L(A[j]) + " &lt; " + L(A[j - 1]) + "? " + (r ? YES + " — swap." : NO + " — leave them.") });
+      if (r) {
+        R.swap(j, j - 1);
+        yield S("bub.5", { ev: "swap", sw: [j - 1, j], v: { n, i, j }, ptr: { i, j }, reg,
+          msg: () => c("swap(A, " + j + ", " + (j - 1) + ")") + ": " + L(A[j - 1]) + " rises one position." });
+      }
+    }
+  }
+  R.ret();
+  yield S("bub.6", { mile: 1, done: 1, reg: [{ a: 0, b: n, cls: "final" }],
+    msg: () => "Sorted. " + c("less") + " was called " + R.nc + " times (always " + c("n(n−1)/2") + "), " + c("swap") + " " + R.ns + " times." });
+}
+
+/* ---- Improved Bubblesort ------------------------------------------------- */
+function* gBubbleImproved(R) {
+  const A = R.A, n = A.length, L = id => R.L(id);
+  R.call("bubbleSortImproved(A, c)");
+  yield S("bi.1", { mile: 1, msg: () => "<b>bubbleSortImproved</b>: if the last swap of a pass was between " + c("A[t]") + " and " + c("A[t−1]") + ", then " + c("A[0..t)") + " holds the " + c("t") + " smallest elements in sorted order — the next pass can stop there." });
+  let t = 0, pass = 0;
+  yield S("bi.2", { v: { n, t }, ptr: { t }, msg: () => c("n = " + n + "; t = 0") + "." });
+  while (true) {
+    const go = t !== n;
+    yield S("bi.3", { mile: 1, v: { n, t }, ptr: { t }, reg: [{ a: 0, b: t, cls: "final" }],
+      msg: () => go ? c("t = " + t + " ≠ n") + ". Invariant (line 3): " + c("A[0.." + t + ")") + (t ? " contains the " + t + " smallest elements, sorted." : " is empty.")
+                    : c("t = n") + ": the last pass made no swap at all — " + c("A[0..n)") + " is sorted." });
+    if (!go) break;
+    const i = t; t = n; pass++;
+    const reg = [{ a: 0, b: i, cls: "final" }];
+    yield S("bi.4", { v: { n, i, t }, ptr: { i, t }, reg,
+      msg: () => "Pass " + pass + ": " + c("i = " + i) + ", and " + c("t = n") + " — it stays " + c("n") + " if this pass swaps nothing." });
+    for (let j = n - 1; ; --j) {
+      const go2 = j >= i + 1;
+      yield S("bi.5", { v: { n, i, j, t }, ptr: go2 ? { i, j, t } : { i, t }, reg: go2 ? reg : [{ a: 0, b: t, cls: "final" }],
+        trace: go2 ? null : { label: "pass " + pass + ": i = " + i + ", t → " + t, short: "pass " + pass, range: [i, n - 1] },
+        msg: () => go2 ? c("j = " + j) + (j === n - 1 ? ": start at the bottom." : ".")
+                       : c("j = i = " + i) + ": pass over. " + (t === n ? "No swap happened, " + c("t = n") + "." : "The last swap was at " + c("t = " + t) + ", so " + c("A[0.." + t + ")") + " is final.") });
+      if (!go2) break;
+      const r = R.less(A[j], A[j - 1]);
+      yield S("bi.6", { ev: "cmp", cmp: [j - 1, j], res: r, v: { n, i, j, t }, ptr: { i, j, t }, reg,
+        msg: () => c("less(A[" + j + "], A[" + (j - 1) + "])") + ": " + L(A[j]) + " &lt; " + L(A[j - 1]) + "? " + (r ? YES + "." : NO + ".") });
+      if (r) {
+        R.swap(j, j - 1);
+        yield S("bi.7", { ev: "swap", sw: [j - 1, j], v: { n, i, j, t }, ptr: { i, j, t }, reg,
+          msg: () => c("swap(A, " + j + ", " + (j - 1) + ")") + ": " + L(A[j - 1]) + " rises one position." });
+        t = j;
+        yield S("bi.8", { v: { n, i, j, t }, ptr: { i, j, t }, reg,
+          msg: () => c("t = j = " + j) + ": the last swap so far was between " + c("A[" + j + "]") + " and " + c("A[" + (j - 1) + "]") + "." });
+      }
+    }
+  }
+  R.ret();
+  yield S("bi.11", { mile: 1, done: 1, reg: [{ a: 0, b: n, cls: "final" }],
+    msg: () => "Sorted after " + pass + " pass" + (pass === 1 ? "" : "es") + ". " + c("less") + " was called " + R.nc + " times, " + c("swap") + " " + R.ns + " times." });
+}
+
+/* ---- Insertionsort ------------------------------------------------------- */
+function* gInsertion(R) {
+  const A = R.A, n = A.length, L = id => R.L(id);
+  R.call("insertionSort(A, c)");
+  yield S("ins.1", { mile: 1, msg: () => "<b>insertionSort</b>: the card player's method. The hand is the prefix of the array; insert the next card by swapping it to the left until its left neighbour is not larger." });
+  yield S("ins.2", { v: { n }, msg: () => c("n = A.length = " + n) + "." });
+  for (let i = 1; ; ++i) {
+    const go = i < n;
+    yield S("ins.3", { mile: 1, v: { n, i }, ptr: go ? { i } : {}, reg: [{ a: 0, b: Math.min(i, n), cls: go ? "sorted" : "final" }],
+      msg: () => go ? c("i = " + i) + ". Invariant (line 3): " + c("A[0.." + i + ")") + " is sorted. Now insert " + c("A[" + i + "] = " + L(A[i])) + "."
+                    : c("i = n") + ": the loop ends — the whole array is sorted." });
+    if (!go) break;
+    for (let j = i; ; --j) {
+      const reg = [{ a: 0, b: i + 1, cls: "range" }];
+      if (j > 0) {
+        const r = R.less(A[j], A[j - 1]);
+        yield S("ins.4", { ev: "cmp", cmp: [j - 1, j], res: r, v: { n, i, j }, ptr: { i, j }, reg,
+          trace: r ? null : { label: "i = " + i, short: "i=" + i, range: [0, i] },
+          msg: () => c("j = " + j + " > 0") + " and " + c("less(A[" + j + "], A[" + (j - 1) + "])") + ": " + L(A[j]) + " &lt; " + L(A[j - 1]) + "? " +
+                     (r ? YES + " — swap it one further left." : NO + " — " + L(A[j]) + " has found its place.") });
+        if (!r) break;
+        R.swap(j, j - 1);
+        yield S("ins.5", { ev: "swap", sw: [j - 1, j], v: { n, i, j }, ptr: { i, j }, reg,
+          msg: () => c("swap(A, " + j + ", " + (j - 1) + ")") + ", then " + c("--j") + "." });
+      } else {
+        yield S("ins.4", { v: { n, i, j }, ptr: { i, j }, reg,
+          trace: { label: "i = " + i, short: "i=" + i, range: [0, i] },
+          msg: () => c("j = 0") + ": " + L(A[0]) + " arrived at the front; no comparison needed (" + c("&amp;&amp;") + " stops early)." });
+        break;
+      }
+    }
+  }
+  R.ret();
+  yield S("ins.6", { mile: 1, done: 1, reg: [{ a: 0, b: n, cls: "final" }],
+    msg: () => "Sorted. " + c("less") + " was called " + R.nc + " times, " + c("swap") + " " + R.ns + " times — one swap per inversion of the input." });
+}
+
+/* ---- Binary insertion sort ----------------------------------------------- */
+function* gBinaryInsertion(R) {
+  const A = R.A, n = A.length, lab = id => R.L(id);
+  R.call("binaryInsertionSort(A, c)");
+  yield S("bins.1", { mile: 1, msg: () => "<b>binaryInsertionSort</b>: insertionsort, but the position of " + c("A[i]") + " in the sorted prefix is found by binary search; then " + c("A[i]") + " is swapped to the left up to that position." });
+  yield S("bins.2", { v: { n }, msg: () => c("n = A.length = " + n) + "." });
+  for (let i = 1; ; ++i) {
+    const go = i < n;
+    yield S("bins.3", { mile: 1, v: { n, i }, ptr: go ? { i } : {}, reg: [{ a: 0, b: Math.min(i, n), cls: go ? "sorted" : "final" }],
+      msg: () => go ? c("i = " + i) + ". Invariant: " + c("A[0.." + i + ")") + " is sorted. Now insert " + c("A[" + i + "] = " + lab(A[i])) + "."
+                    : c("i = n") + ": the loop ends — the whole array is sorted." });
+    if (!go) break;
+    let l = 0, r = i;
+    const reg = () => [{ a: 0, b: i, cls: "sorted" }, { a: l, b: r + 1, cls: "cand" }];
+    yield S("bins.4", { v: { n, i, l, r }, ptr: { i, l, r }, reg: reg(),
+      msg: () => c("l = 0, r = " + i) + ": " + c("A[" + i + "]") + " ends up at one of the " + (i + 1) + " positions " + c("0.." + i) + "." });
+    while (true) {
+      const go2 = l < r;
+      yield S("bins.5", { v: { n, i, l, r }, ptr: { i, l, r }, reg: reg(),
+        msg: () => go2 ? c("l = " + l + " < r = " + r) + ": " + (r - l + 1) + " positions are still possible."
+                       : c("l = r = " + l) + ": the position is found." });
+      if (!go2) break;
+      const m = l + Math.floor((r - l) / 2);
+      yield S("bins.6", { v: { n, i, l, r, m }, ptr: { i, l, r, m }, reg: reg(), msg: () => c("m = l + (r − l) / 2 = " + m) + "." });
+      const res = R.less(A[i], A[m]);
+      yield S("bins.7", { ev: "cmp", cmp: [m, i], res, v: { n, i, l, r, m }, ptr: { i, l, r, m }, reg: reg(),
+        msg: () => c("less(A[" + i + "], A[" + m + "])") + ": " + lab(A[i]) + " &lt; " + lab(A[m]) + "? " +
+                   (res ? YES + " — " + c("A[" + i + "]") + " goes before position " + m + "."
+                        : NO + " — " + c("A[" + i + "]") + " goes after position " + m + (R.vals[A[i]] === R.vals[A[m]] ? " (equal keys: behind, which keeps the sort stable)" : "") + ".") });
+      if (res) {
+        r = m;
+        yield S("bins.7", { v: { n, i, l, r, m }, ptr: { i, l, r, m }, reg: reg(), msg: () => c("r = m = " + m) + "." });
+      } else {
+        l = m + 1;
+        yield S("bins.8", { v: { n, i, l, r, m }, ptr: { i, l, r, m }, reg: reg(), msg: () => c("l = m + 1 = " + l) + "." });
+      }
+    }
+    for (let j = i; ; --j) {
+      const go3 = j > l;
+      yield S("bins.10", { v: { n, i, l, j }, ptr: { l, j }, reg: [{ a: 0, b: i + 1, cls: "range" }],
+        trace: go3 ? null : { label: "i = " + i + " → " + l, short: "i=" + i, range: [0, i] },
+        msg: () => go3 ? c("j = " + j + " > l = " + l) + ": swap one further left."
+                       : c("j = l = " + l) + ": " + lab(A[l]) + " is at its place" + (l === i ? " (it stayed where it was)." : ".") });
+      if (!go3) break;
+      R.swap(j, j - 1);
+      yield S("bins.10", { ev: "swap", sw: [j - 1, j], v: { n, i, l, j }, ptr: { l, j }, reg: [{ a: 0, b: i + 1, cls: "range" }],
+        msg: () => c("swap(A, " + j + ", " + (j - 1) + ")") + ", then " + c("--j") + "." });
+    }
+  }
+  R.ret();
+  yield S("bins.12", { mile: 1, done: 1, reg: [{ a: 0, b: n, cls: "final" }],
+    msg: () => "Sorted. " + c("less") + " was called " + R.nc + " times; " + c("swap") + " " + R.ns + " times — exactly as many swaps as insertionsort (one per inversion)." });
+}
+
+/* ---- Merging (shared by both mergesorts) --------------------------------- */
+function* gMerge(R, lo, mid, hi, site, pre) {
+  const a = R.A, aux = R.aux, L = id => R.L(id);
+  R.call("merge(a, aux, " + lo + ", " + mid + ", " + hi + ")", site);
+  const prevRange = R.range;
+  R.range = [lo, hi];
+  const runs = [{ a: lo, b: mid + 1, cls: "run1" }, { a: mid + 1, b: hi + 1, cls: "run2" }];
+  const V = o => Object.assign({ lo, mid, hi }, o);
+  yield S("mg.1", { mile: 1, v: V({}), ptr: { lo, mid, hi }, reg: runs, mrg: { phase: "start", lo, mid, hi },
+    msg: () => c("merge(a, aux, " + lo + ", " + mid + ", " + hi + ")") + ": " + c("a[" + lo + ".." + mid + "]") + " and " + c("a[" + (mid + 1) + ".." + hi + "]") + " are sorted runs; afterwards " + c("a[" + lo + ".." + hi + "]") + " shall be sorted." });
+  for (let k = lo; ; k++) {
+    const go = k <= hi;
+    yield S("mg.3", { v: V({ k }), ptr: go ? { k } : {}, reg: runs, mrg: { phase: "copy", lo, mid, hi, k },
+      msg: () => go ? (k === lo ? "First copy both runs to the auxiliary array: " : "") + c("k = " + k) + "."
+                    : c("k = hi + 1") + ": " + c("aux[" + lo + ".." + hi + "]") + " now holds a copy of both runs." });
+    if (!go) break;
+    const old = aux[k];
+    aux[k] = a[k]; R.nm++;
+    yield S("mg.4", { ev: "copy", mv: { from: ["a", k], to: ["aux", k], old }, v: V({ k }), ptr: { k }, reg: runs, mrg: { phase: "copy", lo, mid, hi, k },
+      msg: () => c("aux[" + k + "] = a[" + k + "] = " + L(a[k])) + "." });
+  }
+  let i = lo, j = mid + 1;
+  yield S("mg.6", { mile: 1, v: V({ i, j }), pa: { lo, i, mid, j, hi }, reg: runs, mrg: { phase: "merge", lo, mid, hi, i, j, k: lo },
+    msg: () => "Merge back from " + c("aux") + " into " + c("a") + ": " + c("i = lo = " + lo) + " walks the first run, " + c("j = mid+1 = " + (mid + 1)) + " the second." });
+  for (let k = lo; ; k++) {
+    const go = k <= hi;
+    const M = () => ({ phase: "merge", lo, mid, hi, i, j, k });
+    yield S("mg.7", { v: V({ i, j, k }), ptr: go ? { k } : {}, pa: { lo, i, mid, j, hi }, reg: runs, mrg: M(),
+      msg: () => go ? c("k = " + k) + ": fill " + c("a[" + k + "]") + " with the smaller of " + c("aux[i]") + " and " + c("aux[j]") + "."
+                    : c("k = hi + 1") + ": done." });
+    if (!go) break;
+    let src;
+    if (i > mid) {
+      src = j; const old = a[k]; a[k] = aux[j++]; R.nm++;
+      yield S("mg.9", { ev: "write", mv: { from: ["aux", src], to: ["a", k], old }, v: V({ i, j, k }), ptr: { k }, pa: { lo, i, mid, j, hi }, reg: runs, mrg: M(),
+        msg: () => c("i > mid") + ": the first run is used up, so " + c("a[" + k + "] = aux[j++] = " + L(a[k])) + "." });
+      continue;
+    }
+    yield S("mg.9", { v: V({ i, j, k }), ptr: { k }, pa: { lo, i, mid, j, hi }, reg: runs, mrg: M(),
+      msg: () => c("i = " + i + " ≤ mid") + ": the first run still has elements." });
+    if (j > hi) {
+      src = i; const old = a[k]; a[k] = aux[i++]; R.nm++;
+      yield S("mg.10", { ev: "write", mv: { from: ["aux", src], to: ["a", k], old }, v: V({ i, j, k }), ptr: { k }, pa: { lo, i, mid, j, hi }, reg: runs, mrg: M(),
+        msg: () => c("j > hi") + ": the second run is used up, so " + c("a[" + k + "] = aux[i++] = " + L(a[k])) + "." });
+      continue;
+    }
+    yield S("mg.10", { v: V({ i, j, k }), ptr: { k }, pa: { lo, i, mid, j, hi }, reg: runs, mrg: M(),
+      msg: () => c("j = " + j + " ≤ hi") + ": the second run still has elements." });
+    const r = R.less(aux[j], aux[i]);
+    yield S("mg.11", { ev: "cmp", cin: "aux", cmp: [i, j], res: r, v: V({ i, j, k }), ptr: { k }, pa: { lo, i, mid, j, hi }, reg: runs, mrg: M(),
+      msg: () => c("less(aux[" + j + "], aux[" + i + "])") + ": " + L(aux[j]) + " &lt; " + L(aux[i]) + "? " +
+                 (r ? YES + " — take it from the second run." : NO + " — take " + c("aux[i]") + " from the first run" + (R.vals[aux[i]] === R.vals[aux[j]] ? " (on ties the first run wins: this keeps mergesort stable)" : "") + ".") });
+    if (r) {
+      src = j; const old = a[k]; a[k] = aux[j++]; R.nm++;
+      yield S("mg.11", { ev: "write", mv: { from: ["aux", src], to: ["a", k], old }, v: V({ i, j, k }), ptr: { k }, pa: { lo, i, mid, j, hi }, reg: runs, mrg: M(),
+        msg: () => c("a[" + k + "] = aux[j++] = " + L(a[k])) + "." });
+    } else {
+      src = i; const old = a[k]; a[k] = aux[i++]; R.nm++;
+      yield S("mg.12", { ev: "write", mv: { from: ["aux", src], to: ["a", k], old }, v: V({ i, j, k }), ptr: { k }, pa: { lo, i, mid, j, hi }, reg: runs, mrg: M(),
+        msg: () => c("a[" + k + "] = aux[i++] = " + L(a[k])) + "." });
+    }
+  }
+  yield S("mg.14", { mile: 1, v: V({}), reg: [{ a: lo, b: hi + 1, cls: "sorted" }], mrg: { phase: "done", lo, mid, hi },
+    trace: { label: (pre || "") + "merge(a, aux, " + lo + ", " + mid + ", " + hi + ")", short: lo + ".." + hi, range: [lo, hi] },
+    msg: () => c("a[" + lo + ".." + hi + "]") + " is sorted." });
+  R.ret();
+  R.range = prevRange;
+}
+
+/* ---- Top-down mergesort -------------------------------------------------- */
+function* gMergeTD(R) {
+  const n = R.A.length;
+  R.call("sort(a)");
+  yield S("ms.10", { mile: 1, msg: () => "<b>sort(a)</b>, top-down mergesort: sort both halves recursively, then merge them." });
+  yield S("ms.12", { v: { n }, auxNew: 1, msg: () => "Allocate the auxiliary array " + c("aux[0.." + n + ")") + "." });
+  yield S("ms.13", { msg: () => c("sort(a, aux, 0, " + (n - 1) + ")") + ": the whole array." });
+  yield* gSortTD(R, 0, n - 1, "ms.13");
+  R.ret();
+  yield S("ms.14", { mile: 1, done: 1, reg: [{ a: 0, b: n, cls: "final" }],
+    msg: () => "Sorted. " + c("less") + " was called " + R.nc + " times; " + R.nm + " element copies (to " + c("aux") + " and back)." });
+}
+function* gSortTD(R, lo, hi, site) {
+  R.call("sort(a, aux, " + lo + ", " + hi + ")", site);
+  const prevRange = R.range;
+  R.range = [lo, hi];
+  const reg = [{ a: lo, b: hi + 1, cls: "range" }];
+  yield S("ms.1", { mile: 1, v: { lo, hi }, ptr: { lo, hi }, reg,
+    msg: () => c("sort(a, aux, " + lo + ", " + hi + ")") + ": sort " + c("a[" + lo + ".." + hi + "]") + "." });
+  if (hi <= lo) {
+    yield S("ms.3", { mile: 1, v: { lo, hi }, ptr: { lo, hi }, reg: [{ a: lo, b: hi + 1, cls: "sorted" }],
+      msg: () => c("hi ≤ lo") + ": " + (hi === lo ? "a single element is sorted" : "nothing to sort") + " — return." });
+    R.ret(); R.range = prevRange; return;
+  }
+  yield S("ms.3", { v: { lo, hi }, ptr: { lo, hi }, reg, msg: () => c("hi > lo") + ": " + (hi - lo + 1) + " elements." });
+  const mid = lo + Math.floor((hi - lo) / 2);
+  const halves = [{ a: lo, b: mid + 1, cls: "run1" }, { a: mid + 1, b: hi + 1, cls: "run2" }];
+  yield S("ms.4", { v: { lo, mid, hi }, ptr: { lo, mid, hi }, reg: halves,
+    msg: () => c("mid = lo + (hi − lo) / 2 = " + mid) + "." });
+  yield S("ms.5", { v: { lo, mid, hi }, ptr: { lo, mid, hi }, reg: halves,
+    msg: () => "Sort the left half " + c("a[" + lo + ".." + mid + "]") + " recursively." });
+  yield* gSortTD(R, lo, mid, "ms.5");
+  yield S("ms.6", { v: { lo, mid, hi }, ptr: { lo, mid, hi }, reg: [{ a: lo, b: mid + 1, cls: "sorted" }, { a: mid + 1, b: hi + 1, cls: "run2" }],
+    msg: () => c("a[" + lo + ".." + mid + "]") + " is sorted. Now the right half " + c("a[" + (mid + 1) + ".." + hi + "]") + "." });
+  yield* gSortTD(R, mid + 1, hi, "ms.6");
+  yield S("ms.7", { v: { lo, mid, hi }, ptr: { lo, mid, hi }, reg: halves,
+    msg: () => "Both halves are sorted: merge them." });
+  yield* gMerge(R, lo, mid, hi, "ms.7");
+  R.ret(); R.range = prevRange;
+}
+
+/* ---- Bottom-up mergesort ------------------------------------------------- */
+function* gMergeBU(R) {
+  const N = R.A.length;
+  R.call("sort(a)");
+  yield S("bu.1", { mile: 1, msg: () => "<b>sort(a)</b>, bottom-up mergesort: pass through the array merging runs of size 1, then 2, 4, 8, … — no recursion." });
+  yield S("bu.3", { v: { N }, msg: () => c("N = a.length = " + N) + "." });
+  yield S("bu.4", { v: { N }, auxNew: 1, msg: () => "Allocate the auxiliary array " + c("aux[0.." + N + ")") + "." });
+  for (let sz = 1; ; sz = sz + sz) {
+    const go = sz < N;
+    yield S("bu.5", { mile: 1, v: { N, sz },
+      msg: () => go ? c("sz = " + sz) + ": merge neighbouring runs of length " + sz + "." : c("sz = " + sz + " ≥ N") + ": the loop ends." });
+    if (!go) break;
+    for (let lo = 0; ; lo += sz + sz) {
+      const go2 = lo < N - sz;
+      yield S("bu.6", { v: { N, sz, lo }, ptr: go2 ? { lo } : {},
+        msg: () => go2 ? c("lo = " + lo) + "."
+                       : c("lo = " + lo + " ≥ N − sz = " + (N - sz)) + ": no second run left " + (lo < N ? "— the last run " + c("a[" + lo + ".." + (N - 1) + "]") + " waits for the next pass." : "in this pass.") });
+      if (!go2) break;
+      const mid = lo + sz - 1, hi = Math.min(lo + sz + sz - 1, N - 1);
+      yield S("bu.7", { v: { N, sz, lo }, ptr: { lo }, reg: [{ a: lo, b: mid + 1, cls: "run1" }, { a: mid + 1, b: hi + 1, cls: "run2" }],
+        msg: () => c("merge(a, aux, " + lo + ", " + mid + ", Math.min(" + (lo + sz + sz - 1) + ", " + (N - 1) + ") = " + hi + ")") + "." });
+      yield* gMerge(R, lo, mid, hi, "bu.7", "sz = " + sz + ": ");
+    }
+  }
+  R.ret();
+  yield S("bu.8", { mile: 1, done: 1, reg: [{ a: 0, b: N, cls: "final" }],
+    msg: () => "Sorted. " + c("less") + " was called " + R.nc + " times; " + R.nm + " element copies." });
+}
+
+/* ---- Quicksort ----------------------------------------------------------- */
+const PIVOT_BLOCK = { random: "pvR", first: "pvB", m3: "pvM" };
+
+function* gQuick(R) {
+  const n = R.A.length;
+  R.final = new Uint8Array(n);
+  R.call("quicksort(A, c)");
+  yield S("qs.1", { mile: 1, msg: () => "<b>quicksort(A, c)</b>: partition around a pivot, then sort both sides recursively." });
+  yield S("qs.2", { msg: () => c("quicksort(A, 0, " + n + ", c)") + ": the whole array " + c("A[0.." + n + ")") + "." });
+  yield* gQs(R, 0, n, "qs.2");
+  R.ret();
+  yield S("qs.3", { mile: 1, done: 1, reg: [{ a: 0, b: n, cls: "final" }],
+    msg: () => "Sorted. " + c("less") + " was called " + R.nc + " times, " + c("swap") + " " + R.ns + " times." });
+}
+function* gQs(R, l, r, site) {
+  const A = R.A, L = id => R.L(id);
+  R.call("quicksort(A, " + l + ", " + r + ")", site);
+  const prevRange = R.range;
+  R.range = [l, r - 1];
+  const reg = [{ a: l, b: r, cls: "range" }];
+  yield S("qs.6", { mile: 1, v: { l, r }, ptr: { l, r }, reg,
+    msg: () => c("quicksort(A, " + l + ", " + r + ")") + ": sort " + c("A[" + l + ".." + r + ")") + " — " + (r - l) + " element" + (r - l === 1 ? "" : "s") + "." });
+  if (r - l <= 1) {
+    if (r - l === 1) R.setFinal(l);
+    yield S("qs.8", { mile: 1, v: { l, r }, ptr: { l, r },
+      msg: () => c("r − l = " + (r - l) + " ≤ 1") + ": already sorted" + (r - l === 1 ? " — and " + L(A[l]) + " sits at its final position" : "") + ". Return." });
+    R.ret(); R.range = prevRange; return;
+  }
+  yield S("qs.8", { v: { l, r }, ptr: { l, r }, reg, msg: () => c("r − l = " + (r - l) + " > 1") + ". State <b><i>1.</i></b>: unsorted." });
+  yield S("qs.10", { v: { l, r }, ptr: { l, r }, reg, msg: () => "Partition " + c("A[" + l + ".." + r + ")") + "." });
+  const p = yield* gPartition(R, l, r, "qs.10");
+  R.setFinal(p);
+  const reg2 = [{ a: l, b: p, cls: "le" }, { a: p + 1, b: r, cls: "ge" }];
+  yield S("qs.10", { mile: 1, v: { l, r, p }, ptr: { l, p, r }, reg: reg2,
+    msg: () => c("p = " + p) + ". State <b><i>2.</i></b>: partitioned — " + c("A[" + p + "] = " + L(A[p])) + " is at its final position, with " + c("A[" + l + ".." + p + ") ≤ " + L(A[p]) + " ≤ A[" + (p + 1) + ".." + r + ")") + "." });
+  yield S("qs.12", { v: { l, r, p }, ptr: { l, p, r }, reg: reg2, msg: () => "Sort the left part: " + c("quicksort(A, " + l + ", " + p + ")") + "." });
+  yield* gQs(R, l, p, "qs.12");
+  yield S("qs.14", { v: { l, r, p }, ptr: { l, p, r }, reg: [{ a: l, b: p + 1, cls: "final" }, { a: p + 1, b: r, cls: "ge" }],
+    msg: () => "State <b><i>3.</i></b>: " + c("A[" + l + ".." + p + "]") + " is sorted. Now the right part: " + c("quicksort(A, " + (p + 1) + ", " + r + ")") + "." });
+  yield* gQs(R, p + 1, r, "qs.14");
+  yield S("qs.16", { mile: 1, v: { l, r, p }, ptr: { l, r }, reg: [{ a: l, b: r, cls: "final" }],
+    msg: () => "State <b><i>4.</i></b>: " + c("A[" + l + ".." + r + ")") + " is sorted. Return." });
+  R.ret(); R.range = prevRange;
+}
+
+function* gChoosePivot(R, l, r) {
+  const A = R.A, L = id => R.L(id), blk = PIVOT_BLOCK[R.pivotRule] || "pvR";
+  if (R.pivotRule === "first") {
+    R.call("choosePivotBad(" + l + ", " + r + ")", "pt.3");
+    yield S(blk + ".1", { v: { l, r }, ptr: { l, r }, msg: () => c("choosePivotBad(" + l + ", " + r + ")") });
+    yield S(blk + ".2", { v: { l, r }, ptr: { l, r }, pick: l,
+      msg: () => "Return " + c("l = " + l) + ": the pivot is " + L(A[l]) + ". A fixed position is predictable — and can be exploited." });
+    R.ret(); return l;
+  }
+  if (R.pivotRule === "m3") {
+    R.call("choosePivot(A, " + l + ", " + r + ", c)", "pt.3");
+    yield S(blk + ".2", { v: { l, r }, ptr: { l, r }, msg: () => c("choosePivot(A, " + l + ", " + r + ", c)") + ": median of three random elements." });
+    const n = r - l;
+    yield S(blk + ".3", { v: { l, r, n }, ptr: { l, r }, msg: () => c("n = r − l = " + n) + "." });
+    if (n < 10) {                                 /* few elements: a plain random pivot */
+      const pv = l + R.randInt(n);
+      yield S(blk + ".4", { v: { l, r, n }, ptr: { l, r }, pick: pv,
+        msg: () => c("n = " + n + " < 10") + ": few elements — median-of-3 would not pay off; random pivot " +
+                   c("l + random.nextInt(" + n + ") = " + pv) + ", i.e. " + L(A[pv]) + "." });
+      R.ret(); return pv;
+    }
+    yield S(blk + ".4", { v: { l, r, n }, ptr: { l, r }, msg: () => c("n = " + n + " ≥ 10") + ": take the median of three different random positions." });
+    const i1 = l + R.randInt(n);
+    yield S(blk + ".5", { v: { n, i1 }, ptr: { i1 }, msg: () => c("i1 = l + random.nextInt(" + n + ") = " + i1) + " (" + L(A[i1]) + ")." });
+    let i2, i3;
+    do {                                          /* do i2 = …; while (i2 == i1); — a repeated draw is a step of its own */
+      i2 = l + R.randInt(n);
+      const again = i2 === i1, _i2 = i2;
+      yield S(blk + ".6", { v: { n, i1, i2: _i2 }, ptr: { i1, i2: _i2 }, msg: () => c("i2 = " + _i2) + (again ? ": the same as " + c("i1") + " — draw again." : " (" + L(A[_i2]) + ").") });
+    } while (i2 === i1);
+    do {
+      i3 = l + R.randInt(n);
+      const again = i3 === i1 || i3 === i2, _i3 = i3;
+      yield S(blk + ".7", { v: { n, i1, i2, i3: _i3 }, ptr: { i1, i2, i3: _i3 }, msg: () => c("i3 = " + _i3) + (again ? ": already taken — draw again." : " (" + L(A[_i3]) + ").") });
+    } while (i3 === i1 || i3 === i2);
+    yield S(blk + ".8", { v: { i1, i2, i3 }, ptr: { i1, i2, i3 }, msg: () => c("sort3(A, c, " + i1 + ", " + i2 + ", " + i3 + ")") + ": put the three in order." });
+    R.call("sort3(A, c, " + i1 + ", " + i2 + ", " + i3 + ")", blk + ".8");
+    yield S(blk + ".12", { v: { i1, i2, i3 }, ptr: { i1, i2, i3 }, msg: () => c("sort3") + " — three compare-and-swaps." });
+    const pairs = [[i2, i1, 13], [i3, i1, 14], [i3, i2, 15]];
+    for (const [x, y, ln] of pairs) {
+      const rr = R.less(A[x], A[y]);
+      const nx = x === i2 ? "i2" : "i3", ny = y === i1 ? "i1" : "i2";
+      yield S(blk + "." + ln, { ev: "cmp", cmp: [Math.min(x, y), Math.max(x, y)], res: rr, v: { i1, i2, i3 }, ptr: { i1, i2, i3 },
+        msg: () => c("less(A[" + nx + "], A[" + ny + "])") + ": " + L(A[x]) + " &lt; " + L(A[y]) + "? " + (rr ? YES + " — swap." : NO + ".") });
+      if (rr) {
+        R.swap(y, x);
+        yield S(blk + "." + ln, { ev: "swap", sw: [Math.min(x, y), Math.max(x, y)], v: { i1, i2, i3 }, ptr: { i1, i2, i3 },
+          msg: () => c("swap(A, " + ny + ", " + nx + ")") + "." });
+      }
+    }
+    R.ret();
+    yield S(blk + ".9", { v: { i1, i2, i3 }, ptr: { i1, i2, i3 }, pick: i2,
+      msg: () => "Return " + c("i2 = " + i2) + ": the pivot is the median " + L(A[i2]) + " of " + L(A[i1]) + ", " + L(A[i2]) + ", " + L(A[i3]) + "." });
+    R.ret(); return i2;
+  }
+  R.call("choosePivot(" + l + ", " + r + ")", "pt.3");
+  yield S(blk + ".1", { v: { l, r }, ptr: { l, r }, msg: () => c("choosePivot(" + l + ", " + r + ")") + ": a uniformly random position in " + c("[" + l + ".." + r + ")") + "." });
+  const pv = l + R.randInt(r - l);
+  yield S(blk + ".2", { v: { l, r }, ptr: { l, r }, pick: pv,
+    msg: () => c("l + random.nextInt(" + (r - l) + ") = " + l + " + " + (pv - l) + " = " + pv) + ": the pivot is " + L(A[pv]) + "." });
+  R.ret(); return pv;
+}
+
+function* gPartition(R, l, r, site) {
+  const A = R.A, L = id => R.L(id);
+  R.call("partition(A, " + l + ", " + r + ")", site);
+  yield S("pt.1", { mile: 1, v: { l, r }, ptr: { l, r }, reg: [{ a: l, b: r, cls: "range" }],
+    msg: () => c("partition(A, " + l + ", " + r + ")") + ": rearrange " + c("A[" + l + ".." + r + ")") + " around a pivot and return its final position." });
+  yield S("pt.3", { v: { l, r }, ptr: { l, r }, reg: [{ a: l, b: r, cls: "range" }], msg: () => "First choose the pivot: " + c("choosePivot(" + l + ", " + r + ")") + "." });
+  const pv = yield* gChoosePivot(R, l, r);
+  R.swap(l, pv);
+  R.pivotId = A[l];
+  yield S("pt.3", { ev: "swap", sw: [l, pv], v: { l, r }, ptr: { l, r }, reg: [{ a: l, b: r, cls: "range" }], piv: 1,
+    msg: () => c("swap(A, " + l + ", " + pv + ")") + (pv === l ? ": the pivot " + c("p = " + L(A[l])) + " already is at " + c("A[l]") + "." : ": the pivot " + c("p = " + L(A[l])) + " moves to " + c("A[l]") + ".") });
+  let i = l, j = r, sm = l + 1, lg = r;           /* A(l..sm) <= p,  A[lg..r) >= p  -- what is known so far */
+  const reg = () => [{ a: l + 1, b: sm, cls: "le" }, { a: lg, b: r, cls: "ge" }];
+  const V = () => ({ l, r, i, j });
+  yield S("pt.4", { v: V(), ptr: { i, j }, reg: reg(), piv: 1, msg: () => c("i = l = " + l + ", j = r = " + r) + "." });
+  while (true) {
+    yield S("pt.5", { v: V(), ptr: { i, j }, reg: reg(), piv: 1,
+      msg: () => "Loop invariant: " + c("A[l] = p") + ", everything left of " + c("i") + " is " + c("≤ p") + ", everything right of " + c("j") + " is " + c("≥ p") + "; the elements in between are still unknown." });
+    while (true) {
+      ++i;
+      if (i < r) {
+        const cr = R.less(A[i], A[l]);
+        if (cr) sm = i + 1;
+        yield S("pt.6", { ev: "cmp", cmp: [l, i], res: cr, v: V(), ptr: { i, j }, reg: reg(), piv: 1, stop: cr ? null : "i",
+          msg: () => c("++i → " + i) + ", " + c("less(A[" + i + "], A[l])") + ": " + L(A[i]) + " &lt; " + L(A[l]) + "? " +
+                     (cr ? YES + " — keep going." : NO + " — " + c("i") + " stops: " + L(A[i]) + " belongs to the right.") });
+        if (!cr) break;
+      } else {
+        yield S("pt.6", { v: V(), ptr: { i, j }, reg: reg(), piv: 1, msg: () => c("++i → " + i + " = r") + ": " + c("i") + " stops at the end of the range." });
+        break;
+      }
+    }
+    while (true) {
+      --j;
+      if (j > l) {
+        const cr = R.less(A[l], A[j]);
+        if (cr) lg = j;
+        yield S("pt.7", { ev: "cmp", cmp: [l, j], res: cr, v: V(), ptr: { i, j }, reg: reg(), piv: 1, stop: cr ? (i < r && i < j ? "i" : null) : (i < j ? "ij" : null),
+          msg: () => c("--j → " + j) + ", " + c("less(A[l], A[" + j + "])") + ": " + L(A[l]) + " &lt; " + L(A[j]) + "? " +
+                     (cr ? YES + " — keep going." : NO + " — " + c("j") + " stops: " + L(A[j]) + " belongs to the left.") });
+        if (!cr) break;
+      } else {
+        yield S("pt.7", { v: V(), ptr: { i, j }, reg: reg(), piv: 1, msg: () => c("--j → " + j + " = l") + ": " + c("j") + " stops at the pivot." });
+        break;
+      }
+    }
+    if (i >= j) {
+      yield S("pt.8", { v: V(), ptr: { i, j }, reg: reg(), piv: 1,
+        msg: () => c("i = " + i + " ≥ j = " + j) + ": the indices have crossed — break. " + c("j") + " is the last position of the left part." });
+      break;
+    }
+    yield S("pt.8", { v: V(), ptr: { i, j }, reg: reg(), piv: 1, stop: "ij", msg: () => c("i = " + i + " < j = " + j) + ": both stopped on the wrong side." });
+    R.swap(i, j);
+    sm = i + 1; lg = j;
+    yield S("pt.9", { ev: "swap", sw: [i, j], v: V(), ptr: { i, j }, reg: reg(), piv: 1,
+      msg: () => c("swap(A, " + i + ", " + j + ")") + ": now " + L(A[i]) + " ≤ p is on the left and " + L(A[j]) + " ≥ p on the right." });
+  }
+  R.swap(l, j);
+  yield S("pt.11", { ev: "swap", sw: [l, j], v: V(), ptr: { i, j }, piv: 1,
+    reg: [{ a: l, b: j, cls: "le" }, { a: j + 1, b: r, cls: "ge" }],
+    msg: () => c("swap(A, l, j)") + ": the pivot " + L(A[j]) + " moves to position " + j + (j === l ? " — it already was there" : "") + ": its final position." });
+  yield S("pt.12", { mile: 1, v: V(), ptr: { j }, piv: 1, reg: [{ a: l, b: j, cls: "le" }, { a: j + 1, b: r, cls: "ge" }],
+    trace: { label: "partition(A, " + l + ", " + r + ") → " + j, short: l + ".." + (r - 1), range: [l, r - 1] },
+    msg: () => c("return j = " + j) + "." });
+  R.ret();
+  R.pivotId = -1;
+  return j;
+}
+
+/* ---- registry ------------------------------------------------------------ */
+const ALGOS = {
+  selection:      { name: "Selectionsort",         short: "Selection",     gen: gSelection,      blocks: ["sel"],       layout: "bars",
+                    moves: "swap" },
+  bubble:         { name: "Bubblesort",            short: "Bubble",        gen: gBubble,         blocks: ["bub"],       layout: "bubble",
+                    moves: "swap" },
+  bubbleImproved: { name: "Bubblesort, improved",  short: "Bubble (improved)", gen: gBubbleImproved, blocks: ["bi"],  layout: "bubble",
+                    moves: "swap" },
+  insertion:      { name: "Insertionsort",         short: "Insertion",     gen: gInsertion,      blocks: ["ins"],       layout: "bars",
+                    moves: "swap" },
+  binaryInsertion: { name: "Binary insertion sort", short: "Binary insertion", gen: gBinaryInsertion, blocks: ["bins"], layout: "bars",
+                    moves: "swap" },
+  merge:          { name: "Mergesort",             short: "Mergesort",     gen: gMergeTD,        blocks: ["ms", "mg"],  layout: "bars",
+                    moves: "copy", aux: true },
+  mergeBU:        { name: "Bottom-up mergesort",   short: "Mergesort (bottom-up)", gen: gMergeBU, blocks: ["bu", "mg"], layout: "bars",
+                    moves: "copy", aux: true },
+  quick:          { name: "Quicksort",             short: "Quicksort",     gen: gQuick,          blocks: ["qs", "pt", "PIVOT"], layout: "bars",
+                    moves: "swap", pivot: true }
+};
+const ALGO_ORDER = ["selection", "bubble", "bubbleImproved", "insertion", "binaryInsertion", "merge", "mergeBU", "quick"];
+const PIVOT_NAME = { random: "random pivot", first: "pivot A[l]", m3: "median-of-3 pivot" };
+
+const ABOUT = {
+  selection: "<p><b>Idea</b> In a sorted list the minimum comes first. Find the minimum iteratively and remove it.</p>" +
+             "<p><b>Correctness</b> Invariant: <code>A[0..i)</code> contains the <i>i</i> smallest elements in sorted order.</p>" +
+             "<p><b>Cost</b> <i>n</i>(<i>n</i>−1)/2 ~ ½<i>n</i>² comparisons for every input; <i>n</i> swaps.</p>",
+  bubble:    "<p><b>Idea</b> In pairwise comparisons the lighter element rises like an air bubble. Iterate over the input.</p>" +
+             "<p><b>Correctness</b> Every swap brings the array closer to sorted. After each iteration of the outer loop the next minimum has reached the surface and can be ignored from then on.</p>" +
+             "<p><b>Cost</b> ~ ½<i>n</i>² comparisons for every input.</p>",
+  bubbleImproved: "<p><b>Observation</b> If the last swap of the previous pass was between <code>A[t]</code> and <code>A[t−1]</code>, then <code>A[0..t)</code> contains the <i>t</i> smallest elements in sorted order.</p>" +
+             "<p><b>Correctness</b> Invariant (line 3): <code>A[0..t)</code> contains the <i>t</i> smallest elements in sorted order.</p>" +
+             "<p><b>Cost</b> Depends on the input: a sorted array needs a single pass, <i>n</i>−1 comparisons.</p>",
+  binaryInsertion: "<p><b>Idea</b> Insertionsort, but find the position of <code>A[i]</code> in the sorted prefix by binary search, then swap it there.</p>" +
+             "<p><b>Correctness</b> Invariant: <code>A[0..i)</code> is sorted (in line 3); during the search, the target position of <code>A[i]</code> lies in <code>[l..r]</code>. Equal keys go behind, so the sort is stable.</p>" +
+             "<p><b>Cost</b> At most ⌈lg 2⌉ + ⌈lg 3⌉ + … + ⌈lg <i>n</i>⌉ ≈ <i>n</i> lg <i>n</i> comparisons — but the swaps are the same as in insertionsort: one per inversion, ~ ¼<i>n</i>² on average.</p>",
+  insertion: "<p><b>Idea</b> The card player's method: insert elements one by one into the sorted “hand”. Hand = prefix of the array; inserting = swapping to the left while the neighbour is larger.</p>" +
+             "<p><b>Correctness</b> Invariant: <code>A[0..i)</code> is sorted (in line 3).</p>" +
+             "<p><b>Cost</b> At most ½<i>n</i>² + <i>O</i>(<i>n</i>) comparisons and swaps: every swap removes one inversion.</p>",
+  merge:     "<p><b>Idea</b> Split into halves, sort both recursively, then merge the two sorted runs — via the auxiliary array <code>aux</code>: copy <code>a[lo..hi]</code> there, then merge back.</p>" +
+             "<p><b>Cost</b> Between ½ <i>n</i> lg <i>n</i> and <i>n</i> lg <i>n</i> comparisons: the running time hardly depends on the data. Needs Θ(<i>n</i>) extra space.</p>",
+  mergeBU:   "<p><b>Idea</b> Mergesort without recursion: pass through the array merging subarrays of size 1, then 2, 4, 8, …</p>" +
+             "<p><b>Cost</b> Also at most <i>n</i> lg <i>n</i> comparisons; about 10% slower than top-down mergesort on typical systems.</p>",
+  quick:     "<p><b>Idea</b> Partition around a pivot, which lands at its final position; then sort both sides recursively.</p>" +
+             "<p><b>Correctness</b> Loop invariant (lines 5–10): <code>A[l] = p</code> | <code>≤ p</code> | ? | <code>≥ p</code>, with <code>i</code> and <code>j</code> at the ends of the unknown middle.</p>" +
+             "<p><b>Cost</b> Expected ~ 2<i>n</i> ln <i>n</i> ≈ 1.39 <i>n</i> lg <i>n</i> comparisons with random pivots (median of 3: ~ 12/7 <i>n</i> ln <i>n</i>); worst case ~ ½<i>n</i>².</p>"
+};
+
+/* ==========================================================================
+   Colours
+   ========================================================================== */
+const COL = {};
+function hex2rgb(h) {
+  h = h.trim().replace("#", "");
+  if (h.length === 3) h = h.split("").map(x => x + x).join("");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+const mixRGB = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const rgb = a => "rgb(" + Math.round(a[0]) + "," + Math.round(a[1]) + "," + Math.round(a[2]) + ")";
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = (k, d) => (cs.getPropertyValue(k) || "").trim() || d;
+  for (const [k, d] of [["bg", "#f5ebd9"], ["panel", "#faf6ed"], ["ink", "#46433a"], ["ink-soft", "#6b675c"], ["ink-faint", "#8b8779"],
+                        ["accent", "#902015"], ["accent-soft", "#c28577"], ["active", "#cc2f22"], ["examine", "#b07d18"],
+                        ["queue", "#2a6a63"], ["relax", "#4a7c3f"], ["inert", "#b6b1a1"], ["border-soft", "#d4c5b4"],
+                        ["ramp-lo", "#e5c0b4"], ["ramp-hi", "#902015"]])
+    COL[k] = g("--wi-" + k, d);
+  COL.rampLo = hex2rgb(COL["ramp-lo"]); COL.rampHi = hex2rgb(COL["ramp-hi"]);
+  /* the slides' bubble colours: darkblue = blue!80!black, lightblue = blue!20!backcolor */
+  COL.darkblue = [0, 0, 204];
+  COL.lightblue = mixRGB(hex2rgb(COL.bg), [0, 0, 255], 0.2);
+}
+const ramp = m => rgb(mixRGB(COL.rampLo, COL.rampHi, clamp(m, 0, 1)));
+/* lightblue!shade!darkblue with shade = y/10 percent, i.e. a fraction m of lightblue */
+const bubbleBar  = m => mixRGB(COL.darkblue, COL.lightblue, clamp(m, 0, 1));
+const bubbleDot  = m => rgb(mixRGB([255, 255, 255], bubbleBar(m), 0.3));   /* ...!30!white */
+
+/* ==========================================================================
+   Code panel
+   ========================================================================== */
+function codeBlocks(key, pivot) {
+  return ALGOS[key].blocks.map(b => b === "PIVOT" ? PIVOT_BLOCK[pivot] : b);
+}
+function buildCode(box, key, pivot) {
+  let h = "";
+  for (const b of codeBlocks(key, pivot)) {
+    const blk = CODE[b];
+    h += '<div class="sublabel"><span>' + esc(blk.title) + '</span>' + (blk.src ? '<span class="src">' + esc(blk.src) + '</span>' : "") + '</div>';
+    blk.lines.forEach((ln, i) => {
+      const no = i + 1, tag = blk.tags && blk.tags[no] ? '<span class="tag">' + blk.tags[no] + '</span>' : "";
+      h += '<div class="cline" data-k="' + b + "." + no + '"><span class="ln">' + no + '</span><span>' + (hlJava(ln) || " ") + '</span>' + tag + '</div>';
+    });
+  }
+  box.innerHTML = h;
+  box._lines = new Map([...box.querySelectorAll(".cline")].map(d => [d.dataset.k, d]));
+  box._on = [];
+}
+function highlightCode(box, ln, stack) {
+  for (const d of box._on) d.classList.remove("on", "caller");
+  box._on = [];
+  for (const f of stack) {
+    const d = f.site && box._lines.get(f.site);
+    if (d) { d.classList.add("caller"); box._on.push(d); }
+  }
+  const d = box._lines.get(ln);
+  if (d) {
+    d.classList.remove("caller"); d.classList.add("on"); box._on.push(d);
+    const top = d.offsetTop, bot = top + d.offsetHeight;
+    if (top < box.scrollTop + 20 || bot > box.scrollTop + box.clientHeight - 20)
+      box.scrollTop = Math.max(0, top - box.clientHeight * 0.35);
+  }
+}
+
+
+/* ==========================================================================
+   Decision trees
+
+   The algorithm (one of the generators above, unchanged) is run on all n!
+   permutations of 1..n.  Each call of less(x, y) is recorded with the
+   *element ids* x, y, i.e. the positions the two elements had in the input.
+   A node is written A[a] : A[b] with a < b (as on the slides); its left
+   branch is "A[a] ≤ A[b]", its right branch "A[a] > A[b]".  Runs that got
+   the same answers so far are in the same node — for a deterministic
+   comparison-based algorithm they must make the same next comparison,
+   which buildTree checks.
+   ========================================================================== */
+
+const TREE_ROWS = [
+  { id: "selection", key: "selection" }, { id: "bubble", key: "bubble" }, { id: "bubbleImproved", key: "bubbleImproved" },
+  { id: "insertion", key: "insertion" }, { id: "binaryInsertion", key: "binaryInsertion" },
+  { id: "merge", key: "merge" }, { id: "mergeBU", key: "mergeBU" },
+  { id: "quick-first", key: "quick", pivot: "first" },
+  { id: "optimal", opt: true }
+];
+const rowLabel = r => r.opt ? "Optimal tree" : r.key === "quick" ? "Quicksort, pivot A[l]" : ALGOS[r.key].short;
+const EXAMPLE = { 2: "2 1", 3: "2 3 1", 4: "3 1 4 2", 5: "3 1 4 5 2" };
+const TS = { row: TREE_ROWS[3], n: 4, style: "hover", leafRow: false, T: null, walk: null, sel: null, timer: null };
+const lg = x => Math.log2(x);
+const fact = n => n <= 1 ? 1 : n * fact(n - 1);
+
+function allPerms(n) {
+  const out = [], a = [], used = new Array(n + 1).fill(false);
+  (function rec() {
+    if (a.length === n) { out.push(a.slice()); return; }
+    for (let v = 1; v <= n; v++) if (!used[v]) { used[v] = true; a.push(v); rec(); a.pop(); used[v] = false; }
+  })();
+  return out;
+}
+
+/* run the algorithm on one input and record every comparison;
+   the optimal tree has no program — there we follow the tree itself (no data movement) */
+function runTrace(row, vals, T) {
+  if (row.opt) {
+    const inp = makeInput(vals), ids = vals.map((_, i) => i), cmps = [];
+    let v = T.root;
+    while (!v.leaf) {
+      const o = cmpVals(vals[v.a], vals[v.b]) < 0;
+      cmps.push({ a: v.a, b: v.b, o, x: v.a, y: v.b, r: o, px: v.a, py: v.b, cin: "a", ln: null, v: {}, A: ids, aux: null, stack: [] });
+      v = v.kids[o ? 0 : 1];
+    }
+    return { cmps, A: v.outIds.slice(), aux: null, inp, stack: [] };
+  }
+  const inp = makeInput(vals);
+  const R = new Run(inp, { pivot: row.pivot || "first", seed: 1 });
+  let last = null;
+  const less0 = R.less.bind(R);
+  R.less = (x, y) => { const r = less0(x, y); last = { x, y, r }; return r; };
+  const hasAux = !!ALGOS[row.key].aux, cmps = [];
+  for (const s of ALGOS[row.key].gen(R)) {
+    if (s.ev !== "cmp") continue;
+    const { x, y, r } = last;
+    const a = Math.min(x, y), b = Math.max(x, y);
+    const o = x === a ? r : !r;                 /* A[a] < A[b]?  (keys are distinct) */
+    const arr = s.cin === "aux" ? R.aux : R.A;
+    cmps.push({ a, b, o, x, y, r, px: s.cmp.find(p => arr[p] === x), py: s.cmp.find(p => arr[p] === y),
+                cin: s.cin === "aux" ? "aux" : "a", ln: s.ln, v: Object.assign({}, s.v || {}),
+                A: R.A.slice(), aux: hasAux ? R.aux.slice() : null, stack: R.stack });
+  }
+  return { cmps, A: R.A.slice(), aux: hasAux ? R.aux.slice() : null, inp, stack: R.stack };
+}
+
+function buildTree(row, n) {
+  return finishTree(row.opt ? buildOptimalTree(row, n) : buildAlgoTree(row, n));
+}
+function buildAlgoTree(row, n) {
+  const perms = allPerms(n);
+  const T = { row, n, perms, root: null, nodes: [], leaves: [] };
+  perms.forEach((P, pi) => {
+    const tr = runTrace(row, P);
+    let parent = null, br = 0, node = T.root, depth = 0;
+    for (const c of tr.cmps) {
+      if (!node) {
+        node = { id: T.nodes.length, a: c.a, b: c.b, ln: c.ln, v: c.v, px: c.px, py: c.py, x0: c.x, y0: c.y, cin: c.cin,
+                 kids: [null, null], inputs: [], depth, parent, br };
+        T.nodes.push(node);
+        if (parent) parent.kids[br] = node; else T.root = node;
+      } else if (node.leaf || node.a !== c.a || node.b !== c.b || node.ln !== c.ln) {
+        throw new Error("Runs that agree so far make different comparisons — not a deterministic comparison-based algorithm?");
+      }
+      node.inputs.push(pi);
+      parent = node; br = c.o ? 0 : 1; node = node.kids[br]; depth++;
+    }
+    if (node) throw new Error("Two inputs reach the same leaf.");
+    const out = tr.A.map(id => P[id]);
+    if (out.some((v, i) => i && out[i - 1] > v)) throw new Error("Output not sorted.");
+    const leaf = { id: T.nodes.length, leaf: true, perm: P, inputs: [pi], depth, parent, br, outIds: tr.A.slice() };
+    T.nodes.push(leaf); T.leaves.push(leaf);
+    if (parent) parent.kids[br] = leaf; else T.root = leaf;
+  });
+  return T;
+}
+function finishTree(T) {
+  const n = T.n;
+  const inner = T.nodes.filter(v => !v.leaf);
+  T.height = Math.max(...T.leaves.map(l => l.depth));
+  T.avg = T.leaves.reduce((s, l) => s + l.depth, 0) / T.leaves.length;
+  T.inner = inner.length;
+  T.redundant = inner.filter(v => !v.kids[0] || !v.kids[1]).length;
+  T.lower = Math.ceil(lg(fact(n)) - 1e-12);
+  return T;
+}
+
+/* ---------- optimal trees by exhaustive search ----------------------------------
+   f(S, H) = least total depth of a tree that sorts the input orders in S with
+   height ≤ H (∞ if impossible).  A comparison A[a] : A[b] splits S into the
+   orders with A[a] < A[b] and the rest; every order in S pays for it:
+       f(S, H) = |S| + min over (a, b) of  f(S≤, H−1) + f(S>, H−1).
+   First the least feasible H (= the worst case), then the least total at that H.
+   Pairs are tried neighbours first — (0,1), (1,2), …, then (0,2), … — and the
+   first of equally good comparisons is taken.                                     */
+/* The example tree for n = 4 from the slides, written as [ab ≤-subtree >-subtree] and (input order).
+   It is used as the optimal tree for n = 4; buildOptimalTree checks that it is consistent and optimal. */
+const HARDCODED_TREES = {
+  4: "[01 [23 [02 [12 (1234) [13 (1324) (1423)]] [03 [13 (2314) (2413)] (3412)]] [03 [12 [13 (1243) (1342)] (1432)] [02 [12 (2341) (2431)] (3421)]]] [23 [03 [02 (2134) [12 (3124) (3214)]] [12 (4123) [13 (4213) (4312)]]] [02 [03 (2143) [13 (3142) (3241)]] [12 [13 (4132) (4231)] (4321)]]]]"
+};
+function parseTreeSpec(str) {
+  let i = 0;
+  const ws = () => { while (str[i] === " ") i++; };
+  function node() {
+    ws();
+    if (str[i] === "(") { const j = str.indexOf(")", i), lab = str.slice(i + 1, j); i = j + 1; return { leaf: true, lab }; }
+    if (str[i] !== "[") throw new Error("tree spec: [ expected at " + i);
+    const a = +str[i + 1], b = +str[i + 2]; i += 3;
+    const L = node(), R = node(); ws();
+    if (str[i] !== "]") throw new Error("tree spec: ] expected at " + i);
+    i++;
+    return { a, b, kids: [L, R] };
+  }
+  const t = node(); ws();
+  if (i !== str.length) throw new Error("tree spec: trailing text");
+  return t;
+}
+
+function buildOptimalTree(row, n) {
+  const perms = allPerms(n), N = perms.length;
+  const pairs = [];
+  for (let d = 1; d < n; d++) for (let a = 0; a + d < n; a++) pairs.push([a, a + d]);
+  const memo = new Map();
+  function split(S, a, b) {
+    const L = [], R = [];
+    for (const pi of S) (perms[pi][a] < perms[pi][b] ? L : R).push(pi);
+    return [L, R];
+  }
+  function f(S, H) {
+    if (S.length === 1) return 0;
+    if (H <= 0 || S.length > 2 ** H) return Infinity;
+    const key = H + ":" + S.join(",");
+    if (memo.has(key)) return memo.get(key);
+    let best = Infinity;
+    for (const [a, b] of pairs) {
+      const [L, R] = split(S, a, b);
+      if (!L.length || !R.length) continue;                 /* answer already known: useless */
+      if (L.length > 2 ** (H - 1) || R.length > 2 ** (H - 1)) continue;
+      const v = S.length + f(L, H - 1) + f(R, H - 1);
+      if (v < best) best = v;
+    }
+    memo.set(key, best);
+    return best;
+  }
+  const all = perms.map((_, i) => i);
+  let H = Math.ceil(lg(N) - 1e-12);
+  while (!isFinite(f(all, H))) H++;
+  const T = { row, n, perms, root: null, nodes: [], leaves: [], optH: H, optTotal: f(all, H), source: "search" };
+  const leafOf = (S, parent, br, depth) => {
+    const P = perms[S[0]], outIds = P.map((_, i) => i).sort((x, y) => P[x] - P[y]);
+    const leaf = { id: T.nodes.length, leaf: true, perm: P, inputs: S, depth, parent, br, outIds };
+    T.nodes.push(leaf); T.leaves.push(leaf);
+    if (parent) parent.kids[br] = leaf; else T.root = leaf;
+  };
+  const inner = (a, b, S, parent, br, depth) => {
+    const v = { id: T.nodes.length, a, b, ln: null, v: {}, px: a, py: b, x0: a, y0: b, cin: "a", kids: [null, null], inputs: S, depth, parent, br };
+    T.nodes.push(v);
+    if (parent) parent.kids[br] = v; else T.root = v;
+    return v;
+  };
+  if (HARDCODED_TREES[n]) {                     /* hard-coded tree: check it is a decision tree and optimal */
+    T.source = "hardcoded";
+    (function make(sp, S, parent, br, depth) {
+      if (sp.leaf) {
+        if (S.length !== 1 || perms[S[0]].join("") !== sp.lab) throw new Error("hard-coded tree: leaf " + sp.lab + " is reached by " + S.map(i => perms[i].join("")).join(" "));
+        return leafOf(S, parent, br, depth);
+      }
+      const [L, R] = split(S, sp.a, sp.b);
+      if (!L.length || !R.length) throw new Error("hard-coded tree: comparison A[" + sp.a + "] : A[" + sp.b + "] is redundant");
+      const v = inner(sp.a, sp.b, S, parent, br, depth);
+      make(sp.kids[0], L, v, 0, depth + 1);
+      make(sp.kids[1], R, v, 1, depth + 1);
+    })(parseTreeSpec(HARDCODED_TREES[n]), all, null, 0, 0);
+    const h = Math.max(...T.leaves.map(l => l.depth)), tot = T.leaves.reduce((x, l) => x + l.depth, 0);
+    if (h !== H || tot !== T.optTotal) throw new Error("hard-coded tree is not optimal");
+    T.minTotalAny = f(all, N - 1);
+    return T;
+  }
+  (function make(S, h, parent, br, depth) {
+    if (S.length === 1) return leafOf(S, parent, br, depth);
+    const target = f(S, h);
+    for (const [a, b] of pairs) {
+      const [L, R] = split(S, a, b);
+      if (!L.length || !R.length || L.length > 2 ** (h - 1) || R.length > 2 ** (h - 1)) continue;
+      if (S.length + f(L, h - 1) + f(R, h - 1) !== target) continue;
+      const v = inner(a, b, S, parent, br, depth);
+      make(L, h - 1, v, 0, depth + 1);
+      make(R, h - 1, v, 1, depth + 1);
+      return;
+    }
+    throw new Error("search inconsistent");
+  })(all, H, null, 0, 0);
+  /* for comparison: the least average without the height constraint */
+  T.minTotalAny = f(all, N - 1);
+  return T;
+}
+
+/* ---------- layout: leaves left to right in tree order, parents centred above ---------- */
+function layoutTree(T, slide, leafRow) {
+  const n = T.n;
+  const dx = slide ? (n <= 3 ? 96 : 72) : ({ 2: 90, 3: 64, 4: 26 }[n] || 14);   /* slide style: neighbouring one-child nodes must not overlap */
+  const dy = slide ? 74 : (n <= 3 ? 56 : 44);
+  let k = 0, t = 0;
+  (function place(v) {
+    v.tin = t++;
+    if (v.leaf) v.x = k++ * dx;
+    else {
+      const ks = v.kids.filter(Boolean);
+      ks.forEach(place);
+      v.x = (ks[0].x + ks[ks.length - 1].x) / 2;
+    }
+    v.y = (v.leaf && leafRow ? T.height : v.depth) * dy;
+    v.tout = t++;
+  })(T.root);
+  T.dx = dx; T.dy = dy;
+}
+
+/* ---------- drawing ---------- */
+const Aij = (a, b) => '<tspan font-style="italic">A</tspan>[' + a + '] : <tspan font-style="italic">A</tspan>[' + b + ']';
+
+function renderTree() {
+  const T = TS.T, slide = TS.style === "slide";
+  layoutTree(T, slide, TS.leafRow);
+  const { dx, dy, n } = T;
+  const xs = T.nodes.map(v => v.x);
+  let minX = Math.min(...xs), maxX = Math.max(...xs), maxY = Math.max(...T.nodes.map(v => v.y));
+  const leafH = slide ? (n >= 4 ? 16 + 7.2 * (2 * n - 1) : 26) : 10;
+  const stubX = Math.max(10, Math.min(dx * 0.8, 26)), stubY = dy * 0.42;
+  let edges = "", nodes = "", extra = "";
+  /* depth scale and the lower bound */
+  const lx = minX - (slide ? 70 : 40);
+  extra += '<text class="lvl" x="' + lx + '" y="' + (-dy * 0.55) + '" style="font-size:10px">#less</text>';
+  for (let d = 0; d <= T.height; d++) extra += '<text class="lvl" x="' + lx + '" y="' + (d * dy) + '">' + d + '</text>';
+  const ly = T.lower * dy;
+  extra += '<line class="lgline" x1="' + (lx + 6) + '" x2="' + (maxX + (slide ? 60 : 30)) + '" y1="' + ly + '" y2="' + ly + '"/>' +
+           '<text class="lglab" x="' + (maxX + (slide ? 64 : 34)) + '" y="' + (ly + 4) + '">⌈lg ' + n + '!⌉ = ' + T.lower + '</text>';
+  for (const v of T.nodes) {
+    const p = v.parent;
+    if (p) {
+      let g = '<path class="te" d="M' + p.x + "," + p.y + " L" + v.x + "," + v.y + '"/>';
+      if (slide) {
+        const mx = (p.x + v.x) / 2, my = (p.y + v.y) / 2, off = v.br === 0 ? -9 : 9;
+        g += '<text class="elab" x="' + (mx + off) + '" y="' + (my - 3) + '">' + (v.br === 0 ? "≤" : "&gt;") + '</text>';
+      }
+      edges += '<g class="teg" id="e' + v.id + '">' + g + '</g>';
+    }
+    if (!v.leaf && (!v.kids[0] || !v.kids[1])) {           /* outcome already known: the other branch cannot happen */
+      const dir = v.kids[0] ? 1 : -1, ex = v.x + dir * stubX, ey = v.y + stubY;
+      edges += '<g class="imp" id="s' + v.id + '" data-n="s' + v.id + '"><line x1="' + v.x + '" y1="' + v.y + '" x2="' + ex + '" y2="' + ey + '"/>' +
+               '<text x="' + (ex + dir * 5) + '" y="' + (ey + 5) + '">×</text></g>';
+    }
+    /* node */
+    let cls = "tn" + (v.leaf ? " leaf" : "") + (!v.leaf && (!v.kids[0] || !v.kids[1]) ? " red" : "");
+    let body;
+    if (slide) {
+      if (v.leaf) {
+        const lab = v.perm.join(",");
+        if (n >= 4) {
+          const L = 12 + 7.2 * lab.length;
+          body = '<g transform="rotate(90)"><rect class="b" x="-2" y="-9" width="' + L + '" height="18" rx="2"/>' +
+                 '<text class="lf" x="' + (L / 2 - 2) + '" y="0.5">' + lab + '</text></g>';
+        } else body = '<rect class="b" x="-24" y="-11" width="48" height="22" rx="2"/><text class="lf" x="0" y="0.5">' + lab + '</text>';
+      } else body = '<rect class="b" x="-34" y="-12" width="68" height="24" rx="4"/><text x="0" y="0.5" style="font-size:12.5px">' + Aij(v.a, v.b) + '</text>';
+    } else {
+      body = v.leaf ? '<rect class="hit" x="-8" y="-8" width="16" height="16"/><rect class="b" x="-4.5" y="-4.5" width="9" height="9"/>'
+                    : '<circle class="hit" r="10"/><circle class="b" r="5.5"/>';
+    }
+    nodes += '<g class="' + cls + '" id="n' + v.id + '" data-n="' + v.id + '" transform="translate(' + v.x + "," + v.y + ')">' + body + '</g>';
+    /* the slides' boxes with the inputs still possible (only where they fit) */
+    if (slide && !v.leaf && n <= 3) {
+      const lines = v.inputs.map(i => T.perms[i].join(","));
+      const right = !v.parent || v.br === 1, w = 44, h = 12 * lines.length + 6;
+      const bx = right ? v.x + 44 : v.x - 44 - w, by = v.y + 12 - h;       /* grows upwards: clear of the child edges */
+      extra += '<g class="perms" data-n="' + v.id + '"><rect x="' + bx + '" y="' + by + '" width="' + w + '" height="' + h + '" rx="2"/>' +
+               lines.map((s, i) => '<text x="' + (bx + 5) + '" y="' + (by + 13 + 12 * i) + '">' + s + '</text>').join("") + '</g>';
+    }
+  }
+  el("vp").innerHTML = extra + edges + nodes;
+  TS.gN = new Map([...el("vp").querySelectorAll(".tn")].map(g => [+g.dataset.n, g]));
+  TS.gE = new Map([...el("vp").querySelectorAll(".teg")].map(g => [+g.id.slice(1), g]));
+  TS.gS = new Map([...el("vp").querySelectorAll(".imp")].map(g => [+g.id.slice(1), g]));
+  VIEW.bounds = { x: lx - 30, y: -dy * 0.9, w: (maxX + (slide ? 150 : 110)) - (lx - 30), h: maxY + leafH + dy * 0.9 + 14 };
+  paintTree();
+}
+
+/* ---------- statistics & legend ---------- */
+function renderStats() {
+  const T = TS.T, n = T.n, nf = fact(n);
+  el("stats").innerHTML =
+    "<span><b>" + nf + "</b> leaves = " + n + "! input orders</span>" +
+    "<span>height <b>" + T.height + "</b> = comparisons in the worst case · <span class=\"bound\">lower bound ⌈lg " + n + "!⌉ = " + T.lower + "</span></span>" +
+    "<span>average depth <b>" + T.avg.toFixed(2) + "</b> · <span class=\"bound\">lower bound lg " + n + "! ≈ " + lg(nf).toFixed(2) + "</span></span>" +
+    "<span><b>" + T.inner + "</b> comparison nodes, <b>" + T.redundant + "</b> of them redundant</span>";
+  const sw = (inner) => '<svg width="18" height="14" viewBox="-9 -7 18 14">' + inner + '</svg>';
+  el("tlegend").innerHTML =
+    '<span>' + sw('<circle r="5.5" fill="var(--wi-controls)" stroke="var(--wi-border-strong)"/>') + 'comparison A[i] : A[j] of input positions (left: ≤, right: &gt;)</span>' +
+    '<span>' + sw('<circle r="5.5" fill="#f0dfb4" stroke="var(--wi-examine)" stroke-width="1.5"/>') + 'redundant: the answer is already known</span>' +
+    '<span>' + sw('<line x1="-7" y1="-5" x2="5" y2="5" stroke="var(--wi-examine)" stroke-dasharray="3 3"/>') + 'answer no input can give</span>' +
+    '<span>' + sw('<rect x="-4.5" y="-4.5" width="9" height="9" fill="var(--wi-panel-2)" stroke="var(--wi-ink-soft)"/>') + 'leaf = one input order</span>' +
+    '<span>' + sw('<line x1="-8" y1="0" x2="8" y2="0" stroke="var(--wi-accent-soft)" stroke-dasharray="4 3" stroke-width="1.5"/>') + 'depth ⌈lg <i>n</i>!⌉</span>' +
+    '<span>' + sw('<line x1="-8" y1="0" x2="8" y2="0" stroke="var(--wi-active)" stroke-width="3"/>') + 'path of the input below</span>';
+}
+
+/* ---------- node details (hover and click) ---------- */
+function codeLine(ln) {
+  const [b, no] = ln.split(".");
+  return { text: CODE[b].lines[+no - 1].trim(), no: +no, block: CODE[b].title };
+}
+function permList(T, ids, max) {
+  const s = ids.slice(0, max).map(i => "(" + T.perms[i].join(",") + ")").join(" ");
+  return ids.length > max ? s + " … (" + (ids.length - max) + " more)" : s;
+}
+function nodeInfo(v, full) {
+  const T = TS.T, nf = T.perms.length;
+  if (v.leaf) {
+    const steps = [];
+    for (let u = v; u.parent; u = u.parent) steps.unshift("<i>A</i>[" + u.parent.a + "] " + (u.br === 0 ? "≤" : "&gt;") + " <i>A</i>[" + u.parent.b + "]");
+    return '<div class="h">Leaf: input (' + v.perm.join(", ") + ')</div>' +
+      "This input order is sorted after <b>" + v.depth + "</b> comparison" + (v.depth === 1 ? "" : "s") + "." +
+      (full ? "<br>Answers on the way: " + (steps.join(", ") || "none") + "." +
+              "<br>Sorted output takes the input elements " + v.outIds.map(i => "<i>A</i>[" + i + "]").join(", ") + "." : "");
+  }
+  const c = v.ln ? codeLine(v.ln) : null, arr = v.cin === "aux" ? "aux" : "A";
+  const k0 = v.kids[0] ? v.kids[0].inputs.length : 0, k1 = v.kids[1] ? v.kids[1].inputs.length : 0;
+  const vars = Object.entries(v.v).map(([k, x]) => k + " = " + x).join(", ");
+  let h = '<div class="h">Comparison <i>A</i>[' + v.a + '] : <i>A</i>[' + v.b + ']</div>' +
+    "the input's elements originally at positions " + v.a + " and " + v.b + "; " + (v.depth === 0 ? "first comparison." : "comparison no. " + (v.depth + 1) + ".") +
+    (c ? "<br>Code, line " + c.no + ": <code>" + esc(c.text) + "</code>" + (vars ? " with " + esc(vars) : "") +
+         " — these elements sit at positions " + v.px + " and " + v.py + " of <code>" + arr + "</code> then."
+       : "<br>After this comparison, both groups of inputs can still be sorted within the optimal height, at least total cost.");
+  h += "<br>Reached by <b>" + v.inputs.length + "</b> of " + nf + " inputs: " + k0 + " go left (≤), " + k1 + " right (&gt;).";
+  if (!k0 || !k1) h += '<br><span style="color:var(--wi-examine)">Redundant: all these inputs already have <i>A</i>[' + v.a + "] " +
+                       (k0 ? "&lt;" : "&gt;") + " <i>A</i>[" + v.b + "] — implied by the answers above. The algorithm learns nothing here.</span>";
+  if (full) h += "<br>Inputs here: " + permList(T, v.inputs, 24);
+  return h;
+}
+function stubInfo(id) {
+  const v = TS.T.nodes[id];
+  return '<div class="h">Impossible answer</div>No input that reaches <i>A</i>[' + v.a + "] : <i>A</i>[" + v.b + "] has <i>A</i>[" + v.a + "] " +
+         (v.kids[0] ? "&gt;" : "≤") + " <i>A</i>[" + v.b + "]: that is excluded by the earlier answers.";
+}
+function showInfo(v) {
+  TS.sel = v;
+  let h = nodeInfo(v, true);
+  h += '<div style="margin-top:8px"><button id="infoRun">' + (v.leaf ? "Run this input" : "Run an input through this node") + "</button></div>";
+  el("info").innerHTML = h;
+  el("infoRun").onclick = () => {
+    const P = TS.T.perms[v.inputs[0]];
+    startWalk(P.slice(), v.leaf ? 0 : null, v);
+  };
+  paintTree();
+}
+
+/* ---------- the walk ---------- */
+function ranksOf(vals) {
+  const s = vals.slice().sort(cmpVals);
+  return vals.map(x => s.indexOf(x) + 1);
+}
+function startWalk(vals, cur, stopAt) {
+  const T = TS.T;
+  const tr = runTrace(TS.row, vals, T);
+  const path = [T.root];
+  for (const c of tr.cmps) path.push(path[path.length - 1].kids[c.o ? 0 : 1]);
+  TS.walk = { vals, ranks: ranksOf(vals), tr, path, cur: 0 };
+  if (stopAt && !stopAt.leaf) TS.walk.cur = Math.max(0, path.indexOf(stopAt));
+  else if (typeof cur === "number") TS.walk.cur = cur;
+  el("walkIn").value = vals.join(" ");
+  el("walkErr").textContent = "";
+  renderWalk(true);
+  writeTreeHash();
+}
+function parseWalk(txt) {
+  const toks = String(txt).split(/[\s,;]+/).filter(Boolean);
+  if (toks.length < 2 || toks.length > 5) throw new Error("Give 2 to 5 values.");
+  const NUM = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+  const vals = toks.every(t => NUM.test(t)) ? toks.map(Number) : toks;
+  if (new Set(vals).size !== vals.length) throw new Error("The values must be distinct — the tree is built for distinct keys.");
+  return vals;
+}
+
+function renderWalk(follow) {
+  const W = TS.walk, T = TS.T;
+  if (!W) return;
+  const m = W.tr.cmps.length, cur = W.cur, node = W.path[cur];
+  const nf = T.perms.length, k = node.inputs.length;
+  const L = id => esc(W.tr.inp.labels[id]);
+  el("walkNo").textContent = cur + " / " + m + " comparisons";
+  let st;
+  if (cur < m && TS.row.opt) {
+    const c = W.tr.cmps[cur], sa = cmpVals(W.vals[c.a], W.vals[c.b]) < 0;
+    st = "Comparison " + (cur + 1) + " of " + m + ": the tree asks <i>A</i>[" + c.a + "] : <i>A</i>[" + c.b + "], i.e. " + L(c.a) + " vs. " + L(c.b) +
+         ". There is no program here, so nothing is moved: only the answers matter.<br>" +
+         L(c.a) + (sa ? " &lt; " : " &gt; ") + L(c.b) + ": the walk continues to the " + (sa ? "left (≤)." : "right (&gt;).");
+  } else if (cur < m) {
+    const c = W.tr.cmps[cur], cl = codeLine(c.ln), arr = c.cin === "aux" ? "aux" : "A";
+    const sa = cmpVals(W.vals[c.a], W.vals[c.b]) < 0;
+    st = "Comparison " + (cur + 1) + " of " + m + ". Line " + cl.no + ", <code>" + esc(cl.text) + "</code>, compares positions " +
+         c.px + " and " + c.py + " of <code>" + arr + "</code>. They hold the input's elements <i>A</i>[" + c.x + "] = " + L(c.x) +
+         " and <i>A</i>[" + c.y + "] = " + L(c.y) + ", so this is the tree node <i>A</i>[" + c.a + "] : <i>A</i>[" + c.b + "].<br>" +
+         L(c.a) + (sa ? " &lt; " : " &gt; ") + L(c.b) + ": the walk continues to the " + (sa ? "left (≤)." : "right (&gt;).");
+  } else {
+    st = '<span class="yes">Leaf reached</span> after ' + m + " comparison" + (m === 1 ? "" : "s") + ": the input order (" +
+         W.ranks.join(", ") + ") is identified, and the array is sorted. The tags below it tell which input position each element came from.";
+  }
+  el("walkStat").innerHTML = st;
+  el("cand").innerHTML = "Inputs still possible: <b>" + k + "</b> of " + nf +
+    '<span class="bar"><div style="width:' + (100 * k / nf) + '%"></div></span>' +
+    (k > 1 ? "lg " + k + " ≈ " + lg(k).toFixed(2) + " bits left" : "0 bits left");
+  renderCells();
+  const snapStack = cur < m ? W.tr.cmps[cur].stack : [];
+  if (!TS.row.opt) highlightCode(el("codeScroll"), cur < m ? W.tr.cmps[cur].ln : "", snapStack);
+  el("wBack").disabled = el("wReset").disabled = cur === 0;
+  el("wStep").disabled = cur >= m;
+  paintTree();
+  if (follow) followNode(node);
+}
+
+/* current arrangement vs. input, with the compared elements joined */
+function renderCells() {
+  const W = TS.walk, m = W.tr.cmps.length, cur = W.cur, n = W.vals.length;
+  const c = cur < m ? W.tr.cmps[cur] : null;
+  const A = c ? c.A : W.tr.A, aux = c ? c.aux : W.tr.aux;
+  const cw = 50, ch = 40, gap = 8, lx = 86, top = 24;
+  const X = i => lx + i * (cw + gap);
+  const rows = TS.row.opt ? (c ? [] : [{ name: "sorted", arr: A, key: "a" }])
+                          : [{ name: ALGOS[TS.row.key].aux ? "a now" : "A now", arr: A, key: "a" }];
+  if (aux) rows.push({ name: "aux now", arr: aux, key: "aux" });
+  const inY = top + rows.length * (ch + 34) + 34;
+  let h = "";
+  for (let i = 0; i < n; i++) h += '<text class="sv-idx" x="' + (X(i) + cw / 2) + '" y="' + (top - 8) + '">' + i + "</text>";
+  const L = id => esc(W.tr.inp.labels[id]);
+  rows.forEach((r, ri) => {
+    const y = top + ri * (ch + 34);
+    h += '<text class="sv-row" x="4" y="' + (y + ch / 2 + 4) + '">' + r.name + "</text>";
+    for (let i = 0; i < n; i++) {
+      const id = r.arr[i];
+      const hot = c && c.cin === r.key && (i === c.px || i === c.py);
+      if (id < 0) { h += '<rect x="' + X(i) + '" y="' + y + '" width="' + cw + '" height="' + ch + '" rx="3" fill="none" stroke="var(--wi-border-soft)" stroke-dasharray="3 3"/>'; continue; }
+      h += '<rect x="' + X(i) + '" y="' + y + '" width="' + cw + '" height="' + ch + '" rx="3" fill="var(--wi-panel-2)" stroke="' + (hot ? "var(--wi-active)" : "var(--wi-border)") + '" stroke-width="' + (hot ? 2.6 : 1) + '"/>';
+      h += '<text class="sv-val" x="' + (X(i) + cw / 2) + '" y="' + (y + ch / 2 + 5) + '">' + L(id) + "</text>";
+      h += '<text class="sv-ptr" x="' + (X(i) + cw / 2) + '" y="' + (y + ch + 14) + '" style="fill:var(--wi-accent);font-weight:normal;font-size:11.5px">A[' + id + "]</text>";
+    }
+  });
+  h += '<text class="sv-row" x="4" y="' + (inY + ch / 2 + 4) + '">input</text>';
+  for (let i = 0; i < n; i++) {
+    const hot = c && (i === c.x || i === c.y);
+    h += '<rect x="' + X(i) + '" y="' + inY + '" width="' + cw + '" height="' + ch + '" rx="3" fill="var(--wi-controls)" stroke="' + (hot ? "var(--wi-active)" : "var(--wi-border)") + '" stroke-width="' + (hot ? 2.6 : 1) + '"/>';
+    h += '<text class="sv-val" x="' + (X(i) + cw / 2) + '" y="' + (inY + ch / 2 + 5) + '">' + L(i) + "</text>";
+    h += '<text class="sv-ptr" x="' + (X(i) + cw / 2) + '" y="' + (inY + ch + 15) + '" style="fill:var(--wi-ink-soft);font-weight:normal;font-size:11.5px">A[' + i + "]</text>";
+  }
+  if (c && rows.length) {                        /* join current positions to input positions */
+    const ri = rows.findIndex(r => r.key === c.cin), y0 = top + ri * (ch + 34) + ch + 18;
+    for (const [p, id] of [[c.px, c.x], [c.py, c.y]])
+      h += '<path d="M' + (X(p) + cw / 2) + "," + y0 + " C" + (X(p) + cw / 2) + "," + (y0 + 30) + " " + (X(id) + cw / 2) + "," + (inY - 30) + " " + (X(id) + cw / 2) + "," + (inY - 3) +
+           '" fill="none" stroke="var(--wi-active)" stroke-width="1.8" marker-end="url(#ah)"/>';
+  }
+  const Wd = lx + n * (cw + gap) + 8, Ht = inY + ch + 24;
+  const svg = el("cellsSvg");
+  svg.setAttribute("width", Wd); svg.setAttribute("height", Ht); svg.setAttribute("viewBox", "0 0 " + Wd + " " + Ht);
+  svg.innerHTML = SVG_DEFS_T + h;
+}
+const SVG_DEFS_T = '<defs><marker id="ah" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+                   '<path d="M0,0 L10,5 L0,10 z" fill="var(--wi-active)"/></marker></defs>';
+
+/* classes on the tree: path, current node, and what is no longer possible */
+function paintTree() {
+  const T = TS.T, W = TS.walk;
+  const cur = W ? W.path[W.cur] : null;
+  const onPath = new Set(W ? W.path.slice(0, W.cur + 1).map(v => v.id) : []);
+  for (const v of T.nodes) {
+    const g = TS.gN.get(v.id); if (!g) continue;
+    const inSub = !cur || (v.tin >= cur.tin && v.tout <= cur.tout);
+    g.classList.toggle("on", onPath.has(v.id) && v !== cur);
+    g.classList.toggle("cur", v === cur);
+    g.classList.toggle("dim", !inSub && !onPath.has(v.id));
+    g.classList.toggle("sel", TS.sel === v);
+    const e = TS.gE.get(v.id);
+    if (e) { e.classList.toggle("on", onPath.has(v.id)); e.classList.toggle("dim", !inSub && !onPath.has(v.id)); }
+    const s = TS.gS.get(v.id);
+    if (s) s.classList.toggle("dim", !inSub);
+  }
+}
+
+/* ==========================================================================
+   Pan & zoom (mouse, wheel, and explicit touch handling for tablets)
+   ========================================================================== */
+const VIEW = { k: 1, tx: 0, ty: 0, bounds: null, anim: null };
+function applyView() {
+  el("vp").setAttribute("transform", "translate(" + VIEW.tx.toFixed(2) + "," + VIEW.ty.toFixed(2) + ") scale(" + VIEW.k.toFixed(4) + ")");
+  el("zoomVal").textContent = Math.round(VIEW.k * 100) + "%";
+}
+function boxSize() { const b = el("treeBox"); return { W: b.clientWidth || 800, H: b.clientHeight || 500 }; }
+function fitView() {
+  const { W, H } = boxSize(), b = VIEW.bounds;
+  VIEW.k = clamp(Math.min(W / b.w, H / b.h) * 0.96, 0.04, 1.25);        /* never blow the text up much */
+  VIEW.tx = (W - b.w * VIEW.k) / 2 - b.x * VIEW.k;
+  VIEW.ty = (H - b.h * VIEW.k) / 2 - b.y * VIEW.k;
+  applyView();
+}
+function initialView() {
+  /* short trees get a shorter box: height needed at the width-limited zoom */
+  const box = el("treeBox"), b = VIEW.bounds, W = box.clientWidth || 800;
+  const k = clamp(W / b.w * 0.96, 0.04, 1.25);
+  const maxH = Math.max(360, Math.min(900, window.innerHeight * 0.62));
+  box.style.height = (TS.style === "slide" && k < 0.55 ? maxH : clamp(b.h * k + 40, 260, maxH)) + "px";
+  fitView();
+  if (TS.style === "slide" && VIEW.k < 0.55) {       /* labels would be unreadable: start at page size, at the root */
+    const { W } = boxSize(), r = TS.T.root;
+    VIEW.k = 1; VIEW.tx = W / 2 - r.x; VIEW.ty = 50 - r.y; applyView();
+  }
+}
+function zoomAt(px, py, f) {
+  const k2 = clamp(VIEW.k * f, 0.04, 4);
+  VIEW.tx = px - (px - VIEW.tx) * (k2 / VIEW.k);
+  VIEW.ty = py - (py - VIEW.ty) * (k2 / VIEW.k);
+  VIEW.k = k2; applyView();
+}
+function followNode(v) {
+  const { W, H } = boxSize();
+  const sx = VIEW.tx + v.x * VIEW.k, sy = VIEW.ty + v.y * VIEW.k;
+  if (sx > W * 0.12 && sx < W * 0.88 && sy > H * 0.1 && sy < H * 0.85) return;
+  const tx1 = W / 2 - v.x * VIEW.k, ty1 = H * 0.4 - v.y * VIEW.k, tx0 = VIEW.tx, ty0 = VIEW.ty, t0 = performance.now();
+  if (VIEW.anim) cancelAnimationFrame(VIEW.anim);
+  const step = t => {
+    const u = Math.min(1, (t - t0) / 280), e = u * (2 - u);
+    VIEW.tx = tx0 + (tx1 - tx0) * e; VIEW.ty = ty0 + (ty1 - ty0) * e; applyView();
+    if (u < 1) VIEW.anim = requestAnimationFrame(step);
+  };
+  VIEW.anim = requestAnimationFrame(step);
+}
+
+function nodeFromTarget(t) {
+  const g = t && t.closest ? t.closest("[data-n]") : null;
+  if (!g) return null;
+  const d = g.dataset.n;
+  return d[0] === "s" ? { stub: +d.slice(1) } : TS.T.nodes[+d];
+}
+function showTip(target, px, py) {
+  const tip = el("tip"), hit = nodeFromTarget(target);
+  if (!hit) { tip.style.display = "none"; return; }
+  tip.innerHTML = hit.stub !== undefined ? stubInfo(hit.stub) : nodeInfo(hit, false);
+  tip.style.display = "block";
+  const { W, H } = boxSize(), tw = tip.offsetWidth || 300, th = tip.offsetHeight || 80;
+  tip.style.left = clamp(px + 14, 4, W - tw - 4) + "px";
+  tip.style.top = (py + th + 20 > H ? py - th - 12 : py + 16) + "px";
+}
+function clickAt(target) {
+  const hit = nodeFromTarget(target);
+  if (hit && hit.stub === undefined) showInfo(hit);
+}
+
+function initPanZoom() {
+  const box = el("treeBox");
+  const rel = e => { const r = box.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  let drag = null;
+  box.addEventListener("wheel", e => { e.preventDefault(); const [x, y] = rel(e); zoomAt(x, y, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+  box.addEventListener("mousedown", e => {
+    if (e.button !== 0 || e.target.closest(".zoombar")) return;
+    drag = { x: e.clientX, y: e.clientY, tx: VIEW.tx, ty: VIEW.ty, moved: false, target: e.target };
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove", e => {
+    if (drag) {
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) { drag.moved = true; box.classList.add("drag"); el("tip").style.display = "none"; }
+      if (drag.moved) { VIEW.tx = drag.tx + dx; VIEW.ty = drag.ty + dy; applyView(); }
+    } else if (box.contains(e.target)) { const [x, y] = rel(e); showTip(e.target, x, y); }
+  });
+  window.addEventListener("mouseup", () => {
+    if (drag && !drag.moved) clickAt(drag.target);
+    drag = null; box.classList.remove("drag");
+  });
+  box.addEventListener("mouseleave", () => { if (!drag) el("tip").style.display = "none"; });
+  /* touch: one finger pans, two fingers pinch; a tap selects */
+  let tc = null;
+  const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  box.addEventListener("touchstart", e => {
+    if (e.target.closest(".zoombar")) return;
+    e.preventDefault();
+    const t = e.touches;
+    if (t.length === 1) tc = { mode: "pan", x: t[0].clientX, y: t[0].clientY, tx: VIEW.tx, ty: VIEW.ty, moved: false, target: t[0].target };
+    else if (t.length >= 2) {
+      const r = box.getBoundingClientRect();
+      tc = { mode: "pinch", d: dist(t[0], t[1]), mx: (t[0].clientX + t[1].clientX) / 2 - r.left, my: (t[0].clientY + t[1].clientY) / 2 - r.top, moved: true };
+    }
+  }, { passive: false });
+  box.addEventListener("touchmove", e => {
+    if (!tc) return;
+    e.preventDefault();
+    const t = e.touches;
+    if (tc.mode === "pan" && t.length === 1) {
+      const dx = t[0].clientX - tc.x, dy = t[0].clientY - tc.y;
+      if (Math.abs(dx) + Math.abs(dy) > 6) tc.moved = true;
+      if (tc.moved) { VIEW.tx = tc.tx + dx; VIEW.ty = tc.ty + dy; applyView(); }
+    } else if (t.length >= 2) {
+      const r = box.getBoundingClientRect(), d = dist(t[0], t[1]);
+      const mx = (t[0].clientX + t[1].clientX) / 2 - r.left, my = (t[0].clientY + t[1].clientY) / 2 - r.top;
+      if (tc.mode !== "pinch") tc = { mode: "pinch", d, mx, my, moved: true };
+      zoomAt(mx, my, d / tc.d);
+      VIEW.tx += mx - tc.mx; VIEW.ty += my - tc.my; applyView();
+      tc.d = d; tc.mx = mx; tc.my = my;
+    }
+  }, { passive: false });
+  box.addEventListener("touchend", e => {
+    if (!tc) return;
+    e.preventDefault();
+    if (tc.mode === "pan" && !tc.moved) {
+      clickAt(tc.target);
+      const r = box.getBoundingClientRect(); showTip(tc.target, tc.x - r.left, tc.y - r.top);
+    }
+    if (e.touches.length === 0) tc = null;
+  }, { passive: false });
+  const mid = () => { const { W, H } = boxSize(); return [W / 2, H / 2]; };
+  el("zIn").onclick = () => zoomAt(...mid(), 1.4);
+  el("zOut").onclick = () => zoomAt(...mid(), 1 / 1.4);
+  el("zFit").onclick = () => fitView();
+  el("z100").onclick = () => { const [x, y] = mid(); zoomAt(x, y, 1 / VIEW.k); };
+  for (const b of el("treeBox").querySelectorAll(".zoombar button")) {
+    b.addEventListener("touchend", e => { e.preventDefault(); e.stopPropagation(); b.click(); }, { passive: false });
+  }
+}
+
+/* ==========================================================================
+   Wiring
+   ========================================================================== */
+function rebuild(keepWalk) {
+  const vals = keepWalk && TS.walk && TS.walk.vals.length === TS.n ? TS.walk.vals : parseWalk(EXAMPLE[TS.n]);
+  TS.T = buildTree(TS.row, TS.n);
+  TS.sel = null; TS.walk = null;       /* (the code panel below uses TS.T) */
+  el("info").innerHTML = '<span class="muted">Hover over a node to see what it compares; click it to pin the details here.</span>';
+  document.querySelectorAll("#algoSeg button").forEach(b => b.classList.toggle("on", b.dataset.id === TS.row.id));
+  document.querySelectorAll("#nSeg button").forEach(b => b.classList.toggle("on", +b.dataset.n === TS.n));
+  document.querySelectorAll("#styleSeg button").forEach(b => b.classList.toggle("on", b.dataset.style === TS.style));
+  el("leafRow").checked = TS.leafRow;
+  if (TS.row.opt) {
+    const T = TS.T, nf = T.perms.length;
+    el("codeScroll").innerHTML = '<div class="about" style="padding:10px 12px">' +
+      (T.source === "hardcoded"
+        ? "<p><b>No program.</b> This is the example tree from the slides, stored in the page. The page checks that every input order " +
+          "reaches exactly its own leaf, and — by exhaustive search over all ways to choose comparisons — that no tree does better, " +
+          "neither in height nor in average depth.</p>"
+        : "<p><b>No program.</b> This tree was found by exhaustive search over all ways to choose comparisons: " +
+          "first the least possible height, then — among the trees of that height — the least average depth." +
+          (T.n === 3 ? " (It is the tree from the slides.)" : "") + "</p>") +
+      "<p>For <i>n</i> = " + T.n + ": height <b>" + T.optH + "</b> = ⌈lg " + T.n + "!⌉, average depth <b>" + (T.optTotal / nf).toFixed(3) + "</b>" +
+      (T.minTotalAny === T.optTotal ? ", which is also the least average of <i>all</i> trees." : "; without the height limit the average could be " + (T.minTotalAny / nf).toFixed(3) + ".") + "</p>" +
+      "<p>An algorithm with this behaviour for every <i>n</i> ≤ 11 exists (Ford–Johnson's merge insertion); for <i>n</i> = 12, however, " +
+      "30 comparisons are necessary — one more than ⌈lg 12!⌉ = 29. The lower bound is not always tight.</p>" +
+      (T.source === "search" ? "<p>Among equally good comparisons, neighbouring positions are preferred: (0,1), (1,2), …, then (0,2), …</p>" : "") + "</div>";
+    el("codeMeta").textContent = "Optimal tree";
+  } else {
+    buildCode(el("codeScroll"), TS.row.key, TS.row.pivot || "first");
+    el("codeMeta").textContent = rowLabel(TS.row);
+  }
+  renderStats();
+  renderTree();
+  initialView();
+  startWalk(vals, 0);
+}
+function writeTreeHash() {
+  const q = ["algo=" + TS.row.id, "n=" + TS.n];
+  if (TS.style === "slide") q.push("style=slide");
+  if (TS.leafRow) q.push("leaves=row");
+  if (TS.walk) q.push("in=" + TS.walk.vals.map(v => encodeURIComponent(String(v))).join(","));
+  const h = "#" + q.join("&");
+  if (location.hash !== h) {
+    try { history.replaceState(null, "", h); }
+    catch (e) { /* not allowed in a sandboxed frame (e.g. a preview): then the address simply stays as it is */ }
+  }
+}
+function readTreeHash() {
+  const q = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const r = TREE_ROWS.find(x => x.id.toLowerCase() === String(q.get("algo") || "").toLowerCase());
+  if (r) TS.row = r;
+  const n = parseInt(q.get("n"), 10); if (n >= 2 && n <= 5) TS.n = n;
+  if (q.get("style") === "slide") TS.style = "slide";
+  if (q.get("leaves") === "row") TS.leafRow = true;
+  let vals = null;
+  if (q.get("in")) { try { vals = parseWalk(q.get("in").replace(/,/g, " ")); TS.n = vals.length; } catch (e) { vals = null; } }
+  return vals;
+}
+function walkGo(d) { walkStop(); const W = TS.walk; W.cur = clamp(W.cur + d, 0, W.tr.cmps.length); renderWalk(true); }
+function walkStop() { if (TS.timer) { clearTimeout(TS.timer); TS.timer = null; } el("wPlay").innerHTML = "&#x25B6;&#xFE0E;"; }
+function walkPlay() {
+  if (TS.timer) { walkStop(); return; }
+  const W = TS.walk; if (W.cur >= W.tr.cmps.length) W.cur = 0;
+  el("wPlay").innerHTML = "&#x23F8;&#xFE0E;";
+  const tick = () => {
+    if (W !== TS.walk || W.cur >= W.tr.cmps.length) { walkStop(); return; }
+    W.cur++; renderWalk(true); TS.timer = setTimeout(tick, 1100);
+  };
+  TS.timer = setTimeout(tick, 250);
+}
+
+function initTree() {
+  readColors();
+  el("algoSeg").innerHTML = TREE_ROWS.map(r => '<button data-id="' + r.id + '">' + esc(rowLabel(r)) + "</button>").join("");
+  el("algoSeg").querySelectorAll("button").forEach(b => b.onclick = () => { TS.row = TREE_ROWS.find(r => r.id === b.dataset.id); rebuild(true); });
+  el("nSeg").innerHTML = [2, 3, 4, 5].map(n => '<button data-n="' + n + '">' + n + "</button>").join("");
+  el("nSeg").querySelectorAll("button").forEach(b => b.onclick = () => { TS.n = +b.dataset.n; rebuild(false); });
+  el("styleSeg").querySelectorAll("button").forEach(b => b.onclick = () => { TS.style = b.dataset.style; rebuild(true); });
+  el("leafRow").onchange = () => { TS.leafRow = el("leafRow").checked; rebuild(true); };
+  const setFromBox = () => {
+    try {
+      const vals = parseWalk(el("walkIn").value);
+      if (vals.length !== TS.n) { TS.n = vals.length; rebuild(false); }
+      startWalk(vals, 0);
+    } catch (e) { el("walkErr").textContent = e.message; }
+  };
+  el("walkSet").onclick = setFromBox;
+  el("walkIn").onkeydown = e => { if (e.key === "Enter") setFromBox(); };
+  el("walkRnd").onclick = () => {
+    const P = TS.T.perms[Math.floor(Math.random() * TS.T.perms.length)];
+    startWalk(P.slice(), 0);
+  };
+  el("wReset").onclick = () => { walkStop(); TS.walk.cur = 0; renderWalk(true); };
+  el("wBack").onclick = () => walkGo(-1);
+  el("wStep").onclick = () => walkGo(1);
+  el("wPlay").onclick = () => walkPlay();
+  document.addEventListener("keydown", e => {
+    if (e.target.closest && e.target.closest("input[type=text], textarea, select")) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "ArrowRight") { e.preventDefault(); walkGo(1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); walkGo(-1); }
+    else if (e.key === " ") { e.preventDefault(); walkPlay(); }
+    else if (e.key === "Home") { e.preventDefault(); walkStop(); TS.walk.cur = 0; renderWalk(true); }
+    else if (e.key === "End") { e.preventDefault(); walkStop(); TS.walk.cur = TS.walk.tr.cmps.length; renderWalk(true); }
+  });
+  initPanZoom();
+  let rz = null;
+  window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => applyView(), 100); });
+  el("aboutNote").innerHTML =
+    "<b>Why this proves the lower bound.</b> A comparison-based algorithm learns about its input only through <code>less</code>. " +
+    "Inputs that gave the same answers so far are indistinguishable for it, so it treats them alike — that is why the runs merge into a tree. " +
+    "A correct algorithm must end in different leaves for different input orders (it rearranges them differently), so the tree has " +
+    "<i>n</i>! leaves, and a binary tree with <i>n</i>! leaves has height ≥ ⌈lg <i>n</i>!⌉: some input needs that many comparisons. " +
+    "Redundant nodes (orange) are comparisons whose answer the algorithm could have known — wasted work, as in selection- and bubblesort.";
+  const vals = readTreeHash();
+  TS.T = null;
+  rebuild(false);
+  if (vals) startWalk(vals, 0);
+}
+if (typeof window !== "undefined" && !window.__NO_INIT__) {
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initTree); else initTree();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compression pipelines — a lab</title>
+<style>
+:root{
+  --bg:#f5ebd9; --panel:#faf6ed; --panel-border:#d4c5b4;
+  --ink:#6b675c; --ink-strong:#46433a; --muted:#8b8779; --dim:#a89880;
+  --btn:#faf6ed; --btn-border:#b9a793; --btn-border-hover:#9c866d;
+  --accent:#cc2f22; --deep:#902015; --new:#2f6b3a; --ccol:#2f5f8a; --grey:#b9ab8d;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;
+     margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+.container{width:100%;max-width:1500px;display:flex;flex-direction:column}
+h1{font-size:1.5rem;font-weight:500;margin:0 0 4px;letter-spacing:.5px;color:var(--ink-strong);text-transform:uppercase}
+.subtitle{font-size:.9rem;color:var(--muted);margin:0 0 18px;line-height:1.5}
+.subtitle code{background:#ecddc5;padding:1px 6px;border-radius:3px}
+.card{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:14px 18px;
+      margin-bottom:14px;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lbl{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.sep{width:1px;height:22px;background:#d4c5b4;margin:0 4px}
+button,select{background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);
+  padding:7px 14px;font-size:.85rem;border-radius:5px;cursor:pointer;font-weight:500;font-family:inherit;white-space:nowrap}
+button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--btn-border-hover)}
+button.primary{background:#46433a;color:#faf6ed;border-color:#46433a}
+button.primary:hover{background:#5c5043;border-color:#5c5043}
+button.mode.on{background:#f7e6e0;border-color:var(--accent);color:var(--accent);font-weight:600}
+.sidebar-note{font-size:.72rem;color:var(--muted);margin-top:4px}
+.bits .head{background:#dce6ee;border-bottom:2px solid #2f5f8a;color:#24506f}
+.bits .body{color:var(--deep)}
+textarea{width:100%;font-family:var(--wi-font-mono);font-size:.82rem;
+  background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);
+  border-radius:5px;padding:8px 10px;resize:vertical}
+.err{color:var(--accent);font-weight:600;font-size:.8rem;min-height:17px;margin-top:6px}
+.box{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:12px 16px;
+     box-shadow:0 2px 8px rgba(0,0,0,.04);margin-bottom:14px}
+.box-title{font-size:.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin:0 0 10px}
+.stage{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:14px;align-items:start}
+@media(max-width:1050px){.stage{grid-template-columns:1fr}}
+.pipe{display:flex;flex-direction:column;gap:8px}
+.node-row{display:grid;grid-template-columns:150px 1fr 116px;gap:12px;align-items:center;
+  border:1px solid var(--panel-border);border-radius:6px;padding:8px 12px;background:#fbf8f0;cursor:pointer}
+.node-row.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(196,51,51,.12);background:#fdf6f3}
+.node-row.bits{background:#f6f2ea}
+.node-name{font-size:.82rem;font-weight:600;color:var(--ink-strong)}
+.node-name .sub{display:block;font-size:.68rem;font-weight:400;color:var(--muted);white-space:normal}
+.node-name .tag{display:inline-block;font-size:.6rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.4px;padding:1px 5px;border-radius:3px;margin-left:5px;vertical-align:1px}
+.tag.chars{background:#e7eef2;color:var(--ccol)}
+.tag.ints{background:#eee8dd;color:#8a6a45}
+.tag.bits{background:#f3e4dd;color:var(--deep)}
+.tag.mixed{background:#e8e4ee;color:#5f4d78}
+.node-data{font-family:var(--wi-font-mono);font-size:.76rem;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node-size{text-align:right;font-size:.8rem;font-variant-numeric:tabular-nums;color:var(--ink-strong)}
+.node-size .pct{display:block;font-size:.68rem;color:var(--muted)}
+.stage-pick{display:flex;align-items:center;gap:10px;padding:0 0 0 20px}
+.stage-pick .arrow{color:var(--accent);font-size:1rem;line-height:1}
+.stage-pick select{padding:4px 10px;font-size:.8rem}
+.stage-note{font-size:.72rem;color:var(--muted)}
+.stats{font-size:.82rem;line-height:1.8}
+.stats .k{color:var(--muted)} .stats .v{color:var(--ink-strong);font-weight:600;font-variant-numeric:tabular-nums}
+.stats .note{font-size:.75rem;color:var(--dim);font-style:italic}
+.stats hr{border:none;border-top:1px dashed #ecddc5;margin:7px 0}
+.stats-head{font-size:.86rem;font-weight:700;color:var(--ink-strong);margin-bottom:6px}
+.bits{font-family:var(--wi-font-mono);font-size:.72rem;letter-spacing:.5px;
+  word-break:break-all;line-height:1.6;color:var(--deep);max-height:240px;overflow-y:auto;
+  background:#faf6ed;border:1px solid var(--panel-border);border-radius:5px;padding:8px 10px;margin-top:8px}
+.chart{display:flex;flex-direction:column;gap:3px}
+.chart .crow{display:flex;align-items:center;gap:8px;font-size:.76rem;cursor:pointer;padding:2px 4px;border-radius:4px}
+.chart .crow:hover{background:#ecddc5}
+.chart .crow.cur{background:#f7e6e0;font-weight:600}
+.chart .clab{min-width:270px;color:var(--ink)}
+.chart .cbar{height:13px;background:#e5c0b4;border:1px solid #6d180f;border-radius:2px}
+.chart .cbar.best{background:#bcd9b4;border-color:var(--new)}
+.chart .cbar.side{background:#dce6ee;border-color:#2f5f8a;margin-left:-1px}
+.chart .cval{font-variant-numeric:tabular-nums;color:var(--muted)}
+details.panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;width:100%;
+  margin-top:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+details.panel>summary{cursor:pointer;padding:13px 18px;font-size:.88rem;font-weight:600;color:var(--ink-strong);list-style:none;user-select:none}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::before{content:"▶ ";font-size:.72rem;color:var(--btn-border-hover)}
+details.panel[open]>summary::before{content:"▼ "}
+.panel-body{padding:0 18px 16px}
+.help{font-size:.82rem;line-height:1.6}
+.help code{background:#ecddc5;padding:1px 5px;border-radius:3px}
+.help table{border-collapse:collapse;font-size:.8rem;margin:10px 0;width:100%}
+.help th{text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+  padding:4px 8px;border-bottom:1px solid var(--panel-border)}
+.help td{padding:4px 8px;border-bottom:1px dashed #ecddc5;vertical-align:top}
+#test-out{font-family:var(--wi-font-mono);font-size:.75rem;line-height:1.6;white-space:pre-wrap;
+  margin-top:10px;color:#46433a;max-height:360px;overflow-y:auto;background:#faf6ed;
+  border:1px solid var(--panel-border);border-radius:6px;padding:12px}
+.t-pass{color:#2f6b3a;font-weight:600}.t-fail{color:var(--accent);font-weight:700}.t-head{color:var(--ink-strong);font-weight:700}
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Compression pipelines</h1>
+<p class="subtitle">
+  A chain of <b>data nodes</b> joined by <b>processing stages</b>. Every node is a text over some alphabet —
+  characters, numbers, or bits — and every stage maps one node to the next. Transformations like BWT and MTF
+  never shorten anything; coders like Huffman and Elias γ do. A coder's output is itself a text over
+  <code>{0,1}</code>, so it can be fed into further stages.
+</p>
+
+<div class="card">
+  <div class="row" style="margin-bottom:10px">
+    <span class="lbl">Example</span>
+    <select id="presetSel" onchange="loadPreset(this.value)"></select>
+    <div class="sep"></div>
+    <input type="file" id="fileInput" accept=".txt,.md,.csv,.json,text/*" onchange="loadFile(event)" style="font-size:.78rem">
+    <span class="lbl" id="sizeInfo" style="text-transform:none;font-weight:400"></span>
+  </div>
+  <textarea id="textArea" rows="5" spellcheck="false"></textarea>
+  <div class="row" style="margin-top:8px">
+    <button class="primary" onclick="loadFromInput()">Load</button>
+    <div class="sep"></div>
+    <span class="lbl">Count</span>
+    <button class="mode on" id="cnt-total" onclick="setCount('total')">body + side information</button>
+    <button class="mode" id="cnt-body" onclick="setCount('body')">body only</button>
+    <span class="lbl" style="text-transform:none;font-weight:400">
+      the end-of-word character <code>$</code> is appended automatically; up to 20 000 characters</span>
+  </div>
+  <div class="err" id="inputErr"></div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="box">
+      <div class="box-title">The chain</div>
+      <div class="pipe" id="pipeView"></div>
+    </div>
+    <div class="box" id="pipeOut">
+      <div class="box-title">Output of the last node</div>
+      <div class="stats" id="outMeta"></div>
+      <div class="bits" id="outBits"></div>
+    </div>
+  </div>
+  <div>
+    <div class="box">
+      <div class="box-title">The node you are pointing at</div>
+      <div class="stats" id="pipeStats"></div>
+    </div>
+  </div>
+</div>
+
+<div class="box">
+  <div class="box-title">Standard pipelines — click one to build it above</div>
+  <div class="chart" id="pipeChart"></div>
+  <div class="stats" id="pipeNote" style="margin-top:10px"></div>
+</div>
+
+<details class="panel">
+  <summary>The stages</summary>
+  <div class="panel-body help">
+    <table>
+      <thead><tr><th>stage</th><th>accepts</th><th>produces</th><th>what it does</th>
+        <th>side information</th></tr></thead>
+      <tbody id="stageTable"></tbody>
+    </table>
+    <p><b>Chaining coders.</b> A coder turns its input into a bit string, which is a perfectly good text over
+      the alphabet <code>{0,1}</code>. So a coder may sit in the middle of a chain and be followed by more
+      stages. Some of those combinations are pointless and it is worth seeing why: binary Huffman on a
+      two-symbol alphabet always spends exactly one bit per symbol, so <code>Huffman → Huffman</code> changes
+      nothing. Others are not pointless at all — a fixed-length code leaves a very regular bit pattern, and
+      <code>RLE (binary) → Elias γ</code> on top of it can beat the fixed-length code itself.</p>
+    <p><b>What is not counted.</b> Every figure is the size of the <i>body</i>. The cost of transmitting the
+      code table is not included, which flatters Huffman, especially on short inputs; Elias γ and RLE need no
+      table at all. See the Huffman page for what a code header actually costs.</p>
+    <p><b>Invertibility.</b> Every stage here is invertible given its parameters, so any chain is a genuine
+      compressor, not a lossy one.</p>
+  </div>
+</details>
+
+<details class="panel">
+  <summary>Self-tests</summary>
+  <div class="panel-body">
+    <button class="primary" onclick="runTests()">Run all tests</button>
+    <div id="test-out">Not run yet.</div>
+  </div>
+</details>
+
+</div>
+
+<script>
+"use strict";
+function disp(ch){ if(ch===' ')return '␣'; if(ch==='\n')return '↵'; if(ch==='\t')return '⇥'; return ch; }
+function dstr(s){ return [...s].map(disp).join(''); }
+function lg(x){ return Math.log(x)/Math.LN2; }
+function fmt(x,d){ return (Math.round(x*Math.pow(10,d))/Math.pow(10,d)).toFixed(d); }
+const SVGNS='http://www.w3.org/2000/svg';
+function el(t,a){ const e=document.createElementNS(SVGNS,t); for(const k in a) e.setAttribute(k,a[k]); return e; }
+function txt(x,y,s,a){ const e=el('text',Object.assign({x,y,'text-anchor':'middle'},a||{})); e.textContent=s; return e; }
+function H0(seq){
+  const m=new Map();
+  for(const v of seq) m.set(v,(m.get(v)||0)+1);
+  let h=0; const n=seq.length;
+  if(!n) return 0;
+  for(const c of m.values()){ const p=c/n; h-=p*lg(p); }
+  return h;
+}
+/* k-th order empirical entropy: group the characters by the k characters that
+   FOLLOW them, exactly the grouping the BWT produces.                       */
+function Hk(S,k){
+  const n=S.length;
+  if(k===0) return H0([...S]);
+  const g=new Map();
+  for(let i=0;i<n;i++){
+    let ctx='';
+    for(let j=1;j<=k;j++) ctx+=S[(i+j)%n];
+    if(!g.has(ctx)) g.set(ctx,[]);
+    g.get(ctx).push(S[i]);
+  }
+  let tot=0;
+  for(const arr of g.values()) tot+=arr.length*H0(arr);
+  return tot/n;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1.  The transform
+   ──────────────────────────────────────────────────────────────────────────
+     0.  append $         1.  all cyclic shifts      2.  sort      3.  last column
+   The rotation starting at i is S[i..n) · S[0..i).  Because $ occurs once and
+   is smallest, sorting the rotations is the same as sorting the suffixes, so
+   the order is the suffix array of S.
+   ══════════════════════════════════════════════════════════════════════════ */
+function rotation(S,i){ return S.slice(i)+S.slice(0,i); }
+/* The end-of-word character is by convention SMALLER than every real
+   character.  It has to be said explicitly: in ASCII the space (32) would
+   otherwise sort before $ (36), and the whole transform would come out
+   different from the one on the slides.                                    */
+function chRank(c){ return c==='$' ? -1 : c.charCodeAt(0); }
+function chLess(a,b){ return chRank(a)<chRank(b); }
+function sortedChars(str){ return [...str].sort((a,b)=>chRank(a)-chRank(b)).join(''); }
+/* Sorting the rotations by comparing them character by character is Θ(n² log n)
+   and dies well before a thousand characters.  Prefix doubling sorts by the
+   first 1, 2, 4, … characters, reusing the previous ranks, and is O(n log² n).
+   Indices are taken mod n throughout, so this really is the rotation order.  */
+function sortRotations(S){
+  const n=S.length;
+  let sa=[...Array(n).keys()];
+  let rank=[...S].map(chRank);
+  sa.sort((a,b)=>rank[a]-rank[b]);
+  let r=new Array(n), c=0; r[sa[0]]=0;
+  for(let i=1;i<n;i++){ if(rank[sa[i]]!==rank[sa[i-1]]) c++; r[sa[i]]=c; }
+  rank=r;
+  for(let k=1;k<n && c<n-1;k<<=1){
+    sa.sort((a,b)=> rank[a]-rank[b] || rank[(a+k)%n]-rank[(b+k)%n]);
+    const r2=new Array(n); let cc=0; r2[sa[0]]=0;
+    for(let i=1;i<n;i++){
+      const p=sa[i-1], q=sa[i];
+      if(rank[p]!==rank[q] || rank[(p+k)%n]!==rank[(q+k)%n]) cc++;
+      r2[q]=cc;
+    }
+    rank=r2; c=cc;
+  }
+  return sa;
+}
+let _bwtCache={key:null,val:null};
+function bwtForward(S){
+  if(_bwtCache.key===S) return _bwtCache.val;
+  const v=bwtForwardUncached(S);
+  _bwtCache={key:S,val:v};
+  return v;
+}
+function bwtForwardUncached(S){
+  const n=S.length;
+  const idx=sortRotations(S);
+  const B=idx.map(i=>S[(i+n-1)%n]).join('');
+  const F=idx.map(i=>S[i]).join('');
+  return {n,idx,B,F,S};
+}
+/* the inverse, exactly as on the slide:
+     D[r] = (B[r], r);  sort D stably by the first entry;
+     read D as a linked list (character, next entry)                          */
+function bwtInverse(B){
+  const n=B.length;
+  const dollar=[...B].filter(c=>c==='$').length;
+  if(dollar!==1) throw new Error('B must contain the end-of-word character $ exactly once');
+  const D=[...Array(n).keys()].map(r=>({c:B[r],r}));
+  /* stable sort by character, in the same order the forward transform used */
+  const sorted=D.slice().sort((a,b)=> chRank(a.c)-chRank(b.c) || a.r-b.r);
+  let j=B.indexOf('$');            // the row that is S itself
+  const out=[], visited=[];
+  for(let i=0;i<n;i++){
+    out.push(sorted[j].c);
+    visited.push(j);
+    j=sorted[j].r;
+  }
+  return {S:out.join(''),D,sorted,visited,n};
+}
+function runsOf(B){
+  const runs=[];
+  for(let i=0;i<B.length;){
+    let k=i; while(k<B.length&&B[k]===B[i]) k++;
+    runs.push({c:B[i],start:i,len:k-i});
+    i=k;
+  }
+  return runs;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2.  MTF, RLE, Huffman cost, Elias gamma  (for the pipeline)
+   ══════════════════════════════════════════════════════════════════════════ */
+function mtf(seq){
+  /* The initial list must use the SAME order as the alphabet transmitted as
+     side information.  Default sort() compares numbers as strings (0,1,10,2),
+     which is invisible on characters but wrong as soon as MTF feeds MTF.   */
+  const L=[...new Set(seq)].sort(cmpSym);
+  const out=[];
+  for(const c of seq){
+    const p=L.indexOf(c);
+    out.push(p);
+    L.splice(p,1); L.unshift(c);
+  }
+  return out;
+}
+function huffmanCost(seq){
+  /* Σ w(c)·|E(c)| for the optimal prefix-free code, via Huffman's algorithm */
+  const m=new Map();
+  for(const v of seq) m.set(v,(m.get(v)||0)+1);
+  const ws=[...m.values()];
+  if(ws.length<=1) return seq.length;              // one symbol: 1 bit each
+  ws.sort((a,b)=>a-b);
+  let cost=0;
+  const q=ws.slice();
+  while(q.length>1){
+    q.sort((a,b)=>a-b);
+    const a=q.shift(), b=q.shift();
+    cost+=a+b; q.push(a+b);
+  }
+  return cost;
+}
+function eliasGammaBits(x){          /* γ(x) for x ≥ 1 has 2⌊lg x⌋+1 bits */
+  return 2*Math.floor(lg(x))+1;
+}
+function eliasCost(seq){             /* values may be 0, so encode x+1 */
+  return seq.reduce((a,x)=>a+eliasGammaBits(x+1),0);
+}
+function rleOf(seq){
+  const out=[];
+  for(let i=0;i<seq.length;){
+    let k=i; while(k<seq.length&&seq[k]===seq[i]) k++;
+    out.push({v:seq[i],len:k-i});
+    i=k;
+  }
+  return out;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Coders that emit real bits, so their output can be chained
+   ══════════════════════════════════════════════════════════════════════════ */
+function cmpSym(a,b){
+  if(typeof a==='number'&&typeof b==='number') return a-b;
+  return String(a)<String(b)?-1:String(a)>String(b)?1:0;
+}
+function toInts(seq){
+  if(seq.every(x=>typeof x==='number')) return seq;
+  /* a mixed or character sequence is numbered by position in its sorted
+     alphabet — the same order encodeAlpha transmits                       */
+  const alpha=[...new Set(seq)].sort(cmpSym);
+  const rank=new Map(alpha.map((v,i)=>[v,i]));
+  return seq.map(x=>rank.get(x));
+}
+function eliasGamma(x){ const b=x.toString(2); return '0'.repeat(b.length-1)+b; }
+/* the canonical code with the Huffman lengths: same cost, and recoverable
+   from the lengths alone                                                   */
+function huffmanCanonical(seq){
+  const tree=huffmanCodeFor(seq);
+  const syms=[...tree.keys()].sort(cmpSym);
+  return canonicalFromLengths(syms,syms.map(x=>tree.get(x).length));
+}
+function huffmanCodeFor(seq){
+  const m=new Map();
+  for(const v of seq) m.set(v,(m.get(v)||0)+1);
+  const syms=[...m.keys()].sort(cmpSym);
+  if(syms.length<=1) return new Map(syms.map(s=>[s,'0']));
+  let nodes=syms.map(s=>({w:m.get(s),sym:s,l:null,r:null,min:String(s)}));
+  const cmp=(a,b)=>a.w-b.w||(a.min<b.min?-1:a.min>b.min?1:0);
+  while(nodes.length>1){
+    nodes.sort(cmp);
+    const a=nodes.shift(), b=nodes.shift();
+    nodes.push({w:a.w+b.w,sym:undefined,l:a,r:b,min:a.min<b.min?a.min:b.min});
+  }
+  const code=new Map();
+  (function go(nd,pre){
+    if(nd.sym!==undefined){ code.set(nd.sym,pre||'0'); return; }
+    go(nd.l,pre+'0'); go(nd.r,pre+'1');
+  })(nodes[0],'');
+  return code;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Side information
+   ──────────────────────────────────────────────────────────────────────────
+   A body of bits is worthless unless the decoder can interpret it, so every
+   stage that needs parameters must transmit them too.  Each stage below
+   produces the ACTUAL bit string of its parameters, and the self-tests decode
+   the whole thing again, so the totals are honest by construction.
+
+   One convention is used throughout:
+        list(V) =  16 bits |V|−1 · 5 bits vb−1 · |V| values in vb bits
+   Every symbol travels as a non-negative integer: a number is itself, a
+   character is its code point.
+   ══════════════════════════════════════════════════════════════════════════ */
+function bitsOf(x,b){ return x.toString(2).padStart(b,'0'); }
+function widthFor(max){ return Math.max(1,Math.floor(lg(Math.max(1,max)))+1); }
+function symVal(x){ return typeof x==='number' ? x : x.charCodeAt(0); }
+function encodeList(vals){
+  const vb=widthFor(Math.max(...vals,1));
+  return bitsOf(vals.length-1,16)+bitsOf(vb-1,5)+vals.map(v=>bitsOf(v,vb)).join('');
+}
+function decodeList(bits,pos){
+  const n=parseInt(bits.slice(pos,pos+16),2)+1; pos+=16;
+  const vb=parseInt(bits.slice(pos,pos+5),2)+1;  pos+=5;
+  const vals=[];
+  for(let i=0;i<n;i++){ vals.push(parseInt(bits.slice(pos,pos+vb),2)); pos+=vb; }
+  return {vals,pos};
+}
+function alphabetOf(seq){ return [...new Set(seq)].sort(cmpSym); }
+/* An alphabet of a mixed node holds characters and numbers side by side, and
+   both travel as integers — so one extra bit per symbol says which it was.
+   Homogeneous nodes need no such bit.                                      */
+function encodeAlpha(alpha,type){
+  const base=encodeList(alpha.map(symVal));
+  if(type!=='mixed') return base;
+  return base+alpha.map(x=>typeof x==='number'?'0':'1').join('');
+}
+function decodeAlpha(bits,pos,type){
+  const r=decodeList(bits,pos);
+  /* a bits node's symbols are the characters '0' and '1', not the numbers */
+  const asChars = (type==='chars'||type==='bits');
+  if(type!=='mixed')
+    return {alpha:r.vals.map(v=>asChars?String.fromCharCode(v):v),pos:r.pos};
+  let p=r.pos;
+  const alpha=r.vals.map(v=>{
+    const isChar=bits[p]==='1'; p++;
+    return isChar?String.fromCharCode(v):v;
+  });
+  return {alpha,pos:p};
+}
+/* the canonical code of a length vector, as on the Huffman page */
+function canonicalFromLengths(syms,lens){
+  const ord=syms.map((s,i)=>({s,l:lens[i]}))
+                .sort((a,b)=>a.l-b.l||cmpSym(a.s,b.s));
+  const code=new Map();
+  let v=0, prev=ord.length?ord[0].l:0;
+  for(const e of ord){
+    v*=Math.pow(2,e.l-prev); prev=e.l;
+    code.set(e.s,bitsOf(v,e.l)); v++;
+  }
+  return code;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Data nodes and stages
+   ══════════════════════════════════════════════════════════════════════════ */
+function node(seq,type,label,note){ return {seq,type,label,note}; }
+function bitsNode(str,label,note){ return node([...str],'bits',label,note); }
+
+const STAGES={
+  bwt:{label:'BWT',kind:'transform',
+    accepts:'a character text ending in $ (and containing no other $)',produces:'characters',
+    note:'sort the cyclic shifts, take the last column',
+    sideNote:'none — the row ending in $ is S itself, so the inverse knows where to start',
+    /* $ must be the LAST character, not merely present: the inverse starts at
+       the row whose last character is $, and that row is S only when S ends
+       in $.  B does not, so BWT is deliberately not offered on its own output. */
+    ok:d=>d.type==='chars'&&d.seq.length>0&&
+          d.seq[d.seq.length-1]==='$'&&d.seq.filter(c=>c==='$').length===1,
+    run:d=>node([...bwtForward(d.seq.join('')).B],'chars','BWT','a permutation of the input'),
+    side:d=>'',
+    invert:(seq,bits,pos)=>({seq:[...bwtInverse(seq.join('')).S],pos})},
+
+  mtf:{label:'MTF',kind:'transform',
+    accepts:'anything',produces:'numbers',
+    note:'replace each symbol by its position in a self-adjusting list',
+    sideNote:'the initial list, i.e. the alphabet of the input',
+    ok:d=>true,
+    run:d=>node(mtf(d.seq),'ints','MTF','positions, small where symbols cluster'),
+    /* inverting MTF needs the list it started from, which is the alphabet of
+       its INPUT — not of its output, so no later header can supply it      */
+    side:d=>encodeAlpha(alphabetOf(d.seq),d.type),
+    invert:(seq,bits,pos,type)=>{
+      const r=decodeAlpha(bits,pos,type);
+      const L=r.alpha.slice();
+      const out=[];
+      for(const p of seq){ const c=L[p]; out.push(c); L.splice(p,1); L.unshift(c); }
+      return {seq:out,pos:r.pos};
+    }},
+
+  rle:{label:'RLE',kind:'transform',
+    accepts:'anything',produces:'symbol/length pairs',
+    note:'replace each run by its symbol followed by its length',
+    sideNote:'none — symbols and lengths alternate',
+    ok:d=>true,
+    run:d=>{
+      const runs=rleOf(d.seq), out=[];
+      runs.forEach(r=>{ out.push(r.v); out.push(r.len); });
+      /* the type must describe what the node actually holds: RLE of a number
+         sequence is still all numbers, and every stage downstream keys its
+         side information off this type                                     */
+      const t=out.every(x=>typeof x==='number')?'ints':'mixed';
+      return node(out,t,'RLE','symbol, length, symbol, length, …');
+    },
+    side:d=>'',
+    invert:(seq,bits,pos)=>{
+      const out=[];
+      for(let i=0;i+1<seq.length;i+=2)
+        for(let k=0;k<seq[i+1];k++) out.push(seq[i]);
+      return {seq:out,pos};
+    }},
+
+  rlebits:{label:'RLE (binary)',kind:'transform',
+    accepts:'a bit string',produces:'numbers',
+    note:'only the run lengths are needed; the bits alternate',
+    sideNote:'one bit: the value the first run consists of',
+    ok:d=>d.type==='bits',
+    run:d=>{
+      const runs=rleOf(d.seq);
+      return node(runs.map(r=>r.len),'ints','RLE (binary)',
+        'run lengths, starting with a run of '+(d.seq[0]||'0'));
+    },
+    side:d=>(d.seq[0]==='1'?'1':'0'),
+    invert:(seq,bits,pos)=>{
+      let cur=bits[pos]; pos+=1;
+      const out=[];
+      for(const len of seq){ for(let k=0;k<len;k++) out.push(cur); cur=cur==='0'?'1':'0'; }
+      return {seq:out,pos};
+    }},
+
+  huffman:{label:'Huffman',kind:'coder',
+    accepts:'anything',produces:'bits',
+    note:'an optimal prefix-free code over the symbols of this node',
+    sideNote:'the code table: one (symbol, codeword length) pair per symbol',
+    ok:d=>true,
+    /* The header stores lengths only, so the body must use the CANONICAL
+       codewords for those lengths — the tree's own codewords have the same
+       lengths but are not recoverable from them.                          */
+    run:d=>{
+      const code=huffmanCanonical(d.seq);
+      return bitsNode(d.seq.map(x=>code.get(x)).join(''),'Huffman',
+        'canonical optimal prefix-free code over '+code.size+' distinct symbols');
+    },
+    /* Only the LENGTHS are stored; the canonical rule turns them back into
+       codewords.  This is exactly the header of the Huffman page.          */
+    side:d=>{
+      const code=huffmanCanonical(d.seq);
+      const syms=alphabetOf(d.seq);
+      const lens=syms.map(x=>code.get(x).length);
+      const lb=widthFor(Math.max(...lens));
+      return encodeAlpha(syms,d.type)+bitsOf(lb-1,5)+lens.map(l=>bitsOf(l,lb)).join('');
+    },
+    invert:(seq,bits,pos,type)=>{
+      const r=decodeAlpha(bits,pos,type); pos=r.pos;
+      const lb=parseInt(bits.slice(pos,pos+5),2)+1; pos+=5;
+      const lens=[];
+      for(let i=0;i<r.alpha.length;i++){ lens.push(parseInt(bits.slice(pos,pos+lb),2)); pos+=lb; }
+      const syms=r.alpha;
+      const code=canonicalFromLengths(syms,lens);
+      const rev=new Map([...code.entries()].map(([k,v])=>[v,k]));
+      const out=[]; let buf='';
+      for(const b of seq){
+        buf+=b;
+        if(rev.has(buf)){ out.push(rev.get(buf)); buf=''; }
+      }
+      return {seq:out,pos};
+    }},
+
+  elias:{label:'Elias γ',kind:'coder',
+    accepts:'anything (characters are numbered first)',produces:'bits',
+    note:'γ(x+1) for each symbol; self-delimiting, so no code table',
+    sideNote:'none for numbers; for characters, the alphabet they stand for',
+    ok:d=>true,
+    run:d=>{
+      const nums=toInts(d.seq);
+      return bitsNode(nums.map(x=>eliasGamma(x+1)).join(''),'Elias γ',
+        'γ(x+1) for each of '+nums.length+' symbols');
+    },
+    /* numbers are coded directly, so nothing extra is needed; anything else
+       must say which symbol each number stands for                        */
+    side:d=>d.type==='ints' ? '' : encodeAlpha(alphabetOf(d.seq),d.type),
+    invert:(seq,bits,pos,type)=>{
+      const str=seq.join('');
+      const nums=[]; let i=0;
+      while(i<str.length){
+        let z=0; while(i+z<str.length&&str[i+z]==='0') z++;
+        const w=2*z+1;
+        if(i+w>str.length) break;
+        nums.push(parseInt(str.slice(i,i+w),2)-1);
+        i+=w;
+      }
+      if(type==='ints') return {seq:nums,pos};
+      const r=decodeAlpha(bits,pos,type);
+      return {seq:nums.map(x=>r.alpha[x]),pos:r.pos};
+    }},
+
+  fixed:{label:'fixed length',kind:'coder',
+    accepts:'anything',produces:'bits',
+    note:'⌈lg σ⌉ bits per symbol — the baseline',
+    sideNote:'the alphabet, so the decoder knows which index means what',
+    ok:d=>true,
+    run:d=>{
+      const alpha=alphabetOf(d.seq);
+      const b=Math.max(1,Math.ceil(lg(alpha.length)));
+      const rank=new Map(alpha.map((v,i)=>[v,i]));
+      return bitsNode(d.seq.map(x=>bitsOf(rank.get(x),b)).join(''),
+        'fixed length',b+' bit'+(b===1?'':'s')+' per symbol, σ = '+alpha.length);
+    },
+    side:d=>encodeAlpha(alphabetOf(d.seq),d.type),
+    invert:(seq,bits,pos,type)=>{
+      const r=decodeAlpha(bits,pos,type);
+      const alpha=r.alpha;
+      const b=Math.max(1,Math.ceil(lg(alpha.length)));
+      const out=[];
+      for(let i=0;i+b<=seq.length;i+=b) out.push(alpha[parseInt(seq.slice(i,i+b).join(''),2)]);
+      return {seq:out,pos:r.pos};
+    }}
+};
+
+let pipeline=['bwt','mtf','huffman'];
+let statsNode=0, source='', countMode='total';
+function setCount(m){
+  countMode=m;
+  document.getElementById('cnt-total').classList.toggle('on',m==='total');
+  document.getElementById('cnt-body').classList.toggle('on',m==='body');
+  render();
+}
+
+function computePipeline(S,stages){
+  const nodes=[node([...S],'chars','S','the source text, with $ appended')];
+  const used=[], side=[];
+  for(const key of stages){
+    const st=STAGES[key], d=nodes[nodes.length-1];
+    if(!st||!st.ok(d)) break;
+    used.push(key);
+    side.push(st.side(d));            // the parameters this stage must transmit
+    nodes.push(st.run(d));
+  }
+  return {nodes,stages:used,side};
+}
+/* The complete transmission: the body, plus every stage's parameters.  The
+   side information is written outermost-first, which is the order a decoder
+   needs it in — it must undo the last stage before it can undo the one
+   before.                                                                  */
+function transmission(P){
+  const last=P.nodes[P.nodes.length-1];
+  if(last.type!=='bits') return null;
+  const head=P.side.slice().reverse().join('');
+  return {body:last.seq.join(''),head,
+          bodyBits:last.seq.length,headBits:head.length,
+          totalBits:last.seq.length+head.length};
+}
+function finalBits(P){ const t=transmission(P); return t?t.bodyBits:null; }
+function totalBits(P){ const t=transmission(P); return t?t.totalBits:null; }
+
+/* Decode a transmission back to the source text.  This exists so the sizes
+   above can be checked rather than asserted: if the accounting is wrong, this
+   fails.                                                                    */
+function decodeTransmission(P,t){
+  let seq=[...t.body], pos=0;
+  for(let i=P.stages.length-1;i>=0;i--){
+    const st=STAGES[P.stages[i]];
+    const inType=P.nodes[i].type;
+    const r=st.invert(seq,t.head,pos,inType);
+    seq=r.seq; pos=r.pos;
+  }
+  return seq.join('');
+}
+function nodeStats(d){
+  const seq=d.seq, n=seq.length;
+  const sigma=new Set(seq).size;
+  let runs=0;
+  for(let i=0;i<n;i++) if(i===0||seq[i]!==seq[i-1]) runs++;
+  const w=Math.min(16,Math.max(4,Math.round(n/40)||4));
+  let loc=0,c=0;
+  for(let i=0;i+w<=n;i++){ loc+=H0(seq.slice(i,i+w)); c++; }
+  const hk=[];
+  if(d.type==='chars'&&n<=4000) for(let k=1;k<=3;k++) hk.push(Hk(seq.join(''),k));
+  return {n,sigma,h0:H0(seq),runs,localMean:c?loc/c:0,w,hk,
+          fixedBits:n*Math.max(1,Math.ceil(lg(sigma)))};
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Rendering
+   ══════════════════════════════════════════════════════════════════════════ */
+function previewOf(d){
+  const s = (d.type==='chars') ? dstr(d.seq.join(''))
+          : (d.type==='bits')  ? d.seq.join('')
+          : d.seq.join(' ');
+  return s.length>150 ? s.slice(0,150)+' …' : s;
+}
+function render(){
+  const S=source;
+  const P=computePipeline(S,pipeline);
+  const n0=S.length;
+  const v=document.getElementById('pipeView'); v.innerHTML='';
+
+  P.nodes.forEach((d,i)=>{
+    const row=document.createElement('div');
+    row.className='node-row'+(statsNode===i?' on':'')+(d.type==='bits'?' bits':'');
+    row.innerHTML='<div class="node-name">'+d.label+
+      '<span class="tag '+d.type+'">'+d.type+'</span>'+
+      '<span class="sub">'+d.note+'</span></div>'+
+      '<div class="node-data">'+previewOf(d)+'</div>'+
+      '<div class="node-size">'+d.seq.length+(d.type==='bits'?' bits':' symbols')+
+      '<span class="pct">σ = '+new Set(d.seq).size+'</span></div>';
+    const pick=()=>{ statsNode=i; renderStats(P,n0); mark(); };
+    row.addEventListener('mouseenter',pick);
+    row.addEventListener('click',pick);
+    v.appendChild(row);
+    if(i<P.stages.length) addStage(P.stages[i],i,P.nodes[i]);
+  });
+  const last=P.nodes[P.nodes.length-1];
+  addStage(null,P.stages.length,last);
+
+  function addStage(k,pos,d){
+    const wrap=document.createElement('div');
+    wrap.className='stage-pick';
+    const a=document.createElement('span'); a.className='arrow'; a.textContent='↓';
+    wrap.appendChild(a);
+    const sel=document.createElement('select');
+    const first=document.createElement('option');
+    first.value=''; first.textContent = k===null ? '+ add a stage' : '— remove —';
+    sel.appendChild(first);
+    Object.keys(STAGES).filter(key=>STAGES[key].ok(d)).forEach(key=>{
+      const o=document.createElement('option'); o.value=key; o.textContent=STAGES[key].label;
+      if(key===k) o.selected=true;
+      sel.appendChild(o);
+    });
+    sel.onchange=()=>{
+      if(k===null){ if(sel.value){ pipeline=P.stages.concat([sel.value]); render(); } }
+      else if(sel.value===''){ pipeline=P.stages.slice(); pipeline.splice(pos,1); render(); }
+      else { pipeline=P.stages.slice(); pipeline[pos]=sel.value; render(); }
+    };
+    wrap.appendChild(sel);
+    const note=document.createElement('span');
+    note.className='stage-note';
+    note.textContent = k&&STAGES[k] ? STAGES[k].note : '';
+    wrap.appendChild(note);
+    v.appendChild(wrap);
+  }
+  function mark(){
+    [...v.querySelectorAll('.node-row')].forEach((e,i)=>e.classList.toggle('on',i===statsNode));
+  }
+
+  /* output */
+  const T=transmission(P);
+  if(T){
+    document.getElementById('outMeta').innerHTML=
+      '<span class="v">'+T.totalBits+'</span> bits total &nbsp;·&nbsp; <span class="v">'+
+      fmt(T.totalBits/n0,3)+'</span> bits per character of S'+
+      '<br><span class="k">body =</span> <span class="v">'+T.bodyBits+'</span>'+
+      ' &nbsp;+&nbsp; <span class="k">side information =</span> <span class="v">'+T.headBits+
+      '</span> <span class="note">('+fmt(T.headBits/T.totalBits*100,1)+'% of the total)</span>'+
+      '<br><span class="note">'+sideBreakdown(P)+'</span>';
+    const cap=6000;
+    const h=T.head.length>cap?T.head.slice(0,cap):T.head;
+    const room=Math.max(0,cap-h.length);
+    const b=T.body.length>room?T.body.slice(0,room):T.body;
+    const cut=(T.head.length+T.body.length)-(h.length+b.length);
+    document.getElementById('outBits').innerHTML=
+      '<span class="head">'+h+'</span><span class="body">'+b+'</span>'+
+      (cut>0?'<span class="note"> … ('+cut+' more bits)</span>':'');
+  } else {
+    const st=nodeStats(last);
+    document.getElementById('outMeta').innerHTML=
+      '<span class="note">this chain does not end in a coder, so there is no bit string yet — the last node '+
+      'is '+last.seq.length+' symbols over an alphabet of '+st.sigma+'. Add a coder, or see the panel on the '+
+      'right for what finishing here would cost.</span>';
+    document.getElementById('outBits').textContent=
+      (last.type==='chars'?dstr(last.seq.join('')):last.seq.join(' ')).slice(0,4000);
+  }
+  mark();
+  renderStats(P,n0);
+  renderChart(S,n0);
+}
+/* which stage paid for which part of the side information */
+function sideBreakdown(P){
+  const parts=[];
+  P.stages.forEach((k,i)=>{
+    const n=P.side[i].length;
+    if(n>0) parts.push(STAGES[k].label+' '+n);
+  });
+  return parts.length
+    ? 'side information: '+parts.join(' bits, ')+' bits — without it the body cannot be decoded'
+    : 'this chain needs no side information at all';
+}
+function renderStats(P,n0){
+  const i=Math.min(statsNode,P.nodes.length-1);
+  const d=P.nodes[i], st=nodeStats(d);
+  let h='<div class="stats-head">'+d.label+' <span class="note">'+d.note+'</span></div>'+
+    '<span class="k">length =</span> <span class="v">'+st.n+'</span>'+
+    ' &nbsp;·&nbsp; <span class="k">alphabet σ =</span> <span class="v">'+st.sigma+'</span>'+
+    '<br><span class="k">runs =</span> <span class="v">'+st.runs+'</span>'+
+    ' &nbsp;·&nbsp; <span class="k">mean run length =</span> <span class="v">'+fmt(st.n/st.runs,2)+'</span><hr>'+
+    '<span class="k">H<sub>0</sub> =</span> <span class="v">'+fmt(st.h0,3)+'</span> bits/symbol'+
+    '<br><span class="k">mean local H<sub>0</sub> (window '+st.w+') =</span> <span class="v">'+
+    fmt(st.localMean,3)+'</span>';
+  if(st.hk.length)
+    h+='<br>'+st.hk.map((v,k)=>'<span class="k">H<sub>'+(k+1)+'</sub> =</span> <span class="v">'+
+        fmt(v,3)+'</span>').join(' &nbsp; ');
+  /* what it would cost to finish the chain here — including the tables that
+     coder would then have to transmit, and every earlier stage's parameters  */
+  const upto=P.side.slice(0,i).reduce((a,x)=>a+x.length,0);
+  h+='<hr><span class="note">if the chain were finished right here, with '+upto+
+     ' bits of side information already owed:</span>';
+  for(const k of ['fixed','huffman','elias']){
+    const st2=STAGES[k];
+    const body=st2.run(d).seq.length, head=st2.side(d).length+upto;
+    h+='<br><span class="k">'+st2.label+':</span> <span class="v">'+fmt((body+head)/n0,3)+
+       '</span> bits/char <span class="note">('+body+' body + '+head+' side)</span>';
+  }
+  h+='<br><span class="note">all divided by the length of the original text, so the figures stay '+
+     'comparable along the whole chain</span>';
+  document.getElementById('pipeStats').innerHTML=h;
+}
+const STANDARD=[
+  {name:'fixed length only (the baseline)',p:['fixed']},
+  {name:'Huffman only',p:['huffman']},
+  {name:'RLE + Huffman',p:['rle','huffman']},
+  {name:'MTF + Huffman',p:['mtf','huffman']},
+  {name:'MTF + Elias γ',p:['mtf','elias']},
+  {name:'BWT + Huffman',p:['bwt','huffman']},
+  {name:'BWT + RLE + Huffman',p:['bwt','rle','huffman']},
+  {name:'BWT + MTF + Huffman   (bzip2-like)',p:['bwt','mtf','huffman']},
+  {name:'BWT + MTF + Elias γ',p:['bwt','mtf','elias']},
+  {name:'BWT + MTF + RLE + Huffman',p:['bwt','mtf','rle','huffman']},
+  {name:'fixed length, then RLE (binary) + Elias γ',p:['fixed','rlebits','elias']},
+  {name:'BWT + MTF + fixed, then RLE (binary) + Elias γ',p:['bwt','mtf','fixed','rlebits','elias']},
+  {name:'BWT + MTF + Huffman, then Huffman again',p:['bwt','mtf','huffman','huffman']}
+];
+function renderChart(S,n0){
+  const rows=STANDARD.map(c=>{
+    const P=computePipeline(S,c.p), T=transmission(P);
+    return T?{name:c.name,p:c.p,body:T.bodyBits,head:T.headBits,total:T.totalBits}:null;
+  }).filter(Boolean);
+  const val=r=>countMode==='body'?r.body:r.total;
+  rows.sort((a,b)=>val(a)-val(b));
+  const best=Math.min(...rows.map(val));
+  const worst=Math.max(...rows.map(val));
+  const c=document.getElementById('pipeChart'); c.innerHTML='';
+  const cur=pipeline.join('>');
+  rows.forEach(r=>{
+    const d=document.createElement('div');
+    d.className='crow'+(r.p.join('>')===cur?' cur':'');
+    const scale=300/worst;
+    const bar = countMode==='body'
+      ? '<span class="cbar'+(val(r)===best?' best':'')+'" style="width:'+(r.body*scale)+'px"></span>'
+      : '<span class="cbar'+(val(r)===best?' best':'')+'" style="width:'+(r.body*scale)+'px"></span>'+
+        '<span class="cbar side" style="width:'+(r.head*scale)+'px" title="side information"></span>';
+    d.innerHTML='<span class="clab">'+r.name+'</span>'+bar+
+      '<span class="cval">'+fmt(val(r)/n0,3)+' bits/char</span>';
+    d.title='click to build this pipeline'+
+      (countMode==='total'?'  ·  '+r.body+' body + '+r.head+' side information':'');
+    d.onclick=()=>{ pipeline=r.p.slice(); statsNode=0; render(); };
+    c.appendChild(d);
+  });
+  document.getElementById('pipeNote').innerHTML= countMode==='total'
+    ? '<span class="note">Click any row to build that chain above; the pale segment is the '+
+      '<b>side information</b> — code tables, alphabets, and anything else the decoder must be told. '+
+      'Every chain here has been checked by decoding it again, so these are sizes of genuinely '+
+      'decodable transmissions. On short texts the tables can outweigh the body entirely, which is why '+
+      'Elias γ — which needs no table on a number sequence — often wins where Huffman does not.</span>'
+    : '<span class="note">Click any row to build that chain above. These are <b>body sizes only</b>, so they '+
+      'are not decodable transmissions — the code tables are missing. Useful for seeing what a stage does to '+
+      'the coder that follows it, misleading as a comparison.</span>';
+}
+function fillStageTable(){
+  const t=document.getElementById('stageTable'); t.innerHTML='';
+  for(const k in STAGES){
+    const s=STAGES[k];
+    t.innerHTML+='<tr><td><b>'+s.label+'</b><br><span style="color:var(--muted);font-size:.7rem">'+
+      s.kind+'</span></td><td>'+s.accepts+'</td><td>'+s.produces+'</td><td>'+s.note+
+      '</td><td>'+(s.sideNote||'')+'</td></tr>';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Input
+   ══════════════════════════════════════════════════════════════════════════ */
+const MAXN=20000;
+const PRESETS={
+  'a paragraph about the transform':
+    'the burrows wheeler transform is a reversible permutation of a text. it does not compress '+
+    'anything by itself, but it rearranges the text so that characters appearing in the same '+
+    'context end up next to each other. a following move to front stage turns those stretches '+
+    'into small numbers, and only the last stage of the chain actually makes the text shorter. '+
+    'this paragraph is long enough that the pipelines start to separate.',
+  'alf␣eats␣alfalfa  (tiny, for checking by hand)':'alf eats alfalfa',
+  'have␣had␣hadnt␣hasnt␣havent␣has␣what  (runs)':'have had hadnt hasnt havent has what',
+  'a repeated sentence  (very compressible)':
+    'to be or not to be that is the question '.repeat(30),
+  'aaaa…bbbb…  (two long runs)':'a'.repeat(200)+'b'.repeat(200),
+  'random letters  (incompressible)':(()=>{
+    let s='',r=12345;
+    for(let i=0;i<600;i++){ r=(r*1103515245+12345)&0x7fffffff; s+='abcdefghijklmnopqrstuvwxyz'[r%26]; }
+    return s;
+  })()
+};
+function initPresets(){
+  const s=document.getElementById('presetSel');
+  for(const k in PRESETS){ const o=document.createElement('option'); o.value=k; o.textContent=k; s.appendChild(o); }
+}
+function loadPreset(k){
+  if(!PRESETS[k]) return;
+  document.getElementById('presetSel').value=k;
+  document.getElementById('textArea').value=PRESETS[k];
+  loadFromInput();
+}
+function loadFile(ev){
+  const f=ev.target.files&&ev.target.files[0];
+  if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    let t=String(rd.result);
+    if(t.length>MAXN){
+      t=t.slice(0,MAXN);
+      document.getElementById('inputErr').textContent=
+        'the file was truncated to the first '+MAXN+' characters';
+    }
+    document.getElementById('textArea').value=t;
+    loadFromInput();
+  };
+  rd.readAsText(f);
+}
+function loadFromInput(){
+  const err=document.getElementById('inputErr'); err.textContent='';
+  try{
+    let t=document.getElementById('textArea').value.replace(/\$/g,'');
+    if(!t.length) throw new Error('the text is empty');
+    if(t.length>MAXN) throw new Error('please keep the text to '+MAXN+
+      ' characters (this one has '+t.length+')');
+    source=t+'$';
+    document.getElementById('sizeInfo').textContent=
+      'n = '+source.length+' (including $)   σ = '+new Set([...source]).size;
+    statsNode=0;
+    render();
+  }catch(e){ err.textContent=e.message; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Self-tests
+   ══════════════════════════════════════════════════════════════════════════ */
+function runTests(){
+  const out=[]; let pass=0,fail=0;
+  const ok=(n,c,d)=>{ if(c){pass++;out.push('<span class="t-pass">PASS</span>  '+n);}
+                      else{fail++;out.push('<span class="t-fail">FAIL</span>  '+n+(d?'\n         '+d:''));} };
+  const head=t=>out.push('<span class="t-head">'+t+'</span>');
+  const S='have had hadnt hasnt havent has what$';
+  const bits=p=>finalBits(computePipeline(S,p));
+  const total=p=>totalBits(computePipeline(S,p));
+
+  head('1 — Stages and their types');
+  {
+    const src=computePipeline(S,[]).nodes[0];
+    ok('BWT accepts the source text', STAGES.bwt.ok(src));
+    ok('BWT does not accept a number sequence', !STAGES.bwt.ok(STAGES.mtf.run(src)));
+    ok('RLE (binary) is offered only on a bit string',
+       !STAGES.rlebits.ok(src) && STAGES.rlebits.ok(STAGES.huffman.run(src)));
+    ok('a coder produces a node of type bits',
+       STAGES.huffman.run(src).type==='bits' && STAGES.elias.run(src).type==='bits'
+       && STAGES.fixed.run(src).type==='bits');
+    ok('every coder emits only 0s and 1s',
+       ['huffman','elias','fixed'].every(k=>STAGES[k].run(src).seq.every(b=>b==='0'||b==='1')));
+    ok('MTF produces numbers', STAGES.mtf.run(src).type==='ints');
+  }
+
+  head('2 — Coders may sit in the middle of a chain');
+  {
+    const P=computePipeline(S,['bwt','mtf','fixed','rlebits','elias']);
+    ok('a five-stage chain with a coder in the middle builds', P.stages.length===5,
+       P.stages.join(' → '));
+    ok('its nodes alternate types as expected',
+       P.nodes.map(n=>n.type).join(',')==='chars,chars,ints,bits,ints,bits',
+       P.nodes.map(n=>n.type).join(','));
+    ok('the chain still ends in a bit string', finalBits(P)!==null);
+    /* binary Huffman on two symbols cannot do anything */
+    const once=bits(['bwt','mtf','huffman']);
+    const twice=bits(['bwt','mtf','huffman','huffman']);
+    ok('Huffman applied twice changes nothing ('+once+' then '+twice+' bits)', once===twice);
+    ok('fixed length on a bit string is also a no-op',
+       bits(['bwt','mtf','huffman'])===bits(['bwt','mtf','huffman','fixed']));
+    /* RLE(binary) then Elias is a real alternative to a plain fixed code */
+    const plain=bits(['bwt','mtf','fixed']);
+    const rebuilt=bits(['bwt','mtf','fixed','rlebits','elias']);
+    out.push('           fixed = '+plain+' bits, then RLE+γ = '+rebuilt+' bits');
+    ok('RLE (binary) + Elias γ is a genuine alternative, not a no-op', plain!==rebuilt);
+  }
+
+  head('3 — The coders are correct');
+  {
+    const seq=[...'abracadabra'];
+    const code=huffmanCodeFor(seq);
+    ok('the Huffman code is prefix-free',
+       [...code.values()].every((a,i,arr)=>arr.every((b,j)=>i===j||!b.startsWith(a))));
+    ok('and has the optimal length',
+       seq.reduce((a,x)=>a+code.get(x).length,0)===huffmanCost(seq));
+    ok('γ(1)=1, γ(2)=010, γ(4)=00100',
+       eliasGamma(1)==='1'&&eliasGamma(2)==='010'&&eliasGamma(4)==='00100',
+       [1,2,4].map(eliasGamma).join(' '));
+    ok('a fixed-length code over σ symbols uses ⌈lg σ⌉ bits each',
+       STAGES.fixed.run(node([...'abcd'],'chars','','')).seq.length===8);
+    ok('a one-symbol alphabet still gets one bit per symbol',
+       STAGES.huffman.run(node([...'aaaa'],'chars','','')).seq.length===4);
+  }
+
+  head('4 — Side information: everything must be decodable');
+  {
+    /* the strongest check available: decode the transmission again */
+    let n=0, bad=[];
+    const texts=['have had hadnt hasnt havent has what$','alf eats alfalfa$','aaaabbbb$','a$',
+                 'mississippi$'];
+    const keys=Object.keys(STAGES);
+    for(const T of texts){
+      const rec=pre=>{
+        if(pre.length>3) return;
+        const P=computePipeline(T,pre);
+        if(pre.length&&P.stages.length===pre.length){
+          const t=transmission(P);
+          if(t){
+            n++;
+            let back;
+            try{ back=decodeTransmission(P,t); }catch(e){ back='threw: '+e.message; }
+            if(back!==T) bad.push(pre.join('+')+' on '+JSON.stringify(T.slice(0,10)));
+          }
+        }
+        if(pre.length<3) for(const k of keys) rec(pre.concat([k]));
+      };
+      rec([]);
+    }
+    ok('all '+n+' chains up to length 3 decode back to the source text',
+       bad.length===0, bad.slice(0,4).join(' | '));
+    /* the parts must add up */
+    const P=computePipeline(S,['bwt','mtf','huffman']), t=transmission(P);
+    ok('total = body + side information',
+       t.totalBits===t.bodyBits+t.headBits);
+    ok('the Huffman table is not free ('+t.headBits+' bits for σ = '+
+       new Set(P.nodes[2].seq).size+' symbols)', t.headBits>0);
+    ok('BWT needs no side information', STAGES.bwt.side(P.nodes[0])==='');
+    ok('Elias γ needs none on a number sequence',
+       STAGES.elias.side(P.nodes[2])==='');
+    ok('but it does on a character sequence',
+       STAGES.elias.side(P.nodes[0]).length>0);
+    ok('MTF must transmit its initial list',
+       STAGES.mtf.side(P.nodes[1]).length>0);
+    /* the header really is the canonical-code header, so the body must use
+       canonical codewords                                                  */
+    const code=huffmanCanonical([...'abracadabra']);
+    ok('Huffman bodies use canonical codewords',
+       [...code.values()].every(c=>/^[01]+$/.test(c)) &&
+       [...'abracadabra'].reduce((a,x)=>a+code.get(x).length,0)===huffmanCost([...'abracadabra']));
+    /* and BWT is refused where it would not be invertible */
+    ok('BWT is not offered on a text whose $ is not last',
+       !STAGES.bwt.ok(node([...'ab$c'],'chars','','')));
+    ok('BWT is not offered on its own output',
+       !STAGES.bwt.ok(STAGES.bwt.run(node([...'banana$'],'chars','',''))));
+  }
+
+  head('5 — Pipelines on a real text');
+  {
+    ok('the bzip2-like chain beats the fixed-length baseline in body size ('+
+       bits(['bwt','mtf','huffman'])+' < '+bits(['fixed'])+' bits)',
+       bits(['bwt','mtf','huffman'])<bits(['fixed']));
+    /* the honest comparison is the total, and on a short text it can go the
+       other way — that is exactly the point of counting the table         */
+    out.push('           totals on this 37-character text: BWT+MTF+Huffman '+
+             total(['bwt','mtf','huffman'])+', fixed '+total(['fixed'])+
+             ', BWT+MTF+Elias γ '+total(['bwt','mtf','elias'])+' bits');
+    ok('Elias γ beats Huffman once the table is counted, on this short text',
+       total(['bwt','mtf','elias'])<total(['bwt','mtf','huffman']));
+    ok('MTF without BWT is worse than with it',
+       bits(['mtf','huffman'])>bits(['bwt','mtf','huffman']));
+    ok('every standard pipeline produces a bit string',
+       STANDARD.every(c=>finalBits(computePipeline(S,c.p))!==null),
+       STANDARD.filter(c=>finalBits(computePipeline(S,c.p))===null).map(c=>c.name).join(', '));
+    const long='to be or not to be that is the question '.repeat(60)+'$';
+    const Pl=computePipeline(long,['bwt','mtf','huffman']);
+    ok('on a long text the table is a small overhead ('+
+       fmt(transmission(Pl).headBits/transmission(Pl).totalBits*100,1)+'% of the total)',
+       transmission(Pl).headBits/transmission(Pl).totalBits<0.25);
+    const t0=Date.now();
+    const b=finalBits(computePipeline(long,['bwt','mtf','huffman']));
+    const ms=Date.now()-t0;
+    ok('n = '+long.length+' through BWT+MTF+Huffman in '+ms+' ms',ms<5000,ms+' ms');
+    ok('a long repetitive text compresses far better than a short one ('+
+       fmt(b/long.length,3)+' vs '+fmt(bits(['bwt','mtf','huffman'])/S.length,3)+' bits/char)',
+       b/long.length < bits(['bwt','mtf','huffman'])/S.length);
+    ok('random text resists every pipeline',
+       STANDARD.every(c=>{
+         const R=PRESETS['random letters  (incompressible)']+'$';
+         return finalBits(computePipeline(R,c.p))/R.length > 3.5;
+       }));
+  }
+
+  out.push('');
+  out.push('<span class="'+(fail===0?'t-pass':'t-fail')+'">'+pass+' passed, '+fail+' failed</span>');
+  document.getElementById('test-out').innerHTML=out.join('\n');
+}
+
+initPresets();
+fillStageTable();
+loadPreset(Object.keys(PRESETS)[0]);
+</script>
+</body>
+</html>

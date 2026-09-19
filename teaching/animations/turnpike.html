@@ -1,0 +1,2842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peptide sequencing &amp; the turnpike problem · step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 14px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code, .status code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  /* --- tabs --- */
+  .tabs { display:flex; flex-wrap:wrap; gap:0; border-bottom:2px solid var(--wi-border-soft); margin-bottom:16px; }
+  .tabs button { border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent;
+                 padding:8px 16px 7px; font-size:.86rem; color:var(--wi-ink-soft); margin-bottom:-2px; }
+  .tabs button:hover:not(:disabled) { background:var(--wi-panel); border-bottom-color:var(--wi-border); }
+  .tabs button.on { color:var(--wi-accent); border-bottom-color:var(--wi-accent); font-weight:bold; }
+  .tabs button .no { display:inline-block; font-family:var(--wi-font-mono); font-size:.8em; color:var(--wi-ink-faint);
+                     margin-right:6px; }
+  .tabs button.on .no { color:var(--wi-accent-soft); }
+  .tabpane { display:none; }
+  .tabpane.on { display:block; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.str { font-family:var(--wi-font-mono); font-size:.8rem; width:14em; }
+  input.wide { width:26em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  .opbar { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:10px 18px;
+           background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+           border-radius:var(--wi-radius-lg); margin-bottom:14px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  /* --- transport --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0; width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden; flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px;
+              font-size:.68rem; line-height:1.3; font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-left-width:0;
+              border-radius:0; color:var(--wi-ink-faint); cursor:pointer; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage --- */
+  .stage { display:grid; gap:18px; align-items:start; }
+  /* --- draggable splitter between the drawing column and the explanation column --- */
+  .stage { grid-template-columns:minmax(0,1.3fr) 12px minmax(300px,1fr); }
+  .stage.sized { grid-template-columns:minmax(0,var(--left)) 12px minmax(0,1fr); }
+  .splitter { align-self:stretch; cursor:col-resize; position:relative; touch-action:none; border-radius:3px; }
+  .splitter::before { content:""; position:absolute; left:5px; top:0; bottom:0; width:2px; background:var(--wi-border-soft); border-radius:1px; }
+  .splitter::after { content:""; position:absolute; left:3px; top:50%; width:6px; height:34px; margin-top:-17px; border-radius:3px;
+                     background:var(--wi-border); }
+  .splitter:hover::before, .splitter.drag::before { background:var(--wi-accent-soft); }
+  .splitter:hover::after, .splitter.drag::after { background:var(--wi-accent); }
+  @media (max-width:1080px) { .stage, .stage.sized { grid-template-columns:1fr; } .splitter { display:none; } }
+
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-box + .sim-box { margin-top:14px; }
+  .col-side .sim-box + .sim-box { margin-top:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:88px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status code { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-panel-2); }
+  .k-ok { color:var(--wi-relax); font-weight:bold; }
+  .k-bad { color:var(--wi-active); font-weight:bold; }
+  .k-ex { color:var(--wi-examine); font-weight:bold; }
+  .k-q { color:var(--wi-queue); font-weight:bold; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem; color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  /* --- chips (multisets) --- */
+  .chips { display:flex; flex-wrap:wrap; gap:4px 5px; align-items:flex-start; }
+  .chip { font-family:var(--wi-font-mono); font-size:.78rem; line-height:1.3; padding:2px 6px;
+          border:1px solid var(--wi-border-soft); border-radius:3px; background:var(--wi-panel-2);
+          color:var(--wi-ink-strong); position:relative; }
+  .chip.sub { font-size:.72rem; padding:1px 5px 2px; text-align:center; }
+  .chip .fr { display:block; font-size:.78em; color:var(--wi-ink-faint); line-height:1.15; letter-spacing:.02em; }
+  .chip.new { background:#f6e6df; border-color:var(--wi-active); color:var(--wi-active); font-weight:bold; }
+  .chip.used { color:var(--wi-ink-faint); background:var(--wi-panel); border-style:dashed; }
+  .chip.used::after { content:""; position:absolute; left:6px; right:6px; top:50%; border-top:1px solid var(--wi-ink-faint); }
+  .chip.ok { background:#e8f0e2; border-color:var(--wi-relax); }
+  .chip.miss { background:#f6e6df; border-color:var(--wi-active); color:var(--wi-active); }
+  .chip.extra { background:#f7edd9; border-color:var(--wi-examine); color:var(--wi-examine); }
+  .chip.max { background:#f6e6df; border-color:var(--wi-active); color:var(--wi-active); font-weight:bold; }
+  .chip.cand { background:#f7edd9; border-color:var(--wi-examine); color:var(--wi-examine); font-weight:bold; }
+  .chip.hot { box-shadow:0 0 0 2px var(--wi-accent-soft); }
+  .setline { font-family:var(--wi-font-mono); font-size:.78rem; color:var(--wi-ink-soft); margin:6px 0 0; line-height:1.5;
+             word-break:break-word; }
+  .setline b { color:var(--wi-ink-strong); }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+  .summ { font-size:.86rem; margin:0 0 8px; }
+  .summ.good { color:var(--wi-relax); font-weight:bold; }
+  .summ.bad { color:var(--wi-ink-strong); }
+
+  /* --- amino acid table --- */
+  .aatab { display:grid; grid-template-columns:repeat(2, 1fr); gap:0 14px; font-size:.78rem; }
+  .aarow { display:grid; grid-template-columns:1.3em 1.3fr 2.4em; gap:8px; padding:1px 6px; border-radius:3px;
+           align-items:baseline; color:var(--wi-ink-soft); }
+  .aarow .lt { font-family:var(--wi-font-mono); font-weight:bold; color:var(--wi-ink-strong); }
+  .aarow .ms { font-family:var(--wi-font-mono); text-align:right; }
+  .aarow.hot { background:#f6e6df; color:var(--wi-active); }
+  .aarow.hot .lt, .aarow.hot .ms { color:var(--wi-active); }
+  .aarow.inpep .lt { color:var(--wi-accent); }
+  .aanote { font-size:.72rem; color:var(--wi-ink-faint); margin-top:8px; line-height:1.45; }
+
+  /* --- toll table --- */
+  .tolltab { border-collapse:collapse; font-family:var(--wi-font-mono); font-size:.74rem; }
+  .tolltab th, .tolltab td { padding:2px 5px; text-align:center; min-width:2.2em; border:1px solid var(--wi-border-soft); }
+  .tolltab th { color:var(--wi-ink-faint); font-weight:normal; background:var(--wi-panel-2); }
+  .tolltab td { cursor:default; }
+  .tolltab td.blank { border:0; }
+  .tolltab td.ok { background:#e8f0e2; color:var(--wi-relax); }
+  .tolltab td.extra { background:#f7edd9; color:var(--wi-examine); }
+  .tolltab td.plain { background:var(--wi-panel-2); }
+  .tolltab td.hot, .tolltab th.hot { background:#f6e6df !important; color:var(--wi-active) !important; font-weight:bold; }
+
+  /* --- recursion tree --- */
+  .tree { font-family:var(--wi-font-mono); font-size:.76rem; line-height:1.55; }
+  .frame { display:flex; gap:6px; align-items:baseline; padding:1px 6px; border-radius:3px; white-space:nowrap; }
+  .frame .st { display:inline-block; width:1.3em; text-align:center; }
+  .frame .lab { color:var(--wi-ink-faint); }
+  .frame .sset { color:var(--wi-ink-strong); }
+  .frame.open .st { color:var(--wi-examine); }
+  .frame.ok .st, .frame.ok .sset { color:var(--wi-relax); }
+  .frame.fail .st { color:var(--wi-active); }
+  .frame.fail .sset { color:var(--wi-ink-faint); text-decoration:line-through; }
+  .frame.cur { background:#f6e6df; }
+  .frame.future { opacity:.35; }
+  .treewrap { overflow-x:auto; max-height:420px; overflow-y:auto; }
+
+  /* --- pseudocode --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head); font-size:.72rem;
+                           text-transform:uppercase; letter-spacing:.1em; color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent; white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  /* --- editor --- */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head); font-size:.78rem;
+                             letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr; gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:130px; font-family:var(--wi-font-mono); font-size:.78rem; background:var(--wi-panel-2);
+             color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius); padding:6px 9px;
+             font-size:.76rem; color:var(--wi-ink-strong); box-shadow:0 3px 10px rgba(0,0,0,.12);
+             max-width:270px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls, .opbar { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    input.wide { width:100%; }
+  }
+
+  /* --- SVG classes --- */
+  .road { stroke:var(--wi-border-strong); stroke-width:10; stroke-linecap:round; }
+  .roadmid { stroke:var(--wi-bg); stroke-width:1.2; stroke-dasharray:7 7; }
+  .roadhit { fill:transparent; cursor:copy; }
+  .exit { fill:var(--wi-panel-2); stroke:var(--wi-ink-strong); stroke-width:2; }
+  .exit.drag { cursor:grab; }
+  .exit.drag:active { cursor:grabbing; }
+  .exit.sel { stroke:var(--wi-accent); stroke-width:3; fill:#f0d7cd; }
+  .exit.fixed { fill:var(--wi-controls); }
+  .exit.cand { fill:#f7edd9; stroke:var(--wi-examine); stroke-dasharray:3 2; }
+  .exit.candbad { fill:#f6e6df; stroke:var(--wi-active); stroke-dasharray:3 2; }
+  .exit.hot { stroke:var(--wi-active); stroke-width:3; }
+  .exlab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .exlab.faint { fill:var(--wi-ink-faint); font-size:11px; }
+  .exlab.cand { fill:var(--wi-examine); font-weight:bold; }
+  .exlab.candbad { fill:var(--wi-active); font-weight:bold; }
+  .seglab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-accent); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .seghit { fill:transparent; cursor:pointer; }
+  .seghit:hover { fill:rgba(144,32,21,.08); }
+  .segsel { fill:rgba(144,32,21,.16); stroke:var(--wi-accent); stroke-width:1.5; stroke-dasharray:4 3; }
+  .arc { fill:none; stroke-width:1.6; }
+  .arc.ok { stroke:var(--wi-relax); }
+  .arc.bad { stroke:var(--wi-active); stroke-dasharray:4 3; }
+  .arc.neu { stroke:var(--wi-queue); }
+  .arc.faint { stroke:var(--wi-inert); stroke-width:1.2; }
+  .arc.hot { stroke:var(--wi-active); stroke-width:2.4; }
+  .arclab { font-family:var(--wi-font-mono); font-size:12px; text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .arclab.ok { fill:var(--wi-relax); font-weight:bold; }
+  .arclab.bad { fill:var(--wi-active); font-weight:bold; }
+  .arclab.neu { fill:var(--wi-queue); }
+  .arclab.faint { fill:var(--wi-ink-faint); }
+  .arclab.hot { fill:var(--wi-active); font-weight:bold; }
+  .arclabbg { fill:var(--wi-bg); }
+
+  .aabox { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.2; }
+  .aabox.hot { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2; }
+  .aabox.infrag { fill:#f0d7cd; stroke:var(--wi-accent); stroke-width:1.6; }
+  .aabox.pending { fill:var(--wi-bg); stroke:var(--wi-border-soft); stroke-dasharray:3 3; }
+  .aalet { font-family:var(--wi-font-mono); font-size:19px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .aalet.pending { fill:var(--wi-ink-faint); }
+  .aamass { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-accent); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .aamass.pending { fill:var(--wi-inert); }
+  .cut { stroke:var(--wi-ink-strong); stroke-width:2; }
+  .cut.pending { stroke:var(--wi-inert); }
+  .cut.hot { stroke:var(--wi-active); stroke-width:3.5; }
+  .sumlab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; }
+  .sumlab.pending { fill:var(--wi-inert); }
+  .sumlab.hot { fill:var(--wi-active); font-weight:bold; }
+  .brace { fill:none; stroke:var(--wi-active); stroke-width:2.2; }
+  .bracelab { font-family:var(--wi-font-mono); font-size:14px; fill:var(--wi-active); text-anchor:middle; dominant-baseline:central; font-weight:bold; }
+  .axis { stroke:var(--wi-border-strong); stroke-width:1.2; }
+  .axtick { stroke:var(--wi-border-strong); stroke-width:1; }
+  .axlab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint); text-anchor:middle; }
+  .peak { fill:var(--wi-queue); stroke:var(--wi-panel-2); stroke-width:.6; }
+  .peak.new { fill:var(--wi-active); }
+  .peaklab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-soft); text-anchor:middle; }
+  .peaklab.new { fill:var(--wi-active); font-weight:bold; }
+  .ttl { font-family:var(--wi-font-body); font-size:14px; fill:var(--wi-ink-soft); font-style:italic; }
+  .hit { fill:transparent; cursor:pointer; }
+
+
+  .randbar { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
+  .randbar input[type=number] { width:4.6em; }
+  .randbar .lbl { font-size:.66rem; }
+  /* --- tab 5: tracking chart --- */
+  .trk { stroke-width:2; fill:none; }
+  .trk.top { stroke:var(--wi-queue); }
+  .trk.cut { stroke:var(--wi-examine); stroke-dasharray:4 3; }
+  .trk.true { stroke:var(--wi-accent); }
+  .trk.lead { stroke:var(--wi-relax); stroke-width:2.6; }
+  .trkdot { stroke:none; }
+  .trkdot.top { fill:var(--wi-queue); } .trkdot.cut { fill:var(--wi-examine); } .trkdot.true { fill:var(--wi-accent); } .trkdot.lead { fill:var(--wi-relax); }
+  .alive { fill:var(--wi-relax); } .dead { fill:var(--wi-active); }
+  /* --- tab 4: formula --- */
+  .formula { font-family:var(--wi-font-body); font-size:.95rem; line-height:1.7; color:var(--wi-ink-strong); overflow-x:auto; }
+  .formula .row { margin:2px 0 8px; }
+  .formula .lhs { color:var(--wi-ink-soft); }
+  .formula .term { display:inline-block; padding:0 2px; border-radius:3px; }
+  .formula .term.cur { background:#f6e6df; color:var(--wi-active); font-weight:bold; }
+  .formula .term.dim { color:var(--wi-ink-faint); }
+  .formula .term.pos { color:var(--wi-queue); }
+  .formula .term.neg { color:var(--wi-ink-faint); }
+  .formula .term.zero { color:var(--wi-examine); }
+  .formula sup { font-size:.72em; }
+  .formula .note { font-size:.8rem; color:var(--wi-ink-soft); margin-top:6px; line-height:1.5; }
+  .coefbar { fill:var(--wi-queue); }
+  .coefbar.neg { fill:var(--wi-inert); }
+  .coefbar.zero { fill:var(--wi-examine); }
+  .coefbar.cur { fill:var(--wi-active); }
+  .coeflab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-soft); text-anchor:middle; }
+  .coeflab.cur { fill:var(--wi-active); font-weight:bold; }
+
+  /* --- tab 5: leaderboard --- */
+  .board { border-collapse:collapse; font-family:var(--wi-font-mono); font-size:.76rem; width:100%; }
+  .board th { text-align:left; color:var(--wi-ink-faint); font-weight:normal; padding:2px 8px; border-bottom:1px solid var(--wi-border-soft); }
+  .board td { padding:1px 8px; border-bottom:1px solid var(--wi-border-soft); white-space:nowrap; }
+  .board tr.keep td { background:#eef4ea; }
+  .board tr.trim td { color:var(--wi-ink-faint); background:var(--wi-panel); }
+  .board tr.trim td.pep { text-decoration:line-through; }
+  .board tr.heavy td { background:#f6e6df; color:var(--wi-ink-faint); }
+  .board tr.heavy td.pep { text-decoration:line-through; }
+  .board tr.parent td { background:#f7edd9; }
+  .board tr.true td.pep { color:var(--wi-accent); font-weight:bold; }
+  .board tr.lead td.pep::after { content:" ★"; color:var(--wi-accent); }
+  .board tr.sel td { outline:2px solid var(--wi-accent-soft); outline-offset:-2px; }
+  .board tr { cursor:pointer; }
+  .board tr.cut td { border-bottom:2px solid var(--wi-accent); }
+  .board td.num { text-align:right; }
+  .board .more { color:var(--wi-ink-faint); font-style:italic; cursor:pointer; }
+  .leaderbox { font-size:.9rem; line-height:1.55; }
+  .leaderbox .big { font-family:var(--wi-font-mono); font-size:1.15rem; color:var(--wi-accent); font-weight:bold; }
+  .leaderbox .kv { color:var(--wi-ink-soft); font-size:.82rem; }
+  .spec-e { fill:var(--wi-inert); }
+  .spec-t { fill:var(--wi-active); }
+  .spec-ok { fill:var(--wi-relax); }
+
+  @keyframes pop { from { opacity:0; transform:translateY(-6px) scale(.7); } to { opacity:1; transform:none; } }
+  .pop { animation:pop .32s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box; transform-origin:center; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption { font-family: var(--wi-font-head); letter-spacing: .05em; }
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>Peptide sequencing &nbsp;·&nbsp; the turnpike problem</h1>
+</div>
+
+<p class="subtitle">
+  A mass spectrometer shatters many copies of a peptide and weighs the pieces. In the ideal case every
+  contiguous fragment appears, so what we observe is the <b>difference multiset</b> Δ<i>S</i> of the prefix
+  sums <i>S</i> of the amino-acid masses. Reading the peptide off that spectrum is the <b>turnpike problem</b>:
+  reconstruct the exits of a toll road from the multiset of all pairwise tolls. The three tabs go
+  forward (peptide → spectrum), let you solve the reverse problem by hand, run the backtracking
+  algorithm from the lecture step by step, show the algebraic trick behind the pseudopolynomial algorithm, and
+  finally face a <i>real</i> spectrum with missing and false masses.
+</p>
+
+<div class="tabs" id="tabs">
+  <button data-tab="fwd" class="on"><span class="no">1</span>Peptide → spectrum</button>
+  <button data-tab="road"><span class="no">2</span>Turnpike playground</button>
+  <button data-tab="bt"><span class="no">3</span>Backtracking</button>
+  <button data-tab="poly"><span class="no">4</span>Polynomial method</button>
+  <button data-tab="lb"><span class="no">5</span>Real spectra: leaderboard</button>
+</div>
+
+<!-- ================================================================ TAB 1 -->
+<div class="tabpane on" id="pane-fwd">
+<div class="controls">
+  <div class="ctl">
+    <label for="fwdPreset">Example</label>
+    <select id="fwdPreset"></select>
+  </div>
+  <div class="ctl">
+    <label for="fwdIn">Peptide</label>
+    <input type="text" id="fwdIn" class="str wide" spellcheck="false" placeholder="NQEL   or   3 5 1 2">
+    <button id="fwdSet" class="pri">Set</button>
+  </div>
+  <div class="ctl randbar" id="fwdRandBar" style="display:none">
+    <span class="lbl">length</span><input type="number" id="fwdRandN" min="2" max="15" value="5">
+    <span class="seg"><button id="fwdRandAA" class="on">amino acids</button><button id="fwdRandInt">integers ≤</button></span>
+    <input type="number" id="fwdRandMax" min="2" max="99" value="9" style="display:none">
+    <button id="fwdRandGo" class="pri">New random peptide</button>
+  </div>
+  <div class="ctl">
+    <label class="chk"><input type="checkbox" id="fwdZero"> include the empty fragment (mass 0)</label>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="fwdNote"></span>
+  <span class="opnote" style="margin-left:auto">
+    <button id="fwdToRoad">Use this spectrum in the playground</button>
+    <button id="fwdToBt">Run backtracking on it</button>
+    <button id="fwdToPoly">Polynomial view</button>
+    <button id="fwdToLb">Noisy spectrum → leaderboard</button>
+  </span>
+</div>
+
+<div class="transport" id="fwdTransport"></div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Peptide as a toll road</span><span class="rhs" id="fwdMeta"></span></div>
+      <div class="svgscroll"><svg id="fwdSvg" class="stagesvg"></svg></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Spectrum</span><span class="rhs" id="fwdSpecMeta"></span></div>
+      <div class="svgscroll"><svg id="fwdSpec" class="stagesvg"></svg></div>
+      <div class="setline" id="fwdSetline"></div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="fwdPhase"></span></div>
+      <div class="status" id="fwdStatus"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Fragments found so far</span><span class="rhs" id="fwdFragMeta"></span></div>
+      <div class="chips" id="fwdFrags"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Integer masses of amino acids</span><span class="rhs">Da</span></div>
+      <div class="aatab" id="aaTab"></div>
+      <div class="aanote">Monoisotopic masses rounded to integers, as in Compeau &amp; Pevzner. Two pairs collide
+        exactly: <b>I</b>soleucine/<b>L</b>eucine (113) and <b>K</b> Lysine/<b>Q</b> Glutamine (128) — a mass
+        spectrum can never tell them apart.</div>
+    </div>
+  </div>
+</div>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="fwdText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="fwdLoad">Load</button></div>
+      <div class="err" id="fwdErr"></div>
+    </div>
+    <div class="hint">
+      One line. Either a peptide in one-letter code (<code>NQEL</code>, any of the 20 standard amino acids,
+      case-insensitive), or a list of positive integers separated by spaces — the sequence <i>P</i> of
+      segment lengths directly, as in <code>3 5 1 2</code> from the lecture. Lines starting with <code>#</code>
+      are ignored. At most 15 amino acids, so that the picture stays readable.
+    </div>
+  </div>
+</details>
+</div>
+
+<!-- ================================================================ TAB 2 -->
+<div class="tabpane" id="pane-road">
+<div class="controls">
+  <div class="ctl">
+    <label for="roadPreset">Puzzle</label>
+    <select id="roadPreset"></select>
+  </div>
+  <div class="ctl">
+    <label for="roadD">Target D</label>
+    <input type="text" id="roadD" class="str wide" spellcheck="false" placeholder="1 2 3 3 5 6 8 8 9 11">
+    <button id="roadSetD" class="pri">Set</button>
+    <button id="roadClearD" title="drop the target; the road is then a free sandbox">No target</button>
+  </div>
+  <div class="ctl">
+    <button id="roadFreeze" title="take the current Δ𝑆 as the target, then scramble the exits">Make a puzzle from this road</button>
+  </div>
+  <div class="ctl randbar" id="roadRandBar" style="display:none">
+    <span class="lbl">segments</span><input type="number" id="roadRandN" min="2" max="9" value="5">
+    <span class="lbl">max length</span><input type="number" id="roadRandMax" min="2" max="30" value="9">
+    <label class="chk"><input type="checkbox" id="roadRandTamper"> sometimes tamper with D (may be unsolvable)</label>
+    <button id="roadRandGo" class="pri">New random puzzle</button>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="ctl" style="gap:6px">
+    <button id="roadAdd" title="adds an exit in the middle of the widest gap">+ exit</button>
+    <button id="roadDel" disabled title="remove the selected exit (Delete)">− exit</button>
+    <button id="roadMirror" title="reverse the order of the segments — same tolls, same Δ𝑆">Mirror road</button>
+    <button id="roadReset" title="back to only the two end exits">Only end exits</button>
+    <button id="roadUndo" disabled title="Ctrl+Z">Undo</button>
+  </span>
+  <span class="opnote" id="roadNote" style="margin-left:auto">
+    <b>Drag</b> an exit to move it · <b>click</b> the road to add one · <b>double-click</b> an exit to remove it ·
+    <b>click two segment lengths</b> (the red numbers) to swap those segments.
+  </span>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The road</span><span class="rhs" id="roadMeta"></span></div>
+      <div class="svgscroll"><svg id="roadSvg" class="stagesvg"></svg></div>
+      <div class="setline" id="roadSetline"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Toll table  S[j] − S[i]</span><span class="rhs" id="tollMeta"></span></div>
+      <div class="svgscroll" id="tollBox"></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> toll occurs in D</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> toll not in D (or too often)</span>
+        <span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> distance in D not realized</span>
+      </div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>Live comparison</span><span class="rhs" id="cmpMeta"></span></div>
+      <div id="cmpSumm" class="summ"></div>
+      <div class="lbl" style="margin-bottom:4px">Target D</div>
+      <div class="chips" id="cmpD"></div>
+      <div class="lbl" style="margin:10px 0 4px">Δ𝑆 of the road</div>
+      <div class="chips" id="cmpS"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Why this is a puzzle</span></div>
+      <div class="status" id="roadStatus" style="min-height:0"></div>
+    </div>
+  </div>
+</div>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="roadText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="roadLoad">Load</button></div>
+      <div class="err" id="roadErr"></div>
+    </div>
+    <div class="hint">
+      Up to two lines. <code>D 1 2 3 3 5 6 8 8 9 11</code> sets the target multiset (integers separated by spaces,
+      order irrelevant, repetitions count). <code>S 0 3 8 9 11</code> places exits at the given prefix sums, or
+      <code>P 3 5 1 2</code> gives the segment lengths instead. A single line of numbers is taken as <i>D</i>.
+      Lines starting with <code>#</code> are ignored.
+    </div>
+  </div>
+</details>
+</div>
+
+<!-- ================================================================ TAB 3 -->
+<div class="tabpane" id="pane-bt">
+<div class="controls">
+  <div class="ctl">
+    <label for="btPreset">Example</label>
+    <select id="btPreset"></select>
+  </div>
+  <div class="ctl">
+    <label for="btIn">D</label>
+    <input type="text" id="btIn" class="str wide" spellcheck="false">
+    <button id="btSet" class="pri">Set</button>
+  </div>
+  <div class="ctl randbar" id="btRandBar" style="display:none">
+    <span class="lbl">segments</span><input type="number" id="btRandN" min="2" max="12" value="5">
+    <span class="lbl">max length</span><input type="number" id="btRandMax" min="2" max="30" value="9">
+    <label class="chk"><input type="checkbox" id="btRandTamper"> sometimes tamper with D (may be infeasible)</label>
+    <button id="btRandGo" class="pri">New random instance</button>
+  </div>
+  <div class="ctl randbar" id="btClusterBar" style="display:none">
+    <span class="lbl">points per cluster k+1, k =</span><input type="number" id="btClK" min="2" max="7" value="4">
+    <span class="lbl">gap N</span><input type="number" id="btClN" min="20" max="500" value="100">
+    <label class="chk"><input type="checkbox" id="btClTwin"> infeasible twin: one distance N+1 lowered to N</label>
+    <button id="btClGo" class="pri">Build</button>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Detail</span>
+    <span class="seg">
+      <button id="btCoarse" class="on">One step per placement</button>
+      <button id="btFine">Every line</button>
+    </span>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="btNote"></span>
+  <span class="opnote" style="margin-left:auto"><button id="btToRoad">Open this D in the playground</button>
+    <button id="btToPoly" disabled title="available once a solution S has been found">Polynomial view of the solution</button></span>
+</div>
+
+<div class="transport" id="btTransport"></div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Placing exits: S</span><span class="rhs" id="btMeta"></span></div>
+      <div class="svgscroll"><svg id="btSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:var(--wi-panel-2);border-color:var(--wi-ink-strong)"></span> placed exit</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> candidate</span>
+        <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> new distance still available in D</span>
+        <span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> new distance not available</span>
+      </div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The multiset D</span><span class="rhs" id="btDMeta"></span></div>
+      <div class="chips" id="btD"></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="border-style:dashed;background:var(--wi-panel)"></span> already in Δ𝑆</span>
+        <span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> largest not yet explained → d</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> would be explained by the candidate</span>
+      </div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="btPhase"></span></div>
+      <div class="status" id="btStatus"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Recursion tree</span><span class="rhs" id="btTreeMeta"></span></div>
+      <div class="treewrap"><div class="tree" id="btTree"></div></div>
+    </div>
+  </div>
+</div>
+
+<details class="code" id="btCodeBox" open style="margin-top:18px">
+  <summary>Pseudocode (lecture)</summary>
+  <div class="codebody" id="btCode"></div>
+  <div class="codenote" id="btCodeNote"></div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="btText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="btLoad">Load</button></div>
+      <div class="err" id="btErr"></div>
+    </div>
+    <div class="hint">
+      The multiset <i>D</i>: positive integers separated by spaces or line breaks, repetitions count, order
+      irrelevant. Lines starting with <code>#</code> are ignored. A valid difference multiset has
+      <i>n</i>(<i>n</i>+1)/2 elements for some <i>n</i>, but the algorithm can be run on any multiset — it
+      then reports that no sequence exists.
+    </div>
+  </div>
+</details>
+</div>
+
+
+<!-- ================================================================ TAB 4 -->
+<div class="tabpane" id="pane-poly">
+<div class="controls">
+  <div class="ctl">
+    <label for="polyPreset">Example</label>
+    <select id="polyPreset"></select>
+  </div>
+  <div class="ctl">
+    <label for="polyIn">S or P</label>
+    <input type="text" id="polyIn" class="str wide" spellcheck="false" placeholder="S 0 3 8 9 11   or   3 5 1 2   or   NQEL">
+    <button id="polySet" class="pri">Set</button>
+  </div>
+  <div class="ctl randbar" id="polyRandBar" style="display:none">
+    <span class="lbl">exits</span><input type="number" id="polyRandN" min="2" max="12" value="5">
+    <span class="lbl">max segment</span><input type="number" id="polyRandMax" min="2" max="30" value="9">
+    <button id="polyRandGo" class="pri">New random S</button>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="polyNote"></span>
+</div>
+
+<div class="transport" id="polyTransport"></div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Exits and the current pair (s, t)</span><span class="rhs" id="polyMeta"></span></div>
+      <div class="svgscroll"><svg id="polySvg" class="stagesvg"></svg></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Coefficients of S(z) · S(z⁻¹)</span><span class="rhs" id="polyCoefMeta"></span></div>
+      <div class="svgscroll"><svg id="polyCoef" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:var(--wi-queue)"></span> exponent s − t &gt; 0 &nbsp;(a distance in D)</span>
+        <span class="item"><span class="sw" style="background:var(--wi-inert)"></span> exponent s − t &lt; 0 &nbsp;(its mirror)</span>
+        <span class="item"><span class="sw" style="background:var(--wi-examine)"></span> exponent 0 &nbsp;(s = t, counts |S|)</span>
+      </div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="polyPhase"></span></div>
+      <div class="status" id="polyStatus"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The algebra</span></div>
+      <div class="formula" id="polyFormula"></div>
+    </div>
+  </div>
+</div>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="polyText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="polyLoad">Load</button></div>
+      <div class="err" id="polyErr"></div>
+    </div>
+    <div class="hint">
+      One line: <code>S 0 3 8 9 11</code> (exits, must contain 0), <code>P 3 5 1 2</code> or just <code>3 5 1 2</code>
+      (segment lengths), or a peptide such as <code>NQEL</code>. Lines starting with <code>#</code> are ignored.
+      At most 16 exits.
+    </div>
+  </div>
+</details>
+</div>
+
+<!-- ================================================================ TAB 5 -->
+<div class="tabpane" id="pane-lb">
+<div class="controls">
+  <div class="ctl">
+    <label for="lbPreset">Example</label>
+    <select id="lbPreset"></select>
+  </div>
+  <div class="ctl">
+    <label for="lbN">N</label>
+    <input type="number" id="lbN" min="1" max="1000" value="10" style="width:5.5em">
+  </div>
+  <div class="ctl">
+    <span class="lbl">Alphabet</span>
+    <span class="seg">
+      <button id="lbAlph20" title="all 20 amino acids; I/L and K/Q are then separate candidates with equal spectra">20 letters</button>
+      <button id="lbAlph18" class="on" title="the 18 distinct masses (I/L → L, K/Q → Q)">18 masses</button>
+      <button id="lbAlphConv" title="the M most frequent differences between 57 and 200 in the spectrum (spectral convolution)">convolution</button>
+    </span>
+    <label for="lbM" id="lbMLab" style="display:none">M</label>
+    <input type="number" id="lbM" min="1" max="60" value="20" style="width:5em;display:none">
+  </div>
+  <div class="ctl">
+    <span class="lbl">Detail</span>
+    <span class="seg">
+      <button id="lbCoarse" class="on">One step per round</button>
+      <button id="lbFine">Expand · check · trim</button>
+    </span>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="ctl">
+    <label for="lbPep">Simulate from</label>
+    <input type="text" id="lbPep" class="str" spellcheck="false" placeholder="peptide, e.g. NQEL">
+    <label for="lbMiss">missing %</label><input type="number" id="lbMiss" min="0" max="80" value="10" style="width:4.5em">
+    <label for="lbFalse">false %</label><input type="number" id="lbFalse" min="0" max="80" value="10" style="width:4.5em">
+    <label for="lbSeed">seed</label><input type="number" id="lbSeed" min="0" max="9999" value="1" style="width:5em">
+    <button id="lbGen" class="pri">Generate spectrum</button>
+  </span>
+  <span class="opnote" id="lbNote" style="margin-left:auto"></span>
+</div>
+
+<div class="transport" id="lbTransport"></div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Experimental spectrum vs. theoretical spectrum of <span id="lbSelName">…</span></span><span class="rhs" id="lbSpecMeta"></span></div>
+      <div class="svgscroll"><svg id="lbSpec" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:var(--wi-relax)"></span> shared (counts towards the score)</span>
+        <span class="item"><span class="sw" style="background:var(--wi-active)"></span> theoretical only (missing from the experiment)</span>
+        <span class="item"><span class="sw" style="background:var(--wi-inert)"></span> experimental only (false or unexplained)</span>
+      </div>
+      <div class="setline" id="lbSpecLine"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Leaderboard</span><span class="rhs" id="lbBoardMeta"></span></div>
+      <div id="lbBoard"></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> kept</span>
+        <span class="item"><span class="sw" style="background:var(--wi-panel);border-style:dashed"></span> trimmed</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> mass = parent mass: competes for LeaderPeptide</span>
+        <span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> too heavy: removed</span>
+        <span class="item"><span class="sw" style="background:#f0d7cd;border-color:var(--wi-accent)"></span> prefix of the true peptide</span>
+      </div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="lbPhase"></span></div>
+      <div class="status" id="lbStatus"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>LeaderPeptide</span><span class="rhs" id="lbLeadMeta"></span></div>
+      <div id="lbLeader" class="leaderbox"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Scores over the rounds</span><span class="rhs" id="lbTrackMeta"></span></div>
+      <svg id="lbTrack" class="stagesvg"></svg>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:var(--wi-queue)"></span> best on the board</span>
+        <span class="item"><span class="sw" style="background:var(--wi-examine)"></span> N-th (trim threshold)</span>
+        <span class="item"><span class="sw" style="background:var(--wi-accent)"></span> prefix of the true peptide</span>
+        <span class="item"><span class="sw" style="background:var(--wi-relax)"></span> LeaderPeptide</span>
+      </div>
+      <div class="legend" id="lbAliveLegend">
+        <span class="item"><span class="sw" style="background:var(--wi-relax);border-radius:50%"></span> true prefix on the board</span>
+        <span class="item"><span class="sw" style="background:var(--wi-active);border-radius:50%"></span> trimmed away</span>
+      </div>
+    </div>
+    <div class="sim-box" id="lbAlphBox">
+      <div class="sim-title"><span>Alphabet used by Expand</span><span class="rhs" id="lbAlphMeta"></span></div>
+      <div class="chips" id="lbAlph"></div>
+      <div class="aanote" id="lbAlphNote"></div>
+    </div>
+  </div>
+</div>
+
+<details class="code" id="lbCodeBox" open style="margin-top:18px">
+  <summary>Pseudocode (Compeau &amp; Pevzner, adapted to linear peptides)</summary>
+  <div class="codebody" id="lbCode"></div>
+  <div class="codenote" id="lbCodeNote"></div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="lbText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="lbLoad">Load</button></div>
+      <div class="err" id="lbErr"></div>
+    </div>
+    <div class="hint">
+      The experimental spectrum as integers separated by spaces or line breaks (Rosalind format); repetitions count.
+      Following the textbook, the spectrum contains <code>0</code> and the parent mass; the largest value is taken as
+      the parent mass. Optionally add a line <code>true NQEL</code> to tell the page which peptide the spectrum came from,
+      so its prefixes can be tracked on the leaderboard. Lines starting with <code>#</code> are ignored.
+    </div>
+  </div>
+</details>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Peptide sequencing and the turnpike problem.
+
+   Conventions on this page
+     * P[0..n)  segment lengths (amino-acid masses), S[0..n] its prefix sums,
+       D = ΔS the multiset { S[j]-S[i] : 0 <= i < j <= n } -- WITHOUT 0.
+       A checkbox in tab 1 additionally shows the empty fragment (mass 0), as
+       the textbook's spectra do; it never enters D.
+     * multisets are kept as sorted arrays of integers; "A ⊆ B" is multiset
+       inclusion (multiplicities count).
+     * tab 3 follows the lecture pseudocode line by line.  Two places where the
+       slides are silent are resolved as follows (both marked in the code):
+         - "S' := S ∪ {d}" with d already an element of S would add no point
+           and ΔS' = ΔS; taken literally the recursion would never terminate
+           (e.g. D = {{1,1,1}}).  We treat it as placing a second exit on top
+           of an existing one, i.e. a distance 0, which is never in D, so the
+           check ΔS' ⊆ D fails.
+         - "return turnpikeRec(S', D)" on line 20 is returned as is, even when
+           it is NO_DIFFERENCE_MULTISET.
+   ========================================================================== */
+
+const el  = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const SVGNS = "http://www.w3.org/2000/svg";
+function mk(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const fmtSet = (arr, open, close) => (open || "{") + arr.join(", ") + (close || "}");
+const MS = arr => "{{" + arr.join(", ") + "}}";        /* multiset notation of the lecture */
+
+/* ---------- amino acids (integer mass table, Compeau & Pevzner Fig. 4.6) --- */
+
+const AA = [
+  ["G", "Glycine", 57], ["A", "Alanine", 71], ["S", "Serine", 87], ["P", "Proline", 97],
+  ["V", "Valine", 99], ["T", "Threonine", 101], ["C", "Cysteine", 103], ["I", "Isoleucine", 113],
+  ["L", "Leucine", 113], ["N", "Asparagine", 114], ["D", "Aspartic acid", 115], ["K", "Lysine", 128],
+  ["Q", "Glutamine", 128], ["E", "Glutamic acid", 129], ["M", "Methionine", 131], ["H", "Histidine", 137],
+  ["F", "Phenylalanine", 147], ["R", "Arginine", 156], ["Y", "Tyrosine", 163], ["W", "Tryptophan", 186]
+];
+const MASS = {}; const NAME = {};
+AA.forEach(a => { MASS[a[0]] = a[2]; NAME[a[0]] = a[1]; });
+
+/* ---------- multisets ---------------------------------------------------- */
+
+const asc = (a, b) => a - b;
+function prefSums(P) { const S = [0]; P.forEach(p => S.push(S[S.length - 1] + p)); return S; }
+function deltaOf(S) {
+  const D = [];
+  for (let i = 0; i < S.length; i++) for (let j = i + 1; j < S.length; j++) D.push(S[j] - S[i]);
+  return D.sort(asc);
+}
+function countMap(arr) { const m = new Map(); arr.forEach(x => m.set(x, (m.get(x) || 0) + 1)); return m; }
+/* A \ B as multisets (A, B sorted) */
+function msMinus(A, B) {
+  const cb = countMap(B), out = [];
+  A.forEach(x => { const c = cb.get(x) || 0; if (c > 0) cb.set(x, c - 1); else out.push(x); });
+  return out;
+}
+const msSubset = (A, B) => msMinus(A, B).length === 0;
+const msEqual  = (A, B) => A.length === B.length && A.every((x, i) => x === B[i]);
+const arrEq    = msEqual;
+
+/* ---------- parsing ------------------------------------------------------ */
+
+function parseIntList(str) {
+  const toks = str.trim().split(/[\s,;]+/).filter(Boolean);
+  const out = [];
+  for (const t of toks) {
+    if (!/^\d+$/.test(t)) throw new Error("not an integer: " + t);
+    out.push(parseInt(t, 10));
+  }
+  return out;
+}
+/* peptide text -> { P, letters|null } */
+function parsePeptide(str) {
+  const s = str.trim();
+  if (!s) throw new Error("empty input");
+  if (/^[0-9\s,;]+$/.test(s)) {
+    const P = parseIntList(s);
+    if (P.length === 0) throw new Error("empty input");
+    if (P.some(x => x < 1)) throw new Error("segment lengths must be ≥ 1");
+    if (P.length > 15) throw new Error("at most 15 segments");
+    return { P: P, letters: null };
+  }
+  const L = s.replace(/\s+/g, "").toUpperCase();
+  for (const c of L) if (!(c in MASS)) throw new Error("unknown amino acid: " + c);
+  if (L.length > 15) throw new Error("at most 15 amino acids");
+  return { P: Array.from(L).map(c => MASS[c]), letters: L };
+}
+function stripComments(txt) { return txt.split(/\r?\n/).filter(l => !/^\s*#/.test(l)).join("\n"); }
+
+/* ---------- tooltip ------------------------------------------------------ */
+
+function moveTip(ev) {
+  const tip = el("tooltip"), pad = 14;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  const r = tip.getBoundingClientRect();
+  if (x + r.width > window.innerWidth - 8) x = ev.clientX - r.width - pad;
+  if (y + r.height > window.innerHeight - 8) y = ev.clientY - r.height - pad;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function showTip(html, ev) { const t = el("tooltip"); t.innerHTML = html; t.style.display = "block"; moveTip(ev); }
+function hideTip() { el("tooltip").style.display = "none"; }
+
+/* ---------- transport (slider + phase bar), one instance per animated tab -- */
+
+function makePlayer(containerId, onRender) {
+  const box = el(containerId);
+  box.innerHTML =
+    '<div class="transport-row">' +
+    '<span class="ctl" style="gap:6px">' +
+    '<button class="icon" data-k="reset" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>' +
+    '<button class="icon" data-k="back" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>' +
+    '<button class="icon pri" data-k="fwd" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>' +
+    '<button class="icon" data-k="play" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>' +
+    '<button class="icon" data-k="end" title="Jump to the end" aria-label="Jump to the end">&#x23ED;&#xFE0E;&#x23ED;&#xFE0E;</button>' +
+    '</span>' +
+    '<span class="progress"><input type="range" min="0" max="0" value="0"><div class="phasebar"></div></span>' +
+    '<span class="stepno" data-k="no">— / —</span>' +
+    '<span class="ctl" style="gap:6px"><span class="lbl">Speed</span>' +
+    '<input type="range" data-k="speed" min="60" max="1400" value="500" style="width:88px">' +
+    '<span class="stepno" data-k="speedval">500ms</span></span></div>';
+  const q = k => box.querySelector('[data-k="' + k + '"]');
+  const scrub = box.querySelector('.progress input[type=range]'), bar = box.querySelector(".phasebar");
+  const pl = { steps: [], phases: [], cur: 0, timer: null };
+
+  pl.render = () => {
+    scrub.max = String(Math.max(0, pl.steps.length - 1)); scrub.value = String(pl.cur);
+    q("no").textContent = pl.steps.length ? (pl.cur + 1) + " / " + pl.steps.length : "— / —";
+    bar.innerHTML = "";
+    pl.phases.forEach(p => {
+      const span = p.to - p.from + 1;
+      const pct = pl.cur > p.to ? 100 : pl.cur < p.from ? 0 : ((pl.cur - p.from + 1) / span) * 100;
+      const b = document.createElement("button");
+      b.className = "phasebtn" + (pl.cur >= p.from && pl.cur <= p.to ? " on" : (pl.cur > p.to ? " past" : ""));
+      b.style.flexGrow = String(Math.max(1, span));
+      b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' + pct.toFixed(2) +
+                    '%"></span><span class="lab">' + esc(p.name) + "</span>";
+      b.title = p.name + " — steps " + (p.from + 1) + "–" + (p.to + 1);
+      b.addEventListener("click", () => { pl.stop(); pl.cur = p.from; pl.render(); });
+      bar.appendChild(b);
+    });
+    q("back").disabled = pl.cur <= 0; q("fwd").disabled = pl.cur >= pl.steps.length - 1;
+    q("end").disabled = q("fwd").disabled;
+    onRender(pl.steps[pl.cur] || {}, pl);
+  };
+  pl.goto = k => { pl.cur = Math.max(0, Math.min(pl.steps.length - 1, k)); pl.render(); };
+  pl.fwd = () => { if (pl.cur < pl.steps.length - 1) { pl.cur++; pl.render(); } else pl.stop(); };
+  pl.back = () => { if (pl.cur > 0) { pl.cur--; pl.render(); } };
+  pl.stop = () => { if (pl.timer) { clearInterval(pl.timer); pl.timer = null; } q("play").innerHTML = "&#x25B6;&#xFE0E;"; };
+  pl.play = () => {
+    if (pl.timer) { pl.stop(); return; }
+    if (pl.cur >= pl.steps.length - 1) pl.cur = 0;
+    q("play").innerHTML = "&#x23F8;&#xFE0E;";
+    pl.timer = setInterval(pl.fwd, Number(q("speed").value));
+  };
+  pl.set = (steps, phases, at) => { pl.stop(); pl.steps = steps; pl.phases = phases; pl.cur = at || 0; pl.render(); };
+  pl.phaseStartOf = k => { for (const p of pl.phases) if (k >= p.from && k <= p.to) return p.from; return 0; };
+
+  q("reset").addEventListener("click", () => { pl.stop(); pl.goto(0); });
+  q("back").addEventListener("click",  () => { pl.stop(); pl.back(); });
+  q("fwd").addEventListener("click",   () => { pl.stop(); pl.fwd(); });
+  q("end").addEventListener("click",   () => { pl.stop(); pl.goto(pl.steps.length - 1); });
+  q("play").addEventListener("click",  pl.play);
+  scrub.addEventListener("input", () => { pl.stop(); pl.goto(Number(scrub.value)); });
+  q("speed").addEventListener("input", () => {
+    q("speedval").textContent = q("speed").value + "ms";
+    if (pl.timer) { clearInterval(pl.timer); pl.timer = setInterval(pl.fwd, Number(q("speed").value)); }
+  });
+  return pl;
+}
+
+/* ---------- step-list builder shared by the animated tabs ------------------ */
+
+function StepList() {
+  this.steps = []; this.phases = [];
+}
+StepList.prototype.phase = function (name) { this.phases.push({ name: name, from: this.steps.length, to: this.steps.length }); };
+StepList.prototype.add = function (o) {
+  if (!this.phases.length) this.phase("");
+  o.ph = this.phases.length - 1; this.steps.push(o);
+  this.phases[this.phases.length - 1].to = this.steps.length - 1;
+  return o;
+};
+
+/* ---------- random instances ----------------------------------------------- */
+
+const rint = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+function randomP(n, mx) { const P = []; for (let i = 0; i < n; i++) P.push(rint(1, mx)); return P; }
+/* move one non-maximal element of D by ±1 or ±2 -- the result usually is NOT a
+   difference multiset any more, but it passes every quick sanity check */
+function tamper(D) {
+  const max = D[D.length - 1];
+  for (let tries = 0; tries < 50; tries++) {
+    const i = rint(0, D.length - 2), nv = D[i] + [-2, -1, 1, 2][rint(0, 3)];
+    if (nv >= 1 && nv < max) { const E = D.slice(); E[i] = nv; return E.sort(asc); }
+  }
+  return D;
+}
+function showRandBar(prefix, show) { el(prefix + "RandBar").style.display = show ? "" : "none"; }
+
+/* ---------- tabs ---------------------------------------------------------- */
+
+let activeTab = "fwd";
+function showTab(name) {
+  activeTab = name;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  document.querySelectorAll(".tabpane").forEach(p => p.classList.toggle("on", p.id === "pane-" + name));
+  if (name === "fwd") fwdPlayer.render();
+  if (name === "road") roadRender();
+  if (name === "bt") btPlayer.render();
+  if (name === "poly") polyPlayer.render();
+  if (name === "lb") lbPlayer.render();
+}
+
+/* ---------- geometry of a road drawing ------------------------------------ */
+
+/* An arc between two exits, drawn above the road.  Height grows with the
+   distance so that arcs of nested spans do not sit on top of each other. */
+function arcPath(x1, x2, y, hmax, L, dist) {
+  const h = 18 + (hmax - 18) * Math.min(1, dist / Math.max(1, L));
+  return "M" + x1 + "," + y + " Q" + ((x1 + x2) / 2) + "," + (y - 2 * h) + " " + x2 + "," + y;
+}
+const arcApex = (y, hmax, L, dist) => y - (18 + (hmax - 18) * Math.min(1, dist / Math.max(1, L)));
+
+/* ==========================================================================
+   TAB 1 -- forward problem: peptide -> masses -> prefix sums -> spectrum
+   ========================================================================== */
+
+const FWD_PRESETS = [
+  { key: "nqel",  name: "NQEL (textbook)",                  in: "NQEL" },
+  { key: "redca", name: "REDCA",                            in: "REDCA" },
+  { key: "gpg",   name: "GPG — repeated masses",            in: "GPG" },
+  { key: "lil",   name: "LIL — indistinguishable letters",  in: "LIL" },
+  { key: "tyro",  name: "VKLFPWFNQY (Tyrocidine B1, cut open)", in: "VKLFPWFNQY" },
+  { key: "p1",    name: "P₁ = [3, 5, 1, 2] (lecture)",       in: "3 5 1 2" },
+  { key: "p2",    name: "P₂ = [1, 1, 1, 1, 1] (lecture)",    in: "1 1 1 1 1" },
+  { key: "slide", name: "lecture example, |D| = 15",         in: "2 3 5 7 1" },
+  { key: "random", name: "random…",                          in: null }
+];
+
+const fwd = { P: [], letters: null, S: [0], D: [], showZero: false };
+let fwdPlayer;
+
+function fwdFragLabel(i, j) {
+  if (fwd.letters) return fwd.letters.slice(i, j);
+  return "P[" + i + ".." + j + ")";
+}
+
+function fwdBuild() {
+  const n = fwd.P.length, P = fwd.P, S = fwd.S = prefSums(P);
+  fwd.D = deltaOf(S);
+  const sl = new StepList();
+  const let_ = fwd.letters;
+
+  /* --- masses ---------------------------------------------------------- */
+  if (let_) {
+    sl.phase("Masses");
+    sl.add({ st: 0, nm: 0, ns: 0, frags: [],
+      txt: "The peptide <b>" + esc(let_) + "</b> is a chain of " + n + " amino acids. Each has a fixed " +
+           "(integer) mass, so the chain is a sequence of numbers <i>P</i>[0..<i>n</i>) &mdash; the " +
+           "<b>segment lengths</b> of a toll road." });
+    for (let i = 0; i < n; i++) {
+      const c = let_[i];
+      const twin = (c === "I" || c === "L") ? " Mass 113 is shared with " + (c === "I" ? "Leucine (L)" : "Isoleucine (I)") + "."
+                 : (c === "K" || c === "Q") ? " Mass 128 is shared with " + (c === "K" ? "Glutamine (Q)" : "Lysine (K)") + "." : "";
+      sl.add({ st: 0, nm: i + 1, ns: 0, frags: [], aa: i,
+        txt: "Look up <b>" + c + "</b> = " + NAME[c] + ": <code>P[" + i + "] = " + MASS[c] + "</code> Da." + twin });
+    }
+  } else {
+    sl.phase("Segments");
+    sl.add({ st: 0, nm: n, ns: 0, frags: [],
+      txt: "The sequence <b>P = " + fmtSet(P, "[", "]") + "</b> is given directly &mdash; think of the numbers as " +
+           "amino-acid masses, or simply as the lengths of the road segments between consecutive exits." });
+  }
+
+  /* --- prefix sums ------------------------------------------------------ */
+  sl.phase("Prefix sums");
+  sl.add({ st: 1, nm: n, ns: 1, frags: [], sum: 0,
+    txt: "Where can the chain break? Between any two neighbours, and at both ends: " + (n + 1) + " <b>cut " +
+         "points</b>. Their positions along the chain are the prefix sums <i>S</i>[0..<i>n</i>], starting with " +
+         "<code>S[0] = 0</code>. On the toll road these are the <b>exits</b>." });
+  for (let i = 1; i <= n; i++)
+    sl.add({ st: 1, nm: n, ns: i + 1, frags: [], sum: i,
+      txt: "<code>S[" + i + "] = S[" + (i - 1) + "] + P[" + (i - 1) + "] = " + S[i - 1] + " + " + P[i - 1] + " = " +
+           S[i] + "</code>" + (i === n ? " &mdash; the mass of the whole peptide (its <i>parent mass</i>)." : ".") });
+
+  /* --- fragments by length ---------------------------------------------- */
+  const frags = [];
+  for (let k = 1; k <= n; k++) {
+    sl.phase(n <= 12 ? "k = " + k : "" + k);
+    for (let i = 0; i + k <= n; i++) {
+      const j = i + k, m = S[j] - S[i];
+      const f = { i: i, j: j, m: m };
+      frags.push(f);
+      const dup = frags.filter(g => g.m === m).length;
+      sl.add({ st: 2, nm: n, ns: n + 1, frags: frags.slice(), frag: f,
+        txt: "Cut at <code>S[" + i + "] = " + S[i] + "</code> and <code>S[" + j + "] = " + S[j] + "</code>: the fragment " +
+             "<b>" + esc(fwdFragLabel(i, j)) + "</b>" + (k === n ? " (the whole peptide)" : "") +
+             " weighs <code>" + S[j] + " − " + S[i] + " = " + m + "</code>." +
+             (dup > 1 ? " <i>Mass " + m + " now occurs " + dup + " times &mdash; the spectrum is a multiset, " +
+                        "multiplicities count.</i>" : "") +
+             (k === 1 ? " Fragments of length 1 are single amino acids: this <i>is</i> the entry from the table." : "") });
+    }
+  }
+
+  /* --- summary ----------------------------------------------------------- */
+  sl.phase("ΔS");
+  sl.add({ st: 3, nm: n, ns: n + 1, frags: frags.slice(), done: true,
+    txt: "All " + (n * (n + 1) / 2) + " = <i>n</i>(<i>n</i>+1)/2 fragments weighed. The <b>ideal spectrum</b> is the " +
+         "difference multiset <b>Δ<i>S</i></b> = {{ <i>S</i>[<i>j</i>] − <i>S</i>[<i>i</i>] : 0 ≤ <i>i</i> &lt; " +
+         "<i>j</i> ≤ <i>n</i> }}. On the toll road it is the multiset of all tolls between pairs of exits. " +
+         "The lab gives us <i>only</i> this multiset &mdash; can we get the peptide back? " +
+         "That is the <b>turnpike problem</b> of the next two tabs.",
+    ans: "ΔS = " + MS(fwd.D) });
+
+  fwdPlayer.set(sl.steps, sl.phases, 0);
+  el("fwdNote").innerHTML = "<b>n = " + n + "</b> segments &middot; parent mass " + S[n] +
+                            " &middot; |Δ<i>S</i>| = " + (n * (n + 1) / 2) +
+                            (let_ ? "" : " &middot; masses given directly");
+}
+
+/* ---- drawing: the chain ------------------------------------------------- */
+
+function fwdDrawChain(st) {
+  const svg = el("fwdSvg"), n = fwd.P.length, S = fwd.S;
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const gap = 10;
+  const bw = Math.max(40, Math.min(70, Math.floor((W - 60 - n * gap) / Math.max(1, n))));
+  const total = n * bw + (n + 1) * gap, x0 = Math.max(30, (W - total) / 2);
+  const yBox = 62, hBox = 52, H = 175;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.innerHTML = "";
+  const cutX = i => x0 + i * (bw + gap) + gap / 2;
+
+  const frag = st.frag || null;
+  for (let i = 0; i < n; i++) {
+    const x = x0 + gap + i * (bw + gap);
+    const known = i < st.nm;
+    const inFrag = frag && i >= frag.i && i < frag.j;
+    mk("rect", { x: x, y: yBox, width: bw, height: hBox, rx: 4,
+                 class: "aabox" + (!known ? " pending" : st.aa === i ? " hot" : inFrag ? " infrag" : "") }, svg);
+    const lt = mk("text", { x: x + bw / 2, y: yBox + (fwd.letters ? 18 : 26),
+                            class: "aalet" + (known ? "" : " pending") }, svg);
+    lt.textContent = fwd.letters ? fwd.letters[i] : String(fwd.P[i]);
+    if (fwd.letters) {
+      const ms = mk("text", { x: x + bw / 2, y: yBox + 39, class: "aamass" + (known ? "" : " pending") }, svg);
+      ms.textContent = known ? String(fwd.P[i]) : "?";
+      if (st.aa === i) ms.classList.add("pop");
+    }
+  }
+  /* cut points and prefix sums */
+  for (let i = 0; i <= n; i++) {
+    const x = cutX(i), known = i < st.ns;
+    const hot = (st.sum === i) || (frag && (i === frag.i || i === frag.j));
+    mk("line", { x1: x, y1: yBox - 8, x2: x, y2: yBox + hBox + 12,
+                 class: "cut" + (!known ? " pending" : hot ? " hot" : "") }, svg);
+    const t = mk("text", { x: x, y: yBox + hBox + 27, class: "sumlab" + (!known ? " pending" : hot ? " hot" : "") }, svg);
+    t.textContent = known ? String(S[i]) : "";
+    if (st.sum === i) t.classList.add("pop");
+    if (i === 0 && st.st >= 1) {
+      const lab = mk("text", { x: x - 6, y: yBox + hBox + 27, class: "exlab faint", "text-anchor": "end" }, svg);
+      lab.textContent = "S =";
+    }
+  }
+  if (st.st === 0 && st.nm > 0 && fwd.letters) {
+    const lab = mk("text", { x: x0 + gap - 8, y: yBox + 39, class: "exlab faint", "text-anchor": "end" }, svg);
+    lab.textContent = "P =";
+  }
+  /* brace over the current fragment */
+  if (frag) {
+    const xa = cutX(frag.i), xb = cutX(frag.j), yb = yBox - 16;
+    mk("path", { d: "M" + xa + "," + (yb + 8) + " V" + yb + " H" + xb + " V" + (yb + 8), class: "brace pop" }, svg);
+    const t = mk("text", { x: (xa + xb) / 2, y: yb - 13, class: "bracelab pop" }, svg);
+    t.textContent = fwdFragLabel(frag.i, frag.j) + " : " + frag.m;
+  }
+  const ttl = mk("text", { x: 8, y: 16, class: "ttl" }, svg);
+  ttl.textContent = st.st === 0 ? "the chain and its segment masses P"
+                  : st.st === 1 ? "cut points = exits, at the prefix sums S"
+                  : st.st === 2 ? "one fragment = the stretch of road between two exits"
+                  : "every pair of exits has been weighed";
+  el("fwdMeta").textContent = fwd.letters ? "n = " + n : "P = " + fmtSet(fwd.P, "[", "]");
+}
+
+/* ---- drawing: the spectrum ---------------------------------------------- */
+
+function fwdDrawSpec(st) {
+  const svg = el("fwdSpec"), n = fwd.P.length, S = fwd.S;
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const frags = st.frags || [];
+  const masses = frags.map(f => f.m);
+  if (fwd.showZero && st.st >= 1) masses.push(0);
+  const cnt = countMap(masses);
+  const allCnt = countMap(fwd.D.concat(fwd.showZero ? [0] : []));
+  let maxMult = 1; allCnt.forEach(c => { maxMult = Math.max(maxMult, c); });
+  const total = Math.max(1, S[n]);
+  const px = 10, yAxis = 26 + maxMult * 11, H = yAxis + 42;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.innerHTML = "";
+  const xOf = m => 36 + (m / total) * (W - 72);
+
+  mk("line", { x1: 30, y1: yAxis, x2: W - 30, y2: yAxis, class: "axis" }, svg);
+  /* ticks: nice spacing */
+  const stepC = total <= 20 ? 1 : total <= 60 ? 5 : total <= 200 ? 20 : total <= 700 ? 50 : 100;
+  for (let m = 0; m <= total; m += stepC) {
+    mk("line", { x1: xOf(m), y1: yAxis, x2: xOf(m), y2: yAxis + 5, class: "axtick" }, svg);
+    const t = mk("text", { x: xOf(m), y: yAxis + 17, class: "axlab" }, svg); t.textContent = String(m);
+  }
+  if (total % stepC !== 0) {
+    mk("line", { x1: xOf(total), y1: yAxis, x2: xOf(total), y2: yAxis + 5, class: "axtick" }, svg);
+    const t = mk("text", { x: xOf(total), y: yAxis + 17, class: "axlab" }, svg); t.textContent = String(total);
+  }
+  const ttl = mk("text", { x: 8, y: 14, class: "ttl" }, svg);
+  ttl.textContent = masses.length ? "mass  →   (one tick per fragment; stacked when repeated)" : "the spectrum fills as fragments are weighed";
+
+  const newM = st.frag ? st.frag.m : null;
+  /* label a peak only if it does not collide with an already labelled one; the new peak always wins */
+  const distinct = Array.from(new Set(masses)).sort(asc);
+  const labelled = new Set(); let lastX = -1e9;
+  if (newM !== null) labelled.add(newM);
+  distinct.forEach(m => {
+    const x = xOf(m);
+    const clashNew = newM !== null && Math.abs(x - xOf(newM)) < 30 && m !== newM;
+    if (!clashNew && x - lastX >= 30 && !labelled.has(m)) { labelled.add(m); }
+    if (labelled.has(m)) lastX = x;
+  });
+  const drawn = new Set();
+  masses.forEach(m => {
+    if (drawn.has(m)) return; drawn.add(m);
+    const c = cnt.get(m), x = xOf(m);
+    for (let k = 0; k < c; k++) {
+      const isNew = (m === newM && k === c - 1);
+      const r = mk("rect", { x: x - px / 2, y: yAxis - 3 - (k + 1) * 11, width: px, height: 10, rx: 1.5,
+                             class: "peak" + (isNew ? " new pop" : "") }, svg);
+      r.dataset.m = m;
+    }
+    if (labelled.has(m)) {
+      const t = mk("text", { x: x, y: yAxis + 31, class: "peaklab" + (m === newM ? " new" : "") }, svg);
+      t.textContent = String(m);
+    }
+  });
+
+  svg.onmousemove = ev => {
+    const t = ev.target;
+    if (t && t.classList.contains("peak")) {
+      const m = Number(t.dataset.m);
+      const fs = frags.filter(f => f.m === m).map(f => esc(fwdFragLabel(f.i, f.j)));
+      showTip('<span class="tt-h">mass ' + m + '</span><br>' + (m === 0 ? "empty fragment" : fs.join(", ")) +
+              (fs.length > 1 ? '<br><span class="tt-s">multiplicity ' + fs.length + "</span>" : ""), ev);
+    } else hideTip();
+  };
+  svg.onmouseleave = hideTip;
+
+  const shown = fwd.showZero && st.st >= 1 ? [0].concat(frags.map(f => f.m).sort(asc)) : frags.map(f => f.m).sort(asc);
+  el("fwdSpecMeta").textContent = st.st >= 2 ? frags.length + " / " + (n * (n + 1) / 2) + " fragments" : "";
+  el("fwdSetline").innerHTML = shown.length
+    ? "<b>ΔS</b> = {{ " + shown.map(m => m === newM ? '<b style="color:var(--wi-active)">' + m + "</b>" : m).join(", ") + " }}" +
+      (fwd.showZero ? ' <span style="color:var(--wi-ink-faint)">(0 shown for the empty fragment; not part of ΔS)</span>' : "")
+    : "";
+}
+
+function fwdRenderFrags(st) {
+  const box = el("fwdFrags"), frags = (st.frags || []).slice().sort((a, b) => a.m - b.m || a.i - b.i);
+  const nf = st.frag;
+  const parts = [];
+  if (fwd.showZero && st.st >= 1) parts.push('<span class="chip sub">0<span class="fr">“”</span></span>');
+  frags.forEach(f => {
+    const isNew = nf && f.i === nf.i && f.j === nf.j;
+    parts.push('<span class="chip sub' + (isNew ? " new" : "") + '">' + f.m + '<span class="fr">' +
+               esc(fwdFragLabel(f.i, f.j)) + "</span></span>");
+  });
+  box.innerHTML = parts.length ? parts.join("") : '<span class="placeholder">Fragments appear here, sorted by mass, with the piece of the peptide they come from.</span>';
+  el("fwdFragMeta").textContent = frags.length ? frags.length + (st.done ? " · complete" : "") : "";
+}
+
+function fwdRenderAA(st) {
+  const inPep = new Set(fwd.letters ? Array.from(fwd.letters) : []);
+  const hot = (st.aa !== undefined && fwd.letters) ? fwd.letters[st.aa] : null;
+  el("aaTab").innerHTML = AA.map(a =>
+    '<div class="aarow' + (a[0] === hot ? " hot" : "") + (inPep.has(a[0]) ? " inpep" : "") + '">' +
+    '<span class="lt">' + a[0] + '</span><span>' + a[1] + '</span><span class="ms">' + a[2] + "</span></div>").join("");
+}
+
+function fwdRender(st, pl) {
+  fwdDrawChain(st); fwdDrawSpec(st); fwdRenderFrags(st); fwdRenderAA(st);
+  el("fwdStatus").innerHTML = (st.txt || "") + (st.ans ? '<span class="ans">' + esc(st.ans) + "</span>" : "");
+  el("fwdPhase").textContent = pl.phases[st.ph] ? pl.phases[st.ph].name : "";
+}
+
+function fwdSetInput(str, fromPreset) {
+  try {
+    const r = parsePeptide(stripComments(str));
+    fwd.P = r.P; fwd.letters = r.letters;
+    el("fwdErr").textContent = "";
+    el("fwdIn").value = r.letters || r.P.join(" ");
+    if (!fromPreset) { el("fwdPreset").value = ""; showRandBar("fwd", false); }
+    el("fwdText").value = r.letters || r.P.join(" ");
+    fwdBuild();
+    return true;
+  } catch (e) { el("fwdErr").textContent = e.message; return false; }
+}
+
+function fwdRandom() {
+  const n = Math.max(2, Math.min(15, Number(el("fwdRandN").value) || 5)); el("fwdRandN").value = n;
+  if (el("fwdRandAA").classList.contains("on")) {
+    let s = ""; for (let i = 0; i < n; i++) s += AA[rint(0, AA.length - 1)][0];
+    fwdSetInput(s, true);
+  } else {
+    const mx = Math.max(2, Math.min(99, Number(el("fwdRandMax").value) || 9)); el("fwdRandMax").value = mx;
+    fwdSetInput(randomP(n, mx).join(" "), true);
+  }
+}
+
+function fwdInit() {
+  fwdPlayer = makePlayer("fwdTransport", fwdRender);
+  const sel = el("fwdPreset");
+  sel.innerHTML = FWD_PRESETS.map(p => '<option value="' + p.key + '">' + esc(p.name) + "</option>").join("") +
+                  '<option value="">(custom)</option>';
+  sel.addEventListener("change", () => {
+    const p = FWD_PRESETS.find(q => q.key === sel.value);
+    showRandBar("fwd", sel.value === "random");
+    if (p && p.in) fwdSetInput(p.in, true); else if (p) fwdRandom();
+  });
+  el("fwdRandGo").addEventListener("click", fwdRandom);
+  el("fwdRandAA").addEventListener("click", () => { el("fwdRandAA").classList.add("on"); el("fwdRandInt").classList.remove("on"); el("fwdRandMax").style.display = "none"; fwdRandom(); });
+  el("fwdRandInt").addEventListener("click", () => { el("fwdRandInt").classList.add("on"); el("fwdRandAA").classList.remove("on"); el("fwdRandMax").style.display = ""; fwdRandom(); });
+  el("fwdSet").addEventListener("click", () => fwdSetInput(el("fwdIn").value, false));
+  el("fwdIn").addEventListener("keydown", ev => { if (ev.key === "Enter") fwdSetInput(el("fwdIn").value, false); });
+  el("fwdLoad").addEventListener("click", () => fwdSetInput(el("fwdText").value, false));
+  el("fwdZero").addEventListener("change", () => { fwd.showZero = el("fwdZero").checked; fwdPlayer.render(); });
+  el("fwdToRoad").addEventListener("click", () => { roadSetTarget(fwd.D.slice(), true); el("roadPreset").value = ""; showRandBar("road", false); showTab("road"); });
+  el("fwdToBt").addEventListener("click", () => { btSetInput(fwd.D.join(" "), false); showTab("bt"); });
+  el("fwdToPoly").addEventListener("click", () => { polySetInput(fwd.letters ? fwd.letters : "S " + fwd.S.join(" "), false); showTab("poly"); });
+  el("fwdToLb").addEventListener("click", () => {
+    if (!fwd.letters) { el("fwdErr").textContent = "the leaderboard tab needs a peptide in one-letter code"; return; }
+    el("lbPep").value = fwd.letters; el("lbPreset").value = ""; lbGenFromForm(false); showTab("lb");
+  });
+  sel.value = "nqel"; fwdSetInput("NQEL", true);
+}
+
+/* ==========================================================================
+   TAB 2 -- the turnpike playground: movable exits, live ΔS vs D
+   ========================================================================== */
+
+const ROAD_PRESETS = [
+  { key: "d1",    name: "D₁ from the lecture (|D| = 10)",      D: [1, 2, 3, 3, 5, 6, 8, 8, 9, 11] },
+  { key: "click", name: "clicker question {{1,1,2,2,3,4}}",    D: [1, 1, 2, 2, 3, 4] },
+  { key: "slide", name: "systematic example (|D| = 15)",       D: [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 13, 14, 15, 17, 18] },
+  { key: "d2",    name: "D₂ = ΔS for [1,1,1,1,1]",             D: [1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5] },
+  { key: "imp",   name: "impossible: {{1,1,1}}",               D: [1, 1, 1] },
+  { key: "nqel",  name: "spectrum of NQEL",                    D: deltaOf(prefSums([114, 128, 129, 113])) },
+  { key: "two",   name: "two essentially different answers", D: deltaOf([0, 1, 4, 10, 12, 17]) },
+  { key: "hardA", name: "puzzle A (|D| = 15) — solvable?",     D: [1, 2, 3, 4, 5, 5, 7, 8, 10, 11, 12, 13, 14, 15, 17] },
+  { key: "hardB", name: "puzzle B (|D| = 15) — solvable?",     D: [2, 3, 5, 7, 7, 8, 8, 12, 13, 15, 16, 20, 21, 23, 28] },
+  { key: "hardC", name: "puzzle C (|D| = 21) — solvable?",     D: [2, 3, 3, 3, 3, 4, 6, 6, 6, 6, 7, 7, 9, 9, 10, 12, 12, 13, 15, 16, 18] },
+  { key: "hardD", name: "puzzle D (|D| = 21) — solvable?",     D: [1, 1, 3, 4, 5, 5, 6, 7, 8, 8, 8, 8, 9, 11, 12, 13, 14, 16, 17, 17, 22] },
+  { key: "random", name: "random puzzle…",                     D: "random" },
+  { key: "free",  name: "sandbox (no target)",                 D: null, S: [0, 3, 8, 9, 11] }
+];
+
+const road = { S: [0, 11], T: null, sel: null, undo: [], hover: null, drag: null };
+
+const roadMaxS = () => road.S[road.S.length - 1];
+function roadLen() {
+  const ms = roadMaxS();
+  if (road.T) return Math.max(road.T[road.T.length - 1], ms);
+  return Math.max(4, Math.ceil(ms * 1.25) + 1);
+}
+function roadPush() { road.undo.push(road.S.slice()); if (road.undo.length > 200) road.undo.shift(); el("roadUndo").disabled = false; }
+function roadUndoDo() {
+  if (!road.undo.length) return;
+  road.S = road.undo.pop(); road.sel = null;
+  el("roadUndo").disabled = !road.undo.length;
+  roadRender();
+}
+function roadSetTarget(D, resetExits) {
+  road.T = D ? D.slice().sort(asc) : null;
+  el("roadD").value = D ? D.join(" ") : "";
+  el("roadErr").textContent = "";
+  if (resetExits) { roadPush(); road.S = D ? [0, road.T[road.T.length - 1]] : [0, 11]; road.sel = null; }
+  roadRender();
+}
+
+/* match ΔS against T cell by cell: which tolls are "ok", which are "extra" */
+function roadMatch() {
+  const S = road.S, n = S.length;
+  const cells = []; /* {i,j,v,cls} */
+  const avail = road.T ? countMap(road.T) : null;
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    const v = S[j] - S[i]; let cls = "plain";
+    if (avail) { const c = avail.get(v) || 0; if (c > 0) { avail.set(v, c - 1); cls = "ok"; } else cls = "extra"; }
+    cells.push({ i: i, j: j, v: v, cls: cls });
+  }
+  const missing = [];
+  if (avail) avail.forEach((c, v) => { for (let k = 0; k < c; k++) missing.push(v); });
+  missing.sort(asc);
+  return { cells: cells, missing: missing };
+}
+
+function roadDraw() {
+  const svg = el("roadSvg"), S = road.S, n = S.length, L = roadLen();
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const y = 110, H = 168, x0 = 40, sc = (W - 80) / L, hmax = 92;
+  const xOf = v => x0 + v * sc;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.innerHTML = "";
+  const m = roadMatch();
+
+  /* road bed, extends to L */
+  mk("line", { x1: xOf(0), y1: y, x2: xOf(L), y2: y, class: "road" }, svg);
+  mk("line", { x1: xOf(0), y1: y, x2: xOf(L), y2: y, class: "roadmid" }, svg);
+  mk("rect", { x: xOf(0) - 10, y: y - 16, width: (xOf(L) - xOf(0)) + 20, height: 32, class: "roadhit" }, svg)
+    .dataset.role = "road";
+
+  /* segments: hit areas + P labels + selection */
+  for (let i = 0; i + 1 < n; i++) {
+    const xa = xOf(S[i]), xb = xOf(S[i + 1]);
+    if (road.sel && road.sel.type === "seg" && road.sel.i === i) {
+      mk("rect", { x: xa + 5, y: y - 6, width: Math.max(2, xb - xa - 10), height: 12, rx: 3, class: "segsel" }, svg);
+      mk("rect", { x: xa + 2, y: y + 35, width: Math.max(2, xb - xa - 4), height: 22, rx: 3, class: "segsel" }, svg);
+    }
+    const t = mk("text", { x: (xa + xb) / 2, y: y + 46, class: "seglab" }, svg); t.textContent = String(S[i + 1] - S[i]);
+    const r = mk("rect", { x: xa + 2, y: y + 35, width: Math.max(2, xb - xa - 4), height: 22, rx: 3, class: "seghit" }, svg);
+    r.dataset.role = "seg"; r.dataset.i = i;
+  }
+  if (n >= 2) { const t = mk("text", { x: x0 - 14, y: y + 46, class: "exlab faint", "text-anchor": "end" }, svg); t.textContent = "P"; }
+  { const t = mk("text", { x: x0 - 14, y: y + 26, class: "exlab faint", "text-anchor": "end" }, svg); t.textContent = "S"; }
+
+  /* arcs: for the selected exit, or the hovered toll-table cell */
+  let arcs = [];
+  if (road.hover) arcs = [{ i: road.hover[0], j: road.hover[1], cls: "hot" }];
+  else if (road.sel && road.sel.type === "exit") {
+    const k = road.sel.i;
+    m.cells.forEach(c => { if (c.i === k || c.j === k) arcs.push({ i: c.i, j: c.j, cls: c.cls === "extra" ? "bad" : c.cls === "ok" ? "ok" : "neu" }); });
+  }
+  arcs.forEach(a => {
+    const d = S[a.j] - S[a.i];
+    mk("path", { d: arcPath(xOf(S[a.i]), xOf(S[a.j]), y - 9, hmax, L, d), class: "arc " + a.cls }, svg);
+    const ax = (xOf(S[a.i]) + xOf(S[a.j])) / 2, ay = arcApex(y - 9, hmax, L, d);
+    mk("rect", { x: ax - 12, y: ay - 8, width: 24, height: 15, rx: 3, class: "arclabbg" }, svg);
+    const t = mk("text", { x: ax, y: ay, class: "arclab " + a.cls }, svg); t.textContent = String(d);
+  });
+
+  /* exits */
+  for (let i = 0; i < n; i++) {
+    const x = xOf(S[i]);
+    const isSel = road.sel && road.sel.type === "exit" && road.sel.i === i;
+    const hot = road.hover && (road.hover[0] === i || road.hover[1] === i);
+    const c = mk("circle", { cx: x, cy: y, r: 8.5, class: "exit" + (i === 0 ? " fixed" : " drag") + (isSel ? " sel" : "") + (hot ? " hot" : "") }, svg);
+    c.dataset.role = "exit"; c.dataset.i = i;
+    if (i === 0) c.setAttribute("title", "exit 0 stays at 0");
+    const t = mk("text", { x: x, y: y + 26, class: "exlab" }, svg); t.textContent = String(S[i]);
+  }
+  el("roadMeta").textContent = n + " exit" + (n === 1 ? "" : "s") + " · " + (n * (n - 1) / 2) + " tolls";
+  el("roadSetline").innerHTML = "<b>S</b> = " + fmtSet(S, "[", "]") + " &nbsp; <b>P</b> = " +
+    fmtSet(S.slice(1).map((v, i) => v - S[i]), "[", "]") + " &nbsp; <b>ΔS</b> = " + MS(m.cells.map(c => c.v).sort(asc));
+  return m;
+}
+
+function roadDrawToll(m) {
+  const S = road.S, n = S.length;
+  if (n < 2) { el("tollBox").innerHTML = '<span class="placeholder">Add a second exit to get a toll.</span>'; el("tollMeta").textContent = ""; return; }
+  const byPair = {}; m.cells.forEach(c => byPair[c.i + "," + c.j] = c);
+  const sel = road.sel && road.sel.type === "exit" ? road.sel.i : -1;
+  let h = '<table class="tolltab"><tr><th></th>';
+  for (let j = 1; j < n; j++) h += '<th class="' + (j === sel ? "hot" : "") + '">' + S[j] + "</th>";
+  h += "</tr>";
+  for (let i = 0; i + 1 < n; i++) {
+    h += '<tr><th class="' + (i === sel ? "hot" : "") + '">' + S[i] + "</th>";
+    for (let j = 1; j < n; j++) {
+      if (j <= i) { h += '<td class="blank"></td>'; continue; }
+      const c = byPair[i + "," + j];
+      const hot = road.hover && road.hover[0] === i && road.hover[1] === j;
+      h += '<td class="' + c.cls + (hot ? " hot" : "") + '" data-i="' + i + '" data-j="' + j + '">' + c.v + "</td>";
+    }
+    h += "</tr>";
+  }
+  h += "</table>";
+  el("tollBox").innerHTML = h;
+  el("tollMeta").textContent = "row S[i], column S[j]";
+}
+
+function roadDrawCmp(m) {
+  const S = road.S, n = S.length, T = road.T;
+  const dS = m.cells.map(c => c.v).sort(asc);
+  if (!T) {
+    el("cmpSumm").className = "summ"; el("cmpSumm").innerHTML = "Sandbox &mdash; no target. Δ<i>S</i> of the road:";
+    el("cmpD").innerHTML = '<span class="placeholder">Set a target D above, or turn this road into a puzzle.</span>';
+    el("cmpS").innerHTML = dS.map(v => '<span class="chip">' + v + "</span>").join("") || '<span class="placeholder">—</span>';
+    el("cmpMeta").textContent = "|ΔS| = " + dS.length;
+    return;
+  }
+  /* target chips: ok if realized by the road, miss otherwise */
+  const okCnt = countMap(m.cells.filter(c => c.cls === "ok").map(c => c.v));
+  const dChips = T.map(v => { const c = okCnt.get(v) || 0; if (c > 0) { okCnt.set(v, c - 1); return '<span class="chip ok">' + v + "</span>"; } return '<span class="chip miss">' + v + "</span>"; });
+  el("cmpD").innerHTML = dChips.join("");
+  const sChips = m.cells.slice().sort((a, b) => a.v - b.v || a.i - b.i).map(c => '<span class="chip ' + c.cls + '">' + c.v + "</span>");
+  el("cmpS").innerHTML = sChips.join("") || '<span class="placeholder">—</span>';
+  const nOk = m.cells.filter(c => c.cls === "ok").length, nEx = m.cells.length - nOk, nMiss = m.missing.length;
+  const need = (Math.sqrt(8 * T.length + 1) - 1) / 2;
+  const needTxt = Number.isInteger(need) ? need + 1 + " exits needed" : "|D| = " + T.length + " is not of the form n(n+1)/2 — no road can fit";
+  const solved = nEx === 0 && nMiss === 0;
+  el("cmpSumm").className = "summ " + (solved ? "good" : "bad");
+  el("cmpSumm").innerHTML = solved
+    ? "Δ<i>S</i> = D &mdash; solved! This road produces exactly the given tolls."
+    : nOk + " of " + T.length + " tolls matched &middot; <span class=\"k-bad\">" + nMiss + " missing</span> &middot; " +
+      "<span class=\"k-ex\">" + nEx + " extra</span>";
+  el("cmpMeta").textContent = needTxt + " · road has " + n;
+  el("roadStatus").innerHTML =
+    "You only get to see the multiset <b>D</b> of tolls. The exits are hidden. Place them so that <i>every</i> " +
+    "toll in D is realized <i>exactly as often</i> as it occurs in D, and no other toll appears.<br><br>" +
+    "Things to try: the largest toll is always between the two end exits. The largest <i>unexplained</i> toll must be " +
+    "measured from one end &mdash; that is the observation behind the backtracking algorithm in the next tab. " +
+    "And swapping two segments (click their two lengths) permutes the tolls without changing the number of exits: " +
+    "the mirror image of any solution is a solution, too.";
+}
+
+function roadRender() {
+  const m = roadDraw();
+  roadDrawToll(m);
+  roadDrawCmp(m);
+  el("roadDel").disabled = !(road.sel && road.sel.type === "exit" && road.sel.i > 0);
+}
+
+/* --- mutations ------------------------------------------------------------ */
+
+function roadAddExit(v) {
+  if (v <= 0 || road.S.includes(v)) return false;
+  roadPush();
+  road.S.push(v); road.S.sort(asc);
+  road.sel = { type: "exit", i: road.S.indexOf(v) };
+  roadRender(); return true;
+}
+function roadRemoveExit(i) {
+  if (i <= 0 || i >= road.S.length) return;
+  roadPush(); road.S.splice(i, 1); road.sel = null; roadRender();
+}
+function roadSwapSeg(a, b) {
+  const P = road.S.slice(1).map((v, i) => v - road.S[i]);
+  roadPush();
+  const t = P[a]; P[a] = P[b]; P[b] = t;
+  road.S = prefSums(P); road.sel = null; roadRender();
+}
+function roadMirror() {
+  const P = road.S.slice(1).map((v, i) => v - road.S[i]).reverse();
+  roadPush(); road.S = prefSums(P); road.sel = null; roadRender();
+}
+
+function roadLoadText(txt) {
+  try {
+    const lines = stripComments(txt).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (!lines.length) throw new Error("empty input");
+    let D, S;
+    for (const l of lines) {
+      const m = l.match(/^([DSP])\b\s*[:=]?\s*(.*)$/i);
+      if (m) {
+        const vals = parseIntList(m[2]);
+        const k = m[1].toUpperCase();
+        if (k === "D") D = vals.sort(asc);
+        else if (k === "S") { S = vals.slice().sort(asc); if (S[0] !== 0) throw new Error("S must start with 0"); if (new Set(S).size !== S.length) throw new Error("S has a repeated exit"); }
+        else { if (vals.some(x => x < 1)) throw new Error("P entries must be ≥ 1"); S = prefSums(vals); }
+      } else if (lines.length === 1) D = parseIntList(l).sort(asc);
+      else throw new Error("expected a line starting with D, S or P: " + l);
+    }
+    if (D && D.some(x => x < 1)) throw new Error("D must contain positive integers");
+    el("roadErr").textContent = "";
+    roadPush();
+    road.T = D !== undefined ? D : road.T;
+    if (S) road.S = S; else if (D) road.S = [0, D[D.length - 1]];
+    el("roadD").value = road.T ? road.T.join(" ") : "";
+    road.sel = null; roadRender();
+  } catch (e) { el("roadErr").textContent = e.message; }
+}
+
+function roadInit() {
+  const svg = el("roadSvg");
+  const sc = () => (Math.max(380, (svg.parentElement.clientWidth || 900) - 2) - 80) / roadLen();
+  const valOf = ev => {
+    const r = svg.getBoundingClientRect();
+    return Math.round((ev.clientX - r.left - 40) / sc());
+  };
+
+  svg.addEventListener("pointerdown", ev => {
+    const t = ev.target, role = t.dataset && t.dataset.role;
+    if (role === "exit") {
+      const i = Number(t.dataset.i);
+      const now = performance.now();
+      if (i > 0 && road.lastDown && road.lastDown.i === i && now - road.lastDown.t < 450) {
+        road.lastDown = null; roadRemoveExit(i); ev.preventDefault(); return;
+      }
+      road.lastDown = { i: i, t: now };
+      road.sel = { type: "exit", i: i };
+      if (i > 0) {
+        road.drag = { i: i, start: road.S[i], moved: false, pushed: false };
+        svg.setPointerCapture(ev.pointerId);
+      }
+      roadRender(); ev.preventDefault();
+    }
+  });
+  svg.addEventListener("pointermove", ev => {
+    if (!road.drag) return;
+    const d = road.drag, i = d.i, S = road.S;
+    let v = valOf(ev);
+    const lo = S[i - 1] + 1, hi = i + 1 < S.length ? S[i + 1] - 1 : roadLen();
+    v = Math.max(lo, Math.min(hi, v));
+    if (v !== S[i]) {
+      if (!d.pushed) { roadPush(); road.undo[road.undo.length - 1][i] = d.start; d.pushed = true; }
+      S[i] = v; d.moved = true; roadRender();
+    }
+  });
+  const endDrag = () => { if (road.drag) { road.drag = null; roadRender(); } };
+  svg.addEventListener("pointerup", endDrag);
+  svg.addEventListener("pointercancel", endDrag);
+
+  svg.addEventListener("click", ev => {
+    const t = ev.target, role = t.dataset && t.dataset.role;
+    if (role === "road") {
+      const v = valOf(ev);
+      if (v > 0 && v <= roadLen() && !road.S.includes(v)) roadAddExit(v);
+      else { road.sel = null; roadRender(); }
+    } else if (role === "seg") {
+      const i = Number(t.dataset.i);
+      if (road.sel && road.sel.type === "seg") {
+        if (road.sel.i !== i) roadSwapSeg(road.sel.i, i); else { road.sel = null; roadRender(); }
+      } else { road.sel = { type: "seg", i: i }; roadRender(); }
+    } else if (!role) { road.sel = null; roadRender(); }
+  });
+  svg.addEventListener("dblclick", ev => ev.preventDefault());
+
+  el("tollBox").addEventListener("mouseover", ev => {
+    const td = ev.target.closest("td[data-i]");
+    if (td) { road.hover = [Number(td.dataset.i), Number(td.dataset.j)]; roadRender(); }
+  });
+  el("tollBox").addEventListener("mouseleave", () => { road.hover = null; roadRender(); });
+
+  el("roadAdd").addEventListener("click", () => {
+    const S = road.S; let best = -1, bi = 0;
+    for (let i = 0; i + 1 < S.length; i++) if (S[i + 1] - S[i] > best) { best = S[i + 1] - S[i]; bi = i; }
+    if (S.length < 2) { roadAddExit(Math.max(1, Math.round(roadLen() / 2))); return; }
+    if (best >= 2) roadAddExit(Math.floor((S[bi] + S[bi + 1]) / 2));
+    else if (!road.T) roadAddExit(S[S.length - 1] + 1);
+  });
+  el("roadDel").addEventListener("click", () => { if (road.sel && road.sel.type === "exit") roadRemoveExit(road.sel.i); });
+  el("roadMirror").addEventListener("click", roadMirror);
+  el("roadReset").addEventListener("click", () => { roadPush(); road.S = [0, roadMaxS()]; road.sel = null; roadRender(); });
+  el("roadUndo").addEventListener("click", roadUndoDo);
+  el("roadFreeze").addEventListener("click", () => {
+    if (road.S.length < 2) return;
+    roadSetTarget(deltaOf(road.S), true);
+    el("roadPreset").value = ""; showRandBar("road", false);
+  });
+  el("roadSetD").addEventListener("click", () => {
+    try { const D = parseIntList(el("roadD").value); if (!D.length) throw new Error("empty");
+          if (D.some(x => x < 1)) throw new Error("D must contain positive integers");
+          roadSetTarget(D, true); el("roadPreset").value = ""; showRandBar("road", false); }
+    catch (e) { el("roadErr").textContent = e.message; }
+  });
+  el("roadD").addEventListener("keydown", ev => { if (ev.key === "Enter") el("roadSetD").click(); });
+  el("roadClearD").addEventListener("click", () => { roadSetTarget(null, false); el("roadPreset").value = "free"; showRandBar("road", false); });
+  el("roadLoad").addEventListener("click", () => roadLoadText(el("roadText").value));
+
+  const sel = el("roadPreset");
+  sel.innerHTML = ROAD_PRESETS.map(p => '<option value="' + p.key + '">' + esc(p.name) + "</option>").join("") +
+                  '<option value="">(custom)</option>';
+  const roadRandom = () => {
+    const n = Math.max(2, Math.min(9, Number(el("roadRandN").value) || 5)), mx = Math.max(2, Math.min(30, Number(el("roadRandMax").value) || 9));
+    el("roadRandN").value = n; el("roadRandMax").value = mx;
+    let D = deltaOf(prefSums(randomP(n, mx)));
+    if (el("roadRandTamper").checked && Math.random() < 0.5) D = tamper(D);
+    roadSetTarget(D, true);
+  };
+  el("roadRandGo").addEventListener("click", roadRandom);
+  sel.addEventListener("change", () => {
+    const p = ROAD_PRESETS.find(q => q.key === sel.value); if (!p) return;
+    showRandBar("road", p.D === "random");
+    if (p.D === "random") roadRandom();
+    else if (p.D) roadSetTarget(p.D, true);
+    else { roadPush(); road.T = null; road.S = p.S.slice(); road.sel = null; el("roadD").value = ""; roadRender(); }
+  });
+  el("roadText").value = "D 1 2 3 3 5 6 8 8 9 11\n# S 0 3 8 9 11";
+  sel.value = "d1"; roadSetTarget(ROAD_PRESETS[0].D, true);
+  road.undo = []; el("roadUndo").disabled = true;
+}
+
+/* ==========================================================================
+   TAB 3 -- the backtracking algorithm of the lecture, line by line
+   ========================================================================== */
+
+const K = s => '<span class="kw">' + s + "</span>";
+const C = s => '<span class="cm">' + s + "</span>";
+const BT_CODE = [
+  [1,  K("procedure") + " turnpikeBacktracking(D)"],
+  [2,  "    d := max D"],
+  [3,  "    S := {0, d}                          " + C("// sorted set of prefSums")],
+  [4,  "    " + K("return") + " turnpikeRec(S, D)"],
+  [5,  ""],
+  [6,  K("procedure") + " turnpikeRec(S, D)"],
+  [7,  "    " + C("// Invariant: ΔS ⊆ D")],
+  [8,  "    " + K("if") + " ΔS == D"],
+  [9,  "        " + K("return") + " S"],
+  [10, "    d := max(D \\ ΔS)"],
+  [11, "    " + C("// Option 1: Distance d from left end")],
+  [12, "    S′ := S ∪ {d}"],
+  [13, "    " + K("if") + " ΔS′ ⊆ D"],
+  [14, "        R := turnpikeRec(S′, D)"],
+  [15, "        " + K("if") + " R ≠ NO_DIFFERENCE_MULTISET"],
+  [16, "            " + K("return") + " R"],
+  [17, "    " + C("// else try Option 2: Distance d from right")],
+  [18, "    S′ := S ∪ {(max D) − d}"],
+  [19, "    " + K("if") + " ΔS′ ⊆ D"],
+  [20, "        " + K("return") + " turnpikeRec(S′, D)"],
+  [21, "    " + K("else") + "                                 " + C("// no option worked!")],
+  [22, "        " + K("return") + " NO_DIFFERENCE_MULTISET"]
+];
+
+const BT_PRESETS = [
+  { key: "slide", name: "systematic example (|D| = 15)",  D: [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 13, 14, 15, 17, 18] },
+  { key: "d1",    name: "D₁ = ΔS for [3, 5, 1, 2]",       D: [1, 2, 3, 3, 5, 6, 8, 8, 9, 11] },
+  { key: "click", name: "clicker question {{1,1,2,2,3,4}}", D: [1, 1, 2, 2, 3, 4] },
+  { key: "back",  name: "needs to backtrack (P = [4,4,1,1,5])", D: deltaOf(prefSums([4, 4, 1, 1, 5])) },
+  { key: "two",   name: "two essentially different answers", D: deltaOf([0, 1, 4, 10, 12, 17]) },
+  { key: "d2",    name: "D₂ = ΔS for [1, 1, 1, 1, 1]",    D: [1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5] },
+  { key: "imp",   name: "impossible: {{1,1,1}}",         D: [1, 1, 1] },
+  { key: "hardA", name: "puzzle A — feasible?",          D: [1, 2, 3, 4, 5, 5, 7, 8, 10, 11, 12, 13, 14, 15, 17] },
+  { key: "hardB", name: "puzzle B — feasible?",          D: [2, 3, 5, 7, 7, 8, 8, 12, 13, 15, 16, 20, 21, 23, 28] },
+  { key: "hardC", name: "puzzle C — feasible?",          D: [2, 3, 3, 3, 3, 4, 6, 6, 6, 6, 7, 7, 9, 9, 10, 12, 12, 13, 15, 16, 18] },
+  { key: "hardD", name: "puzzle D — feasible?",          D: [1, 1, 3, 4, 5, 5, 6, 7, 8, 8, 8, 8, 9, 11, 12, 13, 14, 16, 17, 17, 22] },
+  { key: "nqel",  name: "spectrum of NQEL",              D: deltaOf(prefSums([114, 128, 129, 113])) },
+  { key: "slow",  name: "feasible but slow: 16 exits, 212 calls", D: deltaOf([0, 1, 7, 8, 9, 12, 13, 15, 300, 303, 305, 306, 309, 313, 318, 319]) },
+  { key: "cluster", name: "hard family: two clusters…",  D: "cluster" },
+  { key: "random", name: "random instance…",             D: "random" }
+];
+
+const bt = { D: [], fine: false, frames: [], truncated: false };
+let btPlayer;
+
+const BT_LIMIT = 6000;
+
+/* build the full trace (every line); coarse mode filters on o.major */
+function btBuild() {
+  const D = bt.D, maxD = D[D.length - 1];
+  const sl = new StepList();
+  const frames = bt.frames = [];
+  bt.truncated = false;
+  let count = 0;
+
+  const add = o => { count++; if (count > BT_LIMIT) { bt.truncated = true; throw "limit"; } return sl.add(o); };
+  const setLine = (S, delta) => "S = " + fmtSet(S) + (delta ? " , ΔS = " + MS(delta) : "");
+
+  function candidate(S, v, rem) {
+    const avail = countMap(rem), dists = [];
+    let ok = true;
+    S.forEach(s => {
+      const d = Math.abs(v - s);
+      let good = false;
+      if (d > 0 && (avail.get(d) || 0) > 0) { avail.set(d, avail.get(d) - 1); good = true; }
+      if (!good) ok = false;
+      dists.push({ s: s, d: d, ok: good });
+    });
+    return { v: v, ok: ok, dists: dists, inS: S.includes(v) };
+  }
+  const candTxt = c =>
+    c.dists.map(x => '<span class="' + (x.ok ? "k-ok" : "k-bad") + '">' + x.d + "</span>").join(", ");
+
+  function rec(S, fid, depth) {
+    const fr = frames[fid];
+    const delta = deltaOf(S);
+    const rem = msMinus(D, delta);
+    sl.phase("call " + (fid + 1));
+    if (rem.length === 0 && delta.length === D.length) {
+      add({ S: S, hl: [8], major: true, fid: fid,
+        txt: "<b>ΔS = D.</b> Every distance in D is realized exactly once by the exits " + fmtSet(S) +
+             " &mdash; and nothing else. Done." });
+      fr.okAt = sl.steps.length;
+      const P = S.slice(1).map((v, i) => v - S[i]);
+      add({ S: S, hl: [9], major: true, fid: fid, done: true,
+        txt: "<b>return S = " + fmtSet(S) + "</b>. The exits are the prefix sums; the sequence of segment lengths is " +
+             "<b>P = " + fmtSet(P, "[", "]") + "</b>. Its mirror image " + fmtSet(P.slice().reverse(), "[", "]") +
+             " would give the same D &mdash; the algorithm returns the one it finds first.",
+        ans: "P = " + fmtSet(P, "[", "]") });
+      return S;
+    }
+    const d = rem[rem.length - 1];
+    add({ S: S, hl: [8], major: false, fid: fid,
+      txt: "In this call " + setLine(S, delta) + ". Not all of D is explained yet: " +
+           (rem.length === D.length - delta.length ? "" : "") + "<code>D \\ ΔS = " + MS(rem) + "</code>." });
+    add({ S: S, hl: [10], major: true, fid: fid, dmax: d,
+      txt: "<b>d := max(D \\ ΔS) = " + d + "</b>, the largest distance not yet explained. It must be measured from " +
+           "one of the two <i>ends</i>: a new exit strictly between two placed ones would create an even larger " +
+           "distance to the far end &mdash; a distance that would have to be in D but is not left." });
+
+    /* option 1: d from the left end */
+    const c1 = candidate(S, d, rem);
+    add({ S: S, hl: [12], major: false, fid: fid, dmax: d, cand: c1,
+      txt: "<b>Option 1</b>: place the exit at position <b>" + d + "</b>, i.e. at distance d from the left end. " +
+           "New distances to the exits already placed: " + candTxt(c1) + "." });
+    add({ S: S, hl: [13], major: true, fid: fid, dmax: d, cand: c1,
+      txt: "Is ΔS′ ⊆ D? The old distances are in D by the invariant, so only the <b>new</b> ones matter: " +
+           candTxt(c1) + " must all be available in D \\ ΔS = " + MS(rem) + ". " +
+           (c1.ok ? '<span class="k-ok">Yes</span> &mdash; recurse.'
+                  : c1.inS ? '<span class="k-bad">No</span> &mdash; there already is an exit at ' + d + "; a second one there would realize a distance 0, never in D."
+                  : '<span class="k-bad">No</span> &mdash; option 1 is out.') });
+    if (c1.ok) {
+      const S1 = S.concat([d]).sort(asc);
+      const cid = frames.length;
+      frames.push({ id: cid, parent: fid, S: S1, opt: 1, added: d, createdAt: sl.steps.length, depth: depth + 1 });
+      add({ S: S, hl: [14], major: false, fid: fid, cand: c1,
+        txt: "Call <code>turnpikeRec(" + fmtSet(S1) + ", D)</code>." });
+      const R = rec(S1, cid, depth + 1);
+      sl.phase("call " + (fid + 1));
+      if (R) {
+        fr.okAt = sl.steps.length;
+        add({ S: R, hl: [15, 16], major: false, fid: fid, done: true, ans: "P = " + fmtSet(R.slice(1).map((v, i) => v - R[i]), "[", "]"),
+          txt: "Back in the call with S = " + fmtSet(S) + ": the recursive call succeeded, so <b>return R = " +
+               fmtSet(R) + "</b> &mdash; the answer travels up the chain of calls unchanged." });
+        return R;
+      }
+      add({ S: S, hl: [15], major: true, fid: fid, dmax: d, failed1: true,
+        txt: "The recursive call returned NO_DIFFERENCE_MULTISET: with the exit at " + d + " there is no way to " +
+             "complete the road. <b>Backtrack</b> &mdash; remove it and try option 2." });
+    }
+
+    /* option 2: d from the right end */
+    const v2 = maxD - d;
+    const c2 = candidate(S, v2, rem);
+    add({ S: S, hl: [18], major: false, fid: fid, dmax: d, cand: c2,
+      txt: "<b>Option 2</b>: place the exit at <b>(max D) − d = " + maxD + " − " + d + " = " + v2 + "</b>, i.e. at " +
+           "distance d from the right end. New distances: " + candTxt(c2) + "." });
+    add({ S: S, hl: [19], major: true, fid: fid, dmax: d, cand: c2,
+      txt: "Is ΔS′ ⊆ D? The new distances " + candTxt(c2) + " must be available in D \\ ΔS = " + MS(rem) + ". " +
+           (c2.ok ? '<span class="k-ok">Yes</span> &mdash; recurse, and return whatever comes back.'
+                  : c2.inS ? '<span class="k-bad">No</span> &mdash; there already is an exit at ' + v2 + "."
+                  : '<span class="k-bad">No</span>.') });
+    if (c2.ok) {
+      const S2 = S.concat([v2]).sort(asc);
+      const cid = frames.length;
+      frames.push({ id: cid, parent: fid, S: S2, opt: 2, added: v2, createdAt: sl.steps.length, depth: depth + 1 });
+      add({ S: S, hl: [20], major: false, fid: fid, cand: c2,
+        txt: "Call <code>turnpikeRec(" + fmtSet(S2) + ", D)</code> and return its result as is." });
+      const R = rec(S2, cid, depth + 1);
+      sl.phase("call " + (fid + 1));
+      if (R) {
+        fr.okAt = sl.steps.length;
+        add({ S: R, hl: [20], major: false, fid: fid, done: true, ans: "P = " + fmtSet(R.slice(1).map((v, i) => v - R[i]), "[", "]"),
+          txt: "Back in the call with S = " + fmtSet(S) + ": line 20 returns the result of the option-2 call, " +
+               "<b>R = " + fmtSet(R) + "</b>." });
+        return R;
+      }
+      fr.failAt = sl.steps.length;
+      add({ S: S, hl: [20], major: true, fid: fid, dmax: d, failed2: true,
+        txt: "Option 2 did not lead to a solution either. Line 20 returns the result of that call as it is: " +
+             "<b>NO_DIFFERENCE_MULTISET</b> for " + fmtSet(S) + "." });
+      return null;
+    }
+    fr.failAt = sl.steps.length;
+    add({ S: S, hl: [22], major: true, fid: fid, dmax: d, failed2: true,
+      txt: "Neither end works for d = " + d + ". <b>return NO_DIFFERENCE_MULTISET</b>" +
+           (depth === 0 ? ": D is not a difference multiset &mdash; no sequence P produces it."
+                        : " &mdash; back to the caller, which has one more option to try or fails as well.") });
+    return null;
+  }
+
+  try {
+    sl.phase("init");
+    add({ S: [], hl: [1], major: false, fid: -1,
+      txt: "Input: the multiset <b>D</b> with " + D.length + " distances. We are looking for exits S with ΔS = D." });
+    add({ S: [0], hl: [2], major: false, fid: -1, dmax: maxD,
+      txt: "<b>d := max D = " + maxD + "</b>. The largest toll must be the one between the two end exits, so " +
+           "the road has length " + maxD + "." });
+    frames.push({ id: 0, parent: -1, S: [0, maxD], opt: 0, added: null, createdAt: sl.steps.length + 1, depth: 0 });
+    add({ S: [0, maxD], hl: [3], major: true, fid: -1,
+      txt: "<b>S := {0, " + maxD + "}</b>: both ends of the road are exits. Everything else has to be found." });
+    add({ S: [0, maxD], hl: [4], major: false, fid: 0,
+      txt: "Call <code>turnpikeRec(" + fmtSet([0, maxD]) + ", D)</code>. Invariant on entry: ΔS = {{" + maxD + "}} ⊆ D." });
+    const R = rec([0, maxD], 0, 0);
+    if (!R) {
+      sl.phase("result");
+      add({ S: [0, maxD], hl: [4], major: true, fid: -1, done: true,
+        txt: "The root call failed, so <b>turnpikeBacktracking(D) = NO_DIFFERENCE_MULTISET</b>: no sequence P " +
+             "has ΔprefSum(P) = D.", ans: "no such P exists" });
+    }
+  } catch (e) { if (e !== "limit") throw e; }
+
+  /* coarse view: keep the major steps (and always the very last one) */
+  let steps = sl.steps, phases = sl.phases;
+  if (!bt.fine) {
+    const keep = steps.map((s, i) => s.major || i === steps.length - 1);
+    const map = []; let k = 0;
+    steps.forEach((s, i) => { map.push(k); if (keep[i]) k++; });
+    const fmap = i => map[i];
+    frames.forEach(f => { f.createdAt = fmap(Math.min(f.createdAt, steps.length - 1)); f.okAt = f.okAt !== undefined ? fmap(Math.min(f.okAt, steps.length - 1)) : undefined; f.failAt = f.failAt !== undefined ? fmap(Math.min(f.failAt, steps.length - 1)) : undefined; });
+    const ph = [];
+    phases.forEach(p => { const kept = []; for (let i = p.from; i <= p.to; i++) if (keep[i]) kept.push(map[i]); if (kept.length) ph.push({ name: p.name, from: kept[0], to: kept[kept.length - 1] }); });
+    steps = steps.filter((s, i) => keep[i]); phases = ph;
+    steps.forEach((s, i) => s.ph = -1);
+    phases.forEach((p, k) => { for (let i = p.from; i <= p.to; i++) steps[i].ph = k; });
+  }
+  /* merge consecutive phases of the same name so the bar reads "depth 1 · depth 2 · depth 1" */
+  const merged = [];
+  phases.forEach(p => { const last = merged[merged.length - 1]; if (last && last.name === p.name && last.to + 1 === p.from) last.to = p.to; else merged.push(Object.assign({}, p)); });
+  /* very long traces: group phases so the bar stays legible */
+  const MAXPH = 22;
+  let final = merged;
+  if (merged.length > MAXPH) {
+    const per = Math.ceil(merged.length / MAXPH); final = [];
+    for (let k = 0; k < merged.length; k += per) {
+      const grp = merged.slice(k, k + per);
+      final.push({ name: grp.length === 1 ? grp[0].name : grp[0].name + " …",
+                   from: grp[0].from, to: grp[grp.length - 1].to });
+    }
+  }
+  final.forEach((p, k) => { for (let i = p.from; i <= p.to; i++) steps[i].ph = k; });
+
+  btPlayer.set(steps, final, 0);
+  const found = steps.slice().reverse().find(s => s.done && s.ans && !s.ans.startsWith("no"));
+  bt.solution = found ? found.S : null;
+  el("btToPoly").disabled = !bt.solution;
+  const n = (Math.sqrt(8 * D.length + 1) - 1) / 2;
+  el("btNote").innerHTML = "|D| = " + D.length + " &middot; max D = " + maxD +
+    (Number.isInteger(n) ? " &middot; a solution would have " + (n + 1) + " exits" : " &middot; not of the form n(n+1)/2") +
+    " &middot; " + frames.length + " recursive call" + (frames.length === 1 ? "" : "s") +
+    (bt.truncated ? ' &middot; <b>trace cut off after ' + BT_LIMIT + ' steps</b>' : "");
+}
+
+/* ---- drawing ------------------------------------------------------------ */
+
+function btDraw(st) {
+  const svg = el("btSvg"), D = bt.D, maxD = D[D.length - 1], S = st.S || [];
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const L = Math.max(1, maxD), y = 110, H = 168, x0 = 40, sc = (W - 80) / L, hmax = 92;
+  const xOf = v => x0 + v * sc;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.innerHTML = "";
+  mk("line", { x1: xOf(0), y1: y, x2: xOf(L), y2: y, class: "road" }, svg);
+  mk("line", { x1: xOf(0), y1: y, x2: xOf(L), y2: y, class: "roadmid" }, svg);
+  /* faint arcs for all existing distances */
+  for (let i = 0; i < S.length; i++) for (let j = i + 1; j < S.length; j++) {
+    const d = S[j] - S[i];
+    mk("path", { d: arcPath(xOf(S[i]), xOf(S[j]), y - 9, hmax, L, d), class: "arc faint" }, svg);
+  }
+  /* segment lengths */
+  for (let i = 0; i + 1 < S.length; i++) {
+    const t = mk("text", { x: (xOf(S[i]) + xOf(S[i + 1])) / 2, y: y + 46, class: "seglab" }, svg);
+    t.textContent = String(S[i + 1] - S[i]);
+  }
+  /* candidate */
+  const c = st.cand;
+  if (c) {
+    c.dists.forEach(x => {
+      if (x.d === 0) return;
+      const a = Math.min(c.v, x.s), b = Math.max(c.v, x.s);
+      mk("path", { d: arcPath(xOf(a), xOf(b), y - 9, hmax, L, x.d), class: "arc " + (x.ok ? "ok" : "bad") }, svg);
+      const ax = (xOf(a) + xOf(b)) / 2, ay = arcApex(y - 9, hmax, L, x.d);
+      mk("rect", { x: ax - 12, y: ay - 8, width: 24, height: 15, rx: 3, class: "arclabbg" }, svg);
+      const t = mk("text", { x: ax, y: ay, class: "arclab " + (x.ok ? "ok" : "bad") }, svg); t.textContent = String(x.d);
+    });
+  }
+  S.forEach((s, i) => {
+    const cl = "exit" + (st.done && st.ans && !st.ans.startsWith("no") ? " sel" : "");
+    mk("circle", { cx: xOf(s), cy: y, r: 8.5, class: cl }, svg);
+    const t = mk("text", { x: xOf(s), y: y + 26, class: "exlab" }, svg); t.textContent = String(s);
+  });
+  if (c) {
+    mk("circle", { cx: xOf(c.v), cy: y, r: 8.5, class: "exit " + (c.ok ? "cand" : "candbad") + " pop" }, svg);
+    if (c.inS) { const t2 = mk("text", { x: xOf(c.v), y: y - 22, class: "exlab candbad" }, svg); t2.textContent = "already an exit"; }
+    else { const t = mk("text", { x: xOf(c.v), y: y + 26, class: "exlab " + (c.ok ? "cand" : "candbad") }, svg); t.textContent = String(c.v); }
+  }
+  { const t = mk("text", { x: x0 - 14, y: y + 26, class: "exlab faint", "text-anchor": "end" }, svg); t.textContent = "S"; }
+  if (S.length >= 2) { const t = mk("text", { x: x0 - 14, y: y + 46, class: "exlab faint", "text-anchor": "end" }, svg); t.textContent = "P"; }
+  el("btMeta").textContent = S.length ? "S = " + fmtSet(S) : "";
+}
+
+function btDrawD(st) {
+  const D = bt.D, S = st.S || [], delta = deltaOf(S);
+  const used = countMap(delta);
+  const candOk = new Map(); if (st.cand) st.cand.dists.forEach(x => { if (x.ok) candOk.set(x.d, (candOk.get(x.d) || 0) + 1); });
+  let maxMarked = false;
+  const chips = D.map(v => {
+    let u = used.get(v) || 0;
+    if (u > 0) { used.set(v, u - 1); return '<span class="chip used">' + v + "</span>"; }
+    const co = candOk.get(v) || 0;
+    if (co > 0) { candOk.set(v, co - 1); return '<span class="chip cand">' + v + "</span>"; }
+    if (st.dmax === v && !maxMarked) { maxMarked = true; return '<span class="chip max">' + v + "</span>"; }
+    return '<span class="chip">' + v + "</span>";
+  });
+  el("btD").innerHTML = chips.join("");
+  el("btDMeta").textContent = "|D| = " + D.length + " · explained " + delta.length;
+}
+
+function btDrawTree(st, cur) {
+  const frames = bt.frames, D = bt.D, maxD = D[D.length - 1];
+  const parts = [];
+  frames.forEach(f => {
+    if (f.createdAt > cur) return;
+    const status = f.okAt !== undefined && f.okAt <= cur ? "ok" : f.failAt !== undefined && f.failAt <= cur ? "fail" : "open";
+    const icon = status === "ok" ? "✓" : status === "fail" ? "✗" : "○";
+    const lab = f.opt === 0 ? "turnpikeRec" : f.opt === 1 ? "opt 1: +" + f.added + " (from left)" : "opt 2: +" + f.added + " (= " + maxD + " − " + (maxD - f.added) + ")";
+    parts.push('<div class="frame ' + status + (f.id === st.fid ? " cur" : "") + '" style="padding-left:' + (6 + f.depth * 18) + 'px">' +
+               '<span class="st">' + icon + '</span><span class="lab">' + esc(lab) + '</span><span class="sset">' +
+               esc(fmtSet(f.S)) + "</span></div>");
+  });
+  el("btTree").innerHTML = parts.join("") || '<span class="placeholder">Calls of turnpikeRec appear here as they are made.</span>';
+  const shown = frames.filter(f => f.createdAt <= cur).length;
+  el("btTreeMeta").textContent = shown + " / " + frames.length + " calls";
+  const curEl = el("btTree").querySelector(".frame.cur");
+  if (curEl) curEl.scrollIntoView({ block: "nearest" });
+}
+
+function btRenderCode(st) {
+  const hl = new Set(st.hl || []);
+  el("btCode").innerHTML = BT_CODE.map(l =>
+    '<div class="cline' + (hl.has(l[0]) ? " on" : "") + '"><span class="ln">' + l[0] + "</span><span>" + l[1] + "</span></div>").join("");
+  el("btCodeNote").innerHTML =
+    "Correctness: after a few exits are placed, the largest remaining distance must be measured from an end &mdash; " +
+    "otherwise a larger, unexplained distance would exist. So the two options are the only ones, and the invariant " +
+    "Δ<i>S</i> ⊆ D is checked before every recursive call. Running time: <b>exponential in the worst case</b>; whether the " +
+    "turnpike problem is NP-hard is open." +
+    (bt.fine ? "" : " &nbsp;<i>Switch to “Every line” to see each line of the pseudocode being executed.</i>");
+}
+
+function btRender(st, pl) {
+  btDraw(st); btDrawD(st); btDrawTree(st, pl.cur); btRenderCode(st);
+  el("btStatus").innerHTML = (st.txt || "") + (st.ans ? '<span class="ans">' + esc(st.ans) + "</span>" : "");
+  el("btPhase").textContent = pl.phases[st.ph] ? pl.phases[st.ph].name : "";
+}
+
+function btSetInput(str, fromPreset) {
+  try {
+    const D = parseIntList(stripComments(str));
+    if (!D.length) throw new Error("empty input");
+    if (D.some(x => x < 1)) throw new Error("D must contain positive integers");
+    if (D.length > 120) throw new Error("at most 120 distances");
+    bt.D = D.sort(asc);
+    el("btErr").textContent = "";
+    el("btIn").value = D.join(" "); el("btText").value = D.join(" ");
+    if (!fromPreset) { el("btPreset").value = ""; showRandBar("bt", false); el("btClusterBar").style.display = "none"; }
+    btBuild();
+    return true;
+  } catch (e) { el("btErr").textContent = e.message; return false; }
+}
+
+/* Two clusters {0..k} and {N..N+k}: every cross distance N+j can be realized by a
+   point at either end, so the search tree has 2^k leaves.  The feasible instance
+   is solved by the very first leaf (2k+3 calls); lowering one copy of N+1 to N
+   makes it infeasible and forces the whole tree to be searched: 7·2^(k-1) − 3 calls. */
+function btCluster() {
+  const k = Math.max(2, Math.min(7, Number(el("btClK").value) || 4)), N = Math.max(20, Math.min(500, Number(el("btClN").value) || 100));
+  el("btClK").value = k; el("btClN").value = N;
+  const S = []; for (let c = 0; c < 2; c++) for (let i = 0; i <= k; i++) S.push(c * N + i);
+  const D = deltaOf(S);
+  if (el("btClTwin").checked) { D[D.indexOf(N + 1)] = N; D.sort(asc); }
+  btSetInput(D.join(" "), true);
+}
+
+function btRandom() {
+  const n = Math.max(2, Math.min(12, Number(el("btRandN").value) || 5)), mx = Math.max(2, Math.min(30, Number(el("btRandMax").value) || 9));
+  el("btRandN").value = n; el("btRandMax").value = mx;
+  let D = deltaOf(prefSums(randomP(n, mx)));
+  if (el("btRandTamper").checked && Math.random() < 0.5) D = tamper(D);
+  btSetInput(D.join(" "), true);
+}
+
+function btInit() {
+  btPlayer = makePlayer("btTransport", btRender);
+  const sel = el("btPreset");
+  sel.innerHTML = BT_PRESETS.map(p => '<option value="' + p.key + '">' + esc(p.name) + "</option>").join("") +
+                  '<option value="">(custom)</option>';
+  sel.addEventListener("change", () => {
+    const p = BT_PRESETS.find(q => q.key === sel.value); if (!p) return;
+    showRandBar("bt", p.D === "random");
+    el("btClusterBar").style.display = p.D === "cluster" ? "" : "none";
+    if (p.D === "random") btRandom(); else if (p.D === "cluster") btCluster(); else btSetInput(p.D.join(" "), true);
+  });
+  el("btRandGo").addEventListener("click", btRandom);
+  el("btClGo").addEventListener("click", btCluster);
+  el("btClTwin").addEventListener("change", btCluster);
+  el("btSet").addEventListener("click", () => btSetInput(el("btIn").value, false));
+  el("btIn").addEventListener("keydown", ev => { if (ev.key === "Enter") btSetInput(el("btIn").value, false); });
+  el("btLoad").addEventListener("click", () => btSetInput(el("btText").value, false));
+  el("btToRoad").addEventListener("click", () => { roadSetTarget(bt.D.slice(), true); el("roadPreset").value = ""; showTab("road"); });
+  el("btToPoly").addEventListener("click", () => { if (bt.solution) { polySetInput("S " + bt.solution.join(" "), false); showTab("poly"); } });
+  const setFine = f => {
+    bt.fine = f; el("btCoarse").classList.toggle("on", !f); el("btFine").classList.toggle("on", f);
+    const st = btPlayer.steps[btPlayer.cur] || {};
+    btBuild();
+    /* land on a step of the same frame if possible */
+    const k = btPlayer.steps.findIndex(s => s.fid === st.fid && arrEq(s.hl || [], st.hl || []));
+    btPlayer.goto(k >= 0 ? k : 0);
+  };
+  el("btCoarse").addEventListener("click", () => setFine(false));
+  el("btFine").addEventListener("click", () => setFine(true));
+  sel.value = "slide"; btSetInput(BT_PRESETS[0].D.join(" "), true);
+}
+
+/* ==========================================================================
+   TAB 4 -- the algebraic view: S(z) · S(z⁻¹) = Σ_{d∈D} z^d + Σ_{d∈D} z^{-d} + |S|
+   ========================================================================== */
+
+const POLY_PRESETS = [
+  { key: "lect", name: "S = [0, 3, 8, 9, 11] (lecture)", in: "S 0 3 8 9 11" },
+  { key: "p2",   name: "P = [1, 1, 1, 1, 1]",           in: "1 1 1 1 1" },
+  { key: "slide",name: "systematic example",            in: "S 0 1 3 8 14 18" },
+  { key: "nqel", name: "NQEL",                          in: "NQEL" },
+  { key: "gpg",  name: "GPG",                           in: "GPG" },
+  { key: "random", name: "random S…",                   in: null }
+];
+const poly = { S: [0, 3, 8, 9, 11], letters: null };
+let polyPlayer;
+
+const zpow = e => e === 0 ? "1" : e === 1 ? "z" : e === -1 ? "z<sup>−1</sup>" : "z<sup>" + (e < 0 ? "−" + (-e) : e) + "</sup>";
+const zneg = e => e === 0 ? "1" : "z<sup>−" + e + "</sup>";
+
+function polyBuild() {
+  const S = poly.S, n1 = S.length, maxD = S[n1 - 1];
+  const D = deltaOf(S);
+  const sl = new StepList();
+  const desc = S.slice().reverse();   /* the lecture writes the polynomial with the highest power first */
+  const coef = new Map();
+
+  sl.phase("S(z)");
+  sl.add({ coef: new Map(), shown: 0,
+    txt: "Encode the exits as exponents: <b>S(z) = Σ<sub>s∈S</sub> z<sup>s</sup></b>. A polynomial with " + n1 +
+         " terms, all coefficients 1. The distances we are after are <i>differences</i> of exponents &mdash; and " +
+         "multiplying powers of z <i>adds</i> exponents. So we need a factor with negated exponents: S(z<sup>−1</sup>)." });
+  for (let k = 1; k <= n1; k++)
+    sl.add({ coef: new Map(), shown: k, hlS: desc[k - 1],
+      txt: "Exit " + desc[k - 1] + " becomes the term " + zpow(desc[k - 1]) + " in S(z), and " + zneg(desc[k - 1]) +
+           " in S(z<sup>−1</sup>)." });
+
+  /* multiply out: for each term z^{-t} of S(z^{-1}), times each term z^s of S(z) */
+  desc.forEach(t => {
+    sl.phase("× z^−" + t);
+    desc.forEach(s => {
+      const e = s - t;
+      coef.set(e, (coef.get(e) || 0) + 1);
+      const snap = new Map(coef);
+      sl.add({ coef: snap, shown: n1, pair: [s, t], e: e,
+        txt: "Term " + zneg(t) + " of the first factor times " + zpow(s) + " of the second: " +
+             "<b>" + zpow(s - t) + "</b>. " +
+             (e > 0 ? "Exponent " + e + " = " + s + " − " + t + " is the distance between exits " + t + " and " + s + " &mdash; an element of D." +
+                      (snap.get(e) > 1 ? " It is the " + ["", "", "second", "third", "fourth", "fifth"][snap.get(e)] +
+                       " time: coefficient " + snap.get(e) + ", matching the multiplicity of " + e + " in D." : "")
+              : e < 0 ? "Exponent −" + (-e) + " is the same pair seen from the other side: every distance appears once with each sign."
+                      : "s = t: the product is z<sup>0</sup> = 1. The constant term counts the exits, " + snap.get(0) + " so far.") });
+    });
+  });
+
+  sl.phase("Collect");
+  const full = new Map(coef);
+  sl.add({ coef: full, shown: n1, collect: true,
+    txt: "Collecting terms: <b>S(z)·S(z<sup>−1</sup>) = Σ<sub>d∈D</sub> z<sup>d</sup> + Σ<sub>d∈D</sub> z<sup>−d</sup> + |S|</b>. " +
+         "The coefficient of z<sup>d</sup> is exactly the multiplicity of d in D = ΔS. In other words, the <i>expanded</i> " +
+         "product can be written down from D alone &mdash; without knowing S." });
+  sl.phase("Only D");
+  sl.add({ coef: full, shown: n1, onlyD: true, done: true,
+    txt: "Turn it around. Given only D, form the Laurent polynomial <b>Q(z) = Σ<sub>d∈D</sub> (z<sup>d</sup> + z<sup>−d</sup>) + n+1</b>, " +
+         "where n+1 = |S| follows from |D| = n(n+1)/2. Solving the turnpike problem now means <b>factoring</b>: find a " +
+         "polynomial S(z) with 0/1 coefficients such that Q(z) = S(z)·S(z<sup>−1</sup>). Factoring integer polynomials is " +
+         "polynomial in the degree and the coefficient size (Lenstra–Lenstra–Lovász), and there are only finitely many factors to combine. " +
+         "The degree, however, is 2·max D = " + (2 * maxD) + " &mdash; polynomial in the <i>value</i> of the tolls but " +
+         "exponential in their bit length (" + Math.ceil(Math.log2(maxD + 1)) + " bits here): a <b>pseudopolynomial</b> algorithm.",
+    ans: "degree 2·max D = " + (2 * maxD) + ",  |D| = " + D.length });
+  polyPlayer.set(sl.steps, sl.phases, 0);
+  el("polyNote").innerHTML = "<b>|S| = " + n1 + "</b> exits &middot; max D = " + maxD + " &middot; " + (n1 * n1) +
+                             " products to expand &middot; result has " + (2 * D.length + 1) + " coefficients";
+}
+
+function polyDrawRoad(st) {
+  const svg = el("polySvg"), S = poly.S, L = Math.max(1, S[S.length - 1]);
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const y = 96, H = 140, x0 = 40, sc = (W - 80) / L, hmax = 70;
+  const xOf = v => x0 + v * sc;
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.innerHTML = "";
+  mk("line", { x1: xOf(0), y1: y, x2: xOf(L), y2: y, class: "road" }, svg);
+  mk("line", { x1: xOf(0), y1: y, x2: xOf(L), y2: y, class: "roadmid" }, svg);
+  if (st.pair) {
+    const [s, t] = st.pair;
+    if (s !== t) {
+      const a = Math.min(s, t), b = Math.max(s, t), d = b - a;
+      mk("path", { d: arcPath(xOf(a), xOf(b), y - 9, hmax, L, d), class: "arc " + (s > t ? "neu" : "faint") }, svg);
+      const ax = (xOf(a) + xOf(b)) / 2, ay = arcApex(y - 9, hmax, L, d);
+      mk("rect", { x: ax - 22, y: ay - 8, width: 44, height: 15, rx: 3, class: "arclabbg" }, svg);
+      const lab = mk("text", { x: ax, y: ay, class: "arclab " + (s > t ? "neu" : "faint") }, svg);
+      lab.textContent = (s > t ? "+" : "−") + d;
+      /* arrow head direction: from t to s */
+      const dir = s > t ? 1 : -1;
+      mk("path", { d: "M" + (xOf(s) - dir * 10) + "," + (y - 16) + " L" + xOf(s) + "," + (y - 11) + " L" + (xOf(s) - dir * 10) + "," + (y - 6),
+                   class: "arc " + (s > t ? "neu" : "faint") }, svg);
+    } else {
+      mk("circle", { cx: xOf(s), cy: y, r: 15, class: "arc", style: "stroke:var(--wi-examine)" }, svg);
+    }
+  }
+  const shownSet = new Set(poly.S.slice().reverse().slice(0, st.shown === undefined ? S.length : st.shown));
+  S.forEach(s => {
+    const on = shownSet.has(s), isPair = st.pair && (st.pair[0] === s || st.pair[1] === s);
+    const c = mk("circle", { cx: xOf(s), cy: y, r: 8.5, class: "exit" + (isPair ? " sel" : "") + (st.hlS === s ? " hot" : "") }, svg);
+    if (!on) c.style.opacity = ".3";
+    const t = mk("text", { x: xOf(s), y: y + 26, class: "exlab" }, svg); t.textContent = String(s);
+    if (!on) t.style.opacity = ".3";
+  });
+  if (st.pair && st.pair[0] !== st.pair[1]) {
+    const [s, t] = st.pair;
+    const ls = mk("text", { x: xOf(s), y: y - 26 - (s > t ? 0 : 0), class: "exlab faint" }, svg); ls.textContent = "s";
+    const lt = mk("text", { x: xOf(t), y: y - 26, class: "exlab faint" }, svg); lt.textContent = "t";
+  }
+  el("polyMeta").textContent = "S = " + fmtSet(S);
+}
+
+function polyDrawCoef(st) {
+  const svg = el("polyCoef"), S = poly.S, maxD = S[S.length - 1];
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const coef = st.coef || new Map();
+  let maxC = 1; coef.forEach(c => { maxC = Math.max(maxC, c); });
+  const yAxis = 30 + maxC * 14, H = yAxis + 36, x0 = 36, sc = (W - 72) / (2 * maxD);
+  const xOf = e => x0 + (e + maxD) * sc;
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.innerHTML = "";
+  mk("line", { x1: x0 - 4, y1: yAxis, x2: W - x0 + 4, y2: yAxis, class: "axis" }, svg);
+  const stepC = maxD <= 12 ? 1 : maxD <= 40 ? 5 : maxD <= 150 ? 20 : maxD <= 700 ? 100 : 200;
+  for (let e = -Math.floor(maxD / stepC) * stepC; e <= maxD; e += stepC) {
+    mk("line", { x1: xOf(e), y1: yAxis, x2: xOf(e), y2: yAxis + 5, class: "axtick" }, svg);
+    const t = mk("text", { x: xOf(e), y: yAxis + 17, class: "axlab" }, svg); t.textContent = String(e);
+  }
+  const ttl = mk("text", { x: 8, y: 14, class: "ttl" }, svg);
+  ttl.textContent = st.onlyD ? "Q(z) written down from D alone — the same picture" : "exponent  →   bar height = coefficient";
+  const bw = Math.max(3, Math.min(12, sc * 0.8));
+  coef.forEach((c, e) => {
+    const cur = st.e === e;
+    mk("rect", { x: xOf(e) - bw / 2, y: yAxis - 2 - c * 14, width: bw, height: c * 14 - 1, rx: 1.5,
+                 class: "coefbar" + (cur ? " cur" : e < 0 ? " neg" : e === 0 ? " zero" : "") }, svg);
+    if (c > 1 || cur || maxD <= 20) {
+      const t = mk("text", { x: xOf(e), y: yAxis - 6 - c * 14, class: "coeflab" + (cur ? " cur" : "") }, svg);
+      t.textContent = String(c);
+    }
+  });
+  el("polyCoefMeta").textContent = coef.size ? coef.size + " nonzero coefficients" : "";
+}
+
+function polyFormula(st) {
+  const S = poly.S, n1 = S.length, desc = S.slice().reverse();
+  const shown = st.shown === undefined ? n1 : st.shown;
+  const termS = (s, k) => '<span class="term' + (k < shown ? (st.hlS === s ? " cur" : (st.pair && st.pair[0] === s ? " cur" : "")) : " dim") + '">' + zpow(s) + "</span>";
+  const termT = (t, k) => '<span class="term' + (k < shown ? (st.hlS === t ? " cur" : (st.pair && st.pair[1] === t ? " cur" : "")) : " dim") + '">' + zneg(t) + "</span>";
+  let h = '<div class="row"><span class="lhs">S(z) = </span>' + desc.map((s, k) => termS(s, k)).join(" + ") + "</div>";
+  h += '<div class="row"><span class="lhs">S(z)·S(z<sup>−1</sup>) = </span>(' + desc.map((t, k) => termT(t, k)).join(" + ") + ")·(" +
+       desc.map((s, k) => termS(s, k)).join(" + ") + ")</div>";
+  const coef = st.coef || new Map();
+  if (coef.size) {
+    const es = Array.from(coef.keys()).sort((a, b) => b - a);
+    const terms = es.map(e => {
+      const c = coef.get(e), cls = st.e === e ? " cur" : e > 0 ? " pos" : e < 0 ? " neg" : " zero";
+      return '<span class="term' + cls + '">' + (c > 1 ? c + "·" : "") + zpow(e) + "</span>";
+    });
+    h += '<div class="row"><span class="lhs">= </span>' + terms.join(" + ") + (st.pair && !st.collect ? " + …" : "") + "</div>";
+  }
+  if (st.collect || st.onlyD) {
+    const D = deltaOf(S);
+    h += '<div class="row"><span class="lhs">= </span><span class="term pos">Σ<sub>d∈D</sub> z<sup>d</sup></span> + ' +
+         '<span class="term neg">Σ<sub>d∈D</sub> z<sup>−d</sup></span> + <span class="term zero">' + n1 + "</span>" +
+         '<div class="note">D = ' + MS(D) + ", |S| = " + n1 + "</div></div>";
+  }
+  el("polyFormula").innerHTML = h;
+}
+
+function polyRender(st, pl) {
+  polyDrawRoad(st); polyDrawCoef(st); polyFormula(st);
+  el("polyStatus").innerHTML = (st.txt || "") + (st.ans ? '<span class="ans">' + esc(st.ans) + "</span>" : "");
+  el("polyPhase").textContent = pl.phases[st.ph] ? pl.phases[st.ph].name : "";
+}
+
+function polySetInput(str, fromPreset) {
+  try {
+    const txt = stripComments(str).trim();
+    if (!txt) throw new Error("empty input");
+    let S, letters = null;
+    const m = txt.match(/^([SP])\b\s*[:=]?\s*(.*)$/i);
+    if (m && m[1].toUpperCase() === "S") {
+      S = parseIntList(m[2]).sort(asc);
+      if (!S.length || S[0] !== 0) throw new Error("S must contain 0");
+      if (new Set(S).size !== S.length) throw new Error("S has a repeated exit");
+    } else {
+      const r = parsePeptide(m ? m[2] : txt); S = prefSums(r.P); letters = r.letters;
+    }
+    if (S.length > 16) throw new Error("at most 16 exits");
+    poly.S = S; poly.letters = letters;
+    el("polyErr").textContent = "";
+    el("polyIn").value = letters ? letters : "S " + S.join(" ");
+    el("polyText").value = el("polyIn").value;
+    if (!fromPreset) { el("polyPreset").value = ""; showRandBar("poly", false); }
+    polyBuild(); return true;
+  } catch (e) { el("polyErr").textContent = e.message; return false; }
+}
+
+function polyInit() {
+  polyPlayer = makePlayer("polyTransport", polyRender);
+  const sel = el("polyPreset");
+  sel.innerHTML = POLY_PRESETS.map(p => '<option value="' + p.key + '">' + esc(p.name) + "</option>").join("") + '<option value="">(custom)</option>';
+  const polyRandom = () => {
+    const n = Math.max(2, Math.min(12, Number(el("polyRandN").value) || 5)), mx = Math.max(2, Math.min(30, Number(el("polyRandMax").value) || 9));
+    el("polyRandN").value = n; el("polyRandMax").value = mx;
+    polySetInput("S " + prefSums(randomP(n - 1, mx)).join(" "), true);
+  };
+  el("polyRandGo").addEventListener("click", polyRandom);
+  sel.addEventListener("change", () => {
+    const p = POLY_PRESETS.find(q => q.key === sel.value); if (!p) return;
+    showRandBar("poly", !p.in);
+    if (p.in) polySetInput(p.in, true); else polyRandom();
+  });
+  el("polySet").addEventListener("click", () => polySetInput(el("polyIn").value, false));
+  el("polyIn").addEventListener("keydown", ev => { if (ev.key === "Enter") polySetInput(el("polyIn").value, false); });
+  el("polyLoad").addEventListener("click", () => polySetInput(el("polyText").value, false));
+  sel.value = "lect"; polySetInput("S 0 3 8 9 11", true);
+}
+
+/* ==========================================================================
+   TAB 5 -- leaderboard sequencing on a noisy linear spectrum
+   ========================================================================== */
+
+const LB_CODE = [
+  [1,  K("procedure") + " LeaderboardSequencing(Spectrum, N)"],
+  [2,  "    Leaderboard := {ε}                    " + C("// only the empty peptide")],
+  [3,  "    LeaderPeptide := ε"],
+  [4,  "    " + K("while") + " Leaderboard ≠ ∅"],
+  [5,  "        Leaderboard := Expand(Leaderboard)   " + C("// append every amino acid to every peptide")],
+  [6,  "        " + K("for each") + " Peptide " + K("in") + " Leaderboard"],
+  [7,  "            " + K("if") + " Mass(Peptide) == ParentMass(Spectrum)"],
+  [8,  "                " + K("if") + " Score(Peptide, Spectrum) > Score(LeaderPeptide, Spectrum)"],
+  [9,  "                    LeaderPeptide := Peptide"],
+  [10, "            " + K("else if") + " Mass(Peptide) > ParentMass(Spectrum)"],
+  [11, "                remove Peptide from Leaderboard"],
+  [12, "        Leaderboard := Trim(Leaderboard, Spectrum, N)"],
+  [13, "    " + K("return") + " LeaderPeptide"],
+  [14, ""],
+  [15, K("procedure") + " Trim(Leaderboard, Spectrum, N)"],
+  [16, "    sort Leaderboard by Score(·, Spectrum), highest first"],
+  [17, "    keep the first N peptides, and any further ones tying with the N-th"],
+  [18, ""],
+  [19, "Score(Peptide, Spectrum) := |LinearSpectrum(Peptide) ∩ Spectrum|    " + C("// multiset intersection")],
+  [20, "ParentMass(Spectrum)     := max Spectrum"]
+];
+
+/* Spectrum of NQEL with one missing (129) and two false masses (99, 299): Compeau & Pevzner Fig. 4.10 */
+const LB_PRESETS = [
+  { key: "nqel",  name: "NQEL, textbook spectrum (Fig. 4.10)", spec: [0, 99, 113, 114, 128, 227, 257, 299, 355, 356, 370, 371, 484], truePep: "NQEL", N: 10 },
+  { key: "nqel0", name: "NQEL, ideal spectrum",                gen: { pep: "NQEL", miss: 0, false: 0, seed: 1 }, N: 10 },
+  { key: "redca", name: "REDCA, 10% noise",                    gen: { pep: "REDCA", miss: 10, false: 10, seed: 3 }, N: 10 },
+  { key: "tyro10",name: "Tyrocidine B1 (linear), 10% noise",  gen: { pep: "VKLFPWFNQY", miss: 10, false: 10, seed: 7 }, N: 20 },
+  { key: "tyro25",name: "Tyrocidine B1 (linear), 25% noise",  gen: { pep: "VKLFPWFNQY", miss: 25, false: 25, seed: 7 }, N: 20 },
+  { key: "small", name: "Tyrocidine B1, 10% noise, tiny N = 2", gen: { pep: "VKLFPWFNQY", miss: 10, false: 10, seed: 7 }, N: 2 }
+];
+
+const lb = { spec: [], truePep: null, N: 10, alph: "18", M: 20, fine: false, rounds: [], sel: null, showAll: false };
+let lbPlayer;
+
+/* tokens: { m: mass, l: letter or null } */
+const TOK18 = AA.filter(a => a[0] !== "I" && a[0] !== "K").map(a => ({ m: a[2], l: a[0] }));
+const TOK20 = AA.map(a => ({ m: a[2], l: a[0] }));
+const LETTER_OF_MASS = {}; TOK18.forEach(t => LETTER_OF_MASS[t.m] = t.l);
+function pepStr(pep) {
+  if (!pep.length) return "ε";
+  if (pep.every(t => t.l)) return pep.map(t => t.l).join("");
+  return pep.map(t => t.l || "[" + t.m + "]").join("-");
+}
+const pepMass = pep => pep.reduce((a, t) => a + t.m, 0);
+function linearSpectrum(pep) {
+  const S = prefSums(pep.map(t => t.m));
+  return [0].concat(deltaOf(S)).sort(asc);
+}
+function linearScore(pep, spec) {
+  const th = linearSpectrum(pep), cs = countMap(spec); let sc = 0;
+  th.forEach(m => { const c = cs.get(m) || 0; if (c > 0) { cs.set(m, c - 1); sc++; } });
+  return sc;
+}
+function lettersToPep(str) {
+  return Array.from(str.toUpperCase()).map(c => ({ m: MASS[c], l: lb.alph === "20" ? c : (LETTER_OF_MASS[MASS[c]] || c) }));
+}
+/* spectral convolution: most frequent positive differences in [57, 200], top M with ties */
+function convolutionAlphabet(spec, M) {
+  const cnt = new Map();
+  for (let i = 0; i < spec.length; i++) for (let j = 0; j < spec.length; j++) {
+    const d = spec[i] - spec[j];
+    if (d >= 57 && d <= 200) cnt.set(d, (cnt.get(d) || 0) + 1);
+  }
+  const arr = Array.from(cnt.entries()).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  if (!arr.length) return { toks: [], cnt: cnt };
+  const cut = arr[Math.min(M, arr.length) - 1][1];
+  const toks = arr.filter(x => x[1] >= cut).map(x => ({ m: x[0], l: LETTER_OF_MASS[x[0]] || null, freq: x[1] })).sort((a, b) => a.m - b.m);
+  return { toks: toks, cnt: cnt, cut: cut };
+}
+function lbAlphabet() {
+  if (lb.alph === "20") return TOK20.slice();
+  if (lb.alph === "18") return TOK18.slice();
+  return convolutionAlphabet(lb.spec, lb.M).toks;
+}
+
+/* seeded RNG (mulberry32) */
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function lbGenerate(pepStr_, missPct, falsePct, seed) {
+  const r = parsePeptide(pepStr_); if (!r.letters) throw new Error("need a peptide in one-letter code");
+  const pep = r.letters.split("").map(c => ({ m: MASS[c], l: c }));
+  const th = linearSpectrum(pep), parent = pepMass(pep), rand = rng(seed * 7919 + 17);
+  const inner = th.filter(m => m !== 0 && m !== parent);
+  const kept = inner.filter(() => rand() >= missPct / 100);
+  const nFalse = Math.round(inner.length * falsePct / 100);
+  const falses = [];
+  for (let k = 0; k < nFalse; k++) falses.push(1 + Math.floor(rand() * (parent - 1)));
+  return { spec: [0, parent].concat(kept, falses).sort(asc), truePep: r.letters };
+}
+
+function lbBuild() {
+  const spec = lb.spec, parent = spec[spec.length - 1], N = lb.N, A = lbAlphabet();
+  const truePep = lb.truePep ? lettersToPep(lb.truePep) : null;
+  const trueMasses = truePep ? truePep.map(t => t.m) : null;
+  /* a linear spectrum is mirror-symmetric, so the reversed peptide explains it equally well: track both */
+  const trueRev = trueMasses ? trueMasses.slice().reverse() : null;
+  const isTruePrefix = pep => trueMasses && pep.length <= trueMasses.length &&
+    (pep.every((t, i) => t.m === trueMasses[i]) || pep.every((t, i) => t.m === trueRev[i]));
+  const isTrue = pep => trueMasses && (arrEq(pep.map(t => t.m), trueMasses) || arrEq(pep.map(t => t.m), trueRev));
+  const sl = new StepList();
+  const rounds = lb.rounds = [];
+  const scoreOf = pep => linearScore(pep, spec);
+
+  let board = [{ pep: [], mass: 0, score: scoreOf([]) }];
+  let leader = { pep: [], score: scoreOf([]) };
+  sl.phase("start");
+  sl.add({ hl: [2, 3], board: board.map(e => Object.assign({ state: "keep" }, e)), leader: leader, round: 0, cut: null,
+    txt: "Parent mass = max Spectrum = <b>" + parent + "</b>; |Spectrum| = " + spec.length + ". Start with the empty peptide " +
+         "on the Leaderboard. Its theoretical spectrum is {0}, so its score is " + leader.score + ". Alphabet: " + A.length +
+         " candidates per extension." + (A.length === 0 ? " <b>The alphabet is empty &mdash; nothing to expand.</b>" : "") });
+  let k = 0, guard = 0;
+  while (board.length && guard++ < 60 && A.length) {
+    k++;
+    /* Expand */
+    const expanded = [];
+    board.forEach(e => A.forEach(t => {
+      const pep = e.pep.concat([t]); const mass = e.mass + t.m;
+      expanded.push({ pep: pep, mass: mass, score: scoreOf(pep), state: "cand", isTrue: isTruePrefix(pep), parentM: mass === parent, heavy: mass > parent });
+    }));
+    expanded.sort((a, b) => b.score - a.score || a.mass - b.mass || pepStr(a.pep).localeCompare(pepStr(b.pep)));
+    const leaderBefore = leader;
+    const nParent = expanded.filter(e => e.parentM).length, nHeavy = expanded.filter(e => e.heavy).length;
+    const boardExp = expanded.map(e => Object.assign({}, e, { state: "cand" }));
+    if (lb.fine)
+      sl.add({ hl: [5], board: boardExp, leader: leader, round: k, cut: null, phaseName: "round " + k,
+        txt: "<b>Round " + k + " &mdash; Expand.</b> Each of the " + board.length + " peptides on the leaderboard is extended by each of the " +
+             A.length + " amino acids: " + expanded.length + " candidates of length " + k + ", shown sorted by score." });
+    /* mass check */
+    let changed = null;
+    expanded.forEach(e => {
+      if (e.parentM) { if (e.score > leader.score) { leader = { pep: e.pep, score: e.score }; changed = e; } }
+    });
+    const boardChk = expanded.map(e => Object.assign({}, e, { state: e.heavy ? "heavy" : e.parentM ? "parent" : "cand" }));
+    const afterCheck = expanded.filter(e => !e.heavy);
+    if (lb.fine)
+      sl.add({ hl: changed ? [7, 8, 9, 10, 11] : [7, 10, 11], board: boardChk, leader: leader, round: k, cut: null, phaseName: "round " + k,
+        txt: "<b>Mass check.</b> " + (nParent ? nParent + " candidate" + (nParent === 1 ? " has" : "s have") + " exactly the parent mass " + parent +
+             " and compete" + (nParent === 1 ? "s" : "") + " for LeaderPeptide" + (changed ? ": <b>" + esc(pepStr(changed.pep)) + "</b> scores " + changed.score +
+             " &gt; " + leaderBefore.score + " and becomes the new LeaderPeptide." : "; none beats the current score " + leaderBefore.score + ".")
+             : "No candidate has the parent mass yet.") + (nHeavy ? " " + nHeavy + " candidate" + (nHeavy === 1 ? " is" : "s are") + " heavier than the parent mass and " +
+             (nHeavy === 1 ? "is" : "are") + " removed." : "") });
+    /* trim */
+    let cut = null, kept = afterCheck;
+    if (afterCheck.length > N) { cut = afterCheck[N - 1].score; kept = afterCheck.filter(e => e.score >= cut); }
+    const boardTrim = expanded.map(e => Object.assign({}, e, { state: e.heavy ? "heavy" : (cut !== null && e.score < cut) ? "trim" : "keep" }));
+    const truthKept = boardTrim.find(e => e.isTrue), truthTrimmed = boardTrim.find(e => e.isTrue && (e.state === "trim"));
+    const truthRank = truthKept ? afterCheck.indexOf(afterCheck.find(e => e.isTrue)) + 1 : 0;
+    const ties = cut !== null ? kept.length - N : 0;
+      const trueOnBoard = boardTrim.find(e => e.isTrue && e.state !== "trim" && e.state !== "heavy");
+    const truePrefixPep = trueMasses && k <= trueMasses.length ? truePep.slice(0, k) : null;
+    rounds.push({ k: k, top: afterCheck.length ? afterCheck[0].score : null, cut: cut !== null ? cut : (afterCheck.length ? afterCheck[afterCheck.length - 1].score : null),
+                  trueScore: truePrefixPep ? scoreOf(truePrefixPep) : null, trueAlive: truePrefixPep ? !!trueOnBoard : null,
+                  trueRank: truthRank || null, leader: leader.pep.length ? leader.score : null });
+    const trimTxt = "<b>Trim" + (lb.fine ? "" : " (round " + k + ")") + ".</b> " + (cut === null
+      ? afterCheck.length + " peptide" + (afterCheck.length === 1 ? "" : "s") + " remain &mdash; at most N = " + N + ", nothing to trim."
+      : "Keep the N = " + N + " best" + (ties > 0 ? " plus " + ties + " more tying with the N-th (score " + cut + ")" : " (the N-th has score " + cut + ")") +
+        "; " + (expanded.length - nHeavy - kept.length) + " lower-scoring peptides are dropped for good.") +
+      (truePep && k <= trueMasses.length ? (truthTrimmed ? ' <span class="k-bad">The true prefix ' + esc(pepStr(truthTrimmed.pep)) + " (score " + truthTrimmed.score +
+        ") is trimmed away here &mdash; the heuristic can no longer find the true peptide.</span>" : truthKept && truthKept.state === "keep" ? ' <span class="k-ok">The true prefix ' + esc(pepStr(truthKept.pep)) +
+        " survives at rank " + truthRank + ".</span>" : "") : "");
+    const coarseTxt = "<b>Round " + k + ".</b> Expand " + board.length + " → " + expanded.length + " candidates. " +
+      (changed ? "<b>" + esc(pepStr(changed.pep)) + "</b> reaches the parent mass with score " + changed.score + " and becomes LeaderPeptide. " :
+       nParent ? nParent + " reach the parent mass but do not beat the leader (" + leaderBefore.score + "). " : "") +
+      (nHeavy ? nHeavy + " too heavy, removed. " : "") + trimTxt;
+    sl.add({ hl: lb.fine ? [12, 15, 16, 17] : [5, 6, 7, 8, 9, 10, 11, 12], board: boardTrim, leader: leader, round: k, cut: cut, changed: changed, phaseName: "round " + k, trimmed: true,
+      txt: lb.fine ? trimTxt : coarseTxt });
+    board = kept.map(e => ({ pep: e.pep, mass: e.mass, score: e.score }));
+  }
+  sl.phase("result");
+  sl.add({ hl: [13], board: [], leader: leader, round: k + 1, cut: null, done: true,
+    txt: "The leaderboard is empty: every peptide has become heavier than the parent mass. <b>Output LeaderPeptide = " +
+         esc(pepStr(leader.pep)) + "</b> with score " + leader.score + " out of |Spectrum| = " + spec.length + "." +
+         (truePep ? (isTrue(leader.pep) ? ' <span class="k-ok">This is the true peptide</span> &mdash; up to what no spectrum can tell apart: I/L, K/Q, and the ' +
+                      'order of reading (a peptide and its reverse have the same linear spectrum, since ΔS is mirror-symmetric).' 
+                    : " The true peptide " + esc(pepStr(truePep)) + " scores " + scoreOf(truePep) +
+                      (scoreOf(truePep) > leader.score ? ' <span class="k-bad">&mdash; higher! It was trimmed away on the way, so the heuristic missed it.</span>'
+                       : scoreOf(truePep) === leader.score ? " &mdash; a tie: the spectrum cannot distinguish them." : " &mdash; the data favours the wrong answer: with this much noise, no algorithm could know better.")) : ""),
+    ans: "LeaderPeptide = " + pepStr(leader.pep) + "   (score " + leader.score + ")" });
+  /* phase names from steps */
+  const phases = []; sl.steps.forEach((s, i) => { const nm = s.phaseName || (i === 0 ? "start" : "result"); const last = phases[phases.length - 1]; if (last && last.name === nm) last.to = i; else phases.push({ name: nm, from: i, to: i }); });
+  phases.forEach((p, i) => { for (let j = p.from; j <= p.to; j++) sl.steps[j].ph = i; });
+  lbPlayer.set(sl.steps, phases, 0);
+  lb.sel = null;
+  el("lbNote").innerHTML = "parent mass <b>" + parent + "</b> &middot; |Spectrum| = " + spec.length + " &middot; alphabet " + A.length +
+    " &middot; N = " + N + (lb.truePep ? " &middot; true peptide " + esc(lb.truePep) + " (score " + scoreOf(lettersToPep(lb.truePep)) + ")" : "");
+  lbRenderAlph(A);
+}
+
+function lbRenderAlph(A) {
+  el("lbAlph").innerHTML = A.map(t => '<span class="chip" title="' + t.m + (t.freq ? ", frequency " + t.freq : "") + '">' +
+    (t.l ? t.l + '<span class="fr">' + t.m + "</span>" : t.m) + "</span>").join("") || '<span class="placeholder">empty</span>';
+  el("lbAlphMeta").textContent = A.length + " symbols";
+  el("lbAlphNote").innerHTML = lb.alph === "20"
+    ? "All 20 amino acids. I and L (113) and K and Q (128) have identical spectra, so they always tie: with N small this wastes leaderboard slots on copies."
+    : lb.alph === "18" ? "The 18 distinct integer masses; L stands for I/L and Q for K/Q. This is what the textbook does."
+    : "Spectral convolution: the M = " + lb.M + " most frequent differences between two spectrum masses that lie in the amino-acid range 57…200 (ties included). " +
+      "Masses of the true amino acids tend to appear often (as differences of neighbouring prefixes); letters are shown where a mass is a standard one.";
+}
+
+function lbDrawSpec(st) {
+  const svg = el("lbSpec"), spec = lb.spec, parent = spec[spec.length - 1];
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const yAxis = 62, H = 118, x0 = 36, sc = (W - 72) / Math.max(1, parent);
+  const xOf = m => x0 + m * sc;
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.innerHTML = "";
+  let pep = null, name = "…";
+  if (lb.sel) { pep = lb.sel.pep; name = pepStr(pep); }
+  else if (st.leader && (st.leader.pep.length || !lb.truePep)) { pep = st.leader.pep; name = "LeaderPeptide " + pepStr(pep); }
+  else if (lb.truePep) { pep = lettersToPep(lb.truePep); name = "the true peptide " + pepStr(pep) + " (no LeaderPeptide yet)"; }
+  el("lbSelName").textContent = name;
+  const th = pep ? linearSpectrum(pep) : [];
+  const cs = countMap(spec), shared = [], thOnly = [];
+  th.forEach(m => { const c = cs.get(m) || 0; if (c > 0) { cs.set(m, c - 1); shared.push(m); } else thOnly.push(m); });
+  const expOnly = []; cs.forEach((c, m) => { for (let i = 0; i < c; i++) expOnly.push(m); });
+  mk("line", { x1: x0 - 4, y1: yAxis, x2: W - x0 + 4, y2: yAxis, class: "axis" }, svg);
+  const stepC = parent <= 60 ? 5 : parent <= 200 ? 20 : parent <= 700 ? 50 : 100;
+  for (let m = 0; m <= parent; m += stepC) { mk("line", { x1: xOf(m), y1: yAxis, x2: xOf(m), y2: yAxis + 4, class: "axtick" }, svg); const t = mk("text", { x: xOf(m), y: yAxis + 16, class: "axlab" }, svg); t.textContent = String(m); }
+  const stack = (arr, up, cls) => { const c = new Map(); arr.forEach(m => { const k = c.get(m) || 0; c.set(m, k + 1);
+    mk("rect", { x: xOf(m) - 3, y: up ? yAxis - 4 - (k + 1) * 13 : yAxis + 22 + k * 13, width: 6, height: 12, rx: 1, class: cls }, svg).dataset.m = m; }); };
+  stack(shared, true, "spec-ok"); stack(thOnly, true, "spec-t");
+  stack(expOnly, false, "spec-e"); stack(shared, false, "spec-ok");
+  const t1 = mk("text", { x: 4, y: 14, class: "ttl" }, svg); t1.textContent = "theoretical (above)";
+  const t2 = mk("text", { x: 4, y: H - 4, class: "ttl" }, svg); t2.textContent = "experimental (below)";
+  svg.onmousemove = ev => { const t = ev.target; if (t.dataset && t.dataset.m !== undefined) showTip('<span class="tt-h">mass ' + t.dataset.m + "</span>", ev); else hideTip(); };
+  svg.onmouseleave = hideTip;
+  el("lbSpecMeta").textContent = pep ? "score " + shared.length + " = shared masses · " + thOnly.length + " missing · " + expOnly.length + " unexplained" : "";
+  el("lbSpecLine").innerHTML = pep ? "<b>LinearSpectrum(" + esc(pepStr(pep)) + ")</b> = {{ " + th.join(", ") + " }} &nbsp; mass " + pepMass(pep) : "";
+}
+
+function lbDrawBoard(st) {
+  const board = st.board || [];
+  const N = lb.N;
+  const box = el("lbBoard");
+  if (!board.length) { box.innerHTML = '<span class="placeholder">' + (st.done ? "Empty — the algorithm has terminated." : "—") + "</span>"; el("lbBoardMeta").textContent = ""; return; }
+  const nLive = board.filter(e => e.state !== "heavy" && e.state !== "trim").length;
+  const LIM = lb.showAll ? Infinity : Math.min(60, Math.max(12, nLive + 4));
+  const leadPep = st.leader ? pepStr(st.leader.pep) : null;
+  let rows = '<table class="board"><tr><th>#</th><th>peptide</th><th>mass</th><th>score</th><th></th></tr>';
+  let shown = 0, keptSeen = 0;
+  const kept = board.filter(e => e.state === "keep" || e.state === "cand" || e.state === "parent");
+  board.forEach((e, i) => {
+    if (shown >= LIM) return;
+    const cls = [e.state, e.isTrue ? "true" : "", pepStr(e.pep) === leadPep && e.parentM ? "lead" : "", lb.sel && pepStr(lb.sel.pep) === pepStr(e.pep) ? "sel" : ""];
+    if (e.state !== "heavy" && e.state !== "trim") keptSeen++;
+    const isCut = st.cut !== null && keptSeen === kept.length && (e.state === "keep" || e.state === "parent") && board.some(x => x.state === "trim");
+    if (isCut) cls.push("cut");
+    rows += '<tr class="' + cls.filter(Boolean).join(" ") + '" data-i="' + i + '"><td class="num">' + (i + 1) + '</td><td class="pep">' + esc(pepStr(e.pep)) +
+            '</td><td class="num">' + e.mass + '</td><td class="num">' + e.score + "</td><td>" +
+            (e.state === "heavy" ? "too heavy" : e.state === "parent" ? "parent mass" : e.state === "trim" ? "trimmed" : e.state === "keep" ? "" : "") + "</td></tr>";
+    shown++;
+  });
+  if (board.length > shown) rows += '<tr><td colspan="5" class="more" data-more="1">… ' + (board.length - shown) + " more (click to show all)</td></tr>";
+  rows += "</table>";
+  box.innerHTML = rows;
+  const nKeep = board.filter(e => e.state === "keep").length, nTrim = board.filter(e => e.state === "trim").length, nHeavy = board.filter(e => e.state === "heavy").length;
+  el("lbBoardMeta").textContent = board.length + " candidates" + (st.cut !== null || nTrim ? " · " + nKeep + " kept · " + nTrim + " trimmed" : "") + (nHeavy ? " · " + nHeavy + " too heavy" : "") + " · N = " + N;
+}
+
+function lbDrawTrack(st) {
+  const svg = el("lbTrack"), R = lb.rounds, spec = lb.spec;
+  const W = Math.max(300, (svg.parentElement.clientWidth || 400) - 32);
+  const upto = st.done ? R.length : Math.max(0, (st.round || 0) - (st.trimmed ? 0 : 1));
+  const shown = R.slice(0, Math.min(upto, R.length));
+  const x0 = 30, x1 = W - 12, yTop = 12, yAx = 118, yDots = 136, H = 148;
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.innerHTML = "";
+  const maxS = Math.max(1, spec.length);
+  const xOf = k => R.length <= 1 ? (x0 + x1) / 2 : x0 + (k - 1) * (x1 - x0) / (R.length - 1);
+  const yOf = v => yAx - (v / maxS) * (yAx - yTop);
+  mk("line", { x1: x0, y1: yAx, x2: x1, y2: yAx, class: "axis" }, svg);
+  mk("line", { x1: x0, y1: yAx, x2: x0, y2: yTop, class: "axis" }, svg);
+  [0, Math.round(maxS / 2), maxS].forEach(v => { const t = mk("text", { x: x0 - 5, y: yOf(v) + 4, class: "axlab", "text-anchor": "end" }, svg); t.textContent = String(v); });
+  R.forEach(r => { if (r.k === 1 || r.k === R.length || r.k % Math.ceil(R.length / 8) === 0) { const t = mk("text", { x: xOf(r.k), y: yAx + 12, class: "axlab" }, svg); t.textContent = String(r.k); } });
+  const series = [["top", r => r.top], ["cut", r => r.cut], ["true", r => r.trueScore], ["lead", r => r.leader]];
+  series.forEach(([cls, f]) => {
+    const pts = shown.map(r => f(r) === null ? null : [xOf(r.k), yOf(f(r))]);
+    let d = "", pen = false;
+    pts.forEach(p => { if (!p) { pen = false; return; } d += (pen ? " L" : " M") + p[0] + "," + p[1]; pen = true; });
+    if (d) mk("path", { d: d, class: "trk " + cls }, svg);
+    pts.forEach((p, i) => { if (p) mk("circle", { cx: p[0], cy: p[1], r: 3, class: "trkdot " + cls, opacity: cls === "true" && !shown[i].trueAlive ? .45 : 1 }, svg); });
+  });
+  if (lb.truePep) shown.forEach(r => { if (r.trueAlive !== null) mk("circle", { cx: xOf(r.k), cy: yDots, r: 4, class: r.trueAlive ? "alive" : "dead" }, svg); });
+  el("lbAliveLegend").style.display = lb.truePep ? "" : "none";
+  const last = shown[shown.length - 1];
+  el("lbTrackMeta").textContent = !shown.length ? "" : "round " + last.k + (last.trueAlive === null ? "" : last.trueAlive ? " · true prefix on board (rank " + last.trueRank + ")" : " · true prefix lost");
+}
+
+function lbRenderLeader(st) {
+  const L = st.leader;
+  if (!L) { el("lbLeader").innerHTML = ""; return; }
+  const spec = lb.spec;
+  el("lbLeader").innerHTML = '<div class="big">' + esc(pepStr(L.pep)) + '</div><div class="kv">score ' + L.score + " of " + spec.length +
+    " &middot; mass " + pepMass(L.pep) + (L.pep.length ? " &middot; length " + L.pep.length : "") + "</div>" +
+    (st.changed ? '<div class="kv" style="color:var(--wi-accent)">updated in this round</div>' : "") +
+    (lb.truePep ? '<div class="kv" style="margin-top:6px">true peptide ' + esc(lb.truePep) + " &middot; score " + linearScore(lettersToPep(lb.truePep), spec) + "</div>" : "");
+  el("lbLeadMeta").textContent = st.done ? "final" : st.round ? "after round " + st.round : "";
+}
+
+function lbRenderCode(st) {
+  const hl = new Set(st.hl || []);
+  el("lbCode").innerHTML = LB_CODE.map(l => '<div class="cline' + (hl.has(l[0]) ? " on" : "") + '"><span class="ln">' + l[0] + "</span><span>" + l[1] + "</span></div>").join("");
+  el("lbCodeNote").innerHTML = "This is LEADERBOARDCYCLOPEPTIDESEQUENCING from Compeau &amp; Pevzner, Chapter 4, with the cyclic peptide replaced by a " +
+    "linear one: the theoretical spectrum is LinearSpectrum (all contiguous fragments, plus 0 and the whole peptide, as in the book), and the score counts " +
+    "shared masses <i>with multiplicity</i>. It is a <b>heuristic</b>: a prefix of the true peptide may score badly early on and be trimmed, after which " +
+    "the true peptide can no longer be found. Larger N makes this less likely and the algorithm slower.";
+}
+
+function lbRender(st, pl) {
+  lbDrawSpec(st); lbDrawBoard(st); lbDrawTrack(st); lbRenderLeader(st); lbRenderCode(st);
+  el("lbStatus").innerHTML = (st.txt || "") + (st.ans ? '<span class="ans">' + esc(st.ans) + "</span>" : "");
+  el("lbPhase").textContent = pl.phases[st.ph] ? pl.phases[st.ph].name : "";
+}
+
+function lbSetSpectrum(spec, truePep, fromPreset) {
+  lb.spec = spec.slice().sort(asc); lb.truePep = truePep || null;
+  el("lbText").value = lb.spec.join(" ") + (truePep ? "\ntrue " + truePep : "");
+  el("lbErr").textContent = "";
+  if (!fromPreset) el("lbPreset").value = "";
+  lbBuild();
+}
+function lbLoadText(txt) {
+  try {
+    const lines = stripComments(txt).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    let truePep = null; const nums = [];
+    lines.forEach(l => { const m = l.match(/^true\s*[:=]?\s*([A-Za-z]+)$/i); if (m) { parsePeptide(m[1]); truePep = m[1].toUpperCase(); } else nums.push(...parseIntList(l)); });
+    if (!nums.length) throw new Error("no masses given");
+    if (nums.length > 400) throw new Error("at most 400 masses");
+    lbSetSpectrum(nums, truePep, false);
+  } catch (e) { el("lbErr").textContent = e.message; }
+}
+function lbGenFromForm(fromPreset) {
+  try {
+    const g = lbGenerate(el("lbPep").value, Number(el("lbMiss").value), Number(el("lbFalse").value), Number(el("lbSeed").value));
+    lbSetSpectrum(g.spec, g.truePep, fromPreset);
+  } catch (e) { el("lbErr").textContent = e.message; }
+}
+function lbApplyPreset(p) {
+  lb.N = p.N; el("lbN").value = p.N;
+  if (p.gen) { el("lbPep").value = p.gen.pep; el("lbMiss").value = p.gen.miss; el("lbFalse").value = p.gen.false; el("lbSeed").value = p.gen.seed; lbGenFromForm(true); }
+  else { el("lbPep").value = p.truePep || ""; lbSetSpectrum(p.spec, p.truePep, true); }
+}
+function lbSetAlph(a) {
+  lb.alph = a;
+  ["20", "18", "Conv"].forEach(k => el("lbAlph" + k).classList.toggle("on", (k === "Conv" ? "conv" : k) === a));
+  el("lbM").style.display = el("lbMLab").style.display = a === "conv" ? "" : "none";
+  lbBuild();
+}
+
+function lbInit() {
+  lbPlayer = makePlayer("lbTransport", lbRender);
+  const sel = el("lbPreset");
+  sel.innerHTML = LB_PRESETS.map(p => '<option value="' + p.key + '">' + esc(p.name) + "</option>").join("") + '<option value="">(custom)</option>';
+  sel.addEventListener("change", () => { const p = LB_PRESETS.find(q => q.key === sel.value); if (p) lbApplyPreset(p); });
+  el("lbN").addEventListener("change", () => { lb.N = Math.max(1, Math.min(1000, Number(el("lbN").value) || 10)); el("lbN").value = lb.N; lbBuild(); });
+  el("lbM").addEventListener("change", () => { lb.M = Math.max(1, Math.min(60, Number(el("lbM").value) || 20)); el("lbM").value = lb.M; lbBuild(); });
+  el("lbAlph20").addEventListener("click", () => lbSetAlph("20"));
+  el("lbAlph18").addEventListener("click", () => lbSetAlph("18"));
+  el("lbAlphConv").addEventListener("click", () => lbSetAlph("conv"));
+  el("lbCoarse").addEventListener("click", () => { lb.fine = false; el("lbCoarse").classList.add("on"); el("lbFine").classList.remove("on"); lbBuild(); });
+  el("lbFine").addEventListener("click", () => { lb.fine = true; el("lbFine").classList.add("on"); el("lbCoarse").classList.remove("on"); lbBuild(); });
+  el("lbGen").addEventListener("click", () => { el("lbSeed").value = rint(1, 9999); lbGenFromForm(false); });
+  el("lbPep").addEventListener("keydown", ev => { if (ev.key === "Enter") lbGenFromForm(false); });
+  el("lbLoad").addEventListener("click", () => lbLoadText(el("lbText").value));
+  el("lbBoard").addEventListener("click", ev => {
+    const more = ev.target.closest("[data-more]"); if (more) { lb.showAll = true; lbPlayer.render(); return; }
+    const tr = ev.target.closest("tr[data-i]"); if (!tr) return;
+    const e = (lbPlayer.steps[lbPlayer.cur].board || [])[Number(tr.dataset.i)];
+    if (!e) return;
+    lb.sel = (lb.sel && pepStr(lb.sel.pep) === pepStr(e.pep)) ? null : e;
+    lbPlayer.render();
+  });
+  el("lbBoard").addEventListener("mouseover", ev => {
+    const tr = ev.target.closest("tr[data-i]"); if (!tr || lb.sel) return;
+    const e = (lbPlayer.steps[lbPlayer.cur].board || [])[Number(tr.dataset.i)];
+    if (e) { const st = lbPlayer.steps[lbPlayer.cur]; const keep = lb.sel; lb.sel = e; lbDrawSpec(st); lb.sel = keep; }
+  });
+  el("lbBoard").addEventListener("mouseleave", () => { if (!lb.sel) lbDrawSpec(lbPlayer.steps[lbPlayer.cur] || {}); });
+  sel.value = "nqel"; lbApplyPreset(LB_PRESETS[0]);
+}
+
+/* ---------- draggable splitter between the two stage columns --------------- */
+function initSplitters() {
+  document.querySelectorAll(".stage").forEach(stage => {
+    if (stage.children.length !== 2) return;
+    const sp = document.createElement("div");
+    sp.className = "splitter"; sp.title = "drag to resize · double-click to reset";
+    stage.insertBefore(sp, stage.children[1]);
+    let dragging = false;
+    const setLeft = clientX => {
+      const r = stage.getBoundingClientRect();
+      const min = 300, max = r.width - 12 - 300;
+      if (max <= min) return;
+      const w = Math.max(min, Math.min(max, clientX - r.left - 6));
+      stage.style.setProperty("--left", w + "px"); stage.classList.add("sized");
+      window.dispatchEvent(new Event("resize"));      /* redraw the SVGs at the new width */
+    };
+    sp.addEventListener("pointerdown", ev => { dragging = true; sp.classList.add("drag"); sp.setPointerCapture(ev.pointerId); ev.preventDefault(); });
+    sp.addEventListener("pointermove", ev => { if (dragging) setLeft(ev.clientX); });
+    const stop = () => { dragging = false; sp.classList.remove("drag"); };
+    sp.addEventListener("pointerup", stop); sp.addEventListener("pointercancel", stop);
+    sp.addEventListener("dblclick", () => { stage.classList.remove("sized"); stage.style.removeProperty("--left"); window.dispatchEvent(new Event("resize")); });
+  });
+}
+
+/* ==========================================================================
+   boot
+   ========================================================================== */
+
+function init() {
+  fwdInit(); roadInit(); btInit(); polyInit(); lbInit();
+  document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+  window.addEventListener("resize", () => {
+    if (activeTab === "road") roadRender(); else { const p = { fwd: fwdPlayer, bt: btPlayer, poly: polyPlayer, lb: lbPlayer }[activeTab]; if (p) p.render(); }
+  });
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
+    if (activeTab === "road") {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") { roadUndoDo(); ev.preventDefault(); }
+      if ((ev.key === "Delete" || ev.key === "Backspace") && road.sel && road.sel.type === "exit" && road.sel.i > 0) { roadRemoveExit(road.sel.i); ev.preventDefault(); }
+      if (ev.key === "Escape") { road.sel = null; roadRender(); }
+      return;
+    }
+    const pl = { fwd: fwdPlayer, bt: btPlayer, poly: polyPlayer, lb: lbPlayer }[activeTab]; if (!pl) return;
+    if (ev.key === "ArrowRight") { pl.stop(); pl.fwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft")  { pl.stop(); pl.back(); ev.preventDefault(); }
+    if (ev.key === " ")          { pl.play(); ev.preventDefault(); }
+  });
+}
+document.addEventListener("DOMContentLoaded", () => { init(); initSplitters(); });
+</script>
+</body>
+</html>

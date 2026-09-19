@@ -10,19 +10,19 @@
 <title>Graph Editor — drag &amp; drop</title>
 <style>
     :root {
-        --bg: #f1eed9;
-        --panel: #f8f6ec;
-        --panel-border: #cdc9bb;
-        --controls-bg: #e7e3ca;
-        --controls-border: #cdc9bb;
+        --bg: #f5ebd9;
+        --panel: #faf6ed;
+        --panel-border: #d4c5b4;
+        --controls-bg: #ecddc5;
+        --controls-border: #d4c5b4;
         --ink: #6b675c;
         --ink-strong: #46433a;
         --title-muted: #8b8779;
-        --btn: #f8f6ec;
-        --btn-border: #aeaa9e;
+        --btn: #faf6ed;
+        --btn-border: #b9a793;
         --btn-border-hover: #8d897c;
-        --node-cream: #f8f6ec;
-        --node-cream-border: #aeaa9e;
+        --node-cream: #faf6ed;
+        --node-cream-border: #b9a793;
         --accent: #902015;
         --accent2: #2a6a63;
         --edge: #8d897c;
@@ -35,7 +35,7 @@
     }
     h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; letter-spacing: 0.3px; color: var(--ink-strong); }
     .subtitle { font-size: 0.92rem; color: var(--title-muted); margin: 0 0 20px; max-width: 980px; line-height: 1.5; }
-    .subtitle code { background: #e7e3ca; padding: 1px 6px; border-radius: 3px; }
+    .subtitle code { background: #ecddc5; padding: 1px 6px; border-radius: 3px; }
 
     .controls {
         display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
@@ -49,17 +49,32 @@
         padding: 8px 16px; font-size: 0.9rem; border-radius: 4px; cursor: pointer;
         transition: background 0.15s, border-color 0.15s; font-weight: 500; font-family: inherit;
     }
-    button:hover:not(:disabled), select:hover { background-color: #fbfaf4; border-color: var(--btn-border-hover); }
+    button:hover:not(:disabled), select:hover { background-color: #fcf9f3; border-color: var(--btn-border-hover); }
     select { cursor: pointer; }
     .switch { position: relative; display: inline-block; width: 42px; height: 23px; }
     .switch input { opacity: 0; width: 0; height: 0; }
-    .switch .track { position: absolute; cursor: pointer; inset: 0; background: #cdc9bb; border: 1px solid #aeaa9e; border-radius: 23px; transition: .2s; }
-    .switch .track:before { content: ""; position: absolute; height: 17px; width: 17px; left: 3px; top: 2px; background: #f8f6ec; border-radius: 50%; transition: .2s; }
+    .switch .track { position: absolute; cursor: pointer; inset: 0; background: #d4c5b4; border: 1px solid #b9a793; border-radius: 23px; transition: .2s; }
+    .switch .track:before { content: ""; position: absolute; height: 17px; width: 17px; left: 3px; top: 2px; background: #faf6ed; border-radius: 50%; transition: .2s; }
     .switch input:checked + .track { background: var(--accent2); border-color: #1d5049; }
     .switch input:checked + .track:before { transform: translateX(19px); }
 
-    .stage { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(320px,1fr); gap: 20px; align-items: start; }
-    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+    /* ---- stage: graph | splitter | side panels (splitter column is draggable) ---- */
+    .stage { display: grid; grid-template-columns: minmax(0, var(--main-w, 1.55fr)) 20px minmax(320px, 1fr); gap: 0; align-items: start; }
+    .stage > .splitter { align-self: stretch; position: relative; cursor: col-resize; user-select: none; touch-action: none; }
+    .stage > .splitter::before { content: ""; position: absolute; left: 8px; right: 8px; top: 0; bottom: 0; border-radius: 2px; background: transparent; transition: background 0.15s; }
+    .stage > .splitter::after { content: ""; position: absolute; left: 50%; top: min(50%, 240px); width: 5px; height: 42px; margin-left: -2.5px; border-radius: 3px; background: var(--panel-border, #d4c5b4); transition: background 0.15s; }
+    .stage > .splitter:hover::before, .stage > .splitter.dragging::before { background: rgba(0,0,0,0.04); }
+    .stage > .splitter:hover::after, .stage > .splitter.dragging::after { background: var(--wi-heading, #902015); }
+    body.splitting, body.splitting * { cursor: col-resize !important; user-select: none !important; }
+    @media (max-width: 980px) { .stage { grid-template-columns: 1fr; gap: 20px; } .stage > .splitter { display: none; } }
+    /* ---- zoomable graph canvas ---- */
+    canvas#graph { touch-action: none; }
+    canvas#graph.panning { cursor: grabbing !important; }
+    .sim-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .sim-head .sim-title { flex: 1; }
+    .zoom-ctl { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+    .zoom-ctl button { padding: 0; width: 26px; height: 26px; line-height: 24px; font-size: 1rem; border-radius: 4px; }
+    .zoom-ctl .zoom-pct { min-width: 44px; text-align: center; font-size: 0.78rem; color: var(--title-muted, #7a6d5b); font-variant-numeric: tabular-nums; }
 
     .sim-box { background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
     .sim-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--title-muted); margin: 0 0 12px; font-weight: 700; }
@@ -68,26 +83,26 @@
     canvas#graph { display: block; background-color: var(--bg); width: 100%; height: 100%; cursor: crosshair; }
     #weightInput {
         position: absolute; display: none; width: 64px; padding: 3px 6px; font-size: 0.85rem;
-        border: 2px solid var(--accent2); border-radius: 4px; background: #fbfaf4; color: var(--ink-strong);
+        border: 2px solid var(--accent2); border-radius: 4px; background: #fcf9f3; color: var(--ink-strong);
         font-family: "SF Mono", var(--wi-font-mono); text-align: center; z-index: 5;
         transform: translate(-50%, -50%);
     }
 
     .legend { display: flex; flex-wrap: wrap; gap: 12px 18px; font-size: 0.79rem; color: var(--ink); align-items: center; margin-top: 12px; }
     .legend .item { display: flex; align-items: center; gap: 6px; }
-    .legend kbd { background: #e7e3ca; border: 1px solid #ccbb95; border-radius: 3px; padding: 1px 6px; font-family: inherit; font-size: 0.76rem; color: var(--ink-strong); }
+    .legend kbd { background: #ecddc5; border: 1px solid #ccbb95; border-radius: 3px; padding: 1px 6px; font-family: inherit; font-size: 0.76rem; color: var(--ink-strong); }
 
     .side { display: flex; flex-direction: column; gap: 14px; }
     textarea#graphText {
         font-family: "SF Mono", var(--wi-font-mono); font-size: 0.82rem;
-        background: #e7e3ca; color: var(--ink-strong); border: 1px solid var(--panel-border);
+        background: #ecddc5; color: var(--ink-strong); border: 1px solid var(--panel-border);
         border-radius: 5px; padding: 10px; width: 100%; height: 320px; resize: vertical;
     }
     .taRow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
     .err { color: #6d180f; font-weight: 600; font-size: 0.82rem; min-height: 18px; margin-top: 6px; }
     .stat { font-size: 0.8rem; color: var(--title-muted); margin-top: 4px; }
     .editor-help { font-size: 0.82rem; color: var(--ink); line-height: 1.55; }
-    .editor-help code { background: #e7e3ca; padding: 1px 5px; border-radius: 3px; }
+    .editor-help code { background: #ecddc5; padding: 1px 5px; border-radius: 3px; }
     .editor-help b { color: var(--ink-strong); }
 </style>
 <style>
@@ -159,7 +174,7 @@ those pages' "Edit / paste a graph" box — it's the same augmented <code>algs4<
 
 <div class="stage">
     <div class="sim-box">
-        <div class="sim-title">Canvas</div>
+        <div class="sim-head"><div class="sim-title">Canvas</div><div class="zoom-ctl" title="Wheel: zoom &middot; drag empty space: pan"><button type="button" id="zoomOut" title="Zoom out">&minus;</button><span class="zoom-pct" id="zoomPct">100%</span><button type="button" id="zoomIn" title="Zoom in">+</button><button type="button" id="zoomFit" title="Fit the graph to the canvas">&#x2922;</button></div></div>
         <div class="canvas-wrap" id="canvasWrap">
             <canvas id="graph"></canvas>
             <input id="weightInput" type="number" step="any">
@@ -172,6 +187,7 @@ those pages' "Edit / paste a graph" box — it's the same augmented <code>algs4<
             <div class="item"><kbd>delete</kbd> → remove selection</div>
             <div class="item"><kbd>dbl-click</kbd> edge → edit weight</div>
             <div class="item"><kbd>esc</kbd> → deselect / cancel</div>
+            <div class="item"><kbd>drag</kbd> empty space → pan &nbsp;·&nbsp; <kbd>wheel</kbd> → zoom</div>
             <div class="item" id="snapLegendItem" style="display:none">grid snap active — drag/add positions round to the nearest cell</div>
         </div>
         <div class="legend" id="legendSpring" style="display:none">
@@ -183,6 +199,7 @@ those pages' "Edit / paste a graph" box — it's the same augmented <code>algs4<
         <div class="err" id="springWarn"></div>
     </div>
 
+    <div class="splitter" id="stageSplitter" title="Drag to resize &middot; double-click to reset"></div>
     <div class="side">
         <div class="sim-box">
             <div class="sim-title">Text &nbsp;·&nbsp; live-synced with the canvas</div>
@@ -205,7 +222,7 @@ those pages' "Edit / paste a graph" box — it's the same augmented <code>algs4<
                 <code>v w</code> / <code>v w weight</code> text itself doesn't encode direction, exactly like the
                 other pages: the same edge list works as input for an undirected page or a directed one.
                 <br><br>
-                Any coordinate scale works on import (CS Academy pixels, algs4's own <code>0…1</code> range,
+                Coordinates are drawn to scale — one unit is the same length horizontally and vertically, exactly as the animation pages will show them. Any coordinate scale works on import (CS Academy pixels, algs4's own <code>0…1</code> range,
                 anything) — it's auto-centred and scaled to fit, preserving relative position and aspect ratio.
                 Self-loops aren't supported by the canvas editor; parallel edges between the same pair are drawn as
                 separate curved springs. <b>Snap to grid</b> rounds dragged/added positions to the nearest cell
@@ -271,15 +288,50 @@ function fmtWeight(w) { const r = Math.round((Number.isFinite(w)?w:1)*1000)/1000
 
 let cw = 0, ch = 0, dpr = 1;
 const M = 40;
+/* The view maps graph coordinates to the screen with ONE scale for both axes, so the drawing keeps its
+   aspect ratio — the same way the animation pages display drawn coordinates. fitView() frames the graph's
+   bounding box; wheel/drag then zoom and pan without touching the coordinates themselves. */
+const view = { S: 1, Sfit: 1, ox: 0, oy: 0, user: false };
+let gridWorld = 0.05;   // grid cell in graph units (set from the px value at the current zoom)
 function fitCanvas() {
     dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+    let rect = wrap.getBoundingClientRect();
+    const hMax = Math.max(480, Math.round(window.innerHeight * 0.78));
+    const h = Math.round(Math.max(520, Math.min(hMax, rect.width * 0.62)));   // height follows width, bounded
+    if (Math.abs(h - rect.height) > 0.5) { wrap.style.height = h + 'px'; rect = wrap.getBoundingClientRect(); }
+    const oldW = cw, oldH = ch;
     cw = rect.width; ch = rect.height;
     canvas.width = Math.round(cw*dpr); canvas.height = Math.round(ch*dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (Math.abs(cw - oldW) > 0.5 || Math.abs(ch - oldH) > 0.5) {
+        if (view.user) { view.ox += (cw - oldW)/2; view.oy += (ch - oldH)/2; }   // keep the centre
+        else fitView();
+    }
 }
-function toScreen(p) { return { x: M + p.x*(cw-2*M), y: M + p.y*(ch-2*M) }; }
-function toNorm(px, py) { return { x: (px-M)/Math.max(1,(cw-2*M)), y: (py-M)/Math.max(1,(ch-2*M)) }; }
+function fitView() {
+    let minx = 0, miny = 0, maxx = 1, maxy = 1;                 // empty / single vertex: frame the unit square
+    if (V >= 2) {
+        minx = miny = Infinity; maxx = maxy = -Infinity;
+        for (const q of pos) { minx = Math.min(minx, q.x); miny = Math.min(miny, q.y); maxx = Math.max(maxx, q.x); maxy = Math.max(maxy, q.y); }
+    }
+    const bw = Math.max(maxx - minx, 1e-6), bh = Math.max(maxy - miny, 1e-6);
+    view.S = view.Sfit = Math.min((cw - 2*M)/bw, (ch - 2*M)/bh);
+    view.ox = M + ((cw - 2*M) - view.S*bw)/2 - view.S*minx;
+    view.oy = M + ((ch - 2*M) - view.S*bh)/2 - view.S*miny;
+    view.user = false;
+    gridWorld = gridSize / view.S;
+    const pct = document.getElementById('zoomPct'); if (pct) pct.textContent = '100%';
+}
+function refit() { fitCanvas(); fitView(); render(); }
+function zoomAt(f, mx, my) {
+    const S = Math.max(0.25*view.Sfit, Math.min(12*view.Sfit, view.S*f)); f = S / view.S;
+    view.ox = mx - (mx - view.ox)*f; view.oy = my - (my - view.oy)*f; view.S = S; view.user = true;
+    const pct = document.getElementById('zoomPct'); if (pct) pct.textContent = Math.round(100*view.S/view.Sfit) + '%';
+    render();
+}
+function panBy(dx, dy) { view.ox += dx; view.oy += dy; view.user = true; render(); }
+function toScreen(p) { return { x: view.ox + p.x*view.S, y: view.oy + p.y*view.S }; }
+function toNorm(px, py) { return { x: (px - view.ox)/view.S, y: (py - view.oy)/view.S }; }
 
 /* ============================ spring (Dijkstra ring) preview ============================ */
 function computeSpringDistances(source) {
@@ -359,18 +411,20 @@ function onSpringSourceChange(val) {
     recomputeSpring();
     render();
 }
-function snapPx(px, py) {
+function snapPx(px, py) {   // screen px in, screen px out — but the lattice lives in graph units, so it survives zooming
     if (!snapGrid) return { x: px, y: py };
-    return { x: Math.round(px / gridSize) * gridSize, y: Math.round(py / gridSize) * gridSize };
+    const n = toNorm(px, py), g = gridWorld;
+    return toScreen({ x: Math.round(n.x / g) * g, y: Math.round(n.y / g) * g });
 }
 function onToggleSnap(on) {
     snapGrid = on;
+    if (on) gridWorld = gridSize / view.S;
     document.getElementById('snapLegendItem').style.display = on ? 'flex' : 'none';
     render();
 }
 function onGridSizeChange(val) {
     const n = parseInt(val, 10);
-    if (Number.isFinite(n) && n > 0) gridSize = n;
+    if (Number.isFinite(n) && n > 0) { gridSize = n; gridWorld = gridSize / view.S; }
     render();
 }
 
@@ -574,7 +628,7 @@ function parseCSAcademy(text) {
 }
 function dumpCSAcademy() {
     const w = Math.max(1, Math.round(cw)), h = Math.max(1, Math.round(ch));
-    const nodesTxt = pos.map((p, i) => `{label:${i},center:{x:${fmtCoord(p.x*w)},y:${fmtCoord(p.y*h)}}}`).join(',');
+    const nodesTxt = pos.map((p, i) => { const s = toScreen(p); return `{label:${i},center:{x:${fmtCoord(s.x)},y:${fmtCoord(s.y)}}}`; }).join(',');
     const edgesTxt = E.map(e => weighted ? `{source:${e.u},target:${e.v},weight:${fmtWeight(e.weight)}}` : `{source:${e.u},target:${e.v}}`).join(',');
     const directedAttr = directed ? ' directed={true}' : '';
     return `<Graph indexType="custom" height="${h}" width="${w}"${directedAttr} nodes={[${nodesTxt}]} edges={[${edgesTxt}]} />`;
@@ -616,7 +670,7 @@ function applyTextareaContent() {
         if (springMode) syncSpringSourceSelect();
         errEl.textContent = '';
         refreshTextarea();
-        render();
+        refit();
     } catch (err) { errEl.textContent = err.message; }
 }
 function onToggleWeighted(on) {
@@ -625,8 +679,8 @@ function onToggleWeighted(on) {
     refreshTextarea(); render();
 }
 function onToggleDirected(on) { directed = on; refreshTextarea(); render(); }
-function autoLayout() { pos = layoutAll(V, E); refreshTextarea(); render(); }
-function clearAll() { V = 0; E = []; pos = []; selectedNode = -1; selectedEdge = -1; springSource = 0; if (springMode) syncSpringSourceSelect(); refreshTextarea(); render(); }
+function autoLayout() { pos = layoutAll(V, E); refreshTextarea(); refit(); }
+function clearAll() { V = 0; E = []; pos = []; selectedNode = -1; selectedEdge = -1; springSource = 0; if (springMode) syncSpringSourceSelect(); refreshTextarea(); refit(); }
 function copyText() {
     const ta = document.getElementById('graphText');
     ta.select();
@@ -745,7 +799,7 @@ function computeRadius() {
         const d = Math.hypot(a.x-b.x, a.y-b.y); if (d < minD) minD = d;
     }
     if (!Number.isFinite(minD)) minD = 90;
-    radius = Math.max(13, Math.min(24, minD*0.38));
+    radius = Math.max(10, Math.min(22, minD*0.34));
 }
 function hitNode(px, py) {
     for (let i = V-1; i >= 0; i--) {
@@ -820,8 +874,8 @@ function drawWeightLabel(x, y, text, hi) {
     ctx.font = '700 11px -apple-system, "Segoe UI", Roboto, sans-serif';
     const w = ctx.measureText(text).width, pad = 4;
     roundRect(x-w/2-pad, y-8, w+2*pad, 16, 4);
-    ctx.fillStyle = hi ? '#fbfaf4' : 'rgba(248,246,236,0.95)';
-    ctx.strokeStyle = hi ? '#2a6a63' : '#aeaa9e'; ctx.lineWidth = 1;
+    ctx.fillStyle = hi ? '#fcf9f3' : 'rgba(248,246,236,0.95)';
+    ctx.strokeStyle = hi ? '#2a6a63' : '#b9a793'; ctx.lineWidth = 1;
     ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#46433a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(text, x, y+0.5);
@@ -867,8 +921,12 @@ function render() {
     if (snapGrid && !springMode) {
         ctx.strokeStyle = 'rgba(70,67,58,0.10)'; ctx.lineWidth = 1;
         ctx.beginPath();
-        for (let x = gridSize; x < cw; x += gridSize) { ctx.moveTo(x+0.5, 0); ctx.lineTo(x+0.5, ch); }
-        for (let y = gridSize; y < ch; y += gridSize) { ctx.moveTo(0, y+0.5); ctx.lineTo(cw, y+0.5); }
+        const gs = gridWorld * view.S;
+        if (gs >= 4) {
+            const x0 = ((view.ox % gs) + gs) % gs, y0 = ((view.oy % gs) + gs) % gs;
+            for (let x = x0; x < cw; x += gs) { ctx.moveTo(Math.round(x)+0.5, 0); ctx.lineTo(Math.round(x)+0.5, ch); }
+            for (let y = y0; y < ch; y += gs) { ctx.moveTo(0, Math.round(y)+0.5); ctx.lineTo(cw, Math.round(y)+0.5); }
+        }
         ctx.stroke();
     }
 
@@ -911,10 +969,10 @@ function render() {
     for (let i = 0; i < V; i++) {
         const s = screenOf(i);
         ctx.beginPath(); ctx.arc(s.x, s.y, radius, 0, Math.PI*2);
-        ctx.fillStyle = '#f8f6ec'; ctx.fill();
+        ctx.fillStyle = '#faf6ed'; ctx.fill();
         const isSpringSource = springMode && i === springSource;
         ctx.lineWidth = selectedNode === i ? 4 : (isSpringSource ? 3 : 2);
-        ctx.strokeStyle = selectedNode === i ? '#cc2f22' : (isSpringSource ? '#2a6a63' : '#aeaa9e');
+        ctx.strokeStyle = selectedNode === i ? '#cc2f22' : (isSpringSource ? '#2a6a63' : '#b9a793');
         ctx.stroke();
         ctx.fillStyle = '#46433a';
         ctx.fillText(String(i), s.x, s.y+1);
@@ -945,9 +1003,23 @@ canvas.addEventListener('mousedown', evt => {
         dragNode = mouseDownHitNode;
         dragCursor = p;
     } else {
-        dragMode = null; dragNode = -1;
+        dragMode = (mouseDownHitEdge < 0 && !springMode) ? 'pan' : null; dragNode = -1; panLast = p;
     }
 });
+let panLast = null;
+canvas.addEventListener('wheel', evt => {
+    evt.preventDefault();
+    if (springMode) return;
+    const d = evt.deltaMode === 1 ? evt.deltaY*16 : evt.deltaY;
+    const p = canvasPoint(evt);
+    zoomAt(Math.max(0.5, Math.min(2, Math.exp(-d*0.0015))), p.x, p.y);
+}, { passive: false });
+(function setupZoomButtons() {
+    const zi = document.getElementById('zoomIn'), zo = document.getElementById('zoomOut'), zf = document.getElementById('zoomFit');
+    if (zi) zi.addEventListener('click', () => zoomAt(1.25, cw/2, ch/2));
+    if (zo) zo.addEventListener('click', () => zoomAt(1/1.25, cw/2, ch/2));
+    if (zf) zf.addEventListener('click', refit);
+})();
 canvas.addEventListener('mousemove', evt => {
     const p = canvasPoint(evt);
     if (mouseDownPos && Math.hypot(p.x-mouseDownPos.x, p.y-mouseDownPos.y) > 4) didMove = true;
@@ -971,6 +1043,9 @@ canvas.addEventListener('mousemove', evt => {
         }
     } else if (dragMode === 'edge') {
         dragCursor = p; render();
+    } else if (dragMode === 'pan') {
+        if (didMove) { canvas.classList.add('panning'); panBy(p.x - panLast.x, p.y - panLast.y); }
+        panLast = p;
     } else {
         const overNode = hitNode(p.x, p.y), overEdge = overNode < 0 ? hitEdge(p.x, p.y) : -1;
         canvas.style.cursor = (overNode >= 0 || overEdge >= 0) ? 'pointer' : 'crosshair';
@@ -1005,7 +1080,7 @@ window.addEventListener('mouseup', evt => {
         selectedNode = -1; selectedEdge = -1;
         addVertex(nx, ny);
     }
-    dragMode = null; dragNode = -1; mouseDownPos = null;
+    dragMode = null; dragNode = -1; mouseDownPos = null; panLast = null; canvas.classList.remove('panning');
 });
 canvas.addEventListener('dblclick', evt => {
     const p = canvasPoint(evt);
@@ -1043,6 +1118,30 @@ document.addEventListener('keydown', evt => {
     }
 });
 
+/* ============================ draggable stage splitter ============================ */
+(function setupSplitter() {
+    const sp = document.getElementById('stageSplitter'); if (!sp) return;
+    const stage = sp.parentElement, KEY = 'wi-stage-main-w:' + location.pathname;
+    const clampW = w => { const total = stage.getBoundingClientRect().width; return Math.max(260, Math.min(total - 20 - 330, w)); };
+    const apply = w => { stage.style.setProperty('--main-w', clampW(w) + 'px'); };
+    try { const s = localStorage.getItem(KEY); if (s) apply(parseFloat(s)); } catch (_) {}
+    let dragging = false;
+    sp.addEventListener('pointerdown', e => {
+        dragging = true; sp.setPointerCapture(e.pointerId); sp.classList.add('dragging'); document.body.classList.add('splitting'); e.preventDefault();
+    });
+    sp.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        apply(e.clientX - stage.getBoundingClientRect().left - 10);
+    });
+    const end = () => {
+        if (!dragging) return; dragging = false; sp.classList.remove('dragging'); document.body.classList.remove('splitting');
+        try { localStorage.setItem(KEY, parseFloat(stage.style.getPropertyValue('--main-w'))); } catch (_) {}
+    };
+    sp.addEventListener('pointerup', end); sp.addEventListener('pointercancel', end);
+    sp.addEventListener('dblclick', () => { stage.style.removeProperty('--main-w'); try { localStorage.removeItem(KEY); } catch (_) {} });
+    window.addEventListener('resize', () => { const w = parseFloat(stage.style.getPropertyValue('--main-w')); if (w) apply(w); });
+})();
+
 /* ============================ init ============================ */
 function init() {
     weighted = document.getElementById('weightedToggle').checked;
@@ -1052,7 +1151,8 @@ function init() {
     V = starter.v; E = starter.edges; pos = layoutAll(V, E);
     refreshTextarea();
     window.addEventListener('resize', render);
-    render();
+    if (window.ResizeObserver) new ResizeObserver(() => render()).observe(wrap);
+    refit();
     populateExternalGraphs();
 }
 init();

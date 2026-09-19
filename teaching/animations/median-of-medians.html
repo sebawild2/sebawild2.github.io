@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Median of Medians &middot; deterministic selection by rank, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-done:#902015; --wi-inert:#b6b1a1; --wi-inert-border:#8d897c;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+
+    /* --- the four ingredients of a D&C recurrence keep one colour each,
+           everywhere on this page: green!50!black, blue!80!black, violet,
+           orange of the slides (orange darkened for contrast on cream) --- */
+    --mt-a:#1a7a1a;            /* a  — how many subproblems      */
+    --mt-b:#2f2fb4;            /* b  — how much smaller they are */
+    --mt-f:#6d136d;            /* f  — the conquer effort        */
+    --mt-d:#9d5f25;            /* d  — the base case             */
+    --mt-c:#902015;            /* c = log_b(a), the exponent that decides everything */
+    --mt-f-fill:#e6d3e6; --mt-f-fill2:#d8bcd8;
+    --mt-d-fill:#f2ddc2;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .wi-topbar { display:flex; justify-content:space-between; font-size:.78rem;
+               color:var(--wi-ink-faint); margin-bottom:10px; font-family:var(--wi-font-head);
+               letter-spacing:.06em; }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  /* --- maths, set by hand: the page must stay one standalone file --- */
+  .m { font-style:italic; }
+  .mr { font-style:normal; }
+  sup, sub { font-size:.7em; line-height:0; }
+  .ca { color:var(--mt-a); font-weight:bold; }
+  .cb { color:var(--mt-b); font-weight:bold; }
+  .cf { color:var(--mt-f); font-weight:bold; }
+  .cd { color:var(--mt-d); font-weight:bold; }
+  .cc { color:var(--mt-c); font-weight:bold; }
+  .num { font-family:var(--wi-font-mono); font-size:.86em; font-style:normal; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:12px; }
+  .ctl { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  .ctl > label.mathlabel { font-family:var(--wi-font-body); font-size:.95rem; text-transform:none;
+                           letter-spacing:0; }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.tiny { width:4.2em; text-align:center; font-family:var(--wi-font-mono); font-size:.8rem; }
+  input.mid { width:9em; font-family:var(--wi-font-mono); font-size:.8rem; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* --- transport --- */
+  .tbtns { display:flex; gap:6px; }
+  .tbtn { width:40px; padding:7px 0; font-size:1.02rem; line-height:1.05; text-align:center;
+          font-variant-emoji:text; }              /* keep the glyphs monochrome, not colour emoji */
+  .tbtn:disabled { opacity:.32; }
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:16px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+  .progress { flex:1 1 320px; min-width:220px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; }
+  .phasebar { display:flex; width:100%; margin-top:3px; }
+  .phasebtn { flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn.on { background:var(--wi-panel-2); border-color:var(--wi-accent-soft); color:var(--wi-accent);
+                 font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); background:var(--wi-panel-2); }
+  .explain { margin-top:9px; font-size:.85rem; color:var(--wi-ink-strong); min-height:2.6em; line-height:1.45; }
+
+  /* --- stage --- */
+  .stage { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(340px,.95fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .col-main { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-size:.95em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius);
+                 width:100%; touch-action:none; }
+
+  /* --- the theorem, centre piece --- */
+  .recbox { border:1px solid var(--wi-border); background:var(--wi-panel-2); border-radius:var(--wi-radius);
+            padding:9px 13px; font-size:.95rem; margin-bottom:12px; text-align:center; }
+  .dcases { display:inline-grid; grid-template-columns:auto auto; gap:1px 14px; text-align:left;
+            border-left:2px solid var(--wi-ink); padding-left:9px; vertical-align:middle;
+            font-size:.92em; }
+  .dcases .cond { color:var(--wi-ink-faint); font-size:.86em; }
+  .thm { border:1px solid var(--wi-border-soft); border-left:3px solid var(--wi-accent);
+         background:var(--wi-panel-2); border-radius:var(--wi-radius); padding:10px 13px; }
+  .thm h3 { font-size:.74rem; text-transform:uppercase; letter-spacing:.1em; color:var(--wi-accent);
+            margin:0 0 7px; }
+  .thmlead { font-size:.86rem; margin-bottom:8px; }
+  .thmcase { display:grid; grid-template-columns:1.6em 1fr; gap:0 6px; padding:6px 8px; border-radius:3px;
+             font-size:.86rem; border:1px solid transparent; cursor:default; }
+  .thmcase + .thmcase { margin-top:3px; }
+  .thmcase .tag { color:var(--wi-ink-faint); }
+  .thmcase.on { background:#f6e6df; border-color:var(--wi-accent-soft); }
+  .thmcase.off { opacity:.5; }
+  .thmcase .check { grid-column:2; font-size:.84em; margin-top:3px; color:var(--wi-ink-soft); display:block; }
+  .thmcase.on .check { color:var(--wi-accent-dark); }
+  .verdict { font-size:1.05rem; text-align:center; padding:6px 0 2px; }
+  .verdict .big { font-size:1.25rem; }
+  .vnote { font-size:.78rem; color:var(--wi-ink-soft); text-align:center; margin-top:5px; line-height:1.45; }
+  .warn { border-left:3px solid var(--wi-active); background:#f7ece8; padding:7px 11px;
+          border-radius:3px; font-size:.8rem; margin-top:9px; color:var(--wi-ink-strong); }
+
+  /* --- tables --- */
+  table.led { border-collapse:collapse; width:100%; font-size:.76rem; font-family:var(--wi-font-mono); }
+  table.led th { font-family:var(--wi-font-head); font-size:.66rem; text-transform:uppercase;
+                 letter-spacing:.07em; color:var(--wi-ink-faint); font-weight:normal;
+                 text-align:right; padding:2px 5px; border-bottom:1px solid var(--wi-border-soft); }
+  table.led th:first-child, table.led td:first-child { text-align:left; }
+  table.led td { text-align:right; padding:2px 5px; border-bottom:1px solid #e4dccf; }
+  table.led tr:hover td { background:#f2e7e2; }
+  table.led tr.leafrow td { color:var(--mt-d); }
+  table.led tr.sumrow td { border-top:1px solid var(--wi-border); border-bottom:0;
+                           font-weight:bold; color:var(--wi-ink-strong); }
+  table.led td.share { color:var(--wi-ink-faint); }
+  .scroller { max-height:290px; overflow:auto; }
+
+  /* --- collapsibles --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; margin-top:16px; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .condbody { padding:12px 16px 16px; display:grid; grid-template-columns:1fr 1fr; gap:16px 22px; }
+  @media (max-width:900px) { .condbody { grid-template-columns:1fr; } }
+  .lem { font-size:.84rem; }
+  .lem h4 { font-family:var(--wi-font-head); font-size:.72rem; letter-spacing:.08em; text-transform:uppercase;
+            color:var(--wi-accent); margin:0 0 5px; }
+  .lem p { margin:0 0 7px; }
+  .quant { font-size:.86em; background:var(--wi-panel-2); border:1px solid var(--wi-border-soft);
+           border-radius:3px; padding:6px 9px; display:block; margin:6px 0; }
+  .yes { color:var(--wi-relax); font-weight:bold; }
+  .no { color:var(--wi-active); font-weight:bold; }
+  .maybe { color:var(--wi-examine); font-weight:bold; }
+  details.editor { margin-top:16px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:190px; font-family:var(--wi-font-mono); font-size:.76rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:260px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+
+  .echo { font-size:.82rem; color:var(--wi-ink-soft); font-style:italic; }
+  .echo b { font-style:normal; color:var(--wi-ink-strong); }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.75rem; color:var(--wi-ink-soft);
+            margin-top:8px; }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.8em; height:.8em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.28rem; }
+    .controls { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
+
+  :root {
+    --c-grp:#b07d18; --c-grp-fill:#f2e6ca;
+    --c-med:#2a6a63; --c-med-fill:#d9e7e4;
+    --c-piv:#902015; --c-piv-fill:#f0d9d3;
+    --c-lo:#4a7c3f;  --c-lo-fill:#dfe9d7;
+    --c-hi:#3a5f8a;  --c-hi-fill:#dbe3ee;
+    --c-in:#8d897c;  --c-in-fill:#eee6d9;
+    --mom-mom:#2a6a63; --mom-med:#b07d18;
+  }
+  .phasebtn { min-width:46px; }
+  @media (max-width:820px) {
+    .phasebar { flex-wrap:wrap; }
+    .phasebtn { min-width:40px; border-left-width:1px; border-radius:var(--wi-radius); margin:1px; }
+    .crumb { font-size:.64rem; }
+    pre.code { font-size:.7rem; }
+  }
+  /* ---------- page specific ---------- */
+  .stage { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(330px,.85fr); gap:18px; align-items:start; }
+  .col-main, .col-side { min-width:0; }     /* an <svg> must not set the column's min-content */
+  @media (max-width:1080px) { .stage { grid-template-columns:minmax(0,1fr); } }
+
+  .crumbs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:9px; }
+  .crumb { font-family:var(--wi-font-mono); font-size:.72rem; padding:3px 7px; border-radius:3px;
+           border:1px solid var(--wi-border-soft); background:var(--wi-panel-2); color:var(--wi-ink-soft);
+           cursor:pointer; white-space:nowrap; }
+  .crumb.sel { border-color:var(--wi-accent); color:var(--wi-accent); background:#f6e6df; }
+  .crumb.mom { color:var(--mom-mom); }
+  .crumb .arw { color:var(--wi-ink-faint); }
+
+  pre.code { margin:0; font-family:var(--wi-font-mono); font-size:.78rem; line-height:1.55;
+             background:var(--wi-panel-2); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius);
+             padding:8px 0; overflow-x:auto; }
+  pre.code .ln { display:block; padding:0 10px 0 0; white-space:pre; border-left:3px solid transparent; }
+  pre.code .ln .no { display:inline-block; width:2.1em; text-align:right; margin-right:.7em;
+                     color:var(--wi-ink-faint); font-size:.88em; }
+  pre.code .ln.on { background:#f6e6df; border-left-color:var(--wi-accent); }
+  pre.code .ln.callsite { background:#eef0e4; border-left-color:var(--wi-queue); }
+  pre.code .kw { color:var(--wi-accent-dark); font-weight:bold; }
+  pre.code .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .codehd { font-family:var(--wi-font-head); font-size:.7rem; letter-spacing:.09em; text-transform:uppercase;
+            color:var(--wi-ink-faint); margin:0 0 5px; }
+  summary.codehd { cursor:pointer; list-style:none; }
+  summary.codehd::-webkit-details-marker { display:none; }
+  summary.codehd::before { content:"\25be\2002"; color:var(--wi-ink-faint); }
+  details:not([open]) > summary.codehd::before { content:"\25b8\2002"; }
+  summary.codehd:hover { color:var(--wi-accent); }
+  .codehd b { color:var(--wi-accent); font-weight:normal; }
+
+  .costgrid { display:grid; grid-template-columns:auto 1fr auto; gap:5px 10px; align-items:center;
+              font-size:.8rem; }
+  .costgrid .num { font-family:var(--wi-font-mono); text-align:right; }
+  .costbar { height:9px; border-radius:2px; background:var(--wi-controls); overflow:hidden; display:flex; }
+  .costbar i { display:block; height:100%; }
+
+  .facts { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:.78rem; color:var(--wi-ink-soft); }
+  .facts b { font-family:var(--wi-font-mono); color:var(--wi-ink-strong); font-weight:normal; }
+
+  /* ---------- SVG ---------- */
+  svg text { font-family:var(--wi-font-body); fill:var(--wi-ink-strong); }
+  svg .mono { font-family:var(--wi-font-mono); }
+  .bar { stroke-width:1; }
+  .idx { text-anchor:middle; font-size:8.5px; fill:var(--wi-ink-faint); font-family:var(--wi-font-mono); }
+  .val { text-anchor:middle; font-size:9px; font-family:var(--wi-font-mono); }
+  .grpbox { fill:none; stroke:var(--wi-examine); stroke-width:1.3; stroke-dasharray:3 2.5; }
+  .grplab { text-anchor:middle; font-size:9px; fill:var(--wi-examine); font-family:var(--wi-font-head);
+            letter-spacing:.05em; }
+  .dead { fill:var(--wi-bg); opacity:.62; }
+  .deadline { stroke:var(--wi-inert-border); stroke-width:1; stroke-dasharray:2 3; }
+  .rangebr { fill:none; stroke:var(--wi-accent); stroke-width:1.3; }
+  .rangelab { text-anchor:middle; font-size:9.5px; fill:var(--wi-accent);
+              font-family:var(--wi-font-head); letter-spacing:.06em; }
+  .ptr { font-size:10px; font-family:var(--wi-font-mono); text-anchor:middle; }
+  .base { stroke:var(--wi-border-strong); stroke-width:1; }
+  .movearc { fill:none; stroke:var(--mom-med); stroke-width:1.2; stroke-dasharray:3 2; }
+  .capt { text-anchor:middle; font-size:10.5px; fill:var(--wi-ink-soft); }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+  <span>Selection by rank</span>
+</div>
+
+<div class="titlebar">
+  <h1 id="h1title">Median of Medians</h1>
+</div>
+
+<p class="subtitle" id="sub">Deterministic selection by rank, in place. The pivot is not guessed: the input is cut into
+  groups of five, each group is sorted, the five medians are gathered at the front of the range, and the algorithm calls
+  <i>itself</i> to select the median of those &mdash; that pivot is then good enough to throw away a constant fraction
+  every round. Everything happens inside the one array; the frame shows the range still in play.</p>
+
+<div class="controls" id="ctlMain">
+  <div class="ctl"><label for="presetSel">Input</label>
+    <select id="presetSel"></select></div>
+  <div class="ctl"><label for="inN"><span class="m">n</span></label>
+    <input class="tiny" id="inN" value="31"></div>
+  <div class="ctl"><label for="inK">rank <span class="m">k</span></label>
+    <input class="tiny" id="inK" value="15">
+    <span class="echo" id="kEcho"></span></div>
+  <div class="ctl"><button id="btnResample">Resample</button></div>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <div class="tbtns">
+      <button id="btnFirst" class="tbtn" title="Back to the first step"
+              aria-label="Back to the first step">&#8634;</button>
+      <button id="btnPrev" class="tbtn" title="One step back (left arrow key)"
+              aria-label="One step back">&#9198;&#65038;</button>
+      <button id="btnNext" class="tbtn" title="One step forward (right arrow key)"
+              aria-label="One step forward">&#9197;&#65038;</button>
+      <button id="playBtn" class="tbtn pri" title="Play (space bar)"
+              aria-label="Play">&#9654;&#65038;</button>
+    </div>
+    <div class="progress">
+      <input type="range" id="slider" min="0" max="1" value="0" step="1">
+      <div class="phasebar" id="phasebar"></div>
+    </div>
+    <span class="stepno" id="stepno"></span>
+  </div>
+  <div class="explain" id="explain"></div>
+</div>
+
+<div class="stage">
+  <div class="col-main">
+    <div class="sim-box">
+      <div class="sim-title"><span id="svgTitle">The array</span><span class="rhs" id="svgRhs"></span></div>
+      <svg id="arrSvg" class="stagesvg" viewBox="0 0 720 300" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Comparisons so far</span><span class="rhs" id="costRhs"></span></div>
+      <div class="costgrid" id="costGrid"></div>
+      <div class="facts" id="facts" style="margin-top:10px"></div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>Call stack</span><span class="rhs" id="depthRhs"></span></div>
+      <div class="crumbs" id="crumbs"></div>
+      <details id="codeDet" open>
+        <summary class="codehd" id="codeHd"></summary>
+        <pre class="code" id="codeBox"></pre>
+      </details>
+    </div>
+  </div>
+</div>
+
+<details class="code" id="bothCode">
+  <summary>Both procedures &nbsp;&middot;&nbsp; the pseudocode this page executes</summary>
+  <div class="condbody">
+    <div><div class="codehd">choosePivotMoM</div><pre class="code" id="codeMomFull"></pre></div>
+    <div><div class="codehd">quickselectMoM</div><pre class="code" id="codeQsFull"></pre></div>
+    <div class="lem" style="grid-column:1/-1">
+      <h4>Two black boxes</h4>
+      <p><code>sort</code> and <code>partition</code> are not unfolded here &mdash; only their effect on the array is
+        animated. Their cost is charged as stated: <b>sort</b> of a block counts the comparisons an insertion sort makes
+        on it, <b>partition</b> counts <span class="m">r</span> &minus; <span class="m">l</span>.</p>
+      <p class="hint">Note what <code>partition</code> works on: the whole range, including the up to four leftover
+        elements at the end that were never part of any group of five. Only the medians of complete groups take part in
+        choosing the pivot.</p>
+    </div>
+  </div>
+</details>
+
+<details class="editor">
+  <summary>Load an input &nbsp;&middot;&nbsp; plain-text format</summary>
+  <div class="editor-body">
+    <div class="hint">
+      Numbers separated by spaces, commas or newlines &mdash; duplicates allowed. An optional line
+      <code>k &lt;rank&gt;</code> sets the rank being searched for (0-based, as on the slides).
+      <p style="margin-top:9px">Everything is in place: what you see is the one array being permuted, never a copy.</p>
+    </div>
+    <div>
+      <textarea id="ta" spellcheck="false"></textarea>
+      <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap">
+        <button id="btnLoad" class="pri">Load</button>
+        <button id="btnDump">Copy current</button>
+      </div>
+      <div class="err" id="taErr"></div>
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tt"></div>
+
+<script>
+"use strict";
+/* ============================================================================
+   Median of medians — the in-place version of the slides, executed for real.
+   One array, permuted in place; every step records the whole arrangement, so
+   the slider can walk backwards as well as forwards.
+
+   The two black boxes:
+     sort(A[l..r))        insertion sort, in place; cost = its own comparisons
+     partition(A[l..r),b) rearranges around the pivot; cost charged as r - l
+   ========================================================================= */
+
+const el = id => document.getElementById(id);
+const clamp = (x, a, b) => x < a ? a : (x > b ? b : x);
+
+/* --- the pseudocode, exactly as executed ---------------------------------- */
+const CODE = {
+  qs: { name:"quickselectMoM", lines:[
+    "procedure quickselectMoM(A[l..r), k):",
+    "    if r \u2212 l \u2264 5",
+    "        sort(A[l..r));  return k",
+    "    b := choosePivotMoM(A[l..r))",
+    "    j := partition(A[l..r), b)",
+    "    if j == k",
+    "        return j",
+    "    else if j < k",
+    "        return quickselectMoM(A[j+1..r), k)",
+    "    else // j > k",
+    "        return quickselectMoM(A[l..j), k)"
+  ]},
+  mom: { name:"choosePivotMoM", lines:[
+    "procedure choosePivotMoM(A[l..r)):",
+    "    m := \u230a(r \u2212 l)/5\u230b",
+    "    for i := 0, \u2026, m \u2212 1",
+    "        sort(A[l+5i..l+5i+4])",
+    "        // collect median of 5",
+    "        Swap A[l+i] and A[l+5i+2]",
+    "    return quickselectMoM(A[l..l+m), l + \u230a(m\u22121)/2\u230b)"
+  ]}
+};
+const KEYWORDS = /\b(procedure|if|else|for|return|while|and|or)\b/g;
+function codeHTML(which, curLine, callLine) {
+  return CODE[which].lines.map((t, i) => {
+    const n = i + 1;
+    let body = t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const cm = body.indexOf("//");
+    if (cm >= 0) body = body.slice(0, cm) + '<span class="cm">' + body.slice(cm) + "</span>";
+    body = body.replace(KEYWORDS, '<span class="kw">$1</span>');
+    const cls = n === curLine ? " on" : (n === callLine ? " callsite" : "");
+    return '<span class="ln' + cls + '"><span class="no">' + n + "</span>" + body + "</span>";
+  }).join("");
+}
+
+/* --- inputs --------------------------------------------------------------- */
+const PRESETS = [
+  { id:"perm",  name:"Random permutation of 1\u2026n", gen:n => shuffle(range(1, n)) },
+  { id:"dups",  name:"Random with many duplicates",    gen:n => Array.from({length:n}, () => 1 + Math.floor(Math.random() * Math.max(3, Math.round(n / 5)))) },
+  { id:"sorted", name:"Already sorted",                gen:n => range(1, n) },
+  { id:"rev",   name:"Reverse sorted",                 gen:n => range(1, n).reverse() },
+  { id:"equal", name:"All equal",                      gen:n => Array.from({length:n}, () => 7) },
+  { id:"twoval", name:"Only two distinct values",      gen:n => Array.from({length:n}, (_, i) => (i * 7) % 3 === 0 ? 2 : 9) },
+  { id:"organ", name:"Organ pipe (up then down)",      gen:n => range(1, Math.ceil(n / 2)).concat(range(1, Math.floor(n / 2)).reverse()) }
+];
+const range = (a, b) => Array.from({ length:b - a + 1 }, (_, i) => a + i);
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+/* --- the run -------------------------------------------------------------- */
+function buildRun(values, kWanted) {
+  const A = values.map((v, i) => ({ id:i, v:v }));
+  const steps = [], stack = [];
+  const cost = { s5:0, part:0 };
+  let discarded = 0;
+  const V = i => A[i].v;
+  const swap = (i, j) => { const t = A[i]; A[i] = A[j]; A[j] = t; };
+
+  /* the rank currently being searched for: the innermost quickselectMoM's k.
+     Inside choosePivotMoM that is still its caller's k. */
+  function innerK() {
+    for (let i = stack.length - 1; i >= 0; i--) if (stack[i].code === "qs") return stack[i].k;
+    return kWanted;
+  }
+  function emit(code, line, expl, extra) {
+    const top = stack[stack.length - 1];
+    top.line = line;
+    steps.push(Object.assign({
+      code:code, line:line, expl:expl, phase:"select",
+      stack:stack.map(f => ({ name:f.name, code:f.code, tok:f.tok, line:f.line, callLine:f.callLine })),
+      arr:A.map(e => e.id), cost:{ s5:cost.s5, part:cost.part },
+      frame:[top.l, top.r], k:innerK(), kOuter:kWanted, discarded:discarded
+    }, extra || {}));
+  }
+  /* insertion sort: the black box, and the source of its own cost */
+  function sortRange(l, r) {
+    let c = 0;
+    for (let i = l + 1; i < r; i++) {
+      let j = i;
+      while (j > l && A[j - 1].v > A[j].v) { swap(j - 1, j); j--; c++; }
+      if (j > l) c++;
+    }
+    return c;
+  }
+  /* partition around the element currently at index b; returns its final index */
+  function partition(l, r, b) {
+    swap(l, b);
+    const p = A[l].v;
+    let i = l + 1, j = r - 1;
+    for (;;) {
+      while (i <= j && A[i].v < p) i++;
+      while (j >= i && A[j].v > p) j--;
+      if (i > j) break;
+      swap(i, j); i++; j--;
+    }
+    swap(l, j);
+    return j;
+  }
+
+  /* ---- choosePivotMoM --------------------------------------------------- */
+  function mom(l, r) {
+    const F = { name:"choosePivotMoM", code:"mom", l:l, r:r, tok:"choosePivotMoM(" + l + ".." + r + ")" };
+    stack.push(F);
+    emit("mom", 1, "Find a pivot for A[" + l + ".." + r + ") that cannot be near either extreme \u2014 by taking " +
+      "the median of the group medians.", { phase:"MoM" });
+    const m = Math.floor((r - l) / 5), rest = (r - l) % 5;
+    emit("mom", 2, "m = \u230a" + (r - l) + "/5\u230b = <b>" + m + "</b>: " + m + " complete group" + (m === 1 ? "" : "s") +
+      " of five" + (rest ? ", plus " + rest + " leftover element" + (rest === 1 ? "" : "s") +
+      " at the end that take no part in choosing the pivot" : "") + ".", { phase:"MoM", groups:m });
+    for (let i = 0; i < m; i++) {
+      const g0 = l + 5 * i, g1 = g0 + 5;
+      emit("mom", 3, "Group " + (i + 1) + " of " + m + ": A[" + g0 + ".." + g1 + ").",
+        { phase:"groups", group:[g0, g1], medPrefix:i ? [l, l + i] : null });
+      const c = sortRange(g0, g1); cost.s5 += c;
+      emit("mom", 4, "Sort those five in place \u2014 " + c + " comparisons. The median of the group is now the middle " +
+        "cell, A[" + (g0 + 2) + "] = <b>" + V(g0 + 2) + "</b>.",
+        { phase:"groups", group:[g0, g1], med5:g0 + 2, medPrefix:i ? [l, l + i] : null, move:true });
+      const dst = l + i;
+      emit("mom", 6, "Swap that median into A[" + dst + "], so the medians collect at the front of the range." +
+        (dst >= l + 5 * 0 && dst < g0 ? " It lands inside a group that has already been dealt with \u2014 harmless, " +
+          "since that group\u2019s median was collected already." : ""),
+        { phase:"groups", group:[g0, g1], swap:[dst, g0 + 2], medPrefix:i ? [l, l + i] : null });
+      swap(dst, g0 + 2);
+      emit("mom", 6, "A[" + l + ".." + (l + i + 1) + ") now holds " + (i + 1) + " group median" + (i ? "s" : "") + ".",
+        { phase:"groups", medPrefix:[l, l + i + 1], move:true });
+    }
+    const kk = l + Math.floor((m - 1) / 2);
+    emit("mom", 7, "All " + m + " medians sit in A[" + l + ".." + (l + m) + "). Their own median is the element of rank " +
+      kk + " in that prefix \u2014 so call quickselectMoM on it. <b>This is the second recursion.</b>",
+      { phase:"MoM", medPrefix:[l, l + m], callsite:true });
+    F.callLine = 7;
+    const b = qs(l, l + m, kk);
+    F.callLine = null;
+    emit("mom", 7, "The median of the medians is A[" + b + "] = <b>" + V(b) + "</b>. That is the pivot.",
+      { phase:"MoM", pivot:b, medPrefix:[l, l + m] });
+    stack.pop();
+    return b;
+  }
+
+  /* ---- quickselectMoM --------------------------------------------------- */
+  function qs(l, r, k) {
+    const F = { name:"quickselectMoM", code:"qs", l:l, r:r, k:k,
+                tok:"quickselectMoM(" + l + ".." + r + ", k=" + k + ")" };
+    stack.push(F);
+    emit("qs", 1, "Looking for the element of rank " + k + " inside A[" + l + ".." + r + ").", { phase:"select" });
+    emit("qs", 2, "r \u2212 l = " + (r - l) + (r - l <= 5 ? " \u2264 5 \u2014 small enough to finish outright."
+      : " > 5 \u2014 we need a pivot."), { phase:"select" });
+    if (r - l <= 5) {
+      const c = sortRange(l, r); cost.s5 += c;
+      emit("qs", 3, "Sort what is left (" + c + " comparisons). A[" + k + "] = <b>" + V(k) + "</b> is the element of rank " +
+        k + ".", { phase:"select", ans:k, move:true });
+      stack.pop();
+      return k;
+    }
+    emit("qs", 4, "Hand the whole range to choosePivotMoM.", { phase:"MoM", callsite:true });
+    F.callLine = 4;
+    const b = mom(l, r);
+    F.callLine = null;
+    emit("qs", 4, "It returned index " + b + ", so the pivot is <b>" + V(b) + "</b>.", { phase:"MoM", pivot:b });
+    emit("qs", 5, "Partition the <i>whole</i> range around it \u2014 leftover elements included.",
+      { phase:"partition", pivot:b, callsite:true });
+    F.callLine = 5;
+    const j = partition(l, r, b);
+    F.callLine = null;
+    cost.part += (r - l);
+    emit("qs", 5, "The pivot is now at its final index j = <b>" + j + "</b>: " + (j - l) + " element" + (j - l === 1 ? "" : "s") +
+      " at or below it on the left, " + (r - 1 - j) + " at or above on the right. Charged " + (r - l) + " comparisons.",
+      { phase:"partition", j:j, sides:true, move:true });
+    emit("qs", 6, "Is j = " + j + " the rank we want, k = " + k + "?", { phase:"recurse", j:j, sides:true });
+    let out;
+    if (j === k) {
+      emit("qs", 7, "Yes. A[" + j + "] = <b>" + V(j) + "</b> is the element of rank " + k + ", and we are done.",
+        { phase:"recurse", ans:j });
+      out = j;
+    } else if (j < k) {
+      const drop = j + 1 - l;
+      emit("qs", 8, j + " < " + k + ": the element we want lies to the right of the pivot.",
+        { phase:"recurse", j:j, sides:true });
+      discarded += drop;
+      emit("qs", 9, "Recurse on A[" + (j + 1) + ".." + r + "). " + drop + " element" + (drop === 1 ? "" : "s") +
+        " leave the picture for good.", { phase:"recurse", j:j, drop:[l, j + 1] });
+      F.callLine = 9;
+      out = qs(j + 1, r, k);
+      F.callLine = null;
+    } else {
+      const drop = r - j;
+      emit("qs", 10, j + " > " + k + ": the element we want lies to the left of the pivot.",
+        { phase:"recurse", j:j, sides:true });
+      discarded += drop;
+      emit("qs", 11, "Recurse on A[" + l + ".." + j + "). " + drop + " element" + (drop === 1 ? "" : "s") +
+        " leave the picture for good.", { phase:"recurse", j:j, drop:[j, r] });
+      F.callLine = 11;
+      out = qs(l, j, k);
+      F.callLine = null;
+    }
+    stack.pop();
+    return out;
+  }
+
+  const ansIdx = qs(0, values.length, kWanted);
+  /* Phases for the navigation bar: one run per (round, activity), where the
+     round is driven by the outermost quickselectMoM frame that is not merely
+     sitting on a tail-recursive call. Everything choosePivotMoM does — groups,
+     medians, its own nested selection — counts as that round's "pivot". */
+  steps.forEach(s => {
+    let idx = -1, round = 1;
+    for (let i = 0; i < s.stack.length; i++) {
+      const f = s.stack[i];
+      if (f.code !== "qs") continue;
+      if (f.line === 9 || f.line === 11) { round++; continue; }
+      idx = i; break;
+    }
+    let f;
+    if (idx >= 0) f = s.stack[idx];
+    else { f = s.stack[s.stack.length - 1]; round--; }
+    const L = f.line;
+    s.phase = L <= 2 ? "enter" : L === 3 ? "finish" : L === 4 ? "pivot" : L === 5 ? "partition" : "shrink";
+    s.round = Math.max(1, round);
+  });
+
+  return { steps:steps, answer:A[ansIdx].v, ansIdx:ansIdx, final:A.map(e => e.v),
+           values:values, k:kWanted, cost:cost };
+}
+/* ==========================================================================
+   Drawing. The array is a row of bars; a bar belongs to an element, not to a
+   position, so a swap is a movement rather than a repaint.
+   ========================================================================= */
+const VB_W = 720, VB_H = 300, AX0 = 34, AX1 = 694;
+const YBASE = 218, YTOP = 40;
+
+const MARKCOL = {
+  in:   ["var(--c-in-fill)",  "var(--c-in)"],
+  out:  ["#e7e0d2",           "#bdb8a6"],
+  grp:  ["var(--c-grp-fill)", "var(--c-grp)"],
+  med:  ["var(--c-med-fill)", "var(--c-med)"],
+  piv:  ["var(--c-piv-fill)", "var(--c-piv)"],
+  lo:   ["var(--c-lo-fill)",  "var(--c-lo)"],
+  hi:   ["var(--c-hi-fill)",  "var(--c-hi)"],
+  ans:  ["var(--c-piv)",      "var(--c-piv)"]
+};
+
+function markOf(s, i) {
+  if (s.ans === i) return "ans";
+  if (s.pivot === i || s.j === i) return "piv";
+  if (s.med5 === i) return "med";
+  if (s.swap && (s.swap[0] === i || s.swap[1] === i)) return "med";
+  if (s.group && i >= s.group[0] && i < s.group[1]) return "grp";
+  if (s.medPrefix && i >= s.medPrefix[0] && i < s.medPrefix[1]) return "med";
+  if (i < s.frame[0] || i >= s.frame[1]) return "out";
+  if (s.sides && s.j !== undefined) return i < s.j ? "lo" : "hi";
+  return "in";
+}
+
+/* positions of every element id in a given arrangement */
+function posMap(order) { const p = {}; order.forEach((id, i) => { p[id] = i; }); return p; }
+
+function drawArray(s, pos) {
+  const svg = el("arrSvg"), n = s.arr.length;
+  const cw = (AX1 - AX0) / n, bw = Math.max(2, cw - Math.min(3, cw * 0.22));
+  const maxv = Math.max(1, ...s.arr.map(id => VAL[id]));
+  const H = YBASE - YTOP;
+  const out = [];
+  const xOf = p => AX0 + p * cw + (cw - bw) / 2;
+
+  /* the range still in play */
+  out.push('<rect x="' + (AX0 + s.frame[0] * cw) + '" y="' + (YTOP - 12) + '" width="' + ((s.frame[1] - s.frame[0]) * cw) +
+    '" height="' + (YBASE - YTOP + 20) + '" fill="#fcf9f3" stroke="none"/>');
+
+  /* bars */
+  s.arr.forEach((id, i) => {
+    const m = markOf(s, i), col = MARKCOL[m], v = VAL[id];
+    const h = Math.max(2.5, v / maxv * H), x = xOf(pos[id]);
+    out.push('<rect class="bar" data-i="' + i + '" x="' + x + '" y="' + (YBASE - h) + '" width="' + bw +
+      '" height="' + h + '" rx="1.5" fill="' + col[0] + '" stroke="' + col[1] + '"/>');
+    if (cw >= 15)
+      out.push('<text class="val" x="' + (x + bw / 2) + '" y="' + (YBASE - h - 3.5) + '" fill="' + col[1] + '">' + v + '</text>');
+  });
+  out.push('<line x1="' + AX0 + '" y1="' + YBASE + '" x2="' + AX1 + '" y2="' + YBASE + '" class="base"/>');
+
+  /* index ruler */
+  const every = n <= 24 ? 1 : (n <= 45 ? 2 : 5);
+  for (let i = 0; i < n; i++) {
+    if (i % every) continue;
+    out.push('<text class="idx" x="' + (AX0 + i * cw + cw / 2) + '" y="' + (YBASE + 11) + '">' + i + '</text>');
+  }
+
+  /* the group of five currently being sorted */
+  if (s.group) {
+    const gx = AX0 + s.group[0] * cw, gw = (s.group[1] - s.group[0]) * cw;
+    out.push('<rect class="grpbox" x="' + (gx + 1) + '" y="' + (YTOP - 14) + '" width="' + (gw - 2) +
+      '" height="' + (YBASE - YTOP + 20) + '" rx="3"/>');
+    out.push('<text class="grplab" x="' + (gx + gw / 2) + '" y="' + (YTOP - 19) + '">group of 5</text>');
+  }
+  /* the medians gathered so far */
+  if (s.medPrefix && s.medPrefix[1] > s.medPrefix[0]) {
+    const mx = AX0 + s.medPrefix[0] * cw, mw = (s.medPrefix[1] - s.medPrefix[0]) * cw;
+    out.push('<rect x="' + mx + '" y="' + (YBASE + 16) + '" width="' + mw + '" height="3" fill="var(--c-med)"/>');
+    out.push('<text class="grplab" x="' + (mx + mw / 2) + '" y="' + (YBASE + 30) + '" fill="var(--c-med)">medians</text>');
+  }
+  /* the elements about to be dropped */
+  if (s.drop) {
+    const dx = AX0 + s.drop[0] * cw, dw = (s.drop[1] - s.drop[0]) * cw;
+    out.push('<rect x="' + dx + '" y="' + (YTOP - 12) + '" width="' + dw + '" height="' + (YBASE - YTOP + 14) +
+      '" fill="#902015" opacity=".08"/>');
+    out.push('<line x1="' + dx + '" y1="' + (YTOP - 12) + '" x2="' + (dx + dw) + '" y2="' + (YBASE + 2) + '" class="deadline"/>');
+  }
+  /* swap arc */
+  if (s.swap) {
+    const a = AX0 + s.swap[0] * cw + cw / 2, b = AX0 + s.swap[1] * cw + cw / 2;
+    out.push('<path class="movearc" d="M' + a + ' ' + (YTOP - 16) + ' Q' + ((a + b) / 2) + ' ' + (YTOP - 38) + ' ' +
+      b + ' ' + (YTOP - 16) + '" marker-end="url(#mh)"/>');
+  }
+
+  /* the frame bracket, and the pointers */
+  const fx = AX0 + s.frame[0] * cw, fw = (s.frame[1] - s.frame[0]) * cw;
+  out.push('<path class="rangebr" d="M' + fx + ' ' + (YBASE + 42) + ' v6 h' + fw + ' v-6"/>');
+  out.push('<text class="rangelab" x="' + (fx + fw / 2) + '" y="' + (YBASE + 60) + '">A[' + s.frame[0] + '\u2009..\u2009' +
+    s.frame[1] + ')&#160;&#160;' + (s.frame[1] - s.frame[0]) + ' left</text>');
+  if (s.kOuter !== s.k) {
+    const ox = AX0 + s.kOuter * cw + cw / 2;
+    out.push('<line x1="' + ox + '" y1="' + (YBASE - 6) + '" x2="' + ox + '" y2="' + (YBASE + 6) +
+      '" stroke="var(--wi-accent)" stroke-width="1" opacity=".33"/>' +
+      '<text class="ptr" x="' + ox + '" y="' + (YTOP - 20) + '" fill="var(--wi-accent)" opacity=".45" font-size="8.5">' +
+      'outer k = ' + s.kOuter + '</text>');
+  }
+  const kx = AX0 + s.k * cw + cw / 2;
+  out.push('<line x1="' + kx + '" y1="' + (YTOP - 14) + '" x2="' + kx + '" y2="' + (YBASE + 6) +
+    '" stroke="var(--wi-accent)" stroke-width="1" stroke-dasharray="3 3" opacity=".75"/>');
+  out.push('<text class="ptr" x="' + kx + '" y="' + (YTOP - 20) + '" fill="var(--wi-accent)">k = ' + s.k + '</text>');
+  if (s.j !== undefined) {
+    const jx = AX0 + s.j * cw + cw / 2;
+    out.push('<path d="M' + jx + ' ' + (YBASE + 14) + ' l-4 8 h8 z" fill="var(--c-piv)"/>' +
+      '<text class="ptr" x="' + jx + '" y="' + (YBASE + 31) + '" fill="var(--c-piv)">j</text>');
+  } else if (s.pivot !== undefined) {
+    const px = AX0 + s.pivot * cw + cw / 2;
+    out.push('<path d="M' + px + ' ' + (YBASE + 14) + ' l-4 8 h8 z" fill="var(--c-piv)"/>' +
+      '<text class="ptr" x="' + px + '" y="' + (YBASE + 31) + '" fill="var(--c-piv)">pivot</text>');
+  }
+
+  svg.innerHTML = '<defs><marker id="mh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" ' +
+    'orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--c-grp)"/></marker></defs>' + out.join("");
+}
+
+/* --- movement between two arrangements ----------------------------------- */
+let raf = null;
+function showStep(i, animate) {
+  const s = RUN.steps[i], prev = RUN.steps[Math.max(0, i - 1)];
+  const to = posMap(s.arr);
+  if (!animate || !s.move || i === 0) { drawArray(s, to); return; }
+  const from = posMap(prev.arr);
+  const same = s.arr.every((id, q) => from[id] === q);
+  if (same) { drawArray(s, to); return; }
+  const t0 = performance.now(), dur = 460;
+  if (raf) cancelAnimationFrame(raf);
+  (function frame(now) {
+    const u = clamp((now - t0) / dur, 0, 1), e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    const mid = {};
+    s.arr.forEach(id => { mid[id] = from[id] + (to[id] - from[id]) * e; });
+    drawArray(s, mid);
+    if (u < 1) raf = requestAnimationFrame(frame); else { raf = null; drawArray(s, to); }
+  })(performance.now());
+}
+/* ==========================================================================
+   Panels, transport, input.
+   ========================================================================= */
+let RUN = null, VAL = {}, step = 0, playing = false, timer = null;
+let curFrame = -1;            /* which stack frame the code panel is showing  */
+
+function makeRun(values, k) {
+  VAL = {}; values.forEach((v, i) => { VAL[i] = v; });
+  RUN = buildRun(values, clamp(k, 0, values.length - 1));
+  step = 0; curFrame = -1;
+}
+
+/* --- phases -------------------------------------------------------------- */
+const PHASE_TITLE = { enter:"enter the call and check its size", finish:"small enough \u2014 sort and stop", pivot:"choose a pivot (groups of five, then a nested selection)",
+                      partition:"partition around the pivot", shrink:"drop one side and recurse" };
+function phaseList() {
+  const out = [];
+  RUN.steps.forEach((s, i) => {
+    const key = s.round + ":" + s.phase;
+    if (out.length && out[out.length - 1].key === key) out[out.length - 1].to = i;
+    else out.push({ key:key, label:s.phase, round:s.round, from:i, to:i });
+  });
+  return out;
+}
+function renderPhases() {
+  const ph = phaseList(), bar = el("phasebar");
+  bar.innerHTML = ph.map(p => '<button class="phasebtn' + (step >= p.from && step <= p.to ? " on" :
+    (step > p.to ? " past" : "")) + '" data-goto="' + p.from + '" title="round ' + p.round + ' \u2014 ' +
+    PHASE_TITLE[p.label] + ' (steps ' + (p.from + 1) + "\u2013" + (p.to + 1) + ')">' +
+    p.label + '<span style="opacity:.55"> ' + p.round + '</span></button>').join("");
+  bar.querySelectorAll("[data-goto]").forEach(b => { b.onclick = () => { stop(); setStep(+b.getAttribute("data-goto")); }; });
+  ph.forEach((p, i) => { bar.children[i].style.flexGrow = (p.to - p.from + 1); });
+}
+
+/* --- the call stack ------------------------------------------------------ */
+function renderStack() {
+  const s = RUN.steps[step], st = s.stack;
+  const sel = curFrame < 0 || curFrame >= st.length ? st.length - 1 : curFrame;
+  el("crumbs").innerHTML = st.map((f, i) =>
+    (i ? '<span class="crumb arw" style="border:0;background:none;padding:0 1px">\u203a</span>' : "") +
+    '<span class="crumb' + (i === sel ? " sel" : "") + (f.code === "mom" ? " mom" : "") + '" data-f="' + i + '">' +
+    f.tok + '</span>').join("");
+  el("crumbs").querySelectorAll("[data-f]").forEach(c => {
+    c.onclick = () => { curFrame = +c.getAttribute("data-f"); if (curFrame === st.length - 1) curFrame = -1; render(); };
+  });
+  const f = st[sel];
+  el("depthRhs").textContent = "depth " + st.length;
+  el("codeHd").innerHTML = f.code === "mom" ? "choosePivotMoM" : "quickselectMoM";
+  el("codeBox").innerHTML = codeHTML(f.code, f.line, f.callLine);
+}
+
+/* --- cost ---------------------------------------------------------------- */
+function renderCost() {
+  const s = RUN.steps[step], tot = s.cost.s5 + s.cost.part, big = Math.max(1, RUN.cost.s5 + RUN.cost.part);
+  const row = (lab, v, col) =>
+    '<span class="lbl">' + lab + '</span>' +
+    '<span class="costbar"><i style="width:' + (100 * v / big).toFixed(1) + '%;background:' + col + '"></i></span>' +
+    '<span class="num">' + v + '</span>';
+  el("costGrid").innerHTML =
+    row("sort of 5s", s.cost.s5, "var(--c-grp)") +
+    row("partition", s.cost.part, "var(--c-piv)") +
+    '<span class="lbl">total</span><span class="costbar"><i style="width:' + (100 * tot / big).toFixed(1) +
+    '%;background:var(--wi-ink-soft)"></i></span><span class="num"><b>' + tot + '</b></span>';
+  el("costRhs").innerHTML = "n = " + RUN.steps[0].arr.length + " \u00b7 " + RUN.steps.length + " steps";
+  el("facts").innerHTML =
+    "<span>range left <b>" + (s.frame[1] - s.frame[0]) + "</b></span>" +
+    "<span>dropped for good <b>" + s.discarded + "</b></span>" +
+    "<span>depth <b>" + s.stack.length + "</b></span>" +
+    "<span>rank sought <b>k = " + s.k + "</b></span>" +
+    (step === RUN.steps.length - 1 ? "<span>answer <b>A[" + RUN.ansIdx + "] = " + RUN.answer + "</b></span>" : "");
+}
+
+/* --- everything ---------------------------------------------------------- */
+function render(animate) {
+  const s = RUN.steps[step];
+  el("slider").max = RUN.steps.length - 1;
+  el("slider").value = step;
+  el("stepno").textContent = "step " + (step + 1) + " / " + RUN.steps.length;
+  el("explain").innerHTML = s.expl;
+  el("svgRhs").innerHTML = s.code === "mom"
+    ? '<span style="color:var(--c-med)">choosePivotMoM</span>' : "quickselectMoM";
+  renderPhases(); renderStack(); renderCost();
+  syncTransport();
+  showStep(step, animate);
+  el("legend").innerHTML =
+    lg("var(--c-grp-fill)", "var(--c-grp)", "group of five being sorted") +
+    lg("var(--c-med-fill)", "var(--c-med)", "collected medians") +
+    lg("var(--c-piv-fill)", "var(--c-piv)", "pivot / its final place j") +
+    lg("var(--c-lo-fill)", "var(--c-lo)", "\u2264 pivot") +
+    lg("var(--c-hi-fill)", "var(--c-hi)", "\u2265 pivot") +
+    lg("#e7e0d2", "#bdb8a6", "outside the range");
+  el("codeMomFull").innerHTML = codeHTML("mom", s.code === "mom" ? s.line : 0, 0);
+  el("codeQsFull").innerHTML = codeHTML("qs", s.code === "qs" ? s.line : 0, 0);
+}
+const lg = (f, b, t) => '<span class="item"><span class="sw" style="background:' + f + ';border-color:' + b +
+  '"></span> ' + t + '</span>';
+
+function setStep(i, animate) {
+  const old = step;
+  step = clamp(i, 0, RUN.steps.length - 1);
+  curFrame = -1;
+  render(animate !== false && Math.abs(step - old) === 1);
+}
+/* --- transport ----------------------------------------------------------- */
+function setPlayGlyph(running) {
+  const b = el("playBtn");
+  b.innerHTML = running ? "\u23f8\ufe0e" : "\u25b6\ufe0e";
+  b.title = running ? "Pause (space bar)" : "Play (space bar)";
+  b.setAttribute("aria-label", running ? "Pause" : "Play");
+}
+function syncTransport() {
+  const last = RUN.steps.length - 1;
+  el("btnFirst").disabled = step <= 0;
+  el("btnPrev").disabled = step <= 0;
+  el("btnNext").disabled = step >= last;
+}
+function stop() { playing = false; if (timer) clearInterval(timer); timer = null; setPlayGlyph(false); }
+function play() {
+  if (playing) { stop(); return; }
+  if (step >= RUN.steps.length - 1) { step = 0; render(false); }
+  playing = true; setPlayGlyph(true);
+  timer = setInterval(() => {
+    if (step >= RUN.steps.length - 1) { stop(); return; }
+    setStep(step + 1, true);
+  }, 1250);
+}
+
+/* --- input --------------------------------------------------------------- */
+function currentPreset() { return el("presetSel").value; }
+function resample() {
+  const n = clamp(Math.round(+el("inN").value) || 31, 5, 80);
+  el("inN").value = n;
+  const p = PRESETS.find(x => x.id === currentPreset()) || PRESETS[0];
+  let k = Math.round(+el("inK").value);
+  if (!isFinite(k)) k = Math.floor(n / 2);
+  k = clamp(k, 0, n - 1);
+  el("inK").value = k;
+  makeRun(p.gen(n).slice(0, n), k);
+  render(false);
+  dump();
+}
+function dump() {
+  el("ta").value = "k " + RUN.k + "\n" + RUN.values.join(" ");
+}
+function loadText() {
+  const err = el("taErr"); err.textContent = "";
+  try {
+    const txt = el("ta").value;
+    let k = null;
+    const vals = [];
+    txt.split(/[\n,]+/).forEach(line => {
+      const m = line.trim().match(/^k\s+(-?\d+)$/i);
+      if (m) { k = +m[1]; return; }
+      line.trim().split(/\s+/).forEach(t => { if (t !== "" && isFinite(+t)) vals.push(+t); });
+    });
+    if (vals.length < 1) throw new Error("no numbers found");
+    if (k === null) k = Math.floor(vals.length / 2);
+    if (k < 0 || k >= vals.length) throw new Error("k must lie in [0, " + (vals.length - 1) + "]");
+    el("inN").value = vals.length; el("inK").value = k;
+    el("presetSel").value = "";
+    makeRun(vals, k);
+    render(false);
+  } catch (e) { err.textContent = String(e.message || e); }
+}
+
+function init() {
+  el("presetSel").innerHTML = PRESETS.map(p => '<option value="' + p.id + '">' + p.name + '</option>').join("") +
+    '<option value="">(pasted input)</option>';
+  el("presetSel").onchange = () => { stop(); resample(); };
+  el("btnResample").onclick = () => { stop(); resample(); };
+  ["inN", "inK"].forEach(id => el(id).addEventListener("change", () => { stop(); resample(); }));
+  el("slider").addEventListener("input", e => { stop(); setStep(+e.target.value, false); });
+  el("btnFirst").onclick = () => { stop(); setStep(0, false); };
+  el("btnPrev").onclick = () => { stop(); setStep(step - 1, true); };
+  el("btnNext").onclick = () => { stop(); setStep(step + 1, true); };
+  el("playBtn").onclick = play;
+  el("btnLoad").onclick = () => { stop(); loadText(); };
+  el("btnDump").onclick = dump;
+  document.addEventListener("keydown", e => {
+    if (/input|textarea|select/i.test(e.target.tagName)) return;
+    if (e.key === "ArrowRight") { stop(); setStep(step + 1, true); }
+    if (e.key === "ArrowLeft") { stop(); setStep(step - 1, true); }
+    if (e.key === " ") { e.preventDefault(); play(); }
+  });
+  /* hover a bar for its value and role */
+  el("arrSvg").addEventListener("mousemove", ev => {
+    const t = ev.target.closest ? ev.target.closest("[data-i]") : null;
+    if (!t) { el("tt").style.display = "none"; return; }
+    const s = RUN.steps[step], i = +t.getAttribute("data-i"), id = s.arr[i], m = markOf(s, i);
+    const role = { in:"in the active range", out:"outside the range \u2014 already discarded",
+      grp:"in the group of five being sorted", med:"a collected group median", piv:"the pivot",
+      lo:"\u2264 pivot", hi:"\u2265 pivot", ans:"the answer" }[m];
+    const tt = el("tt");
+    tt.innerHTML = '<span class="tt-h">A[' + i + '] = ' + VAL[id] + "</span><br>" + role;
+    tt.style.display = "block";
+    const r = tt.getBoundingClientRect();
+    tt.style.left = Math.min(ev.clientX + 14, window.innerWidth - r.width - 10) + "px";
+    tt.style.top = Math.max(8, ev.clientY - r.height - 12) + "px";
+  });
+  el("arrSvg").addEventListener("mouseleave", () => { el("tt").style.display = "none"; });
+
+  el("presetSel").value = "perm";
+  resample();
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

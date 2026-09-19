@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Burrows–Wheeler Transform — Animated</title>
+<style>
+:root{
+  --bg:#f5ebd9; --panel:#faf6ed; --panel-border:#d4c5b4;
+  --ink:#6b675c; --ink-strong:#46433a; --muted:#8b8779; --dim:#a89880;
+  --btn:#faf6ed; --btn-border:#b9a793; --btn-border-hover:#9c866d;
+  --accent:#cc2f22; --deep:#902015; --new:#2f6b3a; --ccol:#2f5f8a;
+  --grey:#b9ab8d;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;
+     margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+.container{width:100%;max-width:1600px;display:flex;flex-direction:column}
+h1{font-size:1.5rem;font-weight:500;margin:0 0 4px;letter-spacing:.5px;color:var(--ink-strong);text-transform:uppercase}
+.subtitle{font-size:.9rem;color:var(--muted);margin:0 0 18px;line-height:1.5}
+.subtitle code{background:#ecddc5;padding:1px 6px;border-radius:3px}
+.card{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:14px 18px;
+      margin-bottom:14px;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lbl{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.sep{width:1px;height:22px;background:#d4c5b4;margin:0 4px}
+button,select{background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);
+  padding:7px 14px;font-size:.85rem;border-radius:5px;cursor:pointer;font-weight:500;font-family:inherit;
+  transition:background .15s,border-color .15s;white-space:nowrap}
+button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--btn-border-hover)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:#46433a;color:#faf6ed;border-color:#46433a}
+button.primary:hover:not(:disabled){background:#5c5043;border-color:#5c5043}
+button.mode.on,button.small.on{background:#f7e6e0;border-color:var(--accent);color:var(--accent);font-weight:600}
+button.small{font-size:.75rem;padding:5px 10px}
+input[type=text]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;height:34px;
+  background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);border-radius:5px;
+  padding:0 10px;font-size:.85rem}
+input.wide{flex:1;min-width:280px}
+input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+label.chk{font-size:.78rem;color:var(--muted);display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.steplabel{font-size:.78rem;color:var(--muted);min-width:140px;font-variant-numeric:tabular-nums}
+.err{color:var(--accent);font-weight:600;font-size:.8rem;min-height:17px;margin-top:6px}
+.phasebar{display:flex;height:15px;margin:1px 9px 0;border-radius:3px;overflow:hidden;border:1px solid var(--panel-border)}
+.pseg{flex-grow:1;flex-basis:0;min-width:0;display:flex;align-items:center;justify-content:center;
+  font-size:.58rem;color:var(--muted);background:#ecddc5;cursor:pointer;overflow:hidden;white-space:nowrap;
+  border-right:1px solid var(--btn-border)}
+.pseg:last-child{border-right:none}
+.pseg:nth-child(even){background:#e8ddc0}
+.pseg.on{background:#f7e6e0;color:var(--accent);font-weight:700}
+.box{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:12px 16px;
+     box-shadow:0 2px 8px rgba(0,0,0,.04);margin-bottom:14px}
+.box-title{font-size:.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin:0 0 10px}
+.status{background:#ecddc5;border:1px solid var(--panel-border);border-radius:5px;padding:11px 13px;
+        font-size:.9rem;color:var(--ink-strong);min-height:44px;line-height:1.55;display:block}
+.status b{color:var(--accent)}
+.status code{background:#e4d5bb;padding:0 4px;border-radius:3px;font-family:var(--wi-font-mono);font-size:.86em}
+.svg-wrap{background:var(--bg);border-radius:5px;overflow:auto;max-height:70vh}
+svg{display:block;margin:0 auto}
+.stage{display:grid;grid-template-columns:minmax(0,var(--main-w,1.5fr)) 20px minmax(300px,1fr);gap:0;align-items:start}
+/* the splitter column between the main panel and the side panels is draggable */
+.stage>.splitter{align-self:stretch;position:relative;cursor:col-resize;user-select:none;touch-action:none}
+.stage>.splitter::before{content:"";position:absolute;left:8px;right:8px;top:0;bottom:0;border-radius:2px;
+  background:transparent;transition:background .15s}
+.stage>.splitter::after{content:"";position:absolute;left:50%;top:min(50%,240px);width:5px;height:42px;margin-left:-2.5px;
+  border-radius:3px;background:var(--panel-border);transition:background .15s}
+.stage>.splitter:hover::before,.stage>.splitter.dragging::before{background:rgba(0,0,0,.04)}
+.stage>.splitter:hover::after,.stage>.splitter.dragging::after{background:var(--deep)}
+body.splitting,body.splitting *{cursor:col-resize!important;user-select:none!important}
+@media(max-width:1050px){.stage{grid-template-columns:1fr;gap:14px}.stage>.splitter{display:none}}
+.mono{font-family:var(--wi-font-mono)}
+.strip-label{font-size:.78rem;color:var(--muted);font-weight:600;margin:0 0 5px}
+.strip-label span{color:var(--ink-strong);font-weight:400}
+.bigmono{font-family:var(--wi-font-mono);font-size:.95rem;letter-spacing:1px;
+  word-break:break-all;line-height:1.7;color:var(--ink-strong)}
+.bigmono .run0{background:#f3e4dd}
+.bigmono .run1{background:#e2edf3}
+.bigmono .cur{outline:2px solid var(--accent);border-radius:2px}
+.stats{font-size:.82rem;line-height:1.8}
+.stats .k{color:var(--muted)} .stats .v{color:var(--ink-strong);font-weight:600;font-variant-numeric:tabular-nums}
+.stats .note{font-size:.75rem;color:var(--dim);font-style:italic}
+.stats hr{border:none;border-top:1px dashed #ecddc5;margin:7px 0}
+table.tbl{border-collapse:collapse;font-size:.82rem;width:100%}
+table.tbl th{font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+  text-align:left;font-weight:700;padding:3px 7px;border-bottom:1px solid var(--panel-border)}
+table.tbl td{padding:2px 7px;border-bottom:1px dashed #ecddc5;font-variant-numeric:tabular-nums}
+table.tbl td.m{font-family:var(--wi-font-mono);color:var(--ink-strong)}
+table.tbl tr.hot td{background:#f7e6e0}
+.bar{display:inline-block;height:11px;background:#e5c0b4;border:1px solid #6d180f;border-radius:2px;vertical-align:middle}
+.bar.win{background:#b9cfdd;border-color:#2f5f8a}
+details.panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;width:100%;
+  margin-top:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+details.panel>summary{cursor:pointer;padding:13px 18px;font-size:.88rem;font-weight:600;color:var(--ink-strong);list-style:none;user-select:none}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::before{content:"▶ ";font-size:.72rem;color:var(--btn-border-hover)}
+details.panel[open]>summary::before{content:"▼ "}
+.panel-body{padding:0 18px 16px}
+.code-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}
+.code-section{border:1px solid var(--panel-border);border-radius:6px;overflow:hidden;background:#fbf8f0}
+.code-section.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(196,51,51,.18)}
+.code-head{font-size:.72rem;font-weight:600;color:var(--muted);padding:6px 10px;background:#f0e7d0;border-bottom:1px solid var(--panel-border)}
+.code-section.active .code-head{color:var(--accent);background:#f7e6e0}
+pre.pcode{margin:0;font-family:var(--wi-font-mono);font-size:.75rem;line-height:1.6;
+  color:var(--ink-strong);overflow-x:auto;text-align:left;padding:6px 0}
+pre.pcode .ln{display:block;padding:0 10px;white-space:pre;border-left:3px solid transparent}
+pre.pcode .ln.hot{background:#f6dfd8;border-left-color:var(--accent)}
+.help{font-size:.82rem;line-height:1.6}
+.help code{background:#ecddc5;padding:1px 5px;border-radius:3px}
+.help pre{background:#faf6ed;border:1px solid var(--panel-border);border-radius:5px;padding:9px 12px;font-size:.78rem;overflow-x:auto;margin:8px 0}
+#test-out{font-family:var(--wi-font-mono);font-size:.75rem;line-height:1.6;white-space:pre-wrap;
+  margin-top:10px;color:#46433a;max-height:360px;overflow-y:auto;background:#faf6ed;border:1px solid var(--panel-border);border-radius:6px;padding:12px}
+.t-pass{color:#2f6b3a;font-weight:600}.t-fail{color:var(--accent);font-weight:700}.t-head{color:var(--ink-strong);font-weight:700}
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Burrows–Wheeler Transform</h1>
+<p class="subtitle">
+  A reversible <b>permutation</b> of the text — it compresses nothing by itself. Sorting the cyclic shifts groups
+  each character together with the characters that share its <b>following context</b>, so a text whose symbols are
+  predictable from context turns into a <code>B</code> with <b>locally</b> low entropy. MTF then turns locally low
+  into globally low, and only the last stage actually shortens anything.
+</p>
+
+<div class="card">
+  <div class="row">
+    <span class="lbl">View</span>
+    <button class="mode" id="mode-fwd"  onclick="setMode('fwd')">Transform</button>
+    <button class="mode" id="mode-inv"  onclick="setMode('inv')">Inverse</button>
+    <button class="mode" id="mode-why"  onclick="setMode('why')">Why it is invertible</button>
+    <button class="mode" id="mode-comp" onclick="setMode('comp')">Why it compresses</button>
+    <div class="sep"></div>
+    <span class="lbl">Preset</span>
+    <select id="presetSel" onchange="loadPreset(this.value)"></select>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row" id="oneLineInput">
+    <span class="lbl" id="inLabel">Source text S</span>
+    <input type="text" class="wide" id="mainInput" spellcheck="false">
+    <button class="primary" onclick="loadFromInput()">Load</button>
+    <span class="lbl" id="sizeInfo" style="text-transform:none;font-weight:400"></span>
+  </div>
+  <div class="err" id="inputErr"></div>
+</div>
+
+<div class="card" id="stepCard">
+  <div class="row" style="margin-bottom:9px">
+    <button id="btnFirst" onclick="goto(0)">⏮</button>
+    <button id="btnPrev" onclick="stepBy(-1)">← Prev</button>
+    <button id="btnNext" class="primary" onclick="stepBy(1)">Next →</button>
+    <button id="btnLast" onclick="goto(steps.length-1)">⏭</button>
+    <button id="btnPlay" onclick="togglePlay()">▶ Play</button>
+    <div class="sep"></div>
+    <span style="flex:1;min-width:220px;display:block">
+      <input type="range" id="stepSlider" min="0" max="0" value="0" style="width:100%" oninput="goto(+this.value)">
+      <span class="phasebar" id="phaseBar"></span>
+    </span>
+    <span class="steplabel" id="stepLabel"></span>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <input type="range" id="speedSlider" min="1" max="10" value="6" oninput="setSpeed(this.value)" style="width:110px">
+    <span class="steplabel" id="speedLabel" style="min-width:34px">1×</span>
+    <div class="sep"></div>
+    <label class="chk"><input type="checkbox" id="animToggle" checked> animate motion</label>
+  </div>
+</div>
+
+<div class="box" id="statusBox">
+  <div class="box-title">Status</div>
+  <div class="status" id="statusText">Press <b>&nbsp;Next&nbsp;</b> to begin.</div>
+</div>
+
+<!-- matrix / array stage -->
+<div id="stageSteps">
+  <div class="stage">
+    <div>
+      <div class="box">
+        <div class="box-title" id="mainTitle">Cyclic shifts</div>
+        <div class="row" id="whyCtl" style="margin-bottom:8px;display:none">
+          <span class="lbl">Draw the links</span>
+          <button class="small" id="lnkAround" onclick="setWhyRouting('around')">around the matrix</button>
+          <button class="small" id="lnkAlong"  onclick="setWhyRouting('along')">along the row</button>
+        </div>
+        <div class="svg-wrap"><svg id="mainSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      </div>
+    </div>
+    <div class="splitter" title="Drag to resize · double-click to reset"></div>
+    <div>
+      <div class="box">
+        <div class="box-title">Strings</div>
+        <div class="strip-label">S = <span id="sMeta"></span></div>
+        <div class="bigmono" id="sView"></div>
+        <div class="strip-label" style="margin-top:12px">B = <span id="bMeta"></span></div>
+        <div class="bigmono" id="bView"></div>
+      </div>
+      <div class="box">
+        <div class="box-title">Numbers</div>
+        <div class="stats" id="statsView"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- properties stage -->
+<div id="stageComp" style="display:none">
+  <div class="stage">
+    <div>
+      <div class="box">
+        <div class="box-title" id="compTitle">Sorted cyclic shifts — context and the character before it</div>
+        <div class="row" style="margin-bottom:8px">
+          <span class="lbl">Context length k</span>
+          <input type="range" id="ctxK" min="1" max="6" value="2" style="width:120px" oninput="render()">
+          <span class="steplabel" id="ctxKLab" style="min-width:20px"></span>
+          <div class="sep"></div>
+          <label class="chk"><input type="checkbox" id="ctxColour" checked onchange="render()"> colour by context</label>
+          <div class="sep"></div>
+          <span class="lbl">Squeeze middle columns</span>
+          <input type="range" id="midW" min="1" max="15" value="5" style="width:120px" oninput="render()">
+          <span class="steplabel" id="midWLab" style="min-width:34px"></span>
+        </div>
+        <div class="svg-wrap" style="max-height:60vh"><svg id="compSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      </div>
+    </div>
+    <div class="splitter" title="Drag to resize · double-click to reset"></div>
+    <div>
+      <div class="box">
+        <div class="box-title">Runs in B</div>
+        <div class="bigmono" id="runView"></div>
+        <div class="stats" id="runStats" style="margin-top:8px"></div>
+      </div>
+      <div class="box">
+        <div class="box-title">Empirical entropy</div>
+        <div class="stats" id="entStats"></div>
+      </div>
+      <div class="box">
+        <div class="box-title">Local 0-th order entropy, window by window</div>
+        <div class="row" style="margin-bottom:8px">
+          <span class="lbl">Window</span>
+          <input type="range" id="winW" min="4" max="40" value="8" style="width:110px" oninput="render()">
+          <span class="steplabel" id="winWLab" style="min-width:24px"></span>
+        </div>
+        <div class="svg-wrap"><svg id="winSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+        <div class="stats" id="winStats" style="margin-top:6px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<details class="panel" open id="codePanel">
+  <summary>Pseudocode — the active line is highlighted</summary>
+  <div class="panel-body"><div class="code-grid" id="codeGrid"></div></div>
+</details>
+
+<details class="panel">
+  <summary>Input format</summary>
+  <div class="panel-body help">
+    <p><b>Source text.</b> Anything you type. The end-of-word character <code>$</code> is appended automatically
+      if it is not already there, and it must occur exactly once, at the end — the whole section assumes it. A
+      space is drawn as <code>␣</code>. Type <code>_</code> if that is easier; it is read as a space.</p>
+    <p><b>Inverse.</b> The input box holds <code>B</code> instead, again containing exactly one <code>$</code>.
+      Selecting any preset while in this view transforms it first and puts the resulting <code>B</code> in the
+      box, so both views describe the same example.</p>
+    <p><b>Sizes.</b> The matrix of cyclic shifts is n × n and every view here draws one row per character,
+      so the <i>Transform</i>, <i>Inverse</i> and <i>Why it is invertible</i> views are limited to n = 80 and
+      <i>Why it compresses</i> to n = 200. Chaining the transform with MTF and a coder, on texts of a few
+      thousand characters, is a separate page.</p>
+  </div>
+</details>
+
+<details class="panel">
+  <summary>Self-tests — against the lecture examples and an inverse-transform fuzzer</summary>
+  <div class="panel-body">
+    <button class="primary" onclick="runTests()">Run all tests</button>
+    <div id="test-out">Not run yet.</div>
+  </div>
+</details>
+
+</div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   0.  Helpers
+   ══════════════════════════════════════════════════════════════════════════ */
+function disp(ch){ if(ch===' ')return '␣'; if(ch==='\n')return '↵'; if(ch==='\t')return '⇥'; return ch; }
+function dstr(s){ return [...s].map(disp).join(''); }
+function lg(x){ return Math.log(x)/Math.LN2; }
+function fmt(x,d){ return (Math.round(x*Math.pow(10,d))/Math.pow(10,d)).toFixed(d); }
+const SVGNS='http://www.w3.org/2000/svg';
+function el(t,a){ const e=document.createElementNS(SVGNS,t); for(const k in a) e.setAttribute(k,a[k]); return e; }
+function txt(x,y,s,a){ const e=el('text',Object.assign({x,y,'text-anchor':'middle'},a||{})); e.textContent=s; return e; }
+function H0(seq){
+  const m=new Map();
+  for(const v of seq) m.set(v,(m.get(v)||0)+1);
+  let h=0; const n=seq.length;
+  if(!n) return 0;
+  for(const c of m.values()){ const p=c/n; h-=p*lg(p); }
+  return h;
+}
+/* k-th order empirical entropy: group the characters by the k characters that
+   FOLLOW them, exactly the grouping the BWT produces.                       */
+function Hk(S,k){
+  const n=S.length;
+  if(k===0) return H0([...S]);
+  const g=new Map();
+  for(let i=0;i<n;i++){
+    let ctx='';
+    for(let j=1;j<=k;j++) ctx+=S[(i+j)%n];
+    if(!g.has(ctx)) g.set(ctx,[]);
+    g.get(ctx).push(S[i]);
+  }
+  let tot=0;
+  for(const arr of g.values()) tot+=arr.length*H0(arr);
+  return tot/n;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1.  The transform
+   ──────────────────────────────────────────────────────────────────────────
+     0.  append $         1.  all cyclic shifts      2.  sort      3.  last column
+   The rotation starting at i is S[i..n) · S[0..i).  Because $ occurs once and
+   is smallest, sorting the rotations is the same as sorting the suffixes, so
+   the order is the suffix array of S.
+   ══════════════════════════════════════════════════════════════════════════ */
+function rotation(S,i){ return S.slice(i)+S.slice(0,i); }
+/* The end-of-word character is by convention SMALLER than every real
+   character.  It has to be said explicitly: in ASCII the space (32) would
+   otherwise sort before $ (36), and the whole transform would come out
+   different from the one on the slides.                                    */
+function chRank(c){ return c==='$' ? -1 : c.charCodeAt(0); }
+function chLess(a,b){ return chRank(a)<chRank(b); }
+function sortedChars(str){ return [...str].sort((a,b)=>chRank(a)-chRank(b)).join(''); }
+/* Sorting the rotations by comparing them character by character is Θ(n² log n)
+   and dies well before a thousand characters.  Prefix doubling sorts by the
+   first 1, 2, 4, … characters, reusing the previous ranks, and is O(n log² n).
+   Indices are taken mod n throughout, so this really is the rotation order.  */
+function sortRotations(S){
+  const n=S.length;
+  let sa=[...Array(n).keys()];
+  let rank=[...S].map(chRank);
+  sa.sort((a,b)=>rank[a]-rank[b]);
+  let r=new Array(n), c=0; r[sa[0]]=0;
+  for(let i=1;i<n;i++){ if(rank[sa[i]]!==rank[sa[i-1]]) c++; r[sa[i]]=c; }
+  rank=r;
+  for(let k=1;k<n && c<n-1;k<<=1){
+    sa.sort((a,b)=> rank[a]-rank[b] || rank[(a+k)%n]-rank[(b+k)%n]);
+    const r2=new Array(n); let cc=0; r2[sa[0]]=0;
+    for(let i=1;i<n;i++){
+      const p=sa[i-1], q=sa[i];
+      if(rank[p]!==rank[q] || rank[(p+k)%n]!==rank[(q+k)%n]) cc++;
+      r2[q]=cc;
+    }
+    rank=r2; c=cc;
+  }
+  return sa;
+}
+let _bwtCache={key:null,val:null};
+function bwtForward(S){
+  if(_bwtCache.key===S) return _bwtCache.val;
+  const v=bwtForwardUncached(S);
+  _bwtCache={key:S,val:v};
+  return v;
+}
+function bwtForwardUncached(S){
+  const n=S.length;
+  const idx=sortRotations(S);
+  const B=idx.map(i=>S[(i+n-1)%n]).join('');
+  const F=idx.map(i=>S[i]).join('');
+  return {n,idx,B,F,S};
+}
+/* the inverse, exactly as on the slide:
+     D[r] = (B[r], r);  sort D stably by the first entry;
+     read D as a linked list (character, next entry)                          */
+function bwtInverse(B){
+  const n=B.length;
+  const dollar=[...B].filter(c=>c==='$').length;
+  if(dollar!==1) throw new Error('B must contain the end-of-word character $ exactly once');
+  const D=[...Array(n).keys()].map(r=>({c:B[r],r}));
+  /* stable sort by character, in the same order the forward transform used */
+  const sorted=D.slice().sort((a,b)=> chRank(a.c)-chRank(b.c) || a.r-b.r);
+  let j=B.indexOf('$');            // the row that is S itself
+  const out=[], visited=[];
+  for(let i=0;i<n;i++){
+    out.push(sorted[j].c);
+    visited.push(j);
+    j=sorted[j].r;
+  }
+  return {S:out.join(''),D,sorted,visited,n};
+}
+function runsOf(B){
+  const runs=[];
+  for(let i=0;i<B.length;){
+    let k=i; while(k<B.length&&B[k]===B[i]) k++;
+    runs.push({c:B[i],start:i,len:k-i});
+    i=k;
+  }
+  return runs;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2.  MTF, RLE and code-size estimates, used by the statistics panels
+   ══════════════════════════════════════════════════════════════════════════ */
+function mtf(seq){
+  const L=[...new Set(seq)].sort();
+  const out=[];
+  for(const c of seq){
+    const p=L.indexOf(c);
+    out.push(p);
+    L.splice(p,1); L.unshift(c);
+  }
+  return out;
+}
+function huffmanCost(seq){
+  /* Σ w(c)·|E(c)| for the optimal prefix-free code, via Huffman's algorithm */
+  const m=new Map();
+  for(const v of seq) m.set(v,(m.get(v)||0)+1);
+  const ws=[...m.values()];
+  if(ws.length<=1) return seq.length;              // one symbol: 1 bit each
+  ws.sort((a,b)=>a-b);
+  let cost=0;
+  const q=ws.slice();
+  while(q.length>1){
+    q.sort((a,b)=>a-b);
+    const a=q.shift(), b=q.shift();
+    cost+=a+b; q.push(a+b);
+  }
+  return cost;
+}
+function eliasGammaBits(x){          /* γ(x) for x ≥ 1 has 2⌊lg x⌋+1 bits */
+  return 2*Math.floor(lg(x))+1;
+}
+function eliasCost(seq){             /* values may be 0, so encode x+1 */
+  return seq.reduce((a,x)=>a+eliasGammaBits(x+1),0);
+}
+function rleOf(seq){
+  const out=[];
+  for(let i=0;i<seq.length;){
+    let k=i; while(k<seq.length&&seq[k]===seq[i]) k++;
+    out.push({v:seq[i],len:k-i});
+    i=k;
+  }
+  return out;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3.  Pseudocode
+   ══════════════════════════════════════════════════════════════════════════ */
+const L=(t,k)=>({t,k});
+const CODE=[
+ {key:'fwd',head:'procedure BWT(S)',lines:[
+   L('procedure BWT(S):'),
+   L('    S ← S · $                       // end-of-word character','dollar'),
+   L('    L ← list of all cyclic shifts of S','rot'),
+   L('    sort L lexicographically','sort'),
+   L('    B ← last character of each string in L, top down','extract'),
+   L('    return B','extract')
+ ]},
+ {key:'inv',head:'procedure inverseBWT(B[0..n))',lines:[
+   L('procedure inverseBWT(B[0..n)):'),
+   L('    D[r] ← (B[r], r)   for r = 0,…,n−1','build'),
+   L('    sort D stably by the first entry','sortd'),
+   L('    j ← the row r with B[r] = $      // the row that is S','start'),
+   L('    S ← ε','start'),
+   L('    repeat n times','walk'),
+   L('        (c, r) ← D[j];   S ← S · c','walk'),
+   L('        j ← r                        // follow the link','walk'),
+   L('    return S','walk')
+ ]}
+];
+const codeEls={};
+function buildCodePanel(){
+  const g=document.getElementById('codeGrid'); g.innerHTML='';
+  for(const sec of CODE){
+    const box=document.createElement('div'); box.className='code-section'; box.id='cs-'+sec.key;
+    const h=document.createElement('div'); h.className='code-head'; h.textContent=sec.head;
+    const pre=document.createElement('pre'); pre.className='pcode'; codeEls[sec.key]=[];
+    sec.lines.forEach(l=>{
+      const sp=document.createElement('span'); sp.className='ln'; sp.textContent=l.t;
+      pre.appendChild(sp); codeEls[sec.key].push({el:sp,k:l.k});
+    });
+    box.appendChild(h); box.appendChild(pre); g.appendChild(box);
+  }
+}
+function highlightCode(map){
+  for(const sec of CODE){
+    document.getElementById('cs-'+sec.key).classList.remove('active');
+    codeEls[sec.key].forEach(o=>o.el.classList.remove('hot'));
+  }
+  for(const k in map||{}){
+    if(!codeEls[k]) continue;
+    const tags=new Set(map[k]);
+    let any=false;
+    codeEls[k].forEach(o=>{ if(o.k&&tags.has(o.k)){ o.el.classList.add('hot'); any=true; } });
+    if(any) document.getElementById('cs-'+k).classList.add('active');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   4.  Step sequences
+   ══════════════════════════════════════════════════════════════════════════ */
+function buildForwardSteps(S){
+  const M=bwtForward(S), n=M.n, steps=[];
+  const push=o=>steps.push(Object.assign({rows:null,order:null,cur:-1,bShown:0,
+    highlightCol:-1,hi:{},sorted:false},o));
+  push({phase:'rot',order:[],cur:-1,
+        msg:'The end-of-word character <code>$</code> is in place. Now take every cyclic shift of <i>S</i>.',
+        hi:{fwd:['dollar','rot']}});
+  for(let i=0;i<n;i++)
+    push({phase:'rot',order:[...Array(i+1).keys()],cur:i,
+          msg:'Cyclic shift '+i+': move the first '+i+' character'+(i===1?'':'s')+
+              ' to the end — <code>'+dstr(rotation(S,i))+'</code>.',
+          hi:{fwd:['rot']}});
+  push({phase:'sort',order:[...Array(n).keys()],cur:-1,
+        msg:'All '+n+' cyclic shifts are listed, in the order they were produced.',
+        hi:{fwd:['rot']}});
+  push({phase:'sort',order:M.idx.slice(),sorted:true,cur:-1,
+        msg:'Now sort them lexicographically. <code>$</code> is the smallest character, so the row starting '+
+            'with it comes first. Each row slides to its sorted position.',
+        hi:{fwd:['sort']}});
+  for(let i=0;i<n;i++)
+    push({phase:'extract',order:M.idx.slice(),sorted:true,cur:i,bShown:i+1,highlightCol:n-1,
+          msg:'Row '+i+' ends in <code>'+disp(M.B[i])+'</code> — that is <i>B</i>['+i+'].',
+          hi:{fwd:['extract']}});
+  push({phase:'done',order:M.idx.slice(),sorted:true,cur:-1,bShown:n,highlightCol:n-1,
+        msg:'<i>B</i> = <code>'+dstr(M.B)+'</code>. Same '+n+' characters as <i>S</i>, in a different order — '+
+            'nothing has been compressed yet.',
+        hi:{fwd:['extract']}});
+  return {dir:'fwd',steps,M,S,B:M.B,n};
+}
+
+function buildInverseSteps(B){
+  const R=bwtInverse(B), n=R.n, steps=[];
+  const push=o=>steps.push(Object.assign({shown:0,sorted:false,cur:-1,j:-1,out:'',
+    visited:[],hi:{}},o));
+  push({phase:'build',shown:0,
+        msg:'Build the array <i>D</i>: each entry is the character of <i>B</i> together with the row it came from.',
+        hi:{inv:['build']}});
+  for(let r=0;r<n;r++)
+    push({phase:'build',shown:r+1,cur:r,
+          msg:'<i>D</i>['+r+'] = (<code>'+disp(B[r])+'</code>, '+r+').',
+          hi:{inv:['build']}});
+  push({phase:'sortd',shown:n,sorted:true,
+        msg:'Sort <i>D</i> <b>stably</b> by the character. Stability is the whole trick: equal characters keep '+
+            'the order they had in <i>B</i>, and that is what makes the links point to the right places.',
+        hi:{inv:['sortd']}});
+  const start=B.indexOf('$');
+  push({phase:'walk',shown:n,sorted:true,j:start,out:'',visited:[],
+        msg:'Start at the entry that came from row '+start+' — the row whose last character is <code>$</code>, '+
+            'which is <i>S</i> itself.',
+        hi:{inv:['start']}});
+  let out='';
+  for(let i=0;i<n;i++){
+    const j=R.visited[i];
+    out+=R.sorted[j].c;
+    push({phase:'walk',shown:n,sorted:true,j,out,visited:R.visited.slice(0,i+1),cur:j,
+          msg:'<i>D</i>['+j+'] = (<code>'+disp(R.sorted[j].c)+'</code>, '+R.sorted[j].r+
+              '): output <code>'+disp(R.sorted[j].c)+'</code>, then follow the link to '+R.sorted[j].r+'.',
+          hi:{inv:['walk']}});
+  }
+  push({phase:'done',shown:n,sorted:true,j:-1,out,visited:R.visited.slice(),
+        msg:'Back to <code>'+dstr(out)+'</code> — the original <i>S</i>, from <i>B</i> alone.',
+        hi:{inv:['walk']}});
+  return {dir:'inv',steps,R,B,S:R.S,n};
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   5.  Drawing the matrix
+   ══════════════════════════════════════════════════════════════════════════ */
+const CELLW=15, CELLH=17, MLEFT=42, MTOP=26;
+const MAXFULL=80;
+let livePos={}, animHandle=null, speedFactor=1;
+let hoverChar=null;      // "why" view: the character being pointed at
+let pinChar=null;        // "why" view: the character fixed by a click
+let hoverRun=-1;         // "why it compresses": the run being pointed at
+
+function visibleCols(n){
+  /* elide the middle columns for wide matrices, keeping the last one */
+  if(n<=26) return {cols:[...Array(n).keys()],elide:-1};
+  const head=[...Array(20).keys()];
+  return {cols:head.concat([n-1]),elide:20};
+}
+function drawMatrix(step,animate){
+  const svg=document.getElementById('mainSvg');
+  const M=model.M, n=model.n, S=model.S;
+  const vc=visibleCols(n);
+  const W=MLEFT+vc.cols.length*CELLW+(vc.elide>=0?CELLW:0)+70;
+  const H=MTOP+n*CELLH+14;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.style.width=W+'px'; svg.style.height=H+'px';
+
+  const order=step.order||[];
+  const target={};
+  order.forEach((rot,row)=>{ target[rot]={y:MTOP+row*CELLH}; });
+  const from={};
+  for(const k in target) from[k]=livePos[k]||target[k];
+  if(animHandle){ cancelAnimationFrame(animHandle); animHandle=null; }
+  const dur=animate?520/speedFactor:0, t0=performance.now();
+  const frame=now=>{
+    const t=dur===0?1:Math.min(1,(now-t0)/dur);
+    const e=t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    const p={};
+    for(const k in target) p[k]={y:from[k].y+(target[k].y-from[k].y)*e};
+    paintMatrix(svg,step,p,vc,W);
+    if(t<1) animHandle=requestAnimationFrame(frame);
+    else { livePos=p; animHandle=null; }
+  };
+  animHandle=requestAnimationFrame(frame);
+}
+function paintMatrix(svg,step,pos,vc,W){
+  svg.innerHTML='';
+  const n=model.n, S=model.S, M=model.M;
+  const order=step.order||[];
+  const xOf=k=>MLEFT+k*CELLW+CELLW/2;
+  /* header */
+  svg.appendChild(txt(MLEFT-16,MTOP-10,'r',{'font-size':10,fill:'var(--muted)'}));
+  if(step.highlightCol>=0){
+    const k=vc.cols.indexOf(n-1);
+    if(k>=0){
+      svg.appendChild(txt(xOf(k)+(vc.elide>=0?CELLW:0),MTOP-10,'BWT',
+        {'font-size':10,fill:'var(--accent)','font-weight':700}));
+    }
+  }
+  order.forEach((rot,row)=>{
+    const y=(pos[rot]?pos[rot].y:MTOP+row*CELLH);
+    const isCur = step.cur===row && step.phase!=='rot';
+    const isRotCur = step.phase==='rot' && step.cur===rot;
+    if(isCur||isRotCur)
+      svg.appendChild(el('rect',{x:MLEFT-4,y:y-1,width:W-MLEFT-60,height:CELLH-1,rx:3,
+        fill:'#f7e6e0',opacity:.85}));
+    /* row index */
+    svg.appendChild(txt(MLEFT-16,y+CELLH-5,String(row),
+      {'font-size':9,fill:isCur?'var(--accent)':'var(--dim)'}));
+    let drawn=0;
+    vc.cols.forEach((c,k)=>{
+      if(vc.elide>=0&&k===vc.elide){
+        svg.appendChild(txt(xOf(k),y+CELLH-5,'…',{'font-size':11,fill:'var(--dim)'}));
+        drawn=1;
+      }
+      const ch=S[(rot+c)%n];
+      const last=c===n-1;
+      const hot=last&&step.highlightCol>=0&&(step.phase==='done'||row<=step.cur);
+      svg.appendChild(txt(xOf(k)+drawn*CELLW,y+CELLH-5,disp(ch),
+        {'font-size':12,'font-family':'var(--wi-font-mono)',
+         fill:hot?'var(--accent)':'var(--ink-strong)','font-weight':hot?700:400}));
+    });
+    /* the source index of the row, i.e. the suffix array */
+    if(step.sorted)
+      svg.appendChild(txt(W-34,y+CELLH-5,String(rot),
+        {'font-size':9,fill:'var(--dim)'}));
+  });
+  if(step.sorted)
+    svg.appendChild(txt(W-34,MTOP-10,'L[r]',{'font-size':9,fill:'var(--muted)'}));
+}
+
+/* the D array of the inverse */
+function drawD(step,animate){
+  const svg=document.getElementById('mainSvg');
+  const R=model.R, n=model.n, B=model.B;
+  const CW=34, COL2=150;
+  const W=COL2+180, H=MTOP+n*CELLH+14;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.style.width=W+'px'; svg.style.height=H+'px';
+  /* every entry keeps its identity (its row r) while it moves */
+  const target={};
+  const arr = step.sorted ? R.sorted : R.D;
+  arr.forEach((d,i)=>{ if(i<step.shown||step.sorted) target[d.r]={y:MTOP+i*CELLH}; });
+  const from={};
+  for(const k in target) from[k]=livePos[k]||target[k];
+  if(animHandle){ cancelAnimationFrame(animHandle); animHandle=null; }
+  const dur=animate?560/speedFactor:0, t0=performance.now();
+  const frame=now=>{
+    const t=dur===0?1:Math.min(1,(now-t0)/dur);
+    const e=t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    const p={};
+    for(const k in target) p[k]={y:from[k].y+(target[k].y-from[k].y)*e};
+    paintD(svg,step,p,W,COL2);
+    if(t<1) animHandle=requestAnimationFrame(frame);
+    else { livePos=p; animHandle=null; }
+  };
+  animHandle=requestAnimationFrame(frame);
+}
+function paintD(svg,step,pos,W,COL2){
+  svg.innerHTML='';
+  const R=model.R, n=model.n, B=model.B;
+  svg.appendChild(txt(40,MTOP-10,'B',{'font-size':10,fill:'var(--muted)'}));
+  svg.appendChild(txt(120,MTOP-10,'D',{'font-size':10,fill:'var(--muted)'}));
+  /* B down the left, as the source of the entries */
+  for(let r=0;r<n;r++){
+    const y=MTOP+r*CELLH;
+    svg.appendChild(txt(24,y+CELLH-5,String(r),{'font-size':9,fill:'var(--dim)'}));
+    svg.appendChild(txt(40,y+CELLH-5,disp(B[r]),
+      {'font-size':12,'font-family':'var(--wi-font-mono)',
+       fill:(step.phase==='build'&&step.cur===r)?'var(--accent)':'var(--ink)'}));
+  }
+  const visited=new Set(step.visited||[]);
+  const arr=step.sorted?R.sorted:R.D;
+  arr.forEach((d,i)=>{
+    if(!step.sorted&&i>=step.shown) return;
+    const y=pos[d.r]?pos[d.r].y:MTOP+i*CELLH;
+    const isJ=step.j===i, wasV=visited.has(i);
+    svg.appendChild(el('rect',{x:100,y:y,width:78,height:CELLH-2,rx:3,
+      fill:isJ?'#f7e6e0':wasV?'#ecddc5':'var(--panel)',
+      stroke:isJ?'var(--accent)':'var(--btn-border)','stroke-width':isJ?2:1}));
+    svg.appendChild(txt(118,y+CELLH-6,disp(d.c),
+      {'font-size':12,'font-family':'var(--wi-font-mono)',
+       fill:isJ?'var(--accent)':'var(--ink-strong)','font-weight':isJ?700:500}));
+    svg.appendChild(txt(150,y+CELLH-6,String(d.r),
+      {'font-size':11,'font-family':'var(--wi-font-mono)',fill:'var(--muted)'}));
+    if(step.sorted)
+      svg.appendChild(txt(88,y+CELLH-6,String(i),{'font-size':9,fill:'var(--dim)'}));
+  });
+  /* the link currently being followed */
+  if(step.sorted&&step.j>=0&&step.j<n){
+    const d=R.sorted[step.j];
+    const y1=(pos[d.r]?pos[d.r].y:MTOP+step.j*CELLH)+CELLH/2;
+    const tgt=d.r;
+    const ti=R.sorted.findIndex(x=>x===R.sorted[tgt]);
+    const y2=MTOP+tgt*CELLH+CELLH/2;
+    svg.appendChild(el('path',{d:'M 182 '+y1+' C 215 '+y1+' 215 '+y2+' 182 '+y2,
+      fill:'none',stroke:'var(--accent)','stroke-width':1.6,'marker-end':'url(#ar)'}));
+    const defs=el('defs',{});
+    const m=el('marker',{id:'ar',markerWidth:8,markerHeight:8,refX:6,refY:3,orient:'auto'});
+    m.appendChild(el('path',{d:'M0,0 L6,3 L0,6 Z',fill:'var(--accent)'}));
+    defs.appendChild(m); svg.appendChild(defs);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   6.  Properties view
+   ══════════════════════════════════════════════════════════════════════════ */
+const CTX_COLOURS=['#e8d2c6','#cfdde6','#d9e3cd','#e6d9c2','#dcd0e0','#cfe0dd',
+                   '#eddcd2','#d5d9e8','#e2d9c8','#d8cfd0'];
+function renderComp(){
+  const M=model.M||bwtForward(model.S), n=M.n, S=M.S;
+  const k=+document.getElementById('ctxK').value;
+  document.getElementById('ctxKLab').textContent=k;
+  const midW=+document.getElementById('midW').value;
+  document.getElementById('midWLab').textContent=midW+'px';
+  const colour=document.getElementById('ctxColour').checked;
+  const svg=document.getElementById('compSvg');
+
+  /* Column widths: the context columns and the last column — the two things
+     the picture is about — always keep full width; everything between them is
+     squeezed by the slider.  The last column is never cut off.            */
+  const wOf=c=> (c<k || c===n-1) ? CELLW : midW;
+  const xs=[]; let x=MLEFT;
+  for(let c=0;c<n;c++){ xs.push(x); x+=wOf(c); }
+  const W=x+30, H=MTOP+n*CELLH+16;
+  svg.innerHTML='';
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.style.width=W+'px'; svg.style.height=H+'px';
+
+  const ctxOf=r=>{ let c=''; for(let j=0;j<k;j++) c+=S[(M.idx[r]+j)%n]; return c; };
+  const ctxIndex=new Map(); let ci=0;
+  for(let r=0;r<n;r++){ const c=ctxOf(r); if(!ctxIndex.has(c)) ctxIndex.set(c,ci++); }
+  const runs=runsOf(M.B);
+  const runOfRow=new Array(n);
+  runs.forEach((run,i)=>{ for(let q=run.start;q<run.start+run.len;q++) runOfRow[q]=i; });
+
+  svg.appendChild(txt(MLEFT+k*CELLW/2,MTOP-9,'context',
+    {'font-size':9,fill:'var(--ink-strong)','font-weight':700}));
+  svg.appendChild(txt(xs[n-1]+CELLW/2,MTOP-9,'B',
+    {'font-size':10,fill:'var(--accent)','font-weight':700}));
+  if(n-1>k)
+    svg.appendChild(txt((xs[k]+xs[n-1])/2,MTOP-9,'the rest of the row',
+      {'font-size':8,fill:'var(--dim)'}));
+
+  for(let r=0;r<n;r++){
+    const y=MTOP+r*CELLH;
+    const inRun = hoverRun>=0 && runOfRow[r]===hoverRun;
+    if(inRun)
+      svg.appendChild(el('rect',{x:MLEFT-3,y:y,width:W-MLEFT-24,height:CELLH-1,
+        fill:'#f7e6e0',opacity:.9}));
+    if(colour)
+      svg.appendChild(el('rect',{x:MLEFT-1,y:y,width:k*CELLW+2,height:CELLH-1,
+        fill:CTX_COLOURS[ctxIndex.get(ctxOf(r))%CTX_COLOURS.length],
+        opacity:hoverRun>=0&&!inRun?.35:.85}));
+    svg.appendChild(txt(MLEFT-18,y+CELLH-5,String(r),{'font-size':9,fill:'var(--dim)'}));
+    for(let c=0;c<n;c++){
+      const w=wOf(c);
+      const ch=S[(M.idx[r]+c)%n];
+      if(w<CELLW){
+        /* squeezed: a coloured tick keeps the texture visible without the glyph */
+        if(w>=4)
+          svg.appendChild(txt(xs[c]+w/2,y+CELLH-5,disp(ch),
+            {'font-size':Math.max(5,w-1),'font-family':'var(--wi-font-mono)',
+             fill:'var(--grey)',opacity:hoverRun>=0&&!inRun?.3:.8}));
+        else
+          svg.appendChild(el('rect',{x:xs[c],y:y+3,width:Math.max(1,w-.5),height:CELLH-8,
+            fill:'var(--grey)',opacity:.18+.5*((ch.charCodeAt(0)%7)/7)}));
+        continue;
+      }
+      const isLast=c===n-1;
+      if(isLast)
+        svg.appendChild(el('rect',{x:xs[c],y:y,width:CELLW,height:CELLH-1,rx:2,
+          fill:'#f7e6e0',opacity:hoverRun>=0&&!inRun?.4:1}));
+      const t=txt(xs[c]+w/2,y+CELLH-5,disp(ch),
+        {'font-size':12,'font-family':'var(--wi-font-mono)',
+         fill:isLast?'var(--accent)':'var(--ink-strong)','font-weight':isLast||c<k?700:400,
+         opacity:hoverRun>=0&&!inRun?.35:1});
+      if(isLast){
+        t.style.cursor='pointer';
+        const ri=runOfRow[r];
+        t.addEventListener('mouseenter',()=>{ hoverRun=ri; renderComp(); });
+        t.addEventListener('mouseleave',()=>{ hoverRun=-1; renderComp(); });
+      }
+      svg.appendChild(t);
+    }
+  }
+
+  /* runs, hoverable */
+  const B=M.B;
+  const rv=document.getElementById('runView'); rv.innerHTML='';
+  runs.forEach((run,i)=>{
+    const sp=document.createElement('span');
+    sp.className=i%2?'run1':'run0';
+    if(hoverRun===i) sp.classList.add('cur');
+    sp.textContent=dstr(B.slice(run.start,run.start+run.len));
+    sp.style.cursor='pointer';
+    sp.title='run '+i+': '+run.len+'× '+disp(run.c)+' at rows '+run.start+'…'+(run.start+run.len-1);
+    sp.addEventListener('mouseenter',()=>{ hoverRun=i; renderComp(); });
+    sp.addEventListener('mouseleave',()=>{ hoverRun=-1; renderComp(); });
+    rv.appendChild(sp);
+  });
+  document.getElementById('runStats').innerHTML=
+    '<span class="k">n =</span> <span class="v">'+n+'</span> &nbsp;·&nbsp; '+
+    '<span class="k">runs r =</span> <span class="v">'+runs.length+'</span> &nbsp;·&nbsp; '+
+    '<span class="k">n/r =</span> <span class="v">'+fmt(n/runs.length,2)+'</span>'+
+    (hoverRun>=0
+      ? '<br><span class="k">this run:</span> <span class="v">'+runs[hoverRun].len+'× '+
+        disp(runs[hoverRun].c)+'</span> at rows '+runs[hoverRun].start+'…'+
+        (runs[hoverRun].start+runs[hoverRun].len-1)+
+        ' <span class="note">— all these rows are preceded by the same character, '+
+        'because their contexts are adjacent in sorted order</span>'
+      : '<br><span class="note">S itself has '+runsOf(S).length+' runs. '+
+        'Point at a run to see which rows produce it.</span>');
+
+  /* entropies */
+  let eh='<span class="k">H<sub>0</sub>(S) = H<sub>0</sub>(B) =</span> <span class="v">'+
+         fmt(H0([...S]),3)+'</span> <span class="note">— B is a permutation of S, so the '+
+         'global 0-th order entropy cannot change</span><hr>';
+  for(let kk=1;kk<=4;kk++)
+    eh+='<span class="k">H<sub>'+kk+'</sub>(S) =</span> <span class="v">'+fmt(Hk(S,kk),3)+'</span><br>';
+  eh+='<span class="note">H<sub>k</sub> groups each character with the k characters that follow it — '+
+      'exactly the grouping the sort produces. It is what BWT turns into <i>local</i> 0-th order '+
+      'entropy of B.</span>';
+  document.getElementById('entStats').innerHTML=eh;
+
+  renderWindows(S,M.B);
+}
+
+/* Local entropy: slide a window along the string and, at each position, ask
+   how many bits per character an optimal code would need if it knew only
+   that window's character frequencies.                                     */
+function renderWindows(S,B){
+  const w=+document.getElementById('winW').value;
+  document.getElementById('winWLab').textContent=w;
+  const local=str=>{
+    const out=[];
+    for(let i=0;i+w<=str.length;i++) out.push(H0([...str.slice(i,i+w)]));
+    return out;
+  };
+  const ls=local(S), lb=local(B);
+  const svg=document.getElementById('winSvg');
+  const W=Math.max(320,Math.min(760,ls.length*6+60)), H=190;
+  const PADL=34, PADR=14, PADT=14, PADB=30;
+  svg.innerHTML='';
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.style.width=W+'px'; svg.style.height=H+'px';
+  const maxH=Math.max(1e-9,lg(w));
+  const X=i=>PADL+(ls.length<=1?0:i/(ls.length-1))*(W-PADL-PADR);
+  const Y=v=>H-PADB-(v/maxH)*(H-PADT-PADB);
+  /* axes */
+  svg.appendChild(el('line',{x1:PADL,y1:H-PADB,x2:W-PADR,y2:H-PADB,stroke:'#d4c5b4'}));
+  svg.appendChild(el('line',{x1:PADL,y1:PADT,x2:PADL,y2:H-PADB,stroke:'#d4c5b4'}));
+  for(let t=0;t<=Math.ceil(maxH);t++){
+    if(t>maxH) break;
+    svg.appendChild(el('line',{x1:PADL,y1:Y(t),x2:W-PADR,y2:Y(t),stroke:'#ecddc5','stroke-dasharray':'2 3'}));
+    svg.appendChild(txt(PADL-8,Y(t)+3,String(t),{'font-size':8,fill:'var(--dim)','text-anchor':'end'}));
+  }
+  svg.appendChild(txt(PADL-8,Y(maxH)+3,fmt(maxH,1),{'font-size':8,fill:'var(--dim)','text-anchor':'end'}));
+  svg.appendChild(txt(PADL,H-8,'window start 0',{'font-size':8,fill:'var(--dim)','text-anchor':'start'}));
+  svg.appendChild(txt(W-PADR,H-8,String(ls.length-1),{'font-size':8,fill:'var(--dim)','text-anchor':'end'}));
+  svg.appendChild(txt(12,PADT+4,'bits/char',{'font-size':8,fill:'var(--dim)','text-anchor':'start'}));
+  const plot=(arr,col,dash,wd)=>{
+    let d='';
+    arr.forEach((v,i)=>{ d+=(i?' L ':'M ')+X(i)+' '+Y(v); });
+    svg.appendChild(el('path',{d,fill:'none',stroke:col,'stroke-width':wd||1.7,
+      'stroke-dasharray':dash||'','stroke-linejoin':'round'}));
+  };
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+  plot(ls,'var(--ccol)','4 3');
+  plot(lb,'var(--accent)');
+  svg.appendChild(el('line',{x1:PADL,y1:Y(avg(lb)),x2:W-PADR,y2:Y(avg(lb)),
+    stroke:'var(--accent)','stroke-width':.9,opacity:.45}));
+  svg.appendChild(el('line',{x1:PADL,y1:Y(avg(ls)),x2:W-PADR,y2:Y(avg(ls)),
+    stroke:'var(--ccol)','stroke-width':.9,opacity:.45}));
+  document.getElementById('winStats').innerHTML=
+    '<span style="color:var(--ccol)">▬ ▬</span> S: mean <span class="v">'+fmt(avg(ls),3)+
+    '</span> bits/char &nbsp;&nbsp; <span style="color:var(--accent)">▬▬</span> B: mean <span class="v">'+
+    fmt(avg(lb),3)+'</span> bits/char'+
+    '<hr><span class="note"><b>What this plot shows.</b> Slide a window of '+w+' consecutive characters '+
+    'along the string. At each position, count the character frequencies <i>inside that window only</i>, and '+
+    'compute their 0-th order entropy — the bits per character an optimal code would need if it knew nothing '+
+    'but those local frequencies. One point per window position; the flat lines are the two means. '+
+    'The ceiling is lg '+w+' = '+fmt(maxH,2)+', reached when all '+w+' characters in the window differ.'+
+    '<br><br>S and B contain exactly the same characters, so their <i>global</i> entropies are identical. '+
+    'But B\'s curve sits lower: sorting has gathered equal characters into stretches, so most windows of B see '+
+    'only one or two distinct characters. That gap is the whole point of the transform — and it is what MTF '+
+    'converts into a run of small numbers.</span>';
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   8.  Driver
+   ══════════════════════════════════════════════════════════════════════════ */
+let steps=[], cur=0, model=null, mode='fwd';
+const PHASE_LABELS={rot:'Cyclic shifts',sort:'Sort',extract:'Last column',done:'Done',
+  build:'Build D',sortd:'Stable sort',walk:'Follow the links'};
+
+function render(animate){
+  if(!model) return;
+  if(mode==='comp'){ renderComp(); highlightCode({}); return; }
+  if(mode==='why'){ renderWhy(); return; }
+  const st=steps[cur];
+  document.getElementById('statusText').innerHTML=st.msg;
+  document.getElementById('stepLabel').textContent='step '+(cur+1)+' / '+steps.length;
+  document.getElementById('stepSlider').value=cur;
+  document.getElementById('btnPrev').disabled=document.getElementById('btnFirst').disabled=(cur===0);
+  document.getElementById('btnNext').disabled=document.getElementById('btnLast').disabled=(cur===steps.length-1);
+  highlightCode(st.hi);
+  const doAnim=(animate===undefined?true:animate)&&document.getElementById('animToggle').checked;
+  if(model.dir==='fwd'){
+    document.getElementById('mainTitle').textContent =
+      st.sorted ? 'Sorted cyclic shifts' : 'Cyclic shifts, in the order produced';
+    drawMatrix(st,doAnim);
+  } else {
+    document.getElementById('mainTitle').textContent =
+      st.sorted ? 'D, stably sorted by character' : 'D — the character of B and the row it came from';
+    drawD(st,doAnim);
+  }
+  renderSide(st);
+  updatePhases();
+}
+function renderSide(st){
+  const S=model.S||'', B=model.B||'';
+  document.getElementById('sMeta').textContent=S.length+' characters';
+  document.getElementById('bMeta').textContent=B.length+' characters';
+  if(model.dir==='fwd'){
+    document.getElementById('sView').textContent=dstr(S);
+    const bv=document.getElementById('bView'); bv.innerHTML='';
+    for(let i=0;i<B.length;i++){
+      const sp=document.createElement('span');
+      if(i>=st.bShown) sp.style.opacity=.2;
+      if(i===st.cur&&st.phase==='extract') sp.className='cur';
+      sp.textContent=disp(B[i]); bv.appendChild(sp);
+    }
+  } else {
+    document.getElementById('bView').textContent=dstr(B);
+    const sv=document.getElementById('sView'); sv.innerHTML='';
+    sv.textContent=dstr(st.out||'')||'—';
+  }
+  const runs=runsOf(B);
+  const sigma=new Set([...S]).size;
+  document.getElementById('statsView').innerHTML=
+    '<span class="k">n =</span> <span class="v">'+(model.n)+'</span>'+
+    ' &nbsp;·&nbsp; <span class="k">σ =</span> <span class="v">'+sigma+'</span>'+
+    '<hr><span class="k">runs in B, r =</span> <span class="v">'+runs.length+'</span>'+
+    '<br><span class="k">runs in S =</span> <span class="v">'+runsOf(S).length+'</span>'+
+    '<hr><span class="k">H<sub>0</sub>(S) = H<sub>0</sub>(B) =</span> <span class="v">'+
+    fmt(H0([...S]),3)+'</span>'+
+    '<br><span class="note">B is a permutation of S — the transform on its own compresses nothing</span>';
+}
+
+/* the invertibility argument */
+let whyRouting='around';   // 'around' the matrix (over the top) or 'along' the partner row
+function setWhyRouting(v){
+  whyRouting=v;
+  try{ localStorage.setItem('wi-bwt-why-routing',v); }catch(_){}
+  document.getElementById('lnkAround').classList.toggle('on',v==='around');
+  document.getElementById('lnkAlong').classList.toggle('on',v==='along');
+  if(mode==='why') renderWhy();
+}
+function renderWhy(){
+  const M=model.M||bwtForward(model.S), n=M.n, S=M.S;
+  const pick = hoverChar!==null ? hoverChar : pinChar;   // shown character
+  document.getElementById('statusText').innerHTML=
+    'Row <i>r</i> of the sorted matrix starts with <code>F[r]</code> and ends with <code>B[r]</code>, and it is '+
+    'the <i>same rotation</i> shifted by one. So the <b>i-th occurrence of a character c in F</b> and the '+
+    '<b>i-th occurrence of c in B</b> describe the same rotation — that pairing is the link the inverse follows, '+
+    'and stable sorting is exactly what preserves it.'+
+    (pick!==null
+      ? ' <br>Showing every row whose F or B character is <code>'+disp(pick)+'</code>: the two lists have '+
+        'the same length and are matched in order.'
+      : ' <br><span style="color:var(--muted)">Point at a character to see all of its rows; click to keep it.</span>');
+  const svg=document.getElementById('mainSvg');
+  /* layout of one row:  r | F ⟨i⟩ | the rest of the row, one cell per character | B ⟨i⟩
+     The whole rotation is drawn (no elision), at the same size as in the transform
+     view, because the point here is to read row r and its partner as the same string. */
+  /* 'around': a link leaves B[r] to the right, runs over the top of the matrix and comes
+     down the left margin into F — one lane per link, nested, the lane being the F row, so
+     on the left side no two links ever cross: that is the order-preservation made visible.
+     'along': a link swings down the left margin and then runs underneath its partner row. */
+  const around = whyRouting==='around';
+  const LD = around ? Math.max(3,Math.min(6,150/n)) : 0;          // lane spacing
+  const OX = around ? Math.max(0,(n-1)*LD-8) : 0;                  // room for the left lanes
+  const MT = around ? MTOP+6+n*LD : MTOP;                          // room for the top lanes
+  const CW=22, XIDX=24+OX, XF=58+OX, XRF=XF+CW+4, XMID=XRF+22, MIDN=Math.max(0,n-2);
+  const xOf=c=>XMID+(c-1)*CELLW+CELLW/2;              // c = 1 … n-2 within the rotation
+  const XRB=XMID+MIDN*CELLW+8, XB=XRB+18;              // ⟨i⟩ of B sits before the B cell
+  const laneL=k=>XIDX-10-k*LD, laneR=k=>XB+CW+8+k*LD, laneT=k=>MT-20-k*LD;
+  const W=Math.max(380, around ? laneR(n-1)+8 : XB+CW+36), H=MT+n*CELLH+20;
+  svg.innerHTML='';
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.style.width=W+'px'; svg.style.height=H+'px';
+  const defs=el('defs',{});
+  [['arHot','var(--accent)'],['arDim','#c4a99f']].forEach(([id,col])=>{
+    const m=el('marker',{id,markerWidth:7,markerHeight:7,refX:5,refY:3,orient:'auto',markerUnits:'userSpaceOnUse'});
+    m.appendChild(el('path',{d:'M0,0 L5.5,3 L0,6 Z',fill:col})); defs.appendChild(m);
+  });
+  svg.appendChild(defs);
+  svg.appendChild(txt(XF+CW/2,MT-10,'F',{'font-size':11,fill:'var(--ccol)','font-weight':700}));
+  svg.appendChild(txt(XB+CW/2,MT-10,'B (= L)',{'font-size':11,fill:'var(--accent)','font-weight':700}));
+  if(MIDN>0)
+    svg.appendChild(txt((XMID+XRB)/2,MT-10,'the rest of the row',{'font-size':9,fill:'var(--muted)'}));
+  /* an axis-parallel polyline with rounded corners */
+  const rounded=(pts,rho)=>{
+    let d='M '+pts[0][0]+' '+pts[0][1];
+    for(let i=1;i<pts.length-1;i++){
+      const [x0,y0]=pts[i-1],[x1,y1]=pts[i],[x2,y2]=pts[i+1];
+      const l1=Math.hypot(x1-x0,y1-y0), l2=Math.hypot(x2-x1,y2-y1);
+      const r=Math.min(rho,l1/2,l2/2);
+      const ax=x1+(x0-x1)/l1*r, ay=y1+(y0-y1)/l1*r, bx=x1+(x2-x1)/l2*r, by=y1+(y2-y1)/l2*r;
+      d+=' L '+ax+' '+ay+' Q '+x1+' '+y1+' '+bx+' '+by;
+    }
+    const [xe,ye]=pts[pts.length-1];
+    return d+' L '+xe+' '+ye;
+  };
+
+  const rankF=[],rankB=[],sF={},sB={};
+  for(let r=0;r<n;r++){ const c=M.F[r]; if(sF[c]===undefined) sF[c]=0; rankF[r]=sF[c]++; }
+  for(let r=0;r<n;r++){ const c=M.B[r]; if(sB[c]===undefined) sB[c]=0; rankB[r]=sB[c]++; }
+  const posB={};
+  for(let r=0;r<n;r++) posB[M.B[r]+'#'+rankB[r]]=r;
+
+  const hot = c => pick!==null && c===pick;
+  const dim = pick!==null;
+  /* hovering follows the pointer, clicking pins a character; the listeners live on the
+     svg itself (delegated), so re-rendering the rows never loses them */
+  const hover=(node,c)=>{ node.style.cursor='pointer'; node.setAttribute('data-ch',c); };
+  if(!svg.dataset.whyEvents){
+    svg.dataset.whyEvents='1';
+    const chAt=e=>{ const g=e.target.closest&&e.target.closest('g[data-ch]'); return g?g.getAttribute('data-ch'):null; };
+    svg.addEventListener('mouseover',e=>{ if(mode!=='why') return;
+      const c=chAt(e); if(c!==hoverChar){ hoverChar=c; renderWhy(); } });
+    /* leaving: the hovered node was replaced by the re-render, so the svg itself may
+       never see a mouseleave — watch where the pointer arrives instead */
+    document.addEventListener('mouseover',e=>{ if(mode!=='why'||hoverChar===null) return;
+      if(!e.composedPath().includes(svg)){ hoverChar=null; renderWhy(); } });   // path is fixed at dispatch, even if the target was just re-rendered
+    svg.addEventListener('click',e=>{ if(mode!=='why') return;
+      const c=chAt(e); if(c===null) return; pinChar=(pinChar===c?null:c); renderWhy(); });
+  }
+  /* links first, so the characters sit on top.  A link leaves F[r] to the left, swings
+     down the margin to its partner row, and then runs underneath that row to B[tgt] —
+     so it never cuts through the text of the rows in between. */
+  for(let r=0;r<n;r++){
+    const tgt=posB[M.F[r]+'#'+rankF[r]];
+    if(tgt===undefined) continue;
+    const on=hot(M.F[r]);
+    const yF=MT+r*CELLH+CELLH/2, yB=MT+tgt*CELLH+CELLH/2;
+    let d;
+    if(around){
+      d=rounded([[XB+CW+2,yB],[laneR(r),yB],[laneR(r),laneT(r)],[laneL(r),laneT(r)],[laneL(r),yF],[XF-3,yF]],
+                6+r*LD);
+    } else {
+      const yU=MT+tgt*CELLH+CELLH-1;
+      d='M '+(XF-4)+' '+yF+' C 8 '+yF+' 8 '+yU+' '+(XF+CW)+' '+yU+' L '+(XB-3)+' '+yU;
+    }
+    svg.appendChild(el('path',{d,fill:'none',stroke:on?'var(--accent)':'#c4a99f',
+      'stroke-width':on?1.6:.8,opacity:on?.9:(dim?.12:.5),
+      'marker-end':around?('url(#'+(on?'arHot':'arDim')+')'):'none'}));
+  }
+  for(let r=0;r<n;r++){
+    const y=MT+r*CELLH;
+    const fOn=hot(M.F[r]), bOn=hot(M.B[r]);
+    const rowOn=!dim||fOn||bOn;                            // this row takes part in the pairing
+    svg.appendChild(txt(XIDX,y+CELLH-5,String(r),{'font-size':9,fill:'var(--dim)',
+      stroke:'var(--bg)','stroke-width':3,'paint-order':'stroke'}));   // halo: links pass behind
+    const fg=el('g',{});
+    fg.appendChild(el('rect',{x:XF,y:y,width:CW,height:CELLH-2,rx:2,
+      fill:fOn?'#cfe2ee':'#e7eef2',opacity:dim&&!fOn?.35:1,
+      stroke:fOn?'var(--ccol)':'none','stroke-width':fOn?1.6:0}));
+    fg.appendChild(txt(XF+CW/2,y+CELLH-6,disp(M.F[r]),
+      {'font-size':12,'font-family':'var(--wi-font-mono)',
+       fill:'var(--ccol)','font-weight':700,opacity:dim&&!fOn?.35:1}));
+    hover(fg,M.F[r]); svg.appendChild(fg);
+    svg.appendChild(txt(XRF,y+CELLH-6,'⟨'+rankF[r]+'⟩',
+      {'font-size':8,fill:'var(--dim)','text-anchor':'start',opacity:dim&&!fOn?.3:1}));
+    /* the rest of the rotation, character by character, as in the transform view */
+    for(let c=1;c<=MIDN;c++)
+      svg.appendChild(txt(xOf(c),y+CELLH-5,disp(S[(M.idx[r]+c)%n]),
+        {'font-size':12,'font-family':'var(--wi-font-mono)',
+         fill:'var(--ink-strong)',opacity:rowOn?1:.3}));
+    const bg=el('g',{});
+    bg.appendChild(el('rect',{x:XB,y:y,width:CW,height:CELLH-2,rx:2,
+      fill:bOn?'#f2cfc6':'#f7e6e0',opacity:dim&&!bOn?.35:1,
+      stroke:bOn?'var(--accent)':'none','stroke-width':bOn?1.6:0}));
+    bg.appendChild(txt(XB+CW/2,y+CELLH-6,disp(M.B[r]),
+      {'font-size':12,'font-family':'var(--wi-font-mono)',
+       fill:'var(--accent)','font-weight':700,opacity:dim&&!bOn?.35:1}));
+    hover(bg,M.B[r]); svg.appendChild(bg);
+    svg.appendChild(txt(XRB,y+CELLH-6,'⟨'+rankB[r]+'⟩',
+      {'font-size':8,fill:'var(--dim)','text-anchor':'start',opacity:dim&&!bOn?.3:1}));
+  }
+  highlightCode({inv:['sortd','walk']});
+  document.getElementById('sView').textContent=dstr(S);
+  document.getElementById('bView').textContent=dstr(M.B);
+  document.getElementById('sMeta').textContent=S.length+' characters';
+  document.getElementById('bMeta').textContent=M.B.length+' characters';
+  document.getElementById('mainTitle').textContent='F and B, with the occurrence rank ⟨i⟩ of each character';
+  let note='<span class="note">Each thin line joins the i-th <code>c</code> in F to the i-th <code>c</code> in B. '+
+           'Following those links from the row that ends in <code>$</code> spells out S.</span>';
+  if(pick!==null){
+    const cnt=[...M.B].filter(c=>c===pick).length;
+    note='<span class="k">character</span> <span class="v">'+disp(pick)+'</span>'+
+         '<br><span class="k">occurrences =</span> <span class="v">'+cnt+'</span>'+
+         '<br><span class="k">rows in F =</span> <span class="v">'+
+         [...M.F].map((c,r)=>c===pick?r:-1).filter(r=>r>=0).join(', ')+'</span>'+
+         '<br><span class="k">rows in B =</span> <span class="v">'+
+         [...M.B].map((c,r)=>c===pick?r:-1).filter(r=>r>=0).join(', ')+'</span>'+
+         '<br><span class="note">In F they are consecutive, because F is sorted. In B they are scattered — '+
+         'but taken in order, the two lists correspond one to one. Read the i-th highlighted row in each '+
+         'list in full: they are the same rotation, shifted by one character.'+
+         (whyRouting==='around'?' The links of one character nest without crossing — the order is kept.':'')+
+         '</span>';
+  }
+  document.getElementById('statsView').innerHTML=note;
+}
+
+function phaseStarts(){
+  const out=[], seen=new Set();
+  steps.forEach((s,i)=>{ const l=PHASE_LABELS[s.phase];
+    if(l&&!seen.has(l)){ seen.add(l); out.push({lab:l,i}); } });
+  return out;
+}
+function buildPhases(){
+  const ps=phaseStarts(), bar=document.getElementById('phaseBar');
+  bar.innerHTML='';
+  ps.forEach((p,k)=>{
+    const end=(k+1<ps.length)?ps[k+1].i:steps.length;
+    const seg=document.createElement('span');
+    seg.className='pseg'; seg.style.flexGrow=String(Math.max(1,end-p.i));
+    seg.textContent=p.lab; seg.title=p.lab;
+    seg.onclick=()=>{ stopPlay(); goto(p.i,false); };
+    bar.appendChild(seg);
+  });
+}
+function updatePhases(){
+  const ps=phaseStarts(), segs=document.getElementById('phaseBar').children;
+  for(let k=0;k<ps.length;k++){
+    const end=(k+1<ps.length)?ps[k+1].i:steps.length;
+    if(segs[k]) segs[k].classList.toggle('on',cur>=ps[k].i&&cur<end);
+  }
+}
+function goto(i,animate){ cur=Math.max(0,Math.min(steps.length-1,i)); render(animate); }
+function stepBy(d){ stopPlay(); goto(cur+d,true); }
+let playTimer=null;
+function togglePlay(){ playTimer?stopPlay():startPlay(); }
+function startPlay(){
+  if(cur>=steps.length-1) cur=0;
+  document.getElementById('btnPlay').textContent='⏸ Pause';
+  const tick=()=>{ if(cur>=steps.length-1){stopPlay();return;} goto(cur+1,true);
+                   playTimer=setTimeout(tick,650/speedFactor); };
+  playTimer=setTimeout(tick,10);
+}
+function stopPlay(){ if(playTimer){clearTimeout(playTimer);playTimer=null;}
+  document.getElementById('btnPlay').textContent='▶ Play'; }
+function setSpeed(v){ speedFactor=Math.pow(1.35,v-6);
+  document.getElementById('speedLabel').textContent=fmt(speedFactor,1)+'×'; }
+
+const PRESETS={
+  'alf␣eats␣alfalfa  (the lecture example)':'alf eats alfalfa',
+  'abracadabra':'abracadabra',
+  'have␣had␣hadnt␣hasnt␣havent␣has␣what  (runs)':'have had hadnt hasnt havent has what',
+  'mississippi':'mississippi',
+  'bananaban':'bananaban',
+  'bananaananabanana':'bananaananabanana',
+  'the␣quick␣brown␣fox':'the quick brown fox',
+  'aaaaaaaaaabbbbbbbbbb':'aaaaaaaaaabbbbbbbbbb',
+  'to␣be␣or␣not␣to␣be␣that␣is␣the␣question':'to be or not to be that is the question'
+};
+function initPresets(){
+  const s=document.getElementById('presetSel');
+  for(const k in PRESETS){ const o=document.createElement('option'); o.value=k; o.textContent=k; s.appendChild(o); }
+}
+function normalise(t){
+  t=t.replace(/_/g,' ').replace(/\$/g,'');
+  return t+'$';
+}
+function putText(text){
+  document.getElementById('mainInput').value =
+    (mode==='inv') ? dstr(bwtForward(normalise(text)).B) : text.replace(/\$$/,'');
+  loadFromInput();
+}
+function currentText(fromMode){
+  const raw=document.getElementById('mainInput').value;
+  try{
+    if(fromMode==='inv'){
+      const B=raw.replace(/␣/g,' ').replace(/_/g,' ');
+      return bwtInverse(B).S.replace(/\$$/,'');
+    }
+    return raw;
+  }catch(e){ return null; }
+}
+function loadPreset(k){
+  if(!PRESETS[k]) return;
+  document.getElementById('presetSel').value=k;
+  putText(PRESETS[k]);
+}
+function setMode(m){
+  const was=mode;
+  const text=currentText(was);
+  mode=m;
+  ['fwd','inv','why','comp'].forEach(x=>
+    document.getElementById('mode-'+x).classList.toggle('on',x===m));
+  document.getElementById('stageSteps').style.display=(m==='comp')?'none':'';
+  document.getElementById('stageComp').style.display=(m==='comp')?'':'none';
+  document.getElementById('stepCard').style.display=(m==='fwd'||m==='inv')?'':'none';
+  document.getElementById('statusBox').style.display=(m==='comp')?'none':'';
+  document.getElementById('codePanel').style.display=(m==='comp')?'none':'';
+  document.getElementById('whyCtl').style.display=(m==='why')?'':'none';
+  document.getElementById('inLabel').textContent = m==='inv' ? 'Transformed text B' : 'Source text S';
+  if(text===null){ loadPreset(Object.keys(PRESETS)[0]); return; }
+  putText(text);
+}
+function loadFromInput(){
+  const err=document.getElementById('inputErr'); err.textContent='';
+  stopPlay(); livePos={}; hoverChar=null; pinChar=null; hoverRun=-1;
+  try{
+    const raw=document.getElementById('mainInput').value;
+    let S,B;
+    if(mode==='inv'){
+      B=raw.replace(/␣/g,' ').replace(/_/g,' ');
+      if(!B.length) throw new Error('B is empty');
+      if(B.length>MAXFULL) throw new Error('the inverse view draws one row per character; '+
+        'please keep n ≤ '+MAXFULL+' (this B has '+B.length+')');
+      model=buildInverseSteps(B);
+      steps=model.steps;
+    } else {
+      S=normalise(raw);
+      if(S.length<2) throw new Error('the source text is empty');
+      const limit=(mode==='comp')?200:MAXFULL;
+      if(S.length-1>limit)
+        throw new Error('this view handles n ≤ '+limit+' characters (this text has '+(S.length-1)+')');
+      if(mode==='fwd'){
+        model=buildForwardSteps(S); steps=model.steps;
+            } else {
+        const M=bwtForward(S);
+        model={dir:'fwd',S,B:M.B,M,n:M.n,steps:[]}; steps=[];
+      }
+    }
+    document.getElementById('sizeInfo').textContent='n = '+((model.n)||0)+
+      ' (including $)   σ = '+new Set([...(model.S||'')]).size;
+    if(steps.length){ document.getElementById('stepSlider').max=steps.length-1; buildPhases(); }
+    cur=0; render(false);
+  }catch(e){ err.textContent=e.message; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   9.  Self-tests
+   ══════════════════════════════════════════════════════════════════════════ */
+function runTests(){
+  const out=[]; let pass=0,fail=0;
+  const ok=(n,c,d)=>{ if(c){pass++;out.push('<span class="t-pass">PASS</span>  '+n);}
+                      else{fail++;out.push('<span class="t-fail">FAIL</span>  '+n+(d?'\n         '+d:''));} };
+  const head=t=>out.push('<span class="t-head">'+t+'</span>');
+
+  head('1 — The lecture example');
+  {
+    const S='alf eats alfalfa$';
+    const M=bwtForward(S);
+    ok('B = asff$f␣e␣lllaaata', dstr(M.B)==='asff$f␣e␣lllaaata', dstr(M.B));
+    ok('n = 17', M.n===17);
+    ok('the first sorted row starts with $', S[M.idx[0]]==='$');
+    ok('inverse recovers S', bwtInverse(M.B).S===S, bwtInverse(M.B).S);
+    const r=runsOf(M.B).length;
+    ok('B has fewer runs than S ('+r+' vs '+runsOf(S).length+')', r<runsOf(S).length);
+  }
+
+  head('1b — $ is the smallest character');
+  {
+    const S='a b$';
+    const M=bwtForward(S);
+    ok('the row starting with $ comes first', S[M.idx[0]]==='$', S[M.idx[0]]);
+    ok('a space does not sort before $', chRank('$')<chRank(' '));
+    ok('the inverse uses the same order', bwtInverse(M.B).S===S, bwtInverse(M.B).S);
+    ok('texts with spaces still round-trip',
+       bwtInverse(bwtForward('to be or not to be$').B).S==='to be or not to be$');
+  }
+
+  head('1c — Prefix doubling agrees with the definition');
+  {
+    const naive=S=>{
+      const n=S.length;
+      return [...Array(n).keys()].sort((a,b)=>{
+        for(let k=0;k<n;k++){ const x=S[(a+k)%n], y=S[(b+k)%n];
+          if(x!==y) return chRank(x)-chRank(y); }
+        return 0;
+      });
+    };
+    let agree=true, bad='';
+    for(let t=0;t<200;t++){
+      const sig=1+Math.floor(Math.random()*4);
+      let S=''; const n=1+Math.floor(Math.random()*40);
+      for(let i=0;i<n;i++) S+='ab c'[Math.floor(Math.random()*sig)];
+      S+='$';
+      if(sortRotations(S).join(',')!==naive(S).join(',')){ agree=false; bad=JSON.stringify(S); break; }
+    }
+    ok('the doubling order equals the naive rotation order (200 texts)',agree,bad);
+    const big='to be or not to be that is the question '.repeat(40)+'$';
+    const t0=Date.now(); const M=bwtForward(big); const ms=Date.now()-t0;
+    ok('n = '+big.length+' transforms in '+ms+' ms', ms<3000, ms+' ms');
+    ok('and inverts correctly', bwtInverse(M.B).S===big);
+  }
+
+  head('2 — The runs example');
+  {
+    const S='have had hadnt hasnt havent has what$';
+    const M=bwtForward(S);
+    ok('n = 37 including $', M.n===37, String(M.n));
+    ok('inverse recovers S', bwtInverse(M.B).S===S);
+    out.push('           r = '+runsOf(M.B).length+' runs in B, '+runsOf(S).length+' in S');
+  }
+
+  head('3 — Invertibility on 400 random texts');
+  {
+    let rt=true, perm=true, bad='';
+    for(let t=0;t<400;t++){
+      const sig=1+Math.floor(Math.random()*5);
+      let S=''; const n=1+Math.floor(Math.random()*30);
+      for(let i=0;i<n;i++) S+='abcde'[Math.floor(Math.random()*sig)];
+      S+='$';
+      const M=bwtForward(S);
+      if(bwtInverse(M.B).S!==S){ rt=false; bad=S+' -> '+bwtInverse(M.B).S; break; }
+      if([...M.B].sort().join('')!==[...S].sort().join('')){ perm=false; bad='not a permutation: '+S; }
+    }
+    ok('inverseBWT(BWT(S)) = S',rt,bad);
+    ok('B is always a permutation of S',perm,bad);
+  }
+
+  head('4 — Properties that make it work');
+  {
+    const S='alf eats alfalfa$', M=bwtForward(S), n=M.n;
+    /* F is the sorted B */
+    ok('F is B sorted (with $ smallest)', M.F===sortedChars(M.B), M.F);
+    /* the i-th c in F and the i-th c in B describe the same rotation */
+    let lf=true;
+    const rankF=[],rankB=[],sF={},sB={};
+    for(let r=0;r<n;r++){ const c=M.F[r]; if(sF[c]===undefined) sF[c]=0; rankF[r]=sF[c]++; }
+    for(let r=0;r<n;r++){ const c=M.B[r]; if(sB[c]===undefined) sB[c]=0; rankB[r]=sB[c]++; }
+    for(let r=0;r<n;r++){
+      let tgt=-1;
+      for(let q=0;q<n;q++) if(M.B[q]===M.F[r]&&rankB[q]===rankF[r]) tgt=q;
+      /* the i-th c in F sits one position later in S than the i-th c in B */
+      if(M.idx[tgt]!==(M.idx[r]+1)%n) lf=false;
+    }
+    ok('the i-th c in F is the i-th c in B, one rotation apart',lf);
+    /* H0 is unchanged, higher-order entropy of S bounds local entropy of B */
+    ok('H₀(B) = H₀(S)', Math.abs(H0([...M.B])-H0([...S]))<1e-12);
+    let mono=true;
+    for(let k=1;k<=3;k++) if(Hk(S,k)>Hk(S,k-1)+1e-9) mono=false;
+    ok('H₀(S) ≥ H₁(S) ≥ H₂(S) ≥ H₃(S)',mono,
+       [0,1,2,3].map(k=>fmt(Hk(S,k),3)).join(' ≥ '));
+    /* the point of the whole exercise */
+    const w=6, loc=str=>{ let a=0,c=0; for(let i=0;i+w<=str.length;i++){a+=H0([...str.slice(i,i+w)]);c++;} return a/c; };
+    ok('mean local H₀ of B is below that of S ('+fmt(loc(M.B),3)+' < '+fmt(loc(S),3)+')',
+       loc(M.B)<loc(S));
+  }
+
+  head('5 — Step sequences');
+  {
+    const f=buildForwardSteps('banana$');
+    ok('forward: 1 + n + 2 + n + 1 steps', f.steps.length===1+7+2+7+1, String(f.steps.length));
+    ok('every forward step has a message and a code line',
+       f.steps.every(s=>s.msg&&s.hi));
+    ok('the sorted order appears only from the sort phase on',
+       f.steps.filter(s=>s.sorted).every(s=>['sort','extract','done'].includes(s.phase)));
+    const i=buildInverseSteps(f.B);
+    ok('inverse ends with the original text', i.steps[i.steps.length-1].out==='banana$',
+       i.steps[i.steps.length-1].out);
+    ok('the walk visits every entry exactly once',
+       new Set(i.R.visited).size===i.n);
+    ok('every inverse step has a message and a code line',
+       i.steps.every(s=>s.msg&&s.hi));
+  }
+
+  out.push('');
+  out.push('<span class="'+(fail===0?'t-pass':'t-fail')+'">'+pass+' passed, '+fail+' failed</span>');
+  document.getElementById('test-out').innerHTML=out.join('\n');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   10.  Boot
+   ══════════════════════════════════════════════════════════════════════════ */
+initPresets();
+buildCodePanel();
+setSpeed(6);
+document.getElementById('mode-fwd').classList.add('on');
+setWhyRouting((()=>{ try{ return localStorage.getItem('wi-bwt-why-routing')==='along'?'along':'around'; }catch(_){ return 'around'; } })());
+document.getElementById('mainInput').value='alf eats alfalfa';
+loadFromInput();
+/* draggable splitter: one width, shared by every .stage on the page, kept per page */
+(function setupSplitters(){
+  const stages=[...document.querySelectorAll('.stage')];
+  const KEY='wi-stage-main-w:'+location.pathname;
+  const clampW=(stage,w)=>{ const total=stage.getBoundingClientRect().width;
+                            return Math.max(260,Math.min(total-20-300,w)); };
+  const apply=(stage,w)=>{ const v=clampW(stage,w)+'px'; stages.forEach(st=>st.style.setProperty('--main-w',v)); };
+  const reset=()=>{ stages.forEach(st=>st.style.removeProperty('--main-w'));
+                    try{ localStorage.removeItem(KEY); }catch(_){} };
+  try{ const v=localStorage.getItem(KEY); if(v) apply(stages[0],parseFloat(v)); }catch(_){}
+  document.querySelectorAll('.stage>.splitter').forEach(sp=>{
+    const stage=sp.parentElement; let dragging=false;
+    sp.addEventListener('pointerdown',e=>{
+      dragging=true; sp.setPointerCapture(e.pointerId); sp.classList.add('dragging');
+      document.body.classList.add('splitting'); e.preventDefault();
+    });
+    sp.addEventListener('pointermove',e=>{
+      if(!dragging) return;
+      apply(stage,e.clientX-stage.getBoundingClientRect().left-10);
+    });
+    const end=e=>{
+      if(!dragging) return;
+      dragging=false; sp.classList.remove('dragging'); document.body.classList.remove('splitting');
+      try{ const v=getComputedStyle(stage).getPropertyValue('--main-w').trim();
+           if(v) localStorage.setItem(KEY,String(parseFloat(v))); }catch(_){}
+    };
+    sp.addEventListener('pointerup',end); sp.addEventListener('pointercancel',end);
+    sp.addEventListener('dblclick',reset);
+  });
+  window.addEventListener('resize',()=>{
+    const v=getComputedStyle(stages[0]).getPropertyValue('--main-w').trim();
+    if(v) apply(stages[0],parseFloat(v));
+  });
+})();
+
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if(e.key==='ArrowRight'){e.preventDefault();stepBy(1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stepBy(-1);}
+  else if(e.key===' '){e.preventDefault();togglePlay();}
+});
+</script>
+</body>
+</html>

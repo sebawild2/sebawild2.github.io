@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suffix Array Search with LCP — Animated</title>
+<style>
+:root{
+  --bg:#f5ebd9; --panel:#faf6ed; --panel-border:#d4c5b4;
+  --ink:#6b675c; --ink-strong:#46433a; --muted:#8b8779; --dim:#a89880;
+  --btn:#faf6ed; --btn-border:#b9a793; --btn-border-hover:#9c866d;
+  --accent:#cc2f22; --deep:#902015; --new:#2f6b3a; --ccol:#2f5f8a;
+  --grey:#b9ab8d; --shade:#f3d9d0; --fcell:#e3edf3; --bcell:#f7e3dc;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;
+     margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+.container{width:100%;max-width:1600px;display:flex;flex-direction:column}
+h1{font-size:1.5rem;font-weight:500;margin:0 0 4px;letter-spacing:.5px;color:var(--ink-strong);text-transform:uppercase}
+.subtitle{font-size:.9rem;color:var(--muted);margin:0 0 18px;line-height:1.5;max-width:1100px}
+.subtitle code{background:#ecddc5;padding:1px 6px;border-radius:3px}
+.card{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:14px 18px;
+      margin-bottom:14px;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lbl{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.sep{width:1px;height:22px;background:#d4c5b4;margin:0 4px}
+button,select{background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);
+  padding:7px 14px;font-size:.85rem;border-radius:5px;cursor:pointer;font-weight:500;font-family:inherit;
+  transition:background .15s,border-color .15s;white-space:nowrap}
+button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--btn-border-hover)}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--ccol);outline-offset:1px}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:#46433a;color:#faf6ed;border-color:#46433a}
+button.primary:hover:not(:disabled){background:#5c5043;border-color:#5c5043}
+button.mode.on,button.chip.on{background:#f7e6e0;border-color:var(--accent);color:var(--accent);font-weight:600}
+button.chip{font-family:var(--mono);font-size:.85rem;padding:5px 10px}
+textarea{font-family:var(--mono);font-size:.85rem;background:var(--btn);color:var(--ink-strong);
+  border:1px solid var(--btn-border);border-radius:5px;padding:7px 10px;resize:vertical;min-height:62px;width:100%}
+input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+label.chk{font-size:.78rem;color:var(--muted);display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.steplabel{font-size:.78rem;color:var(--muted);min-width:110px;font-variant-numeric:tabular-nums}
+.err{color:var(--accent);font-weight:600;font-size:.8rem;min-height:17px;margin-top:6px}
+.phasebar{display:flex;height:17px;margin:2px 9px 0;border-radius:3px;overflow:hidden;border:1px solid var(--panel-border)}
+.pseg{flex-grow:1;flex-basis:0;min-width:0;display:flex;align-items:center;justify-content:center;
+  font-size:.64rem;color:var(--muted);background:#ecddc5;cursor:pointer;overflow:hidden;white-space:nowrap;
+  border-right:1px solid var(--btn-border);font-family:var(--mono)}
+.pseg:last-child{border-right:none}
+.pseg:nth-child(even){background:#e8ddc0}
+.pseg.on{background:#f7e6e0;color:var(--accent);font-weight:700}
+.box{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:12px 16px;
+     box-shadow:0 2px 8px rgba(0,0,0,.04);margin-bottom:14px}
+.box-title{font-size:.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin:0 0 10px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.box-title .aside{text-transform:none;letter-spacing:0;font-weight:400;font-size:.75rem;color:var(--dim)}
+.status{background:#ecddc5;border:1px solid var(--panel-border);border-radius:5px;padding:11px 13px;
+        font-size:.92rem;color:var(--ink-strong);min-height:48px;line-height:1.6}
+.status b{color:var(--accent)}
+.status code,.stats code,.help code{background:#e4d5bb;padding:0 4px;border-radius:3px;font-family:var(--mono);font-size:.9em;white-space:pre}
+.svg-wrap{background:var(--bg);border-radius:5px;overflow:auto}
+#mWrap{overflow-x:auto;overflow-y:visible}
+svg{display:block}
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 14px var(--sideW,clamp(400px,32vw,580px));align-items:start}
+.splitter{align-self:stretch;cursor:col-resize;position:relative;touch-action:none;user-select:none}
+.splitter::before{content:"";position:absolute;left:6px;top:0;bottom:14px;width:2px;background:var(--panel-border);border-radius:1px}
+.splitter:hover::before,.splitter.drag::before{background:var(--btn-border-hover)}
+.splitter .grip{position:sticky;top:45vh;margin-left:1px;width:12px;height:40px;border-radius:6px;background:var(--btn);
+  border:1px solid var(--btn-border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;line-height:1}
+.splitter:hover .grip,.splitter.drag .grip{border-color:var(--btn-border-hover);color:var(--ink-strong)}
+.side{position:sticky;top:10px;max-height:calc(100vh - 20px);overflow-y:auto}
+@media(max-width:1100px){.stage{grid-template-columns:1fr}.splitter{display:none}.side{position:static;max-height:none}}
+.boxctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-2px 0 8px}
+.stats{font-size:.84rem;line-height:1.75}
+.stats .k{color:var(--muted)} .stats .v{color:var(--ink-strong);font-weight:600;font-variant-numeric:tabular-nums}
+.stats .note{font-size:.76rem;color:var(--dim);font-style:italic}
+.stats hr{border:none;border-top:1px dashed #ecddc5;margin:7px 0}
+.pview{font-family:var(--mono);font-size:1.15rem;letter-spacing:2px}
+.pview span{display:inline-block;padding:0 2px;border-radius:3px}
+.pview .pm{color:var(--accent);font-weight:700}
+.pview .pc{outline:2px solid var(--accent);background:#f7e6e0}
+table.otab{border-collapse:collapse;font-size:.8rem;font-variant-numeric:tabular-nums;margin:4px 0}
+table.otab th,table.otab td{padding:1px 7px;text-align:center;border-bottom:1px dashed #d4c5b4}
+table.otab th{color:var(--muted);font-weight:600;text-align:right}
+table.otab td.ch{font-family:var(--mono);color:var(--ink-strong);font-weight:700}
+table.otab td.on{background:#f7e6e0;color:var(--accent);font-weight:700}
+.formula{background:#faf6ed;border:1px solid var(--panel-border);border-radius:5px;padding:6px 9px;margin:6px 0;
+  font-size:.86rem;color:var(--ink-strong);line-height:1.6}
+pre.pcode{margin:0;font-family:var(--mono);font-size:.8rem;line-height:1.65;color:var(--ink-strong);
+  overflow-x:auto;text-align:left;padding:6px 0;background:#fbf8f0;border:1px solid var(--panel-border);border-radius:6px}
+pre.pcode .ln{display:block;padding:0 10px 0 calc(6px + 2.2em);text-indent:-2.2em;white-space:pre-wrap;border-left:3px solid transparent}
+pre.pcode .ln .no{display:inline-block;width:2.2em;text-indent:0;color:var(--dim);font-size:.9em;user-select:none}
+pre.pcode .ln.hot{background:#f6dfd8;border-left-color:var(--accent)}
+pre.pcode .kw{font-weight:700}
+pre.pcode .cm{color:var(--muted);font-style:italic}
+.watch{font-family:var(--mono);font-size:.82rem;margin-top:8px;color:var(--ink-strong);display:flex;gap:6px 14px;flex-wrap:wrap;min-height:20px}
+.watch span{white-space:nowrap}
+.watch .wk{color:var(--muted)}
+.watch .chg{color:var(--accent);font-weight:700}
+.legend{font-size:.75rem;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.legend svg{display:inline-block;vertical-align:middle}
+details.panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;width:100%;
+  margin-top:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+details.panel>summary{cursor:pointer;padding:13px 18px;font-size:.88rem;font-weight:600;color:var(--ink-strong);list-style:none;user-select:none}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::before{content:"▶ ";font-size:.72rem;color:var(--btn-border-hover)}
+details.panel[open]>summary::before{content:"▼ "}
+.panel-body{padding:0 18px 16px}
+.help{font-size:.84rem;line-height:1.6;max-width:900px}
+.help pre{background:#faf6ed;border:1px solid var(--panel-border);border-radius:5px;padding:9px 12px;font-size:.8rem;overflow-x:auto;margin:8px 0}
+#test-out{font-family:var(--mono);font-size:.75rem;line-height:1.6;white-space:pre-wrap;
+  margin-top:10px;color:#46433a;max-height:360px;overflow-y:auto;background:#faf6ed;border:1px solid var(--panel-border);border-radius:6px;padding:12px}
+.t-pass{color:#2f6b3a;font-weight:600}.t-fail{color:var(--accent);font-weight:700}.t-head{color:var(--ink-strong);font-weight:700}
+.tip{position:fixed;pointer-events:none;background:#46433a;color:#faf6ed;font-size:.8rem;padding:7px 10px;border-radius:5px;
+  max-width:340px;line-height:1.5;z-index:50;display:none;box-shadow:0 3px 10px rgba(0,0,0,.2)}
+.tip code{background:#5c5043;padding:0 4px;border-radius:3px;font-family:var(--mono)}
+.flyer{position:fixed;z-index:40;pointer-events:none;font-family:var(--mono);font-weight:700;color:var(--accent);
+  font-size:15px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  background:#f7e6e0;border:1.5px solid var(--accent);border-radius:4px}
+/* what the index does not store */
+svg .ns{transition:opacity .25s}
+body.stored svg .ns{opacity:.07}
+svg text{font-variant-numeric:tabular-nums}
+.hint{font-size:.76rem;color:var(--dim)}
+table.itab{border-collapse:collapse;font-size:.8rem;font-variant-numeric:tabular-nums;width:100%}
+table.itab th{font-size:.72rem;color:var(--muted);font-weight:600;text-align:center;padding:2px 4px;border-bottom:1px solid var(--panel-border)}
+table.itab td{text-align:center;padding:2px 4px;border-bottom:1px dashed #ecddc5;color:var(--ink-strong)}
+table.itab td.dim,table.itab .dim{color:var(--dim)}
+table.itab tr.hot td{background:#f7e6e0}
+.pview .pk{background:#dfe9d2}
+.pview .pe{background:#b8d7a8;color:#2f6b3a;font-weight:700}
+.pview .px{background:#f2c2b5;color:#cc2f22;font-weight:700}
+</style>
+
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Suffix Array Search with LCP</h1>
+<p class="subtitle">
+  Binary search for a pattern <code>P</code> among the sorted suffixes. Besides the two boundaries <code>a</code> and
+  <code>b</code>, the search remembers how many characters of <code>P</code> each boundary suffix already matches,
+  <code>ℓ<sub>a</sub></code> and <code>ℓ<sub>b</sub></code>. With LCP values between suffixes, it never compares the same
+  character of <code>P</code> twice as equal — and sometimes decides a step without any comparison at all.
+</p>
+
+<div class="card">
+  <div class="row">
+    <span class="lbl">Preset</span>
+    <select id="presetSel" onchange="loadPreset(+this.value)"></select>
+    <div class="sep"></div>
+    <span class="lbl">Pattern P</span>
+    <span class="row" id="patChips" style="gap:6px"></span>
+    <div class="sep"></div>
+    <span class="hint">Drag across the text T to search for any substring.</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row" style="align-items:flex-start">
+    <div style="flex:1;min-width:280px"><textarea id="specInput" rows="3" spellcheck="false"></textarea></div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button class="primary" onclick="loadFromInput()">Load</button>
+      <span class="hint" id="sizeInfo"></span>
+    </div>
+  </div>
+  <div class="err" id="inputErr"></div>
+</div>
+
+<div class="card" id="stepCard">
+  <div class="row" style="margin-bottom:9px">
+    <button id="btnFirst" onclick="stopPlay();goto(0,false)" title="first step">⏮</button>
+    <button id="btnPrev" onclick="stepBy(-1)">← Prev</button>
+    <button id="btnNext" class="primary" onclick="stepBy(1)">Next →</button>
+    <button id="btnLast" onclick="stopPlay();goto(steps.length-1,false)" title="last step">⏭</button>
+    <button id="btnPlay" onclick="togglePlay()">▶ Play</button>
+    <div class="sep"></div>
+    <span style="flex:1;min-width:240px;display:block">
+      <input type="range" id="stepSlider" min="0" max="0" value="0" style="width:100%" oninput="stopPlay();goto(+this.value,false)">
+      <span class="phasebar" id="phaseBar"></span>
+    </span>
+    <span class="steplabel" id="stepLabel"></span>
+  </div>
+  <div class="row">
+    <span class="lbl">Speed</span>
+    <input type="range" id="speedSlider" min="1" max="10" value="6" oninput="setSpeed(this.value)" style="width:110px">
+    <span class="steplabel" id="speedLabel" style="min-width:34px">1×</span>
+    <div class="sep"></div>
+    <label class="chk"><input type="checkbox" id="animToggle" checked> animate motion</label>
+    <span class="hint">Keys: ← → step, space play/pause.</span>
+  </div>
+</div>
+
+<div class="box">
+  <div class="box-title">Status</div>
+  <div class="status" id="statusText"></div>
+</div>
+
+<div class="stage" id="stage">
+  <div style="min-width:0">
+    <div class="box">
+      <div class="box-title">Text T <span class="aside">drag across T to search for any substring</span></div>
+      <div class="svg-wrap"><svg id="tSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Sorted suffixes <span class="aside">point at a row or an LCP value for details</span></div>
+      <div class="boxctl">
+        <span class="lbl">Squeeze each suffix after the first |P|+1 characters</span>
+        <input type="range" id="squeeze" min="1" max="12" value="12" style="width:140px" oninput="setSqueeze(+this.value)">
+        <span class="steplabel" id="squeezeLab" style="min-width:70px"></span>
+      </div>
+      <div class="svg-wrap" id="mWrap"><svg id="mSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+  <div class="splitter" id="splitter" tabindex="0" role="separator" aria-orientation="vertical" aria-label="Resize panels"
+       title="Drag to resize the panels; double-click to reset"><div class="grip">⋮</div></div>
+  <div class="side">
+    <div class="box">
+      <div class="box-title">Pseudocode — lcpBinarySearch</div>
+      <pre class="pcode" id="codeView"></pre>
+      <div class="watch" id="watch"></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Iterations</div>
+      <div id="iterView"></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Numbers</div>
+      <div class="stats" id="numbers"></div>
+    </div>
+  </div>
+</div>
+
+<details class="panel">
+  <summary>Input format</summary>
+  <div class="panel-body help">
+    <p>One item per line; lines starting with <code>#</code> are comments.</p>
+<pre>hannahbansbananasman     the text T; $ is appended (it must not occur elsewhere)
+anarchy                  patterns, one per line — the first one is loaded
+anna</pre>
+    <p>Type <code>_</code> for a space (drawn as <code>␣</code>). The end-of-word character <code>$</code> is the smallest
+      character and may not occur in a pattern; all others are ordered by their character code.</p>
+    <p><b>Notation</b>, as in the pseudocode: T = T[0..n] with T[n] = <code>$</code>, and T<sub>i</sub> = T[i..n] is the suffix
+      <b>starting</b> at i. The rows are ranks: row r shows T<sub>L[r]</sub>, the suffix of rank r. a, b and m are always
+      ranks. Row n+1 is virtual and larger than every suffix. LCP[r] = LCP(T<sub>L[r−1]</sub>, T<sub>L[r]</sub>), so
+      LCP(T<sub>L[a]</sub>, T<sub>L[m]</sub>) = min LCP[a+1..m] = LCP[RMQ<sub>LCP</sub>(a+1, m)], where RMQ<sub>LCP</sub>(x, y)
+      is the index of the (leftmost) minimum in LCP[x..y]: one range-minimum query, treated as a black box here.</p>
+    <p><b>Counting.</b> Every evaluation of <i>P[ℓ] = T[L[m]+ℓ]</i> is one character comparison; the decision after the
+      loop reuses the result of the last one. "Plain binary search" is the same search comparing P with T<sub>L[m]</sub>
+      from position 0 every time — it visits the same midpoints, since it takes the same decisions.</p>
+    <p><b>Mouse only.</b> The pattern buttons switch patterns; dragging across T searches for the selected substring;
+      clicking a phase below the progress bar jumps to its start. The slider above the suffixes squeezes long suffixes;
+      the bar between drawing and pseudocode can be dragged (double-click resets it).</p>
+  </div>
+</details>
+
+<details class="panel">
+  <summary>Self-tests</summary>
+  <div class="panel-body">
+    <button class="primary" onclick="runTests()">Run all tests</button>
+    <div id="test-out">Not run yet.</div>
+  </div>
+</details>
+
+</div>
+<div class="tip" id="tip"></div>
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   0.  Helpers
+   ══════════════════════════════════════════════════════════════════════════ */
+const SVGNS='http://www.w3.org/2000/svg';
+function el(t,a){ const e=document.createElementNS(SVGNS,t); for(const k in a) e.setAttribute(k,a[k]); return e; }
+function txt(x,y,s,a){ const e=el('text',Object.assign({x,y,'text-anchor':'middle'},a||{})); e.textContent=s; return e; }
+function disp(ch){ return ch===' '?'␣':ch; }
+function dstr(s){ return [...s].map(disp).join(''); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function code(s){ return '<code>'+esc(dstr(s))+'</code>'; }
+function plural(k,w){ return k+' '+w+(k!==1?'s':''); }
+/* $ is the smallest character; in ASCII the space would otherwise come first */
+function chRank(c){ return c==='$' ? -1 : c.charCodeAt(0); }
+const TL=r=>'T<sub>L['+r+']</sub>';
+const LA='ℓ<sub>a</sub>', LB='ℓ<sub>b</sub>';
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1.  Suffix array, LCP array
+   T[0..n] with T[n] = $, T_i = T[i..n].  Row r holds T_{L[r]}.
+   LCP[r] = LCP(T_{L[r−1]}, T_{L[r]}) for r = 1..n.
+   ══════════════════════════════════════════════════════════════════════════ */
+function buildModel(T){
+  const N=T.length, n=N-1;
+  const L=[...Array(N).keys()].sort((a,b)=>{
+    for(let k=0;;k++){ const x=T[a+k], y=T[b+k]; if(x!==y) return chRank(x)-chRank(y); }
+  });
+  const R=new Array(N); L.forEach((p,r)=>{ R[p]=r; });
+  const LCP=new Array(N); LCP[0]=null;
+  for(let r=1;r<N;r++){ let k=0; const i=L[r-1], j=L[r]; while(T[i+k]===T[j+k]) k++; LCP[r]=k; }
+  const M={T,N,n,L,R,LCP};
+  M.suf=r=>T.slice(L[r]);
+  /* the range-minimum query, as a black box */
+  M.rmq=(lo,hi)=>{ let best=lo; for(let r=lo+1;r<=hi;r++) if(LCP[r]<LCP[best]) best=r; return best; };
+  return M;
+}
+function lcpStr(x,y){ let k=0; while(k<x.length && k<y.length && x[k]===y[k]) k++; return k; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2.  The procedure, plainly (the step builder below replays it)
+   ══════════════════════════════════════════════════════════════════════════ */
+function lcpBinarySearch(M,P,stats){
+  const T=M.T, L=M.L;
+  let a=0, la=0, b=M.n+1, lb=0, l;
+  const st=stats||{cmp:0,eq:0,iters:0,cases:[]};
+  while(b-a>1){
+    st.iters++;
+    const m=Math.floor((a+b)/2);
+    if(la===lb){ l=la; st.cases.push('1'); }
+    else if(la>lb){
+      const h=M.LCP[M.rmq(a+1,m)];
+      if(h>la){ a=m; st.cases.push('2a'); continue; }
+      if(h<la){ b=m; lb=h; st.cases.push('2b'); continue; }
+      l=la; st.cases.push('2c');
+    } else {
+      const h=M.LCP[M.rmq(m+1,b)];
+      if(h>lb){ b=m; st.cases.push("2a'"); continue; }
+      if(h<lb){ a=m; la=h; st.cases.push("2b'"); continue; }
+      l=lb; st.cases.push("2c'");
+    }
+    while(l<P.length && (st.cmp++, P[l]===T[L[m]+l])){ l++; st.eq++; }
+    if(l===P.length || chRank(P[l])<chRank(T[L[m]+l])){ b=m; lb=l; }
+    else { a=m; la=l; }
+  }
+  return b;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3.  Pseudocode (as on the slide)
+   ══════════════════════════════════════════════════════════════════════════ */
+const K_=w=>'<span class="kw">'+w+'</span>', C_=w=>'<span class="cm">'+w+'</span>';
+const LCPTXT=(x,y)=>'LCP(T<sub>L['+x+']</sub>, T<sub>L['+y+']</sub>)';
+const CODE=[
+ ['proc', K_('procedure')+' lcpBinarySearch(P)'],
+ ['c1',   '    '+C_('// returns smallest rank b with P ≤<sub>lex</sub> T<sub>L[b]</sub>')],
+ ['initA','    a := 0;  ℓ<sub>a</sub> := 0          '+C_('// T<sub>L[0]</sub> = $ &lt;<sub>lex</sub> P')],
+ ['initB','    b := n+1;  ℓ<sub>b</sub> := 0        '+C_('// virtual row, larger than all suffixes')],
+ ['while','    '+K_('while')+' b − a &gt; 1'],
+ ['mid',  '        m := ⌊(a+b)/2⌋'],
+ ['case1','        '+K_('if')+' ℓ<sub>a</sub> = ℓ<sub>b</sub> '+K_('then')+' ℓ := ℓ<sub>a</sub>  '+C_('// Case 1')],
+ ['elif', '        '+K_('else if')+' ℓ<sub>a</sub> &gt; ℓ<sub>b</sub> '+K_('then')],
+ ['hA',   '            h := LCP[RMQ<sub>LCP</sub>(a+1, m)]  '+C_('// = '+LCPTXT('a','m'))],
+ ['c2a',  '            '+K_('if')+' h &gt; ℓ<sub>a</sub> '+K_('then')+' a := m; '+K_('continue')+'  '+C_('// Case 2a')],
+ ['c2b',  '            '+K_('if')+' h &lt; ℓ<sub>a</sub> '+K_('then')+' b := m; ℓ<sub>b</sub> := h; '+K_('continue')+'  '+C_('// Case 2b')],
+ ['c2c',  '            ℓ := ℓ<sub>a</sub>  '+C_('// Case 2c')],
+ ['else', '        '+K_('else')],
+ ['hB',   '            h := LCP[RMQ<sub>LCP</sub>(m+1, b)]  '+C_('// = '+LCPTXT('m','b'))],
+ ['c2a_', '            '+K_('if')+' h &gt; ℓ<sub>b</sub> '+K_('then')+' b := m; '+K_('continue')+'  '+C_('// Case 2a′')],
+ ['c2b_', '            '+K_('if')+' h &lt; ℓ<sub>b</sub> '+K_('then')+' a := m; ℓ<sub>a</sub> := h; '+K_('continue')+'  '+C_('// Case 2b′')],
+ ['c2c_', '            ℓ := ℓ<sub>b</sub>  '+C_('// Case 2c′')],
+ ['cmpw', '        '+K_('while')+' ℓ &lt; |P| '+K_('and')+' P[ℓ] = T[L[m]+ℓ]'],
+ ['inc',  '            ℓ := ℓ + 1'],
+ ['dec',  '        '+K_('if')+' ℓ = |P| '+K_('or')+' P[ℓ] &lt; T[L[m]+ℓ] '+K_('then')+' b := m; ℓ<sub>b</sub> := ℓ'],
+ ['dec2', '        '+K_('else')+' a := m; ℓ<sub>a</sub> := ℓ'],
+ ['ret',  '    '+K_('return')+' b']
+];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   4.  Step sequence
+   A step is one picture: the variables, the highlighted lines, and what to
+   draw — the comparison window cmp, the range-minimum query rmq, where P sits.
+   ══════════════════════════════════════════════════════════════════════════ */
+function buildSteps(P){
+  const S=[], N=M.N, n=M.n, np=P.length, T=M.T, L=M.L;
+  let a=0, la=0, b=n+1, lb=0, m=null, l=null, h=null;
+  const hist=[]; let curIt=null;
+  const tot={cmp:0,plain:0,rmq:0};
+  let pRow=-1;
+  const push=o=>{
+    const it=curIt?Object.assign({},curIt):null;
+    S.push(Object.assign({P,a,la,b,lb,m,l,h,pRow,act:!!curIt,hist:hist.slice().concat(it?[it]:[]),tot:Object.assign({},tot)},o));
+  };
+  const plainAt=m=>{ const k=lcpStr(P,M.suf(m)); return k>=np?np:k+1; };
+  push({line:['proc'],ph:'init',plab:'start',vars:{},
+    msg:'Binary search for P = '+code(P)+' (|P| = '+np+') among the '+(n+1)+' sorted suffixes. Besides the boundaries a '+
+        'and b, the search keeps '+LA+' and '+LB+': how many characters of P the suffixes of rank a and b already match.'});
+  push({line:['initA'],ph:'init',vars:{a,[LA]:la},chg:['a',LA],
+    msg:'a := 0: row 0 is the suffix '+code('$')+', which is smaller than every pattern. It shares no character with P: '+LA+' := 0.'});
+  push({line:['initB'],ph:'init',vars:{a,[LA]:la,b,[LB]:lb},chg:['b',LB],
+    msg:'b := n+1 = '+(n+1)+': a virtual row below the last one, larger than every suffix; '+LB+' := 0. '+
+        'Invariant: '+TL('a')+' &lt;<sub>lex</sub> P ≤<sub>lex</sub> '+TL('b')+', so the answer is one of the rows a+1, …, b.'});
+  let it=0;
+  for(;;){
+    const go=b-a>1;
+    const ph=go?'it'+it:'ret';
+    const first=S.length;
+    push({line:['while'],ph,plab:go?'…':'result',vars:{a,[LA]:la,b,[LB]:lb},m:null,l:null,h:null,
+      msg: go ? 'b − a = '+(b-a)+' &gt; 1: the rows '+(a+1)+(b-1>a+1?'..'+(b-1):'')+' are still open.'
+              : 'b − a = 1: no row is left between a and b.'});
+    if(!go) break;
+    m=Math.floor((a+b)/2); l=null; h=null;
+    curIt={a,la,b,lb,m,cs:'',h:'',cmp:0,plain:plainAt(m),res:''};
+    tot.plain+=curIt.plain;
+    pRow=m;
+    push({line:['mid'],ph,vars:{a,[LA]:la,b,[LB]:lb,m},chg:['m'],
+      msg:'m := ⌊('+a+'+'+b+')/2⌋ = '+m+'. P is placed right below row '+m+', to be compared with '+TL(m)+' = '+
+          code(clip(M.suf(m)))+'.'});
+    let lstart;
+    const done=(cs,msg,upd)=>{ curIt.cs=cs; S[first].plab=csLabel(cs); push(Object.assign({ph,msg},upd)); hist.push(curIt); curIt=null; it++; };
+    if(la===lb){
+      lstart=la; l=la; curIt.cs='1'; S[first].plab=csLabel('1');
+      push({line:['case1'],ph,vars:{a,[LA]:la,b,[LB]:lb,m,'ℓ':l},chg:['ℓ'],cmp:{k0:l,k1:l},
+        msg:'Case 1: '+LA+' = '+LB+' = '+la+'. Both boundary suffixes agree with P on the first '+plural(la,'character')+
+            ', and '+TL('m')+' lies between them — so it does too. Compare from position ℓ := '+la+'.'});
+    } else if(la>lb){
+      const r=M.rmq(a+1,m); h=M.LCP[r]; tot.rmq++; curIt.h=h;
+      push({line:['elif','hA'],ph,vars:{a,[LA]:la,b,[LB]:lb,m,h},chg:['h'],rmq:{lo:a+1,hi:m,r},
+        msg:LA+' = '+la+' &gt; '+LB+' = '+lb+': use the upper boundary. RMQ<sub>LCP</sub>('+(a+1)+', '+m+') = '+r+' is the position of the smallest value in LCP['+(a+1)+'..'+m+'], so h := LCP['+r+'] = '+h+
+            ' — one range-minimum query, no character comparison. Why this is '+LCPTXT('a','m')+': rows a..m are sorted, '+
+            'so two suffixes in them share exactly as much as the least-sharing pair of neighbours in between.'});
+      if(h>la){
+        a=m;
+        done('2a',
+          'Case 2a: h = '+h+' &gt; '+LA+' = '+la+'. '+TL('m')+' agrees with '+TL('a')+' beyond position '+la+', where '+TL('a')+
+          ' is smaller than P. So P &gt;<sub>lex</sub> '+TL('m')+' <b>without any comparison</b>: a := m. '+LA+' stays '+la+'.',
+          {line:['c2a'],vars:{a,[LA]:la,b,[LB]:lb,m,h},chg:['a'],rmq:{lo:curIt.a+1,hi:m,r}});
+        continue;
+      }
+      if(h<la){
+        b=m; lb=h;
+        done('2b',
+          'Case 2b: h = '+h+' &lt; '+LA+' = '+la+'. At position '+h+', '+TL('m')+' is larger than '+TL('a')+' — and there '+
+          TL('a')+' still agrees with P. So P &lt;<sub>lex</sub> '+TL('m')+' <b>without any comparison</b>, and they share '+
+          'exactly h characters: b := m, '+LB+' := '+h+'.',
+          {line:['c2b'],vars:{a,[LA]:la,b,[LB]:lb,m,h},chg:['b',LB],rmq:{lo:curIt.a+1,hi:m,r}});
+        continue;
+      }
+      lstart=la; l=la; curIt.cs='2c'; S[first].plab=csLabel('2c');
+      push({line:['c2c'],ph,vars:{a,[LA]:la,b,[LB]:lb,m,h,'ℓ':l},chg:['ℓ'],cmp:{k0:l,k1:l},rmq:{lo:a+1,hi:m,r},
+        msg:'Case 2c: h = '+LA+' = '+la+'. '+TL('m')+' and P both agree with '+TL('a')+' on the first '+
+            plural(la,'character')+'; the next one is unknown. Compare from ℓ := '+la+'.'});
+    } else {
+      const r=M.rmq(m+1,b); h=M.LCP[r]; tot.rmq++; curIt.h=h;
+      push({line:['else','hB'],ph,vars:{a,[LA]:la,b,[LB]:lb,m,h},chg:['h'],rmq:{lo:m+1,hi:b,r},
+        msg:LB+' = '+lb+' &gt; '+LA+' = '+la+': use the lower boundary. RMQ<sub>LCP</sub>('+(m+1)+', '+b+') = '+r+' is the position of the smallest value in LCP['+(m+1)+'..'+b+'], so h := LCP['+r+'] = '+h+
+            ' — one range-minimum query, no character comparison. Why this is '+LCPTXT('m','b')+': rows m..b are sorted, '+
+            'so two suffixes in them share exactly as much as the least-sharing pair of neighbours in between.'});
+      if(h>lb){
+        b=m;
+        done("2a'",
+          'Case 2a′: h = '+h+' &gt; '+LB+' = '+lb+'. '+TL('m')+' agrees with '+TL('b')+' beyond position '+lb+', where '+TL('b')+
+          ' is larger than P (or P has ended). So P ≤<sub>lex</sub> '+TL('m')+' <b>without any comparison</b>: b := m. '+LB+' stays '+lb+'.',
+          {line:['c2a_'],vars:{a,[LA]:la,b,[LB]:lb,m,h},chg:['b'],rmq:{lo:m+1,hi:curIt.b,r}});
+        continue;
+      }
+      if(h<lb){
+        a=m; la=h;
+        done("2b'",
+          'Case 2b′: h = '+h+' &lt; '+LB+' = '+lb+'. At position '+h+', '+TL('m')+' is smaller than '+TL('b')+' — and there '+
+          TL('b')+' still agrees with P. So P &gt;<sub>lex</sub> '+TL('m')+' <b>without any comparison</b>, and they share '+
+          'exactly h characters: a := m, '+LA+' := '+h+'.',
+          {line:['c2b_'],vars:{a,[LA]:la,b,[LB]:lb,m,h},chg:['a',LA],rmq:{lo:m+1,hi:curIt.b,r}});
+        continue;
+      }
+      lstart=lb; l=lb; curIt.cs="2c'"; S[first].plab=csLabel("2c'");
+      push({line:['c2c_'],ph,vars:{a,[LA]:la,b,[LB]:lb,m,h,'ℓ':l},chg:['ℓ'],cmp:{k0:l,k1:l},rmq:{lo:m+1,hi:b,r},
+        msg:'Case 2c′: h = '+LB+' = '+lb+'. '+TL('m')+' and P both agree with '+TL('b')+' on the first '+
+            plural(lb,'character')+'; the next one is unknown. Compare from ℓ := '+lb+'.'});
+    }
+    /* character comparisons */
+    let mis=null;
+    for(;;){
+      if(l>=np){
+        push({line:['cmpw'],ph,vars:{a,[LA]:la,b,[LB]:lb,m,'ℓ':l},cmp:{k0:lstart,k1:l,end:true},
+          msg:'ℓ = |P| = '+np+': P has ended — all of it matches, so P is a prefix of '+TL('m')+'. (No comparison needed for this test.)'});
+        break;
+      }
+      const tc=T[L[m]+l];
+      tot.cmp++; curIt.cmp++;
+      if(P[l]===tc){
+        l++;
+        push({line:['cmpw','inc'],ph,vars:{a,[LA]:la,b,[LB]:lb,m,'ℓ':l},chg:['ℓ'],cmp:{k0:lstart,k1:l,at:l-1},
+          msg:'P['+(l-1)+'] = '+code(tc)+' = T['+L[m]+'+'+(l-1)+']: equal, so ℓ := '+l+'.'});
+      } else {
+        mis=l;
+        push({line:['cmpw'],ph,vars:{a,[LA]:la,b,[LB]:lb,m,'ℓ':l},cmp:{k0:lstart,k1:l,at:l,mis:true},
+          msg:'P['+l+'] = '+code(P[l])+' ≠ '+code(tc)+' = T['+L[m]+'+'+l+']: the first difference. Stop.'});
+        break;
+      }
+    }
+    const less = l===np || chRank(P[l])<chRank(T[L[m]+l]);
+    const cmpInfo={k0:lstart,k1:l,at:mis,mis:mis!==null,end:mis===null};
+    if(less){
+      b=m; lb=l; curIt.res='<';
+      push({line:['dec'],ph,vars:{a,[LA]:la,b,[LB]:lb,m,'ℓ':l},chg:['b',LB],cmp:cmpInfo,
+        msg:(l===np ? 'ℓ = |P|: P is a prefix of '+TL('m')+', so P ≤<sub>lex</sub> '+TL('m')
+                    : 'P['+l+'] = '+code(P[l])+' &lt; '+code(T[L[m]+l])+', so P &lt;<sub>lex</sub> '+TL('m'))+
+            '. b := m = '+m+', and '+LB+' := ℓ = '+l+'.'});
+    } else {
+      a=m; la=l; curIt.res='>';
+      push({line:['dec2'],ph,vars:{a,[LA]:la,b,[LB]:lb,m,'ℓ':l},chg:['a',LA],cmp:cmpInfo,
+        msg:'P['+l+'] = '+code(P[l])+' &gt; '+code(T[L[m]+l])+', so P &gt;<sub>lex</sub> '+TL('m')+'. a := m = '+m+
+            ', and '+LA+' := ℓ = '+l+'.'});
+    }
+    hist.push(curIt); curIt=null; it++;
+  }
+  pRow=b-1;
+  const found=lb===np && b<=n;
+  S.push(Object.assign({},S[S.length-1],{line:['ret'],ph:'ret',pRow:b-1,m:null,final:true,found,
+    vars:{b,[LB]:lb},chg:['b'],
+    msg:'return b = '+b+'. '+(b<=n?TL(b)+' = '+code(clip(M.suf(b)))+' is the first suffix ≥ P, ':'P is larger than every suffix, ')+
+        (found ? 'and '+LB+' = |P|: <b>P occurs</b>, at position L['+b+'] = '+L[b]+' (and in every following row that also starts with P).'
+               : 'and '+LB+' = '+lb+' &lt; |P|: P does <b>not</b> occur — it would sit between rows '+a+' and '+b+'.')+
+        ' Character comparisons: <b>'+tot.cmp+'</b>; plain binary search with the same midpoints: '+tot.plain+'.'}));
+  return S;
+}
+function csLabel(c){ return c==='1'?'Case 1':'Case '+c.replace("'",'′'); }
+function clip(s){ return s.length>40?s.slice(0,40)+'…':s; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   5.  Geometry
+   Row r (0..n, plus the virtual row n+1) moves down by PH once P has passed
+   it: P sits right below row pRow, and the rows below make room.
+   ══════════════════════════════════════════════════════════════════════════ */
+const RH=21, PH=27, HDR=34, CW=12, TW=22;
+let GM=null, squeezeW=CW;
+function geom(){
+  const N=M.N, K=Math.min(N,P.length+1), w=k=>k<K?CW:squeezeW;
+  const xR=112, xL=144, x0=168;
+  const xl=new Array(N+1); xl[0]=x0;
+  for(let k=1;k<=N;k++) xl[k]=xl[k-1]+w(k-1);
+  const xLCP=Math.max(xl[N],xl[Math.min(N,P.length+1)])+30;
+  const W=xLCP+150, H=HDR+(N+1)*RH+PH+14;
+  return {N,K,xR,xL,x0,xl:k=>xl[Math.min(k,N)],w,xc:k=>xl[k]+w(k)/2,xLCP,W,H};
+}
+const rowTop=(r,p)=>HDR+r*RH+PH*Math.max(0,Math.min(1,r-p));
+const pTop=p=>HDR+(p+1)*RH+3;
+
+function setSqueezeUI(w){
+  squeezeW=w; document.getElementById('squeeze').value=w;
+  document.getElementById('squeezeLab').textContent = w>=CW ? 'full width' : w+' px / char';
+}
+function setSqueeze(w){ setSqueezeUI(w); if(M){ setupMatrix(); render(false); } }
+function autoSqueeze(){
+  const rest=M.N-4; let w=CW;
+  if(M.N>44 && rest>0) w=Math.max(1,Math.min(CW,Math.floor((480-4*CW)/rest)));
+  setSqueezeUI(w);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   6.  Painting the suffixes
+   static per step: every row is a <g> that is only translated while animating
+   dynamic per frame: boundaries, pointers, P itself
+   ══════════════════════════════════════════════════════════════════════════ */
+let layers=null, rowG=[];
+function setupMatrix(){
+  const svg=document.getElementById('mSvg'); svg.innerHTML='';
+  GM=geom();
+  svg.setAttribute('viewBox','0 0 '+GM.W+' '+GM.H); svg.setAttribute('width',GM.W); svg.setAttribute('height',GM.H);
+  layers={back:el('g',{'pointer-events':'none'}),stat:el('g',{}),front:el('g',{'pointer-events':'none'}),hov:el('g',{'pointer-events':'none'})};
+  for(const k of ['back','stat','front','hov']) svg.appendChild(layers[k]);
+}
+const COL={known:'#dfe9d2',eq:'#b8d7a8',mis:'#f2c2b5',eqInk:'#2f6b3a',misInk:'#cc2f22'};
+function charRuns(G,xs,y,str,styleOf,fs){
+  /* one <text> per row, one <tspan> per run of equal style */
+  const t=el('text',{y,'font-size':fs||14,'font-family':'var(--mono)'});
+  let run=null;
+  const flush=()=>{ if(!run) return; const ts=el('tspan',{x:run.xs.join(' ')}); ts.textContent=run.s;
+    for(const a in run.st) ts.setAttribute(a,run.st[a]); t.appendChild(ts); run=null; };
+  for(let k=0;k<str.length;k++){
+    const st=styleOf(k); if(st===null) break;
+    const key=JSON.stringify(st);
+    if(!run||run.key!==key){ flush(); run={key,st,xs:[],s:''}; }
+    run.xs.push(xs(k)); run.s+=disp(str[k]);
+  }
+  flush(); G.appendChild(t);
+}
+function paintStatic(st){
+  const g=GM, N=g.N, G=layers.stat; G.innerHTML=''; rowG=[];
+  const P=st.P, np=P.length;
+  /* headers */
+  G.appendChild(txt(g.xR,HDR-12,'r',{'font-size':11,fill:'var(--muted)'}));
+  G.appendChild(txt(g.xL,HDR-12,'L[r]',{'font-size':11,fill:'var(--muted)'}));
+  { const h=txt(g.x0,HDR-12,'T',{'font-size':11,fill:'var(--muted)','text-anchor':'start','font-style':'italic'});
+    const sb=el('tspan',{'baseline-shift':'sub','font-size':8,'font-style':'normal'}); sb.textContent='L[r]'; h.appendChild(sb);
+    const rs=el('tspan',{'font-style':'normal'}); rs.textContent='  suffix of rank r'; h.appendChild(rs); G.appendChild(h); }
+  G.appendChild(txt(g.xLCP,HDR-12,'LCP[r]',{'font-size':11,fill:'var(--muted)'}));
+  const fsq=Math.min(14,Math.max(5,squeezeW+1));
+  const xOf=k=>(k>=g.K && squeezeW<CW) ? (g.xl(k)+(squeezeW-0.6*fsq)/2).toFixed(1) : (g.xc(k)-4.2).toFixed(1);
+  const rmq=st.rmq||null, cmp=st.cmp||null;
+  for(let r=0;r<=N;r++){
+    const R=el('g',{'data-h':'row:'+r,transform:'translate(0,'+rowTop(r,live?live.pP:st.pRow)+')'});
+    const yb=RH-6;
+    if(r===N){                       /* the virtual row n+1 */
+      R.appendChild(el('rect',{x:g.x0-4,y:2,width:Math.min(260,g.xLCP-g.x0-20),height:RH-4,rx:3,fill:'none',
+        stroke:'var(--grey)','stroke-dasharray':'4 3'}));
+      R.appendChild(txt(g.x0+4,yb,'row n+1 (virtual): larger than every suffix',{'font-size':11,fill:'var(--muted)','text-anchor':'start','font-style':'italic'}));
+      R.appendChild(txt(g.xR,yb,String(N),{'font-size':10,fill:'var(--dim)'}));
+      G.appendChild(R); rowG.push(R); continue;
+    }
+    R.appendChild(el('rect',{x:g.x0-6,y:0,width:g.xLCP-g.x0-10,height:RH,fill:'transparent'}));
+    R.appendChild(txt(g.xR,yb,String(r),{'font-size':10,fill:'var(--dim)'}));
+    R.appendChild(el('rect',{x:g.xL-13,y:2,width:26,height:RH-4,rx:2,fill:'none',stroke:'var(--btn-border)'}));
+    R.appendChild(txt(g.xL,yb,String(M.L[r]),{'font-size':11,fill:'var(--ink-strong)','font-family':'var(--mono)'}));
+    const s=M.suf(r);
+    /* backgrounds: matched prefix of a / b, comparison window at m */
+    const band=(k0,k1,fill)=>{ if(k1<=k0) return; R.appendChild(el('rect',{x:g.xl(k0),y:2,width:g.xl(k1)-g.xl(k0),height:RH-4,rx:2,fill})); };
+    const isM=st.m===r && cmp;
+    /* the h characters that T_{L[m]} shares with the boundary suffix */
+    if(rmq && (r===st.m || r===(rmq.lo===st.m+1?rmq.hi:rmq.lo-1)))
+      band(0,M.LCP[rmq.r],'#d3e2ec');
+    if(isM){
+      band(0,cmp.k0,COL.known);
+      band(cmp.k0,cmp.k1,COL.eq);
+      if(cmp.mis) band(cmp.k1,cmp.k1+1,COL.mis);
+    }
+    if(r===st.a || r===st.b){
+      const lv=r===st.a?st.la:st.lb;
+      if(lv>0) R.appendChild(el('rect',{x:g.xl(0),y:RH-3,width:g.xl(lv)-g.xl(0),height:2.5,fill:'var(--accent)'}));
+    }
+    if(st.final && st.found && r===st.b)
+      R.appendChild(el('rect',{x:g.xl(0),y:RH-3,width:g.xl(np)-g.xl(0),height:2.5,fill:'var(--accent)'}));
+    charRuns(R,xOf,yb,s,k=>{
+      const sq=k>=g.K && squeezeW<CW;
+      if(sq && squeezeW<5) return null;
+      const o={fill:'var(--ink-strong)'};
+      if(sq){ o['font-size']=fsq; o.fill='var(--grey)'; }
+      if(isM && k>=cmp.k0 && k<cmp.k1) { o.fill=COL.eqInk; o['font-weight']=700; }
+      if(isM && cmp.mis && k===cmp.k1) { o.fill=COL.misInk; o['font-weight']=700; }
+      if(s[k]==='$') o.fill='var(--muted)';
+      return o;
+    });
+    if(squeezeW<5 && s.length>g.K)
+      R.appendChild(el('rect',{x:g.xl(g.K),y:7,width:g.xl(s.length)-g.xl(g.K),height:RH-14,rx:2,fill:'var(--grey)',opacity:.3}));
+    if(isM && cmp.at!==undefined && cmp.at!==null)
+      R.appendChild(el('rect',{x:g.xl(cmp.at)-1,y:0,width:g.w(cmp.at)+2,height:RH,rx:3,fill:'none',stroke:'var(--ink-strong)','stroke-width':1.8}));
+    /* LCP */
+    const inR=rmq && r>=rmq.lo && r<=rmq.hi;
+    const lg=el('g',{'data-h':'lcp:'+r});
+    if(r>0){
+      lg.appendChild(el('rect',{x:g.xLCP-14,y:2,width:28,height:RH-4,rx:3,fill:inR?'#dbe7ef':'#fbf8f0',
+        stroke:rmq&&r===rmq.r?'var(--ccol)':(inR?'#9fbcd0':'var(--btn-border)'),'stroke-width':rmq&&r===rmq.r?2.2:1}));
+      lg.appendChild(txt(g.xLCP,yb,String(M.LCP[r]),{'font-size':12,'font-family':'var(--mono)',
+        fill:inR?'var(--ccol)':'var(--ink)','font-weight':rmq&&r===rmq.r?700:400}));
+    } else lg.appendChild(txt(g.xLCP,yb,'–',{'font-size':12,fill:'var(--dim)'}));
+    R.appendChild(lg);
+    G.appendChild(R); rowG.push(R);
+  }
+}
+/* dynamic values, tweened between steps */
+const DKEYS=['pA','pB','pM','mA','pP'];
+let live=null;
+function targetOf(st){
+  return {pA:st.a,pB:st.b,pM:st.m!==null?st.m:(live?live.pM:0),mA:st.m!==null?1:0,pP:st.pRow};
+}
+function paintDynamic(st,v){
+  const g=GM, B=layers.back, F=layers.front; B.innerHTML=''; F.innerHTML='';
+  const p=v.pP;
+  rowG.forEach((R,r)=>R.setAttribute('transform','translate(0,'+rowTop(r,p).toFixed(2)+')'));
+  const yOf=r=>rowTop(r,p);
+  /* the candidate range: rows a..b */
+  const ya=HDR+v.pA*RH+PH*Math.max(0,Math.min(1,v.pA-p)), yb=HDR+v.pB*RH+PH*Math.max(0,Math.min(1,v.pB-p))+RH;
+  B.appendChild(el('rect',{x:g.x0-10,y:ya,width:g.xLCP+18-(g.x0-10),height:yb-ya,rx:4,fill:'var(--shade)',opacity:.65}));
+  /* the P row */
+  const yP=pTop(p), P=st.P, np=P.length;
+  B.appendChild(el('rect',{x:g.x0-8,y:yP,width:g.xl(np)-g.x0+16,height:PH-6,rx:4,fill:'#fbe9e3',stroke:'var(--accent)','stroke-width':1.4}));
+  F.appendChild(txt(g.x0-16,yP+PH-12,'P',{'font-size':14,fill:'var(--accent)','font-weight':700,'text-anchor':'end','font-style':'italic'}));
+  const cmp=st.cmp||null;
+  for(let k=0;k<np;k++){
+    const x=g.xc(k);
+    let fill='var(--accent)', w=600, bg=null;
+    if(cmp && st.m!==null){
+      if(k<cmp.k0) bg=COL.known;
+      else if(k<cmp.k1){ bg=COL.eq; fill=COL.eqInk; w=700; }
+      else if(cmp.mis && k===cmp.k1){ bg=COL.mis; fill=COL.misInk; w=700; }
+    }
+    if(bg) F.appendChild(el('rect',{x:g.xl(k),y:yP+3,width:g.w(k),height:PH-12,rx:2,fill:bg}));
+    F.appendChild(txt(x,yP+PH-12,disp(P[k]),{'font-size':14,'font-family':'var(--mono)',fill,'font-weight':w}));
+    if(cmp && cmp.at===k && st.m!==null)
+      F.appendChild(el('rect',{x:g.xl(k)-1,y:yP+1,width:g.w(k)+2,height:PH-8,rx:3,fill:'none',stroke:'var(--ink-strong)','stroke-width':1.8}));
+  }
+  /* skipped prefix: a bracket over the known characters */
+  if(cmp && st.m!==null && cmp.k0>0){
+    const x1=g.xl(0), x2=g.xl(cmp.k0), y=yP+PH-4;
+    F.appendChild(el('path',{d:'M '+x1+' '+(y-3)+' L '+x1+' '+y+' L '+x2+' '+y+' L '+x2+' '+(y-3),fill:'none',stroke:COL.eqInk,'stroke-width':1.4}));
+  }
+  /* pointers a, b, m */
+  const ptr=(y,lab,sub,x,col,alpha)=>{
+    const g2=el('g',{opacity:alpha});
+    g2.appendChild(el('path',{d:'M '+(x+4)+' '+(y+RH/2)+' L '+(g.xR-16)+' '+(y+RH/2),stroke:col,'stroke-width':1.6,fill:'none'}));
+    g2.appendChild(el('path',{d:'M '+(g.xR-16)+' '+(y+RH/2-4)+' L '+(g.xR-10)+' '+(y+RH/2)+' L '+(g.xR-16)+' '+(y+RH/2+4)+' Z',fill:col}));
+    const lt=txt(x,y+RH-6,lab,{'font-size':13,fill:col,'font-weight':700,'text-anchor':'end','font-style':'italic'});
+    g2.appendChild(lt);
+    if(sub!==null) g2.appendChild(txt((x+g.xR-12)/2,y+RH/2-3,sub,{'font-size':9.5,fill:col}));
+    F.appendChild(g2);
+  };
+  const ymA=HDR+v.pM*RH+PH*Math.max(0,Math.min(1,v.pM-p));
+  const coA=st.m!==null&&st.a===st.m, coB=st.m!==null&&st.b===st.m;
+  ptr(ya,coA?'a = m':'a','ℓa='+st.la,62,'var(--accent)',1);
+  ptr(yb-RH,coB?'b = m':'b',st.b===M.N?null:'ℓb='+st.lb,62,'var(--accent)',1);
+  if(v.mA>0.01 && !coA && !coB) ptr(ymA,'m',null,62,'var(--ink-strong)',v.mA);
+  /* range-minimum query */
+  if(st.rmq){
+    const x=g.xLCP+20, y1=yOf(st.rmq.lo)+3, y2=yOf(st.rmq.hi)+RH-3;
+    F.appendChild(el('path',{d:'M '+(x-4)+' '+y1+' L '+x+' '+y1+' L '+x+' '+y2+' L '+(x-4)+' '+y2,fill:'none',stroke:'var(--ccol)','stroke-width':1.6}));
+    const ym=yOf(st.rmq.r)+RH-6;
+    const t1=txt(x+6,ym-1,'RMQ',{'font-size':10,fill:'var(--ccol)','text-anchor':'start'});
+    const sb=el('tspan',{'baseline-shift':'sub','font-size':7}); sb.textContent='LCP'; t1.appendChild(sb);
+    const rs=el('tspan',{}); rs.textContent='('+st.rmq.lo+', '+st.rmq.hi+') = '+st.rmq.r; t1.appendChild(rs);
+    F.appendChild(t1);
+    F.appendChild(txt(x+6,ym+12,'h = LCP['+st.rmq.r+'] = '+M.LCP[st.rmq.r],{'font-size':11,fill:'var(--ccol)','text-anchor':'start','font-weight':700}));
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7.  The text strip, side panels
+   ══════════════════════════════════════════════════════════════════════════ */
+let TG=null, dragSel=null;
+function paintText(st){
+  const svg=document.getElementById('tSvg'); svg.innerHTML='';
+  const N=M.N, x0=22, W=x0+N*TW+16, H=58;
+  const X=i=>x0+i*TW;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.setAttribute('width',W); svg.setAttribute('height',H);
+  TG={x0,X};
+  const np=st.P.length;
+  let win=null;
+  if(st.m!==null && st.m!==undefined) win={i:M.L[st.m],len:Math.min(np,N-M.L[st.m]),col:'var(--ink-strong)'};
+  if(st.final && st.found) win={i:M.L[st.b],len:np,col:'var(--accent)'};
+  for(let i=0;i<N;i++){
+    const x=X(i);
+    svg.appendChild(txt(x+TW/2,12,String(i),{'font-size':9,fill:'var(--dim)'}));
+    const g=el('g',{'data-h':'t:'+i,style:'cursor:crosshair'});
+    g.appendChild(el('rect',{x:x+1,y:17,width:TW-2,height:24,rx:3,fill:'#fbf8f0',stroke:'var(--btn-border)'}));
+    g.appendChild(txt(x+TW/2,34,disp(M.T[i]),{'font-size':15,fill:'var(--ink-strong)','font-weight':600,'font-family':'var(--mono)'}));
+    svg.appendChild(g);
+  }
+  if(win){
+    const xa=X(win.i)+2, xb=X(win.i+win.len)-2;
+    svg.appendChild(el('path',{d:'M '+xa+' 45 L '+xa+' 49 L '+xb+' 49 L '+xb+' 45',fill:'none',stroke:win.col,'stroke-width':2}));
+  }
+  svg.appendChild(el('g',{id:'tHover','pointer-events':'none'}));
+  if(dragSel){
+    const a=Math.min(dragSel.a,dragSel.b), b=Math.max(dragSel.a,dragSel.b);
+    svg.appendChild(el('rect',{x:X(a),y:15,width:(b-a+1)*TW,height:28,rx:4,fill:'rgba(47,95,138,.12)',stroke:'var(--ccol)','stroke-width':1.5}));
+  }
+  if(win){
+    const wrap=svg.parentNode, x=X(win.i);
+    if(x<wrap.scrollLeft+40 || x>wrap.scrollLeft+wrap.clientWidth-120) wrap.scrollLeft=Math.max(0,x-wrap.clientWidth/3);
+  }
+}
+function paintCode(st){
+  const hot=new Set(st.line||[]);
+  document.getElementById('codeView').innerHTML=CODE.map((l,i)=>'<span class="ln'+(hot.has(l[0])?' hot':'')+
+    '"><span class="no">'+(i+1)+'</span>'+l[1]+'</span>').join('');
+  const v=st.vars||{};
+  document.getElementById('watch').innerHTML=Object.keys(v).map(k=>'<span><span class="wk">'+k+' =</span> <span class="'+
+    ((st.chg||[]).includes(k)?'chg':'')+'">'+esc(v[k])+'</span></span>').join('');
+}
+function paintIter(st){
+  const H=st.hist||[];
+  if(!H.length){ document.getElementById('iterView').innerHTML='<div class="note stats">No iteration yet.</div>'; return; }
+  let h='<table class="itab"><tr><th>m</th><th>a</th><th>ℓ<sub>a</sub></th><th>b</th><th>ℓ<sub>b</sub></th><th>case</th><th>h</th>'+
+        '<th title="character comparisons">cmp</th><th title="plain binary search, same midpoint">plain</th><th>P vs T<sub>L[m]</sub></th></tr>';
+  H.forEach((r,i)=>{
+    const cur=i===H.length-1 && st.act;
+    const res=r.res==='<'?'&lt;':r.res==='>'?'&gt;':'';
+    const cs=r.cs===''?'':(r.cs==='1'?'1':r.cs.replace("'",'′'));
+    const quick=r.cs==='2a'||r.cs==='2b'||r.cs==="2a'"||r.cs==="2b'";
+    h+='<tr class="'+(cur?'hot':'')+'"><td>'+r.m+'</td><td>'+r.a+'</td><td>'+r.la+'</td><td>'+r.b+'</td><td>'+r.lb+'</td><td>'+cs+
+       '</td><td>'+r.h+'</td><td>'+(cs===''?'':r.cmp)+'</td><td class="dim">'+r.plain+'</td><td>'+
+       (quick?((r.cs==='2a'||r.cs==="2b'")?'&gt;':'&lt;')+' <span class="dim">free</span>':res)+'</td></tr>';
+  });
+  h+='</table><div class="note stats">a, ℓ<sub>a</sub>, b, ℓ<sub>b</sub>: values at the start of the iteration.</div>';
+  document.getElementById('iterView').innerHTML=h;
+}
+function paintNumbers(st){
+  const P=st.P, t=st.tot;
+  let h='<div><span class="k">P =</span> <span class="pview">'+[...P].map((c,k)=>{
+    const cmp=st.cmp; let cl='';
+    if(cmp && st.m!==null){ if(k<cmp.k0) cl='pk'; else if(k<cmp.k1) cl='pe'; else if(cmp.mis&&k===cmp.k1) cl='px'; }
+    return '<span class="'+cl+'">'+esc(disp(c))+'</span>'; }).join('')+'</span> <span class="k">|P| = '+P.length+'</span></div>';
+  h+='<hr><span class="k">character comparisons:</span> <span class="v">'+t.cmp+'</span>'+
+     '<br><span class="k">plain binary search, same midpoints:</span> <span class="v">'+t.plain+'</span>'+
+     '<br><span class="k">range-minimum queries:</span> <span class="v">'+t.rmq+'</span>';
+  h+='<hr><span class="k">n =</span> <span class="v">'+M.n+'</span> <span class="note">(rows 0..n, plus the virtual row n+1)</span>';
+  h+='<br><span class="note">Every comparison that finds two equal characters increases max{ℓ<sub>a</sub>, ℓ<sub>b</sub>} — '+
+     'so there are at most |P| of them in total, plus at most one unequal comparison per iteration.</span>';
+  document.getElementById('numbers').innerHTML=h;
+}
+function paintLegend(){
+  const sw=inner=>'<svg width="30" height="16">'+inner+'</svg>';
+  document.getElementById('legend').innerHTML=
+    '<span>'+sw('<rect x="3" y="2" width="24" height="12" rx="3" fill="#f3d9d0"/>')+' rows a..b: the answer is one of a+1, …, b</span>'+
+    '<span>'+sw('<rect x="3" y="11" width="24" height="2.5" fill="#cc2f22"/>')+' the ℓ<sub>a</sub> / ℓ<sub>b</sub> characters that match P</span>'+
+    '<span>'+sw('<rect x="3" y="2" width="11" height="12" fill="'+COL.known+'"/><rect x="15" y="2" width="11" height="12" fill="'+COL.eq+'"/>')+
+      ' known equal, skipped · compared equal</span>'+
+    '<span>'+sw('<rect x="9" y="2" width="12" height="12" fill="'+COL.mis+'"/>')+' first difference</span>';
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   8.  Hover and drag
+   ══════════════════════════════════════════════════════════════════════════ */
+let hover=null;
+function tipShow(html,ev){
+  const t=document.getElementById('tip'); t.innerHTML=html; t.style.display='block';
+  const x=Math.min(window.innerWidth-360,ev.clientX+14), y=ev.clientY+16;
+  t.style.left=x+'px'; t.style.top=(y+t.offsetHeight>window.innerHeight?ev.clientY-t.offsetHeight-10:y)+'px';
+}
+function tipHide(){ document.getElementById('tip').style.display='none'; }
+function hoverInfo(h){
+  const [k,vs]=h.split(':'), v=+vs;
+  if(k==='row'){
+    if(v===M.N) return 'Row n+1 = '+M.N+' does not exist; it stands for a suffix larger than every other.';
+    return 'Row '+v+': '+TL(v)+' = T<sub>'+M.L[v]+'</sub> = T['+M.L[v]+'..n] = '+code(clip(M.suf(v)))+
+      '<br>LCP with P: '+lcpStr(steps[cur].P,M.suf(v));
+  }
+  if(k==='lcp'){
+    if(v===0) return 'LCP[0] is undefined: row 0 has no predecessor.';
+    return 'LCP['+v+'] = '+LCPTXT(v-1,v)+' = '+M.LCP[v]+'<br>'+code(clip(M.suf(v-1)))+'<br>'+code(clip(M.suf(v)));
+  }
+  if(k==='t') return 'T['+v+'] = '+code(M.T[v])+'. The suffix T<sub>'+v+'</sub> has rank R['+v+'] = <b>'+M.R[v]+'</b>.';
+  return '';
+}
+function paintHover(){
+  const H=layers.hov; H.innerHTML='';
+  const th=document.getElementById('tHover'); if(th) th.innerHTML='';
+  if(!hover||!M) return;
+  const [k,vs]=hover.split(':'), v=+vs, g=GM, p=live?live.pP:steps[cur].pRow;
+  const box=r=>H.appendChild(el('rect',{x:g.x0-8,y:rowTop(r,p),width:g.xLCP+16-(g.x0-8),height:RH,rx:4,fill:'rgba(47,95,138,.10)',stroke:'var(--ccol)'}));
+  const tBox=(i,len)=>{ if(th) th.appendChild(el('rect',{x:TG.X(i),y:15,width:TW*len,height:28,rx:4,fill:'rgba(47,95,138,.12)',stroke:'var(--ccol)','stroke-width':1.5})); };
+  if(k==='row' && v<M.N){ box(v); tBox(M.L[v],M.N-M.L[v]); }
+  if(k==='lcp' && v>0){ box(v-1); box(v); }
+  if(k==='t'){ box(M.R[v]); tBox(v,1); }
+}
+function hoverTarget(ev){ let n=ev.target; while(n&&n.getAttribute&&!n.getAttribute('data-h')) n=n.parentNode; return n&&n.getAttribute?n.getAttribute('data-h'):null; }
+function bindHover(id){
+  const svg=document.getElementById(id);
+  svg.addEventListener('mousemove',ev=>{ const h=hoverTarget(ev); if(h!==hover){ hover=h; paintHover(); } if(h) tipShow(hoverInfo(h),ev); else tipHide(); });
+  svg.addEventListener('mouseleave',()=>{ hover=null; paintHover(); tipHide(); });
+}
+function bindDrag(){
+  const svg=document.getElementById('tSvg');
+  const idxAt=ev=>{ const r=svg.getBoundingClientRect(); return Math.max(0,Math.min(M.N-2,Math.floor((ev.clientX-r.left-TG.x0)/TW))); };
+  svg.addEventListener('pointerdown',ev=>{ if(!M) return; const i=idxAt(ev); dragSel={a:i,b:i}; svg.setPointerCapture(ev.pointerId); paintText(steps[cur]); });
+  svg.addEventListener('pointermove',ev=>{ if(!dragSel) return; const i=idxAt(ev); if(i!==dragSel.b){ dragSel.b=i; paintText(steps[cur]); } });
+  svg.addEventListener('pointerup',()=>{ if(!dragSel) return; const a=Math.min(dragSel.a,dragSel.b), b=Math.max(dragSel.a,dragSel.b);
+    dragSel=null; const p=M.T.slice(a,b+1); if(!patterns.includes(p)) patterns.push(p); setPattern(p); });
+  svg.addEventListener('pointercancel',()=>{ dragSel=null; paintText(steps[cur]); });
+}
+function bindSplitter(){
+  const sp=document.getElementById('splitter'), stage=document.getElementById('stage');
+  let drag=false;
+  const setW=w=>{ const r=stage.getBoundingClientRect(); w=Math.max(280,Math.min(r.width-340,w)); stage.style.setProperty('--sideW',Math.round(w)+'px'); };
+  const cw=()=>document.querySelector('.side').getBoundingClientRect().width;
+  sp.addEventListener('pointerdown',ev=>{ drag=true; sp.classList.add('drag'); sp.setPointerCapture(ev.pointerId); ev.preventDefault(); });
+  sp.addEventListener('pointermove',ev=>{ if(drag) setW(stage.getBoundingClientRect().right-ev.clientX-7); });
+  const end=()=>{ drag=false; sp.classList.remove('drag'); };
+  sp.addEventListener('pointerup',end); sp.addEventListener('pointercancel',end);
+  sp.addEventListener('dblclick',()=>stage.style.removeProperty('--sideW'));
+  sp.addEventListener('keydown',ev=>{
+    if(ev.key==='ArrowLeft'){ ev.preventDefault(); ev.stopPropagation(); setW(cw()+30); }
+    else if(ev.key==='ArrowRight'){ ev.preventDefault(); ev.stopPropagation(); setW(cw()-30); }
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   9.  Driver
+   ══════════════════════════════════════════════════════════════════════════ */
+let M=null, steps=[], cur=0, patterns=[], P='';
+let animHandle=null, speedFactor=1;
+function render(animate){
+  const st=steps[cur];
+  document.getElementById('statusText').innerHTML=st.msg;
+  document.getElementById('stepLabel').textContent='step '+(cur+1)+' / '+steps.length;
+  document.getElementById('stepSlider').value=cur;
+  document.getElementById('btnPrev').disabled=document.getElementById('btnFirst').disabled=(cur===0);
+  document.getElementById('btnNext').disabled=document.getElementById('btnLast').disabled=(cur===steps.length-1);
+  paintStatic(st); paintText(st); paintCode(st); paintIter(st); paintNumbers(st);
+  updatePhases();
+  const tgt=targetOf(st);
+  const from=(live&&animate)?Object.assign({},live):Object.assign({},tgt);
+  if(from.mA<0.5) from.pM=tgt.pM;
+  if(animHandle){ cancelAnimationFrame(animHandle); animHandle=null; }
+  const dur=(animate?700:0)/speedFactor, t0=performance.now();
+  const frame=now=>{
+    const t=dur===0?1:Math.min(1,(now-t0)/dur);
+    const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    const v={}; for(const k of DKEYS) v[k]=from[k]+(tgt[k]-from[k])*e;
+    live=v; paintDynamic(st,v); paintHover();
+    if(t<1) animHandle=requestAnimationFrame(frame); else animHandle=null;
+  };
+  animHandle=requestAnimationFrame(frame);
+}
+function phaseList(){ const out=[]; steps.forEach((s,i)=>{ if(!out.length||out[out.length-1].ph!==s.ph) out.push({ph:s.ph,lab:s.plab||s.ph,i}); }); return out; }
+function buildPhases(){
+  const ps=phaseList(), bar=document.getElementById('phaseBar'); bar.innerHTML='';
+  ps.forEach((p,k)=>{ const end=k+1<ps.length?ps[k+1].i:steps.length;
+    const seg=document.createElement('span'); seg.className='pseg'; seg.style.flexGrow=String(end-p.i);
+    seg.textContent=p.lab; seg.title=p.lab+' (step '+(p.i+1)+')'; seg.onclick=()=>{ stopPlay(); goto(p.i,false); }; bar.appendChild(seg); });
+}
+function updatePhases(){ const ps=phaseList(), segs=document.getElementById('phaseBar').children;
+  ps.forEach((p,k)=>{ const end=k+1<ps.length?ps[k+1].i:steps.length; if(segs[k]) segs[k].classList.toggle('on',cur>=p.i&&cur<end); }); }
+function goto(i,animate){ const was=cur; cur=Math.max(0,Math.min(steps.length-1,i));
+  render(!!animate && document.getElementById('animToggle').checked && Math.abs(cur-was)===1); }
+function stepBy(d){ stopPlay(); goto(cur+d,true); }
+let playTimer=null;
+function togglePlay(){ playTimer?stopPlay():startPlay(); }
+function startPlay(){ if(cur>=steps.length-1) goto(0,false); document.getElementById('btnPlay').textContent='⏸ Pause';
+  const tick=()=>{ if(cur>=steps.length-1){ stopPlay(); return; } goto(cur+1,true); playTimer=setTimeout(tick,1100/speedFactor); };
+  playTimer=setTimeout(tick,10); }
+function stopPlay(){ if(playTimer){ clearTimeout(playTimer); playTimer=null; } document.getElementById('btnPlay').textContent='▶ Play'; }
+function setSpeed(v){ speedFactor=Math.pow(1.35,v-6); document.getElementById('speedLabel').textContent=(Math.round(speedFactor*10)/10).toFixed(1)+'×'; }
+function paintChips(){
+  const box=document.getElementById('patChips'); box.innerHTML='';
+  for(const p of patterns){ const b=document.createElement('button'); b.className='chip'+(p===P?' on':''); b.textContent=dstr(p);
+    b.onclick=()=>setPattern(p); box.appendChild(b); }
+}
+function setPattern(p){
+  P=p; stopPlay();
+  steps=buildSteps(P); live=null; cur=0;
+  setupMatrix();
+  document.getElementById('stepSlider').max=steps.length-1;
+  buildPhases(); paintChips(); paintLegend(); render(false);
+}
+function parseSpec(raw){
+  let text=null; const pats=[];
+  for(let ln of raw.split(/\r?\n/)){
+    ln=ln.replace(/\s+$/,'');
+    if(/^\s*#/.test(ln)||ln.trim()==='') continue;
+    if(text===null) text=ln; else pats.push(ln.replace(/_/g,' '));
+  }
+  if(text===null) throw new Error('No text given: the first line should be the text T.');
+  const T=text.replace(/_/g,' ').replace(/\$/g,'')+'$';
+  if(T.length<2) throw new Error('The text is empty.');
+  for(const p of pats) if(p.includes('$')) throw new Error('Patterns may not contain $ (in "'+dstr(p)+'").');
+  return {T,pats};
+}
+function loadFromInput(){
+  const err=document.getElementById('inputErr'); err.textContent='';
+  try{
+    const sp=parseSpec(document.getElementById('specInput').value);
+    M=buildModel(sp.T);
+    patterns=sp.pats.length?sp.pats.slice():[M.T.slice(0,Math.min(2,M.n))];
+    document.getElementById('sizeInfo').textContent='n+1 = '+M.N+' suffixes';
+    autoSqueeze();
+    setPattern(patterns[0]);
+  }catch(e){ err.textContent=e.message; console.error(e); }
+}
+const PRESETS=[
+  ['hannahbansbananasman  (lecture example)','hannahbansbananasman\nanarchy\nanna\nasterix\nananasmen\nbasmati\nana\nnas\nman'],
+  ['bananaban','bananaban\nana\nban\nnab\naaa'],
+  ['mississippi','mississippi\nissi\nssi\npi\nsis'],
+  ['alf␣eats␣alfalfa','alf_eats_alfalfa\nalf\nlfa\neat\nzebra'],
+  ['abracadabra','abracadabra\nabra\ncad\nbra\nabc'],
+  ['telomere repeats (DNA)','TTAGGGTTAGGGTTAGCGTTAGGG\nTTAGGG\nGGGT\nGCG\nAAA'],
+  ['it␣was␣the␣best␣of␣times…  (long)','it_was_the_best_of_times_it_was_the_worst_of_times_it_was_the_age_of_wisdom_it_was_the_age_of_foolishness\n'+
+    'it_was_the_\nof_times\nage_of_w\nwisdom\nzzz']
+];
+function loadPreset(k){ document.getElementById('presetSel').value=k; document.getElementById('specInput').value=PRESETS[k][1]; loadFromInput(); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   10.  Self-tests
+   ══════════════════════════════════════════════════════════════════════════ */
+function runTests(){
+  const out=[]; let pass=0, fail=0;
+  const ok=(n,c,d)=>{ if(c){pass++;out.push('<span class="t-pass">PASS</span>  '+n);} else {fail++;out.push('<span class="t-fail">FAIL</span>  '+n+(d?'\n         '+d:''));} };
+  const head=t=>out.push('<span class="t-head">'+t+'</span>');
+  const lowerNaive=(X,P)=>{ for(let r=0;r<X.N;r++){ const s=X.suf(r);
+      /* P ≤lex s, where a proper prefix is smaller */
+      let k=0; while(k<P.length&&k<s.length&&P[k]===s[k]) k++;
+      if(k===P.length || chRank(P[k])<chRank(s[k])) return r; } return X.N; };
+  head('1 — The lecture example T = hannahbansbananasman$');
+  { const X=buildModel('hannahbansbananasman$');
+    ok('suffix array as on the slide',X.L.join(' ')==='20 4 18 11 13 1 7 15 10 6 0 5 17 19 3 12 14 2 8 9 16',X.L.join(' '));
+    const st={cmp:0,eq:0,iters:0,cases:[]}; const b=lcpBinarySearch(X,'anarchy',st);
+    ok('anarchy → b = 4',b===4,b);
+    ok("cases 1, 1, 2c′, 1, 2c",st.cases.join()==="1,1,2c',1,2c",st.cases.join());
+    ok('8 character comparisons',st.cmp===8,st.cmp);
+    const keep=M; M=X; const S=buildSteps('anarchy'); M=keep;
+    ok('plain binary search with the same midpoints: 15',S[S.length-1].tot.plain===15,S[S.length-1].tot.plain);
+    ok('ana → b = 3 (ananasman$, anasman$ follow)',lcpBinarySearch(X,'ana')===3);
+  }
+  head('2 — Random texts against the naive answer');
+  { let bad='', eqBad='';
+    for(let it=0;it<1500 && !bad;it++){
+      const sig=1+Math.floor(Math.random()*4), n=1+Math.floor(Math.random()*50);
+      let T=''; for(let i=0;i<n;i++) T+='abcd'[Math.floor(Math.random()*sig)]; T+='$';
+      const X=buildModel(T);
+      const m=1+Math.floor(Math.random()*6); let Pp='';
+      if(Math.random()<.5){ const i=Math.floor(Math.random()*n); Pp=T.slice(i,Math.min(n,i+m)); }
+      if(!Pp) for(let i=0;i<m;i++) Pp+='abcde'[Math.floor(Math.random()*(sig+1))];
+      const st={cmp:0,eq:0,iters:0,cases:[]};
+      const got=lcpBinarySearch(X,Pp,st), want=lowerNaive(X,Pp);
+      if(got!==want) bad=JSON.stringify([T,Pp,got,want]);
+      if(st.eq>Pp.length || st.cmp>Pp.length+st.iters) eqBad=JSON.stringify([T,Pp,st]);
+    }
+    ok('smallest b with P ≤lex T_{L[b]}, 1500 random cases',bad==='',bad);
+    ok('at most |P| equal comparisons, at most one unequal per iteration',eqBad==='',eqBad);
+  }
+  head('3 — The step sequence replays the procedure and keeps the invariant');
+  { let bad='';
+    const keep=[M,P];
+    for(const [,spec] of PRESETS){
+      const sp=parseSpec(spec); M=buildModel(sp.T);
+      for(const Pp of sp.pats){
+        const S=buildSteps(Pp);
+        const last=S[S.length-1];
+        if(last.b!==lcpBinarySearch(M,Pp)) bad='result '+Pp;
+        for(const s of S){
+          if(s.a<M.N && lcpStr(Pp,M.suf(s.a))!==s.la) bad='ℓa '+Pp+' step '+s.line;
+          if(s.b<M.N && lcpStr(Pp,M.suf(s.b))!==s.lb) bad='ℓb '+Pp+' step '+s.line;
+          if(s.b===M.N && s.lb!==0) bad='virtual ℓb';
+        }
+      }
+    }
+    [M,P]=keep;
+    ok('all presets, all patterns: ℓa = LCP(T_{L[a]}, P), ℓb = LCP(T_{L[b]}, P) in every step',bad==='',bad);
+  }
+  out.push('\n'+pass+' passed, '+fail+' failed');
+  document.getElementById('test-out').innerHTML=out.join('\n');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   11.  Start
+   ══════════════════════════════════════════════════════════════════════════ */
+(function init(){
+  const sel=document.getElementById('presetSel');
+  PRESETS.forEach((p,k)=>{ const o=document.createElement('option'); o.value=k; o.textContent=p[0]; sel.appendChild(o); });
+  bindHover('mSvg'); bindHover('tSvg'); bindDrag(); bindSplitter();
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.getElementById('animToggle').checked=false;
+  setSpeed(6);
+  loadPreset(0);
+})();
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if(e.key==='ArrowRight'){ e.preventDefault(); stepBy(1); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); stepBy(-1); }
+  else if(e.key===' '){ e.preventDefault(); togglePlay(); }
+});
+</script>
+</body>
+</html>

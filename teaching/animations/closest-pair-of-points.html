@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Closest Pair of Points &middot; divide &amp; conquer, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-done:#902015; --wi-inert:#b6b1a1; --wi-inert-border:#8d897c;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+
+    /* --- the four ingredients of a D&C recurrence keep one colour each,
+           everywhere on this page: green!50!black, blue!80!black, violet,
+           orange of the slides (orange darkened for contrast on cream) --- */
+    --mt-a:#1a7a1a;            /* a  — how many subproblems      */
+    --mt-b:#2f2fb4;            /* b  — how much smaller they are */
+    --mt-f:#6d136d;            /* f  — the conquer effort        */
+    --mt-d:#9d5f25;            /* d  — the base case             */
+    --mt-c:#902015;            /* c = log_b(a), the exponent that decides everything */
+    --mt-f-fill:#e6d3e6; --mt-f-fill2:#d8bcd8;
+    --mt-d-fill:#f2ddc2;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .wi-topbar { display:flex; justify-content:space-between; font-size:.78rem;
+               color:var(--wi-ink-faint); margin-bottom:10px; font-family:var(--wi-font-head);
+               letter-spacing:.06em; }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  /* --- maths, set by hand: the page must stay one standalone file --- */
+  .m { font-style:italic; }
+  .mr { font-style:normal; }
+  sup, sub { font-size:.7em; line-height:0; }
+  .ca { color:var(--mt-a); font-weight:bold; }
+  .cb { color:var(--mt-b); font-weight:bold; }
+  .cf { color:var(--mt-f); font-weight:bold; }
+  .cd { color:var(--mt-d); font-weight:bold; }
+  .cc { color:var(--mt-c); font-weight:bold; }
+  .num { font-family:var(--wi-font-mono); font-size:.86em; font-style:normal; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:12px; }
+  .ctl { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  .ctl > label.mathlabel { font-family:var(--wi-font-body); font-size:.95rem; text-transform:none;
+                           letter-spacing:0; }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.tiny { width:4.2em; text-align:center; font-family:var(--wi-font-mono); font-size:.8rem; }
+  input.mid { width:9em; font-family:var(--wi-font-mono); font-size:.8rem; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* --- transport --- */
+  .tbtns { display:flex; gap:6px; }
+  .tbtn { width:40px; padding:7px 0; font-size:1.02rem; line-height:1.05; text-align:center;
+          font-variant-emoji:text; }              /* keep the glyphs monochrome, not colour emoji */
+  .tbtn:disabled { opacity:.32; }
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:16px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+  .progress { flex:1 1 320px; min-width:220px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; }
+  .phasebar { display:flex; width:100%; margin-top:3px; }
+  .phasebtn { flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn.on { background:var(--wi-panel-2); border-color:var(--wi-accent-soft); color:var(--wi-accent);
+                 font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); background:var(--wi-panel-2); }
+  .explain { margin-top:9px; font-size:.85rem; color:var(--wi-ink-strong); min-height:2.6em; line-height:1.45; }
+
+  /* --- stage --- */
+  .stage { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(340px,.95fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .col-main { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-size:.95em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius);
+                 width:100%; touch-action:none; }
+
+  /* --- the theorem, centre piece --- */
+  .recbox { border:1px solid var(--wi-border); background:var(--wi-panel-2); border-radius:var(--wi-radius);
+            padding:9px 13px; font-size:.95rem; margin-bottom:12px; text-align:center; }
+  .dcases { display:inline-grid; grid-template-columns:auto auto; gap:1px 14px; text-align:left;
+            border-left:2px solid var(--wi-ink); padding-left:9px; vertical-align:middle;
+            font-size:.92em; }
+  .dcases .cond { color:var(--wi-ink-faint); font-size:.86em; }
+  .thm { border:1px solid var(--wi-border-soft); border-left:3px solid var(--wi-accent);
+         background:var(--wi-panel-2); border-radius:var(--wi-radius); padding:10px 13px; }
+  .thm h3 { font-size:.74rem; text-transform:uppercase; letter-spacing:.1em; color:var(--wi-accent);
+            margin:0 0 7px; }
+  .thmlead { font-size:.86rem; margin-bottom:8px; }
+  .thmcase { display:grid; grid-template-columns:1.6em 1fr; gap:0 6px; padding:6px 8px; border-radius:3px;
+             font-size:.86rem; border:1px solid transparent; cursor:default; }
+  .thmcase + .thmcase { margin-top:3px; }
+  .thmcase .tag { color:var(--wi-ink-faint); }
+  .thmcase.on { background:#f6e6df; border-color:var(--wi-accent-soft); }
+  .thmcase.off { opacity:.5; }
+  .thmcase .check { grid-column:2; font-size:.84em; margin-top:3px; color:var(--wi-ink-soft); display:block; }
+  .thmcase.on .check { color:var(--wi-accent-dark); }
+  .verdict { font-size:1.05rem; text-align:center; padding:6px 0 2px; }
+  .verdict .big { font-size:1.25rem; }
+  .vnote { font-size:.78rem; color:var(--wi-ink-soft); text-align:center; margin-top:5px; line-height:1.45; }
+  .warn { border-left:3px solid var(--wi-active); background:#f7ece8; padding:7px 11px;
+          border-radius:3px; font-size:.8rem; margin-top:9px; color:var(--wi-ink-strong); }
+
+  /* --- tables --- */
+  table.led { border-collapse:collapse; width:100%; font-size:.76rem; font-family:var(--wi-font-mono); }
+  table.led th { font-family:var(--wi-font-head); font-size:.66rem; text-transform:uppercase;
+                 letter-spacing:.07em; color:var(--wi-ink-faint); font-weight:normal;
+                 text-align:right; padding:2px 5px; border-bottom:1px solid var(--wi-border-soft); }
+  table.led th:first-child, table.led td:first-child { text-align:left; }
+  table.led td { text-align:right; padding:2px 5px; border-bottom:1px solid #e4dccf; }
+  table.led tr:hover td { background:#f2e7e2; }
+  table.led tr.leafrow td { color:var(--mt-d); }
+  table.led tr.sumrow td { border-top:1px solid var(--wi-border); border-bottom:0;
+                           font-weight:bold; color:var(--wi-ink-strong); }
+  table.led td.share { color:var(--wi-ink-faint); }
+  .scroller { max-height:290px; overflow:auto; }
+
+  /* --- collapsibles --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; margin-top:16px; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .condbody { padding:12px 16px 16px; display:grid; grid-template-columns:1fr 1fr; gap:16px 22px; }
+  @media (max-width:900px) { .condbody { grid-template-columns:1fr; } }
+  .lem { font-size:.84rem; }
+  .lem h4 { font-family:var(--wi-font-head); font-size:.72rem; letter-spacing:.08em; text-transform:uppercase;
+            color:var(--wi-accent); margin:0 0 5px; }
+  .lem p { margin:0 0 7px; }
+  .quant { font-size:.86em; background:var(--wi-panel-2); border:1px solid var(--wi-border-soft);
+           border-radius:3px; padding:6px 9px; display:block; margin:6px 0; }
+  .yes { color:var(--wi-relax); font-weight:bold; }
+  .no { color:var(--wi-active); font-weight:bold; }
+  .maybe { color:var(--wi-examine); font-weight:bold; }
+  details.editor { margin-top:16px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:190px; font-family:var(--wi-font-mono); font-size:.76rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:260px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+
+  .echo { font-size:.82rem; color:var(--wi-ink-soft); font-style:italic; }
+  .echo b { font-style:normal; color:var(--wi-ink-strong); }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.75rem; color:var(--wi-ink-soft);
+            margin-top:8px; }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.8em; height:.8em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.28rem; }
+    .controls { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
+
+  :root {
+    --c-x:#2a6a63;   --c-x-fill:#d9e7e4;      /* left half   */
+    --c-y:#b07d18;   --c-y-fill:#f2e6ca;      /* right half  */
+    --c-z:#902015;   --c-z-fill:#f0d9d3;      /* current best pair / result */
+    --c-strip:#8a4a86; --c-strip-fill:#ecdcec; /* the strip / candidate points */
+    --c-in:#8d897c;  --c-in-fill:#eee6d9;
+  }
+  .stage { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(320px,.8fr); gap:18px; align-items:start; }
+  .col-main, .col-side { min-width:0; }
+  @media (max-width:1080px) { .stage { grid-template-columns:minmax(0,1fr); } }
+  @media (max-width:820px) {
+    .phasebar { flex-wrap:wrap; }
+    .phasebtn { border-left-width:1px; border-radius:var(--wi-radius); margin:1px; }
+    .crumb { font-size:.64rem; }
+    pre.code { font-size:.7rem; }
+  }
+
+  .crumbs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:9px; }
+  .crumb { font-family:var(--wi-font-mono); font-size:.72rem; padding:3px 7px; border-radius:3px;
+           border:1px solid var(--wi-border-soft); background:var(--wi-panel-2); color:var(--wi-ink-soft);
+           cursor:pointer; white-space:nowrap; }
+  .crumb.sel { border-color:var(--wi-accent); color:var(--wi-accent); background:#f6e6df; }
+  .crumb.arw { border:0; background:none; padding:0 1px; color:var(--wi-ink-faint); cursor:default; }
+
+  pre.code { margin:0; font-family:var(--wi-font-mono); font-size:.78rem; line-height:1.55;
+             background:var(--wi-panel-2); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius);
+             padding:8px 0; overflow-x:auto; }
+  pre.code .ln { display:block; padding:0 10px 0 0; white-space:pre; border-left:3px solid transparent; }
+  pre.code .ln .no { display:inline-block; width:2.1em; text-align:right; margin-right:.7em;
+                     color:var(--wi-ink-faint); font-size:.88em; }
+  pre.code .ln.on { background:#f6e6df; border-left-color:var(--wi-accent); }
+  pre.code .ln.callsite { background:#eef0e4; border-left-color:var(--wi-queue); }
+  pre.code .kw { color:var(--wi-accent-dark); font-weight:bold; }
+  pre.code .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .codehd { font-family:var(--wi-font-head); font-size:.7rem; letter-spacing:.09em; text-transform:uppercase;
+            color:var(--wi-ink-faint); margin:0 0 5px; }
+  summary.codehd { cursor:pointer; list-style:none; }
+  summary.codehd::-webkit-details-marker { display:none; }
+  summary.codehd::before { content:"\25be\2002"; color:var(--wi-ink-faint); }
+  details:not([open]) > summary.codehd::before { content:"\25b8\2002"; }
+  summary.codehd:hover { color:var(--wi-accent); }
+
+  .costgrid { display:grid; grid-template-columns:auto 1fr auto; gap:5px 10px; align-items:center; font-size:.8rem; }
+  .costgrid .num { font-family:var(--wi-font-mono); text-align:right; }
+  .costbar { height:9px; border-radius:2px; background:var(--wi-controls); overflow:hidden; display:flex; }
+  .costbar i { display:block; height:100%; }
+  .facts { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:.78rem; color:var(--wi-ink-soft); }
+  .facts b { font-family:var(--wi-font-mono); color:var(--wi-ink-strong); font-weight:normal; }
+  .bigres { font-family:var(--wi-font-mono); font-size:.86rem; word-break:break-all; line-height:1.5; }
+  .chartctl { display:flex; align-items:center; gap:6px; margin-top:2px; flex-wrap:wrap; }
+  .chartctl label { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                     letter-spacing:.08em; color:var(--wi-ink-strong); }
+  .chartctl .hint { font-size:.78rem; }
+
+  /* ---------- SVG ---------- */
+  svg text { font-family:var(--wi-font-body); fill:var(--wi-ink-strong); }
+  .mono { font-family:var(--wi-font-mono); }
+  .slbl { font-size:10px; fill:var(--wi-ink-faint); font-family:var(--wi-font-head); letter-spacing:.06em; }
+  .pt { cursor:crosshair; }
+  .ptdot { stroke-width:1; }
+  .ptlabel { font-size:8px; font-family:var(--wi-font-mono); text-anchor:middle; fill:var(--wi-ink-faint); }
+  .splitline { stroke:var(--wi-accent); stroke-width:1.3; stroke-dasharray:4 3; }
+  .striprect { fill:var(--c-strip-fill); opacity:.28; }
+  .bestline { stroke:var(--c-z); stroke-width:1.6; }
+  .checkline { stroke:var(--c-strip); stroke-width:1.1; opacity:.7; }
+  .frame { fill:none; stroke:var(--wi-border-soft); stroke-width:1; stroke-dasharray:2 4; }
+  .outrange { fill:var(--wi-ink-strong); opacity:.055; }
+  .hoverlink { stroke: var(--wi-accent) !important; stroke-width: 2.4 !important; }
+  .hoverring { stroke: var(--wi-accent); stroke-width: 1.6; pointer-events: none; }
+  .pt { transition: r .1s; }
+  .arrchip { cursor: default; }
+  .idx { text-anchor:middle; font-size:8.5px; fill:var(--wi-ink-faint); font-family:var(--wi-font-mono); }
+  #arrSvg { width:auto; max-width:100%; max-height:170px; margin:0 auto; display:block; }
+  .arrchip { stroke-width:1; }
+  .rule { stroke:var(--wi-border); stroke-width:1; }
+  .grid { stroke:var(--wi-border-soft); stroke-width:.7; stroke-dasharray:2 4; }
+  .axlab { text-anchor:end; font-size:9.5px; fill:var(--wi-ink-faint); font-family:var(--wi-font-mono); }
+  .axlab.mid { text-anchor:middle; }
+  .axtitle { text-anchor:middle; font-size:10.5px; fill:var(--wi-ink-soft); }
+  .kedge { stroke:var(--wi-ink-faint); stroke-width:.8; fill:none; }
+  .kedge.on { stroke:var(--wi-accent); stroke-width:1.6; }
+  .knode { stroke-width:1; }
+  .klab { font-family:var(--wi-font-mono); text-anchor:middle; font-size:8px; }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+  <span>Divide &amp; conquer geometry</span>
+</div>
+
+<div class="titlebar">
+  <h1 id="h1title">Closest Pair of Points</h1>
+  <span class="seg" id="varSeg">
+    <button data-var="once" class="on">sort once</button>
+    <button data-var="every">sort every level</button>
+  </span>
+</div>
+
+<p class="subtitle" id="sub">Split the points by x, solve each half, then check only the points within &delta; of the
+  split line &mdash; sorted by y, each against at most the next 7. The whole page runs the same execution twice: once
+  with the array sorted a single time up front and split without re-sorting, once with the textbook-naive version that
+  re-sorts every recursive call from scratch. Watch the comparison count.</p>
+
+<div class="controls" id="ctlMain">
+  <div class="ctl"><label for="presetSel">Points</label>
+    <select id="presetSel"></select></div>
+  <div class="ctl"><label for="inN"><span class="m">n</span></label>
+    <input class="tiny" id="inN" value="20"></div>
+  <div class="ctl"><button id="btnRand">Random</button></div>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <div class="tbtns">
+      <button id="btnFirst" class="tbtn" title="Back to the first step"
+              aria-label="Back to the first step">&#8634;</button>
+      <button id="btnPrev" class="tbtn" title="One step back (left arrow key)"
+              aria-label="One step back">&#9198;&#65038;</button>
+      <button id="btnNext" class="tbtn" title="One step forward (right arrow key)"
+              aria-label="One step forward">&#9197;&#65038;</button>
+      <button id="playBtn" class="tbtn pri" title="Play (space bar)"
+              aria-label="Play">&#9654;&#65038;</button>
+    </div>
+    <div class="progress">
+      <input type="range" id="slider" min="0" max="1" value="0" step="1">
+      <div class="phasebar" id="phasebar"></div>
+    </div>
+    <span class="stepno" id="stepno"></span>
+  </div>
+  <div class="explain" id="explain"></div>
+</div>
+
+<div class="stage">
+  <div class="col-main">
+    <div class="sim-box">
+      <div class="sim-title"><span id="svgTitle">The plane</span><span class="rhs" id="svgRhs"></span></div>
+      <svg id="mainSvg" class="stagesvg" viewBox="0 0 720 480" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Comparisons</span><span class="rhs" id="costRhs"></span></div>
+      <div class="costgrid" id="costGrid"></div>
+      <div class="facts" id="facts" style="margin-top:10px"></div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box" id="stackBox">
+      <div class="sim-title"><span id="stackTitle">Call stack</span><span class="rhs" id="depthRhs"></span></div>
+      <div class="crumbs" id="crumbs"></div>
+      <details id="codeDet" open>
+        <summary class="codehd" id="codeHd">pseudocode</summary>
+        <pre class="code" id="codeBox"></pre>
+      </details>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Sorted order</span><span class="rhs" id="arrRhs"></span></div>
+      <svg id="arrSvg" class="stagesvg" viewBox="0 0 320 150" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </div>
+</div>
+
+<details class="code" id="modelBox">
+  <summary>The cost model &nbsp;&middot;&nbsp; what counts as a comparison</summary>
+  <div class="condbody" style="grid-template-columns:1fr">
+    <div class="lem">
+      <p>Sorting is charged its real comparison count, via a counting merge sort &mdash; a black box here exactly as
+        <code>partition</code> and <code>sort</code> were black boxes on the median-of-medians and Karatsuba pages, not
+        animated stroke by stroke. Distance evaluations (d\u2082, in the base cases and the strip check) are counted
+        separately and are the same for both variants on the same input: they depend only on which points end up
+        compared, not on how the arrays got sorted. The one thing that differs between the two toggles is the sorting
+        cost &mdash; which is exactly the point.</p>
+      <p class="hint"><b>Sort once</b> pays for two sorts (by x, by y) a single time, in the driver, then only ever
+        splits already-sorted arrays &mdash; no further comparisons. <b>Sort every level</b> re-sorts the current
+        subset by x and by y at the start of every recursive call, giving the recurrence
+        T(n) = 2T(n/2) + &Theta;(n log n) instead of T(n) = 2T(n/2) + &Theta;(n) &mdash; an extra log factor that the
+        recursion-tree method turns into O(n log&sup2; n) overall, exactly the gap the "Divide and Conquer is not all"
+        slide flags.</p>
+    </div>
+  </div>
+</details>
+
+<details class="code" id="bothCode">
+  <summary>Both procedures &nbsp;&middot;&nbsp; the pseudocode this page executes</summary>
+  <div class="condbody">
+    <div><div class="codehd">closestPair (driver)</div><pre class="code" id="codeDriverFull"></pre></div>
+    <div><div class="codehd" id="codeDistHd">closestDist</div><pre class="code" id="codeDistFull"></pre></div>
+    <div class="lem" style="grid-column:1/-1">
+      <h4>Three fixes to the slide's pseudocode</h4>
+      <p><b>1. The tie-break.</b> Splitting <code>byY</code> by re-testing <code>P[byY[i]].x &le; m.x</code> can put
+        more points on the left than <code>byX&#8343;</code> actually holds whenever two points share x = m.x &mdash;
+        the two arrays would then describe different point sets. Fixed by marking, from <code>byX</code> itself, which
+        point <i>identities</i> are in the left half, and splitting <code>byY</code> by that mark.</p>
+      <p><b>2.</b> <code>for i := 0,&hellip;,C.size()</code> reads one past the end of <code>C</code> &mdash; every
+        other loop in this code writes <code>0,&hellip;,n&minus;1</code>; fixed to <code>C.size()&minus;1</code>.</p>
+      <p><b>3.</b> <code>for j := i+1,&hellip;,i+7</code> has no bound against <code>C.size()</code>; fixed to
+        <code>j := i+1,&hellip;,min(i+7, C.size()&minus;1)</code>.</p>
+    </div>
+  </div>
+</details>
+
+<details class="editor">
+  <summary>Load points &nbsp;&middot;&nbsp; plain-text format</summary>
+  <div class="editor-body">
+    <div class="hint">One point per line: <code>x y</code>, separated by spaces or commas.</div>
+    <div>
+      <textarea id="ta" spellcheck="false"></textarea>
+      <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap">
+        <button id="btnLoad" class="pri">Load</button>
+        <button id="btnDump">Copy current</button>
+      </div>
+      <div class="err" id="taErr"></div>
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tt"></div>
+
+<script>
+"use strict";
+/* ============================================================================
+   Closest Pair of Points — the divide & conquer algorithm of the slides,
+   with three corrections (see the writeup):
+     1. the byY split used P[byY[i]].x <= m.x, which can put more points on
+        the left than byX_L actually holds whenever x-coordinates tie. Fixed
+        by marking, from byX itself, which point IDENTITIES are in the left
+        half, and splitting byY by that mark instead of by re-comparing x.
+     2. "for i := 0,...,C.size()" is one past the end (every other loop in
+        this code writes "0,...,n-1"); fixed to C.size()-1.
+     3. "for j := i+1,...,i+7" has no bound against C.size(); fixed to
+        j := i+1,...,min(i+7, C.size()-1).
+   None of the three change the algorithm's substance or its Theta(n log n)
+   bound — they are the off-by-one/tie-break slips that surface only once
+   the pseudocode actually runs.
+
+   Two variants, toggled by the caller:
+     "once"  — sort by x and by y ONCE, in a driver, before recursing; each
+               level splits byX/byY without re-sorting (Insight 3 of the
+               slides). T(n) = 2T(n/2) + Theta(n).
+     "every" — the textbook-naive version: every call sorts its own current
+               subset from scratch. T(n) = 2T(n/2) + Theta(n log n) — the
+               O(n log^2 n) recursion the "not all" slide computes.
+   Sorting is a black box here, exactly as partition/sort-of-5 were black
+   boxes on the earlier pages: it is charged its real comparison count (via
+   a counting merge sort) but not animated stroke by stroke.
+   ========================================================================= */
+
+const el = id => document.getElementById(id);
+const clamp = (x, a, b) => x < a ? a : (x > b ? b : x);
+
+/* --- pseudocode -------------------------------------------------------- */
+const CODE = {
+  driver: { name:"closestPair", lines:[
+    "procedure closestPair(P[0..N)):",
+    "    byX := sort P by x                    // comparisons charged",
+    "    byY := sort P by y                    // comparisons charged",
+    "    return closestDist(P, byX, byY)"
+  ]},
+  once: { name:"closestDist", lines:[
+    "procedure closestDist(P[0..N), byX[0..n), byY[0..n)):",
+    "    if n == 2 return d\u2082(P[byX[0]], P[byX[1]]), {byX[0],byX[1]}",
+    "    if n == 3 return the closest of the 3 pairs among byX[0..3)",
+    "    // 1. Split by median x and recurse",
+    "    k := \u230an/2\u230b;  m := P[byX[k]]",
+    "    byX\u2097 := byX[0..k);  byX\u1d63 := byX[k..n)",
+    "    left := mark(byX\u2097)                    // which POINTS are on the left",
+    "    byY\u2097, byY\u1d63 := split byY by left[\u00b7]  // NOT by comparing x again",
+    "    \u03b4\u2097, pair\u2097 := closestDist(P, byX\u2097, byY\u2097)",
+    "    \u03b4\u1d63, pair\u1d63 := closestDist(P, byX\u1d63, byY\u1d63)",
+    "    \u03b4, pair := the smaller of (\u03b4\u2097,pair\u2097) and (\u03b4\u1d63,pair\u1d63)",
+    "    // 2. Check straddling pairs",
+    "    C := [ byY[i] : |P[byY[i]].x \u2212 m.x| \u2264 \u03b4 ]",
+    "    for i := 0,\u2026,C.size()\u22121",
+    "        for j := i+1,\u2026,min(i+7, C.size()\u22121)",
+    "            \u03b4, pair := min{ (\u03b4,pair), (d\u2082(P[C[i]],P[C[j]]), {C[i],C[j]}) }",
+    "    return \u03b4, pair"
+  ]},
+  every: { name:"closestDist", lines:[
+    "procedure closestDist(P[0..N), idx[0..n)):",
+    "    if n == 2 return d\u2082(P[idx[0]], P[idx[1]]), {idx[0],idx[1]}",
+    "    if n == 3 return the closest of the 3 pairs among idx[0..3)",
+    "    byX := sort idx by x                  // re-sorted at EVERY call",
+    "    byY := sort idx by y                  // re-sorted at EVERY call",
+    "    // 1. Split by median x and recurse",
+    "    k := \u230an/2\u230b;  m := P[byX[k]]",
+    "    idx\u2097 := byX[0..k);  idx\u1d63 := byX[k..n)",
+    "    \u03b4\u2097, pair\u2097 := closestDist(P, idx\u2097)",
+    "    \u03b4\u1d63, pair\u1d63 := closestDist(P, idx\u1d63)",
+    "    \u03b4, pair := the smaller of (\u03b4\u2097,pair\u2097) and (\u03b4\u1d63,pair\u1d63)",
+    "    // 2. Check straddling pairs",
+    "    C := [ byY[i] : |P[byY[i]].x \u2212 m.x| \u2264 \u03b4 ]",
+    "    for i := 0,\u2026,C.size()\u22121",
+    "        for j := i+1,\u2026,min(i+7, C.size()\u22121)",
+    "            \u03b4, pair := min{ (\u03b4,pair), (d\u2082(P[C[i]],P[C[j]]), {C[i],C[j]}) }",
+    "    return \u03b4, pair"
+  ]}
+};
+const KEYWORDS = /\b(procedure|if|then|return|for|min)\b/g;
+function codeHTML(which, curLine, callLine) {
+  return CODE[which].lines.map((t, i) => {
+    const n = i + 1;
+    let body = t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const cm = body.indexOf("//");
+    if (cm >= 0) body = body.slice(0, cm) + '<span class="cm">' + body.slice(cm) + "</span>";
+    body = body.replace(KEYWORDS, '<span class="kw">$1</span>');
+    const cls = n === curLine ? " on" : (n === callLine ? " callsite" : "");
+    return '<span class="ln' + cls + '"><span class="no">' + n + "</span>" + body + "</span>";
+  }).join("");
+}
+
+/* --- distance ------------------------------------------------------------ */
+function d2sq(P, i, j) {
+  const dx = P[i].x - P[j].x, dy = P[i].y - P[j].y;
+  return dx * dx + dy * dy;
+}
+const d2 = (P, i, j) => Math.sqrt(d2sq(P, i, j));
+
+/* --- a black-box counting sort (stable) ----------------------------------
+   Charged its real merge-sort comparison count; not animated step by step,
+   exactly like partition / sort-of-5 on the earlier pages. */
+function sortByKey(ids, keyFn, cost) {
+  if (ids.length <= 1) return ids.slice();
+  const mid = ids.length >> 1;
+  const L = sortByKey(ids.slice(0, mid), keyFn, cost);
+  const R = sortByKey(ids.slice(mid), keyFn, cost);
+  const out = []; let i = 0, j = 0;
+  while (i < L.length && j < R.length) {
+    cost.cmp++;
+    if (keyFn(L[i]) <= keyFn(R[j])) out.push(L[i++]); else out.push(R[j++]);
+  }
+  while (i < L.length) out.push(L[i++]);
+  while (j < R.length) out.push(R[j++]);
+  return out;
+}
+
+/* --- brute-force pair among <=3 points ------------------------------------ */
+function bruteBest(P, ids, cost) {
+  let best = Infinity, pair = null;
+  for (let a = 0; a < ids.length; a++)
+    for (let b = a + 1; b < ids.length; b++) {
+      cost.dist++;
+      const d = d2sq(P, ids[a], ids[b]);
+      if (d < best) { best = d; pair = [ids[a], ids[b]]; }
+    }
+  return { delta:best, pair:pair };
+}
+
+/* ==========================================================================
+   The run: builds the full step sequence for one point set + one variant.
+   ========================================================================= */
+function buildRun(points, variant) {
+  const P = points.map((p, i) => ({ id:i, x:p.x, y:p.y }));
+  const steps = [], stack = [];
+  const cost = { cmp:0, dist:0 };
+  let born = 0;
+
+  function emit(code, line, expl, extra) {
+    const top = stack[stack.length - 1];
+    if (top) top.line = line;
+    steps.push(Object.assign({
+      code:code, line:line, expl:expl,
+      stack:stack.map(f => ({ id:f.id, code:f.code, tok:f.tok, line:f.line, callLine:f.callLine })),
+      cost:{ cmp:cost.cmp, dist:cost.dist }, born:born
+    }, extra || {}));
+  }
+
+  const nodes = [];
+  function mkNode(ids, parent, role) {
+    const nd = { id:nodes.length, ids:ids.slice(), parent:parent === null ? null : parent.id, role:role,
+                 kids:[], depth:parent === null ? 0 : parent.depth + 1, done:false, doneAt:-1 };
+    nodes.push(nd);
+    if (parent) parent.kids.push(nd.id);
+    born = nodes.length;
+    return nd;
+  }
+
+  /* ---- the "once" variant: sort once in the driver, split by mark ------- */
+  function closestOnce(ids, byX, byY, parentFrame, role) {
+    const nd = mkNode(ids, parentFrame, role);
+    const F = { id:nd.id, code:"once", ids:ids, tok:"closestDist(" + ids.length + " pts)" };
+    stack.push(F);
+    emit("once", 1, "closestDist on " + ids.length + " point" + (ids.length === 1 ? "" : "s") + ".",
+      { node:nd.id, byX:byX, byY:byY });
+    let result;
+    if (ids.length <= 3) {
+      const r = bruteBest(P, byX, cost);
+      emit("once", ids.length === 2 ? 2 : 3, "Base case: " + (ids.length === 2 ? "the only pair." :
+        "check all 3 pairs directly.") + " \u03b4 = " + Math.sqrt(r.delta).toFixed(3) + ".",
+        { node:nd.id, byX:byX, byY:byY, best:r, base:true });
+      result = r;
+    } else {
+      const n = ids.length, k = n >> 1;
+      const m = P[byX[k]];
+      const byXL = byX.slice(0, k), byXR = byX.slice(k);
+      emit("once", 5, "Split at k = " + k + ": m = P[byX[k]] at x = " + m.x.toFixed(2) + ".",
+        { node:nd.id, byX:byX, byY:byY, m:m, splitAt:k });
+      const left = new Set(byXL);
+      emit("once", 7, "Mark, from byX itself, which point IDs are in the left half \u2014 " +
+        "not by comparing x again, so a tie at m.x cannot split byX and byY differently.",
+        { node:nd.id, byX:byX, byY:byY, m:m, left:left });
+      const byYL = [], byYR = [];
+      byY.forEach(id => { (left.has(id) ? byYL : byYR).push(id); });
+      emit("once", 8, "Split byY by that mark, keeping both halves sorted with no comparisons.",
+        { node:nd.id, byX:byX, byY:byY, m:m, byYL:byYL, byYR:byYR });
+
+      emit("once", 9, "Recurse on the left half.", { node:nd.id, callLine:9 });
+      F.callLine = 9;
+      const rL = closestOnce(byXL, byXL, byYL, nd, "L"); F.callLine = null;
+      emit("once", 10, "Recurse on the right half.", { node:nd.id, callLine:10 });
+      F.callLine = 10;
+      const rR = closestOnce(byXR, byXR, byYR, nd, "R"); F.callLine = null;
+
+      let best = rL.delta <= rR.delta ? rL : rR;
+      emit("once", 11, "\u03b4 so far = " + Math.sqrt(best.delta).toFixed(3) + " (the smaller of the two halves).",
+        { node:nd.id, byX:byX, byY:byY, m:m, best:best });
+
+      const strip = byY.filter(id => Math.abs(P[id].x - m.x) <= Math.sqrt(best.delta) + 1e-9);
+      emit("once", 13, "Points within \u03b4 of the split line, in y-order: " + strip.length + " of them.",
+        { node:nd.id, byX:byX, byY:byY, m:m, best:best, strip:strip });
+      for (let i = 0; i < strip.length; i++) {
+        const jmax = Math.min(i + 7, strip.length - 1);
+        emit("once", 14, "Point " + (i + 1) + " of " + strip.length + " in the strip: compare it with the next " +
+          "up to 7.", { node:nd.id, byX:byX, byY:byY, m:m, best:best, strip:strip, i:i, jmax:jmax, sliding:true });
+        for (let j = i + 1; j <= jmax; j++) {
+          cost.dist++;
+          const d = d2sq(P, strip[i], strip[j]);
+          const improved = d < best.delta;
+          if (improved) best = { delta:d, pair:[strip[i], strip[j]] };
+          emit("once", 16, "d\u2082(" + strip[i] + "," + strip[j] + ") = " + Math.sqrt(d).toFixed(3) +
+            (improved ? " \u2014 new best." : "."), { node:nd.id, byX:byX, byY:byY, m:m, best:best, strip:strip,
+            i:i, j:j, jmax:jmax, improved:improved });
+        }
+      }
+      result = best;
+    }
+    nd.done = true; nd.doneAt = steps.length; nd.result = result;
+    emit("once", ids.length <= 3 ? (ids.length === 2 ? 2 : 3) : 17,
+      "Return \u03b4 = " + Math.sqrt(result.delta).toFixed(3) + " and its pair.",
+      { node:nd.id, byX:byX, byY:byY, best:result, done:true });
+    stack.pop();
+    return result;
+  }
+
+  /* ---- the "every" variant: sort fresh at every call --------------------- */
+  function closestEvery(ids, parentFrame, role) {
+    const nd = mkNode(ids, parentFrame, role);
+    const F = { id:nd.id, code:"every", ids:ids, tok:"closestDist(" + ids.length + " pts)" };
+    stack.push(F);
+    emit("every", 1, "closestDist on " + ids.length + " point" + (ids.length === 1 ? "" : "s") + ".",
+      { node:nd.id, byX:ids, byY:ids });
+    let result;
+    if (ids.length <= 3) {
+      const r = bruteBest(P, ids, cost);
+      emit("every", ids.length === 2 ? 2 : 3, "Base case.", { node:nd.id, byX:ids, byY:ids, best:r, base:true });
+      result = r;
+    } else {
+      const byX = sortByKey(ids, id => P[id].x, cost);
+      emit("every", 4, "Sort this subset by x from scratch.", { node:nd.id, byX:byX, byY:byX, resort:"x" });
+      const byY = sortByKey(ids, id => P[id].y, cost);
+      emit("every", 5, "Sort this subset by y from scratch.", { node:nd.id, byX:byX, byY:byY, resort:"y" });
+      const n = ids.length, k = n >> 1;
+      const m = P[byX[k]];
+      const idxL = byX.slice(0, k), idxR = byX.slice(k);
+      /* "every" has no tie-break issue to fix (idxL/idxR come straight from
+         the freshly-sorted byX, and byY is not split at all \u2014 it is just
+         re-sorted from scratch on the other side), but the drawing still
+         wants to show which points are on which side, so mark them exactly
+         as the "once" variant does. */
+      const leftSet = new Set(idxL);
+      emit("every", 7, "Split at k = " + k + ": m = P[byX[k]] at x = " + m.x.toFixed(2) + ".",
+        { node:nd.id, byX:byX, byY:byY, m:m, splitAt:k, left:leftSet });
+
+      emit("every", 9, "Recurse on the left half.", { node:nd.id, callLine:9 });
+      F.callLine = 9;
+      const rL = closestEvery(idxL, nd, "L"); F.callLine = null;
+      emit("every", 10, "Recurse on the right half.", { node:nd.id, callLine:10 });
+      F.callLine = 10;
+      const rR = closestEvery(idxR, nd, "R"); F.callLine = null;
+
+      let best = rL.delta <= rR.delta ? rL : rR;
+      emit("every", 11, "\u03b4 so far = " + Math.sqrt(best.delta).toFixed(3) + ".",
+        { node:nd.id, byX:byX, byY:byY, m:m, best:best });
+
+      const strip = byY.filter(id => Math.abs(P[id].x - m.x) <= Math.sqrt(best.delta) + 1e-9);
+      emit("every", 13, "Points within \u03b4 of the split line: " + strip.length + ".",
+        { node:nd.id, byX:byX, byY:byY, m:m, best:best, strip:strip });
+      for (let i = 0; i < strip.length; i++) {
+        const jmax = Math.min(i + 7, strip.length - 1);
+        emit("every", 14, "Point " + (i + 1) + " of " + strip.length + " in the strip.",
+          { node:nd.id, byX:byX, byY:byY, m:m, best:best, strip:strip, i:i, jmax:jmax, sliding:true });
+        for (let j = i + 1; j <= jmax; j++) {
+          cost.dist++;
+          const d = d2sq(P, strip[i], strip[j]);
+          const improved = d < best.delta;
+          if (improved) best = { delta:d, pair:[strip[i], strip[j]] };
+          emit("every", 16, "d\u2082(" + strip[i] + "," + strip[j] + ") = " + Math.sqrt(d).toFixed(3) +
+            (improved ? " \u2014 new best." : "."), { node:nd.id, byX:byX, byY:byY, m:m, best:best, strip:strip,
+            i:i, j:j, jmax:jmax, improved:improved });
+        }
+      }
+      result = best;
+    }
+    nd.done = true; nd.doneAt = steps.length; nd.result = result;
+    emit("every", ids.length <= 3 ? (ids.length === 2 ? 2 : 3) : 17,
+      "Return \u03b4 = " + Math.sqrt(result.delta).toFixed(3) + " and its pair.",
+      { node:nd.id, byX:ids, byY:ids, best:result, done:true });
+    stack.pop();
+    return result;
+  }
+
+  /* ---- the driver --------------------------------------------------------- */
+  const allIds = P.map(p => p.id);
+  let final;
+  if (variant === "once") {
+    const rootF = { id:-1, code:"driver", tok:"closestPair(" + allIds.length + " pts)" };
+    stack.push(rootF);
+    emit("driver", 1, "Sort the whole input once, by x and by y.", {});
+    const byX0 = sortByKey(allIds, id => P[id].x, cost);
+    emit("driver", 2, "byX done \u2014 " + cost.cmp + " comparisons so far.", { byX:byX0, byY:byX0 });
+    const byY0 = sortByKey(allIds, id => P[id].y, cost);
+    emit("driver", 3, "byY done \u2014 " + cost.cmp + " comparisons total for both sorts.", { byX:byX0, byY:byY0 });
+    rootF.callLine = 4;
+    emit("driver", 4, "Hand off to closestDist \u2014 it will not sort again.", { byX:byX0, byY:byY0, callLine:4 });
+    final = closestOnce(allIds, byX0, byY0, null, "root");
+    stack.pop();
+  } else {
+    final = closestEvery(allIds, null, "root");
+  }
+
+  return { steps:steps, cost:cost, nodes:nodes, P:P, variant:variant,
+           delta:Math.sqrt(final.delta), pair:final.pair };
+}
+/* ==========================================================================
+   Drawing. Point positions are computed once from the input and never move;
+   only which points are highlighted, greyed out, or connected changes.
+
+   Steps only carry the fields that changed at that exact line; anything
+   that persists (the current node's byX/byY, its split point m, its best
+   pair so far, its strip) is looked up by walking backward through the
+   step list for the nearest earlier step belonging to the SAME recursion
+   node (stateFor) — so descending into a child (a different node) never
+   leaks the parent's half-finished state, and returning from a child
+   never leaks the child's.
+   ========================================================================= */
+function stateFor(steps, idx, nodeId, key) {
+  for (let i = idx; i >= 0; i--) {
+    const s = steps[i];
+    if (s.node !== nodeId) continue;
+    if (s[key] !== undefined) return s[key];
+  }
+  return undefined;
+}
+
+const PAD = 34;
+function computeLayout(points, W, H) {
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const rangeX = Math.max(1e-6, maxX - minX), rangeY = Math.max(1e-6, maxY - minY);
+  const availW = W - 2 * PAD, availH = H - 2 * PAD;
+  const scale = Math.min(availW / rangeX, availH / rangeY);
+  const offX = PAD + (availW - rangeX * scale) / 2 - minX * scale;
+  const offY = PAD + (availH - rangeY * scale) / 2 - minY * scale;
+  return {
+    scale:scale,
+    toPx(x, y) { return { x:offX + x * scale, y:H - (offY + y * scale) }; }
+  };
+}
+
+const ROLE_COL = {
+  out:  ["#e7e0d2", "#bdb8a6"],
+  active:["var(--c-x-fill)", "var(--c-x)"],
+  left: ["var(--c-x-fill)", "var(--c-x)"],
+  right:["var(--c-y-fill)", "var(--c-y)"],
+  strip:["var(--c-strip-fill)", "var(--c-strip)"],
+  best: ["var(--c-z-fill)", "var(--c-z)"]
+};
+
+/* which side of ITS OWN PARENT a node came from — "left"/"right"/"active"
+   for the root. Used as the fallback colour whenever a node hasn't yet
+   computed its own split, so a subset keeps the colour it arrived with
+   instead of resetting to a neutral one the instant it becomes "the whole
+   array" for its own call — this is what makes the coloured half staying
+   the same colour across the recursive-call boundary, and lets the hover
+   links and the array-morph animation agree with what the plane shows. */
+function nodeBaseRole(nodeId) {
+  const nd = RUN.nodes[nodeId];
+  if (!nd) return "active";
+  return nd.role === "L" ? "left" : nd.role === "R" ? "right" : "active";
+}
+
+function drawMain(steps, idx) {
+  const svg = el("mainSvg"), s = steps[idx], P = RUN.P;
+  const W = 720, H = 480;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const L = LAYOUT;
+  const out = [];
+
+  /* the driver's very first step (before either sort has run) carries no
+     byX/byY yet, but conceptually the whole input is already "in scope" */
+  const activeIds = new Set(stateFor(steps, idx, s.node, "byX") || s.byX ||
+    (s.node === undefined ? P.map(p => p.id) : []));
+  const leftSet = stateFor(steps, idx, s.node, "left");
+  const byYL = stateFor(steps, idx, s.node, "byYL"), byYR = stateFor(steps, idx, s.node, "byYR");
+  const m = stateFor(steps, idx, s.node, "m");
+  const strip = stateFor(steps, idx, s.node, "strip");
+  const best = s.best !== undefined ? s.best : stateFor(steps, idx, s.node, "best");
+  const stripSet = new Set(strip || []);
+
+  function roleOf(id) {
+    if (!activeIds.has(id)) return "out";
+    if (strip && stripSet.has(id)) return "strip";
+    if (leftSet) return leftSet.has(id) ? "left" : "right";
+    if (byYL) return byYL.includes(id) ? "left" : (byYR.includes(id) ? "right" : nodeBaseRole(s.node));
+    return nodeBaseRole(s.node);
+  }
+
+  /* grey out the x-range strictly outside this subproblem's own points, so
+     it is visually obvious how much of the plane the current call still
+     covers (degenerate single-x inputs are not special-cased: the shaded
+     band just covers almost everything, which is the honest picture). */
+  const activePts = P.filter(p => activeIds.has(p.id));
+  if (activePts.length) {
+    const minX = Math.min(...activePts.map(p => p.x)), maxX = Math.max(...activePts.map(p => p.x));
+    const pxMin = L.toPx(minX, 0).x, pxMax = L.toPx(maxX, 0).x;
+    if (pxMin > 0.5) out.push('<rect x="0" y="0" width="' + pxMin + '" height="' + H + '" class="outrange"/>');
+    if (pxMax < W - 0.5) out.push('<rect x="' + pxMax + '" y="0" width="' + (W - pxMax) + '" height="' + H +
+      '" class="outrange"/>');
+  }
+
+  /* the split line and the strip band */
+  if (m) {
+    const top = L.toPx(m.x, 1e9), bot = L.toPx(m.x, -1e9);
+    out.push('<line x1="' + top.x + '" y1="8" x2="' + top.x + '" y2="' + (H - 8) + '" class="splitline"/>');
+    if (best) {
+      const halfW = Math.sqrt(best.delta) * L.scale;
+      out.push('<rect x="' + (top.x - halfW) + '" y="6" width="' + (2 * halfW) + '" height="' + (H - 12) +
+        '" class="striprect"/>');
+    }
+  }
+
+  /* points */
+  P.forEach(p => {
+    const role = roleOf(p.id), col = ROLE_COL[role];
+    const px = L.toPx(p.x, p.y);
+    const r = role === "out" ? 3 : 4.2;
+    out.push('<circle class="pt ptdot" data-id="' + p.id + '" cx="' + px.x + '" cy="' + px.y + '" r="' + r +
+      '" fill="' + col[0] + '" stroke="' + col[1] + '" stroke-width="' + (role === "out" ? 0.8 : 1.4) + '"/>');
+  });
+
+  /* the sliding-window comparison, if this step is inside the strip loop */
+  if (strip && s.i !== undefined) {
+    const pi = P[strip[s.i]];
+    const pxi = L.toPx(pi.x, pi.y);
+    out.push('<circle cx="' + pxi.x + '" cy="' + pxi.y + '" r="7" fill="none" stroke="var(--c-strip)" stroke-width="2"/>');
+    const jmax = s.jmax !== undefined ? s.jmax : stateFor(steps, idx, s.node, "jmax");
+    for (let j = s.i + 1; j <= jmax; j++) {
+      const pj = P[strip[j]], pxj = L.toPx(pj.x, pj.y);
+      const isCur = j === s.j;
+      out.push('<line x1="' + pxi.x + '" y1="' + pxi.y + '" x2="' + pxj.x + '" y2="' + pxj.y +
+        '" class="checkline"' + (isCur ? ' stroke-width="2"' : ' opacity=".35"') + '/>');
+      if (isCur) out.push('<circle cx="' + pxj.x + '" cy="' + pxj.y + '" r="7" fill="none" stroke="var(--c-strip)" stroke-width="2"/>');
+    }
+  }
+
+  /* the current best pair */
+  if (best && best.pair) {
+    const a = P[best.pair[0]], b = P[best.pair[1]];
+    const pa = L.toPx(a.x, a.y), pb = L.toPx(b.x, b.y);
+    out.push('<line x1="' + pa.x + '" y1="' + pa.y + '" x2="' + pb.x + '" y2="' + pb.y + '" class="bestline"/>');
+    const mid = { x:(pa.x + pb.x) / 2, y:(pa.y + pb.y) / 2 };
+    out.push('<text x="' + mid.x + '" y="' + (mid.y - 6) + '" class="slbl" text-anchor="middle" fill="var(--c-z)" ' +
+      'font-size="10.5">\u03b4 = ' + Math.sqrt(best.delta).toFixed(2) + '</text>');
+    [a, b].forEach(p => {
+      const px = L.toPx(p.x, p.y);
+      out.push('<circle cx="' + px.x + '" cy="' + px.y + '" r="6" fill="none" stroke="var(--c-z)" stroke-width="2"/>');
+    });
+  }
+
+  svg.innerHTML = out.join("");
+}
+
+/* ==========================================================================
+   The "sorted order" panel: byX and byY as chip rows.
+
+   Entering (or returning from) a recursive call plays a short animation:
+   the half that becomes the child's own array slides to the centre and
+   grows to fill the row; the other half just fades out in place. That is
+   meant to make it visually unmistakable that the child's byX/byY ARE
+   precisely that coloured half of the parent's — not a copy, not a
+   re-derivation, the same points.
+
+   arrState() is the one source of truth for "what does this step's byX/byY
+   look like" (roles, split position); arrRowLayout() turns that into pure
+   chip geometry with no drawing; paintArrRow()/paintArrRowMorph() are the
+   only two things that actually emit SVG, from a layout or from two
+   layouts interpolated by an animation progress e in [0,1].
+   ========================================================================= */
+const ARR_X0 = 10, ARR_X1 = 310, ARR_YX = 40, ARR_YY = 90;
+
+function arrRowLayout(ids, roleFn, splitIdx) {
+  const n = Math.max(1, ids.length), cw = Math.min(24, (ARR_X1 - ARR_X0) / n);
+  const totalW = cw * n, xs = ARR_X0 + (ARR_X1 - ARR_X0 - totalW) / 2;
+  const chips = ids.map((id, i) => ({ id:id, cx:xs + i * cw + cw / 2, w:cw,
+    role:roleFn ? roleFn(id, i) : "active" }));
+  const splitX = (splitIdx !== undefined && splitIdx > 0 && splitIdx < ids.length) ? xs + splitIdx * cw : null;
+  return { chips:chips, splitX:splitX, byId:new Map(chips.map(c => [c.id, c])) };
+}
+
+function chipSvg(id, cx, w, role, y, op) {
+  const col = ROLE_COL[role] || ROLE_COL.active;
+  let s = '<rect class="arrchip" data-id="' + id + '" x="' + (cx - w / 2 + 1) + '" y="' + (y - 9) + '" width="' +
+    (w - 2) + '" height="16" rx="2" fill="' + col[0] + '" stroke="' + col[1] + '" opacity="' + op + '"/>';
+  if (w >= 12) s += '<text data-id="' + id + '" x="' + cx + '" y="' + (y + 3.5) + '" class="idx" font-size="9" ' +
+    'opacity="' + op + '">' + id + '</text>';
+  return s;
+}
+
+/* the static row, at full opacity, from one already-computed layout */
+function paintArrRow(layout, y, label) {
+  const out = layout.chips.map(c => chipSvg(c.id, c.cx, c.w, c.role, y, 1));
+  if (layout.splitX !== null)
+    out.push('<line x1="' + layout.splitX + '" y1="' + (y - 13) + '" x2="' + layout.splitX + '" y2="' + (y + 13) +
+      '" class="splitline"/>');
+  out.push('<text x="' + (ARR_X0 - 6) + '" y="' + (y + 3.5) + '" class="slbl" text-anchor="end">' + label + '</text>');
+  return out.join("");
+}
+/* the transitional row: chips present on both sides slide/resize from
+   their FROM position to their TO position; chips only on one side just
+   fade there in place (out of the departing layout, into the arriving
+   one) — matched by point id, which is exactly what makes this an honest
+   picture of "these are the same points" rather than a generic wipe. */
+function paintArrRowMorph(fromL, toL, y, label, e) {
+  const ids = new Set([...fromL.byId.keys(), ...toL.byId.keys()]);
+  const out = [];
+  ids.forEach(id => {
+    const f = fromL.byId.get(id), t = toL.byId.get(id);
+    if (f && t) out.push(chipSvg(id, f.cx + (t.cx - f.cx) * e, f.w + (t.w - f.w) * e, t.role, y, 1));
+    else if (f) out.push(chipSvg(id, f.cx, f.w, f.role, y, 1 - e));
+    else out.push(chipSvg(id, t.cx, t.w, t.role, y, e));
+  });
+  if (fromL.splitX !== null)
+    out.push('<line x1="' + fromL.splitX + '" y1="' + (y - 13) + '" x2="' + fromL.splitX + '" y2="' + (y + 13) +
+      '" class="splitline" opacity="' + (1 - e) + '"/>');
+  out.push('<text x="' + (ARR_X0 - 6) + '" y="' + (y + 3.5) + '" class="slbl" text-anchor="end">' + label + '</text>');
+  return out.join("");
+}
+
+function arrState(steps, idx) {
+  const s = steps[idx];
+  const byX = stateFor(steps, idx, s.node, "byX") || s.byX || [];
+  const byY = stateFor(steps, idx, s.node, "byY") || s.byY || [];
+  const splitAt = stateFor(steps, idx, s.node, "splitAt");
+  const leftSet = stateFor(steps, idx, s.node, "left");
+  const byYL = stateFor(steps, idx, s.node, "byYL"), byYR = stateFor(steps, idx, s.node, "byYR");
+  const base = nodeBaseRole(s.node);
+  const roleX = id => leftSet ? (leftSet.has(id) ? "left" : "right") : base;
+  const roleY = id => byYL ? (byYL.includes(id) ? "left" : "right") : (leftSet ? (leftSet.has(id) ? "left" : "right") : base);
+  return {
+    byXLayout:arrRowLayout(byX, roleX, splitAt),
+    byYLayout:arrRowLayout(byY, roleY, undefined),
+    resort:s.resort
+  };
+}
+
+function drawArr(steps, idx) {
+  const st = arrState(steps, idx);
+  const out = [paintArrRow(st.byXLayout, ARR_YX, "byX"), paintArrRow(st.byYLayout, ARR_YY, "byY")];
+  if (st.resort) out.push('<text x="' + ARR_X0 + '" y="128" class="slbl" fill="var(--c-strip)">re-sorted at this call' +
+    ' (' + st.resort + ')</text>');
+  el("arrSvg").innerHTML = out.join("");
+}
+
+/* --- the entering/leaving-a-call animation -------------------------------- */
+let arrMorphRaf = null;
+function morphArr(fromIdx, toIdx) {
+  const fromSt = arrState(RUN.steps, fromIdx), toSt = arrState(RUN.steps, toIdx);
+  const svg = el("arrSvg"), t0 = performance.now(), dur = 420;
+  if (arrMorphRaf) cancelAnimationFrame(arrMorphRaf);
+  (function frame(now) {
+    const u = clamp((now - t0) / dur, 0, 1), e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    svg.innerHTML = paintArrRowMorph(fromSt.byXLayout, toSt.byXLayout, ARR_YX, "byX", e) +
+      paintArrRowMorph(fromSt.byYLayout, toSt.byYLayout, ARR_YY, "byY", e);
+    if (u < 1) arrMorphRaf = requestAnimationFrame(frame);
+    else { arrMorphRaf = null; drawArr(RUN.steps, toIdx); }
+  })(performance.now());
+}
+/* ==========================================================================
+   Panels, transport, input.
+   ========================================================================= */
+let RUN = null, LAYOUT = null, VAR = "once", step = 0, playing = false, timer = null, curFrame = -1;
+let POINTS = [];
+let OTHER_CACHE = null;
+
+/* --- phases ---------------------------------------------------------------
+   Only one top-level call ever runs (unlike Karatsuba's repeating rounds),
+   so the phase of a step is simply whichever activity the ROOT call is
+   currently engaged in — including, for the "once" variant, the driver's
+   one-time sort before the root call even exists yet. */
+const NAMES_ONCE = { 1:"start", 2:"start", 3:"start", 5:"split", 7:"split", 8:"split",
+                     9:"left", 10:"right", 11:"merge", 13:"strip", 14:"strip", 16:"strip", 17:"return" };
+const NAMES_EVERY = { 1:"start", 2:"start", 3:"start", 4:"sort", 5:"sort", 7:"split",
+                      9:"left", 10:"right", 11:"merge", 13:"strip", 14:"strip", 16:"strip", 17:"return" };
+function assignPhases(steps, variant) {
+  const NAMES = variant === "once" ? NAMES_ONCE : NAMES_EVERY;
+  steps.forEach(s => {
+    const rootDist = s.stack.find(f => f.code !== "driver");
+    s.phase = rootDist ? (NAMES[rootDist.line] || "run") : "sort";
+  });
+}
+
+function build() {
+  RUN = buildRun(POINTS, VAR);
+  assignPhases(RUN.steps, VAR);
+  LAYOUT = computeLayout(RUN.P, 720, 480);
+  step = clamp(step, 0, RUN.steps.length - 1);
+  OTHER_CACHE = null;
+}
+function otherCost() {
+  if (OTHER_CACHE && OTHER_CACHE.var === VAR) return OTHER_CACHE.cost;
+  const other = VAR === "once" ? "every" : "once";
+  const r = buildRun(POINTS, other);
+  OTHER_CACHE = { var:VAR, cost:r.cost };
+  return r.cost;
+}
+
+const PHASE_TITLE = { sort:"sort (once, in the driver, or every level)", start:"enter the call / check its size",
+  split:"split by median x, mark the left half", left:"recurse on the left half", right:"recurse on the right half",
+  merge:"take the smaller of the two halves", strip:"check the straddling strip", return:"return \u03b4 and its pair" };
+function phaseList() {
+  const out = [];
+  RUN.steps.forEach((s, i) => {
+    if (out.length && out[out.length - 1].label === s.phase) out[out.length - 1].to = i;
+    else out.push({ label:s.phase, from:i, to:i });
+  });
+  return out;
+}
+function renderPhases() {
+  const ph = phaseList(), bar = el("phasebar");
+  bar.innerHTML = ph.map(p => '<button class="phasebtn' + (step >= p.from && step <= p.to ? " on" :
+    (step > p.to ? " past" : "")) + '" data-goto="' + p.from + '" title="' + (PHASE_TITLE[p.label] || p.label) +
+    ' (steps ' + (p.from + 1) + "\u2013" + (p.to + 1) + ')">' + p.label + '</button>').join("");
+  bar.querySelectorAll("[data-goto]").forEach(b => { b.onclick = () => { stop(); stepTo(+b.getAttribute("data-goto"), false); }; });
+  ph.forEach((p, i) => { bar.children[i].style.flexGrow = (p.to - p.from + 1); });
+}
+
+/* --- side panel: call stack + pseudocode ---------------------------------- */
+function renderSide() {
+  const s = RUN.steps[step], st = s.stack, sel = curFrame < 0 || curFrame >= st.length ? st.length - 1 : curFrame;
+  el("crumbs").innerHTML = st.map((f, i) =>
+    (i ? '<span class="crumb arw">\u203a</span>' : "") +
+    '<span class="crumb' + (i === sel ? " sel" : "") + '" data-f="' + i + '">' + f.tok + "</span>").join("");
+  el("crumbs").querySelectorAll("[data-f]").forEach(c => {
+    c.onclick = () => { curFrame = +c.getAttribute("data-f"); if (curFrame === st.length - 1) curFrame = -1; render(); };
+  });
+  const f = st[sel];
+  el("depthRhs").textContent = "depth " + st.length;
+  el("codeHd").textContent = f.code === "driver" ? "closestPair (driver)" : "closestDist";
+  el("codeBox").innerHTML = codeHTML(f.code, f.line, f.callLine);
+}
+
+/* --- cost -------------------------------------------------------------- */
+function renderCost() {
+  const s = RUN.steps[step], mine = s.cost, other = otherCost();
+  const big = Math.max(mine.cmp, other.cmp, mine.dist, 1);
+  const row = (lab, v, col, tot) =>
+    '<span class="lbl">' + lab + '</span><span class="costbar"><i style="width:' + (100 * v / big).toFixed(1) +
+    '%;background:' + col + '"></i></span><span class="num">' + v + (tot !== undefined ? " / " + tot : "") + "</span>";
+  el("costGrid").innerHTML =
+    row("sort comparisons (" + (VAR === "once" ? "once, so far" : "every level, so far") + ")",
+        mine.cmp, "var(--c-strip)", RUN.cost.cmp) +
+    row("sort comparisons (" + (VAR === "once" ? "every level instead" : "once instead") + ")",
+        other.cmp, "var(--c-in)") +
+    row("distance evaluations", mine.dist, "var(--c-z)", RUN.cost.dist);
+  el("costRhs").innerHTML = "n = " + RUN.P.length + " \u00b7 " + RUN.steps.length + " steps";
+  const best = s.best !== undefined ? s.best : stateFor(RUN.steps, step, s.node, "best");
+  el("facts").innerHTML =
+    "<span>points <b>" + RUN.P.length + "</b></span>" +
+    "<span>\u03b4 so far <b>" + (best ? Math.sqrt(best.delta).toFixed(3) : "\u2013") + "</b></span>" +
+    "<span>depth <b>" + s.stack.length + "</b></span>" +
+    (step === RUN.steps.length - 1 ? "<span>closest pair <b>" + RUN.pair[0] + ", " + RUN.pair[1] + "</b>, \u03b4 = " +
+      RUN.delta.toFixed(3) + "</span>" : "");
+}
+
+/* --- everything ---------------------------------------------------------- */
+function render(opts) {
+  opts = opts || {};
+  el("varSeg").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.var === VAR));
+  const s = RUN.steps[step];
+  el("slider").max = RUN.steps.length - 1;
+  el("slider").value = step;
+  el("stepno").textContent = "step " + (step + 1) + " / " + RUN.steps.length;
+  el("explain").innerHTML = s.expl;
+  el("svgRhs").innerHTML = VAR === "once" ? "sort once" : "sort every level";
+  el("arrRhs").innerHTML = s.stack[s.stack.length - 1].tok;
+  renderPhases(); renderSide(); renderCost();
+  drawMain(RUN.steps, step);
+  const from = opts.fromStep;
+  const enteringCall = from !== undefined && Math.abs(step - from) === 1 && RUN.steps[from].node !== s.node;
+  if (enteringCall) morphArr(from, step); else drawArr(RUN.steps, step);
+  syncTransport();
+  el("legend").innerHTML =
+    lg("var(--c-x-fill)", "var(--c-x)", "left half") +
+    lg("var(--c-y-fill)", "var(--c-y)", "right half") +
+    lg("var(--c-strip-fill)", "var(--c-strip)", "candidate strip") +
+    lg("var(--c-z-fill)", "var(--c-z)", "current best pair") +
+    lg("#e7e0d2", "#bdb8a6", "outside this call");
+  el("codeDriverFull").innerHTML = codeHTML("driver", s.code === "driver" ? s.line : 0, 0);
+  el("codeDistHd").textContent = "closestDist (" + (VAR === "once" ? "sort once" : "sort every level") + ")";
+  el("codeDistFull").innerHTML = codeHTML(VAR, s.code === VAR ? s.line : 0, 0);
+}
+const lg = (f, b, t) => '<span class="item"><span class="sw" style="background:' + f + ';border-color:' + b +
+  '"></span> ' + t + '</span>';
+
+/* --- transport ------------------------------------------------------------ */
+function setPlayGlyph(running) {
+  const b = el("playBtn");
+  b.innerHTML = running ? "\u23f8\ufe0e" : "\u25b6\ufe0e";
+  b.title = running ? "Pause (space bar)" : "Play (space bar)";
+  b.setAttribute("aria-label", running ? "Pause" : "Play");
+}
+function syncTransport() {
+  const last = RUN.steps.length - 1;
+  el("btnFirst").disabled = step <= 0;
+  el("btnPrev").disabled = step <= 0;
+  el("btnNext").disabled = step >= last;
+}
+function stepTo(i, animate) {
+  const from = step;
+  step = clamp(i, 0, RUN.steps.length - 1);
+  curFrame = -1;
+  render(animate ? { fromStep:from } : {});
+}
+function setStep(i) { stepTo(i, false); }
+function stop() { playing = false; if (timer) clearInterval(timer); timer = null; setPlayGlyph(false); }
+function play() {
+  if (playing) { stop(); return; }
+  if (step >= RUN.steps.length - 1) { step = 0; render(); }
+  playing = true; setPlayGlyph(true);
+  timer = setInterval(() => {
+    if (step >= RUN.steps.length - 1) { stop(); return; }
+    stepTo(step + 1, true);
+  }, 550);
+}
+
+/* --- input ----------------------------------------------------------------- */
+const PRESETS = [
+  { id:"rand", name:"Random points", gen:n => Array.from({length:n}, () => ({
+      x:Math.round(Math.random() * 400), y:Math.round(Math.random() * 260) })) },
+  { id:"dupx", name:"Many shared x-coordinates (tests the tie-break fix)", gen:n => {
+      const cols = Math.max(2, Math.round(n / 4));
+      return Array.from({length:n}, () => ({ x:Math.round(Math.random() * cols) * 40,
+        y:Math.round(Math.random() * 260) })); } },
+  { id:"vline", name:"Collinear, vertical (all one x)", gen:n =>
+      Array.from({length:n}, (_, i) => ({ x:200, y:Math.round(i * 260 / Math.max(1, n - 1)) })) },
+  { id:"hline", name:"Collinear, horizontal", gen:n =>
+      Array.from({length:n}, (_, i) => ({ x:Math.round(i * 400 / Math.max(1, n - 1)), y:130 })) },
+  { id:"twoclust", name:"Two tight clusters (stresses the strip)", gen:n => {
+      const half = Math.ceil(n / 2);
+      const cluster = (cx, cy, k) => Array.from({length:k}, () => ({
+        x:cx + Math.round((Math.random() - .5) * 30), y:cy + Math.round((Math.random() - .5) * 260) }));
+      return cluster(90, 130, half).concat(cluster(310, 130, n - half)); } }
+];
+function currentPreset() { return el("presetSel").value; }
+function resample() {
+  const n = clamp(Math.round(+el("inN").value) || 20, 2, 60);
+  el("inN").value = n;
+  const p = PRESETS.find(x => x.id === currentPreset()) || PRESETS[0];
+  POINTS = p.gen(n);
+  step = 0; build(); render(); dump();
+}
+function dump() { el("ta").value = POINTS.map(p => p.x + " " + p.y).join("\n"); }
+function loadText() {
+  const err = el("taErr"); err.textContent = "";
+  try {
+    const pts = [];
+    el("ta").value.split(/\n+/).forEach(line => {
+      const t = line.trim(); if (!t) return;
+      const m = t.split(/[\s,]+/).map(Number);
+      if (m.length < 2 || m.some(v => !isFinite(v))) throw new Error("cannot read line: \u201c" + t + "\u201d");
+      pts.push({ x:m[0], y:m[1] });
+    });
+    if (pts.length < 2) throw new Error("need at least 2 points");
+    POINTS = pts; el("inN").value = pts.length; el("presetSel").value = "";
+    step = 0; build(); render();
+  } catch (e) { err.textContent = String(e.message || e); }
+}
+
+/* --- cross-highlighting: a point and its chip(s) are the same point ------ */
+function setHover(id) {
+  document.querySelectorAll(".hoverring").forEach(n => n.remove());
+  document.querySelectorAll(".hoverlink").forEach(n => n.classList.remove("hoverlink"));
+  if (id === null || id === undefined) return;
+  document.querySelectorAll('[data-id="' + id + '"]').forEach(n => {
+    n.classList.add("hoverlink");
+    if (n.tagName === "circle" && n.closest("#mainSvg")) {
+      const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      ring.setAttribute("cx", n.getAttribute("cx"));
+      ring.setAttribute("cy", n.getAttribute("cy"));
+      ring.setAttribute("r", 8);
+      ring.setAttribute("class", "hoverring");
+      ring.setAttribute("fill", "none");
+      n.parentNode.appendChild(ring);
+    }
+  });
+}
+function pointTooltip(ev, id) {
+  const tt = el("tt"), p = RUN.P[id];
+  tt.innerHTML = '<span class="tt-h">point ' + id + '</span><br>x = ' + p.x + '<br>y = ' + p.y;
+  tt.style.display = "block";
+  const r = tt.getBoundingClientRect();
+  tt.style.left = Math.min(ev.clientX + 14, window.innerWidth - r.width - 10) + "px";
+  tt.style.top = Math.max(8, ev.clientY - r.height - 12) + "px";
+}
+function wireHover(svgId) {
+  const node = el(svgId);
+  node.addEventListener("mousemove", ev => {
+    const t = ev.target.closest ? ev.target.closest("[data-id]") : null;
+    if (!t) { el("tt").style.display = "none"; setHover(null); return; }
+    const id = +t.getAttribute("data-id");
+    setHover(id);
+    pointTooltip(ev, id);
+  });
+  node.addEventListener("mouseleave", () => { el("tt").style.display = "none"; setHover(null); });
+}
+
+function init() {
+  el("presetSel").innerHTML = PRESETS.map(p => '<option value="' + p.id + '">' + p.name + '</option>').join("") +
+    '<option value="">(pasted input)</option>';
+  el("presetSel").onchange = () => { stop(); resample(); };
+  el("btnRand").onclick = () => { stop(); resample(); };
+  el("inN").addEventListener("change", () => { stop(); resample(); });
+  el("varSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    stop(); VAR = b.dataset.var; step = 0; build(); render();
+  });
+  el("btnFirst").onclick = () => { stop(); stepTo(0, false); };
+  el("btnPrev").onclick = () => { stop(); stepTo(step - 1, true); };
+  el("btnNext").onclick = () => { stop(); stepTo(step + 1, true); };
+  el("playBtn").onclick = play;
+  el("slider").addEventListener("input", e => { stop(); stepTo(+e.target.value, false); });
+  el("btnLoad").onclick = () => { stop(); loadText(); };
+  el("btnDump").onclick = dump;
+  document.addEventListener("keydown", e => {
+    if (/input|textarea|select/i.test(e.target.tagName)) return;
+    if (e.key === "ArrowRight") { stop(); stepTo(step + 1, true); }
+    if (e.key === "ArrowLeft") { stop(); stepTo(step - 1, true); }
+    if (e.key === " ") { e.preventDefault(); play(); }
+  });
+  wireHover("mainSvg");
+  wireHover("arrSvg");
+
+  el("presetSel").value = "rand";
+  resample();
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

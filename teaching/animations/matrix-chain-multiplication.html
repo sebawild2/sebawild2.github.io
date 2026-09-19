@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrix-chain multiplication · dynamic programming, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.dims { font-family:var(--wi-font-mono); font-size:.8rem; width:13em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  .opbar { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:10px 18px;
+           background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+           border-radius:var(--wi-radius-lg); margin-bottom:14px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0;
+              width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden;
+              flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  .stage { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(320px,1fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-box + .sim-box { margin-top:14px; }
+  .col-side .sim-box + .sim-box { margin-top:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:96px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status code { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-panel-2);
+                 padding:1px 4px; border-radius:3px; }
+  .status .rec { color:var(--wi-relax); font-weight:bold; }
+  .status .lastm { color:var(--wi-active); font-weight:bold; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem;
+            color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  .term { font-size:1.05rem; line-height:1.7; word-break:break-word; }
+  .term .t-pending { color:var(--wi-ink-faint); font-family:var(--wi-font-mono); font-size:.82em;
+                     background:var(--wi-bg); border:1px dashed var(--wi-border-soft);
+                     border-radius:3px; padding:0 3px; }
+  .term .t-hot { background:#f6e6df; border-radius:3px; padding:1px 2px; }
+  .term .t-done { color:var(--wi-ink-strong); }
+  .term .clickterm { cursor:pointer; border-radius:3px; padding:2px 3px; margin:-2px -3px;
+                     transition:background .15s; }
+  .term .clickterm:hover { background:var(--wi-controls); }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+
+  .stack { list-style:none; margin:0; padding:0; font-size:.82rem; font-family:var(--wi-font-mono); }
+  .stack li { padding:2px 0 2px 0; border-bottom:1px solid var(--wi-border-soft); white-space:pre; }
+  .stack li:last-child { border-bottom:0; }
+  .stack li.top { color:var(--wi-accent); font-weight:bold; }
+  .stack li .sz { color:var(--wi-ink-faint); }
+
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent;
+           white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em;
+              text-transform:uppercase; color:var(--wi-ink-faint); padding:10px 12px 3px;
+              border-top:1px solid var(--wi-border-soft); margin-top:6px; }
+  .sublabel:first-child { border-top:0; margin-top:0; padding-top:2px; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,280px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:130px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  /* --- the enumeration table ---------------------------------------------- */
+  .alltab { width:100%; border-collapse:collapse; font-size:.82rem; }
+  .alltab td, .alltab th { padding:4px 8px; border-bottom:1px solid var(--wi-border-soft); text-align:left; }
+  .alltab th { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.08em;
+               text-transform:uppercase; color:var(--wi-ink-faint); border-bottom:1px solid var(--wi-border); }
+  .alltab td.num { text-align:right; font-family:var(--wi-font-mono); white-space:nowrap; }
+  .alltab td.sum { font-family:var(--wi-font-mono); color:var(--wi-ink-soft); font-size:.92em; }
+  .alltab tr { cursor:pointer; }
+  .alltab tr:hover td { background:var(--wi-panel-2); }
+  .alltab tr.best td { background:#e8f0e2; }
+  .alltab tr.sel td { background:#f6e6df; }
+  .alltab td.bar { width:170px; padding-right:2px; }
+  .barwrap { display:block; width:160px; height:.8em; background:var(--wi-bg);
+             border:1px solid var(--wi-border-soft); border-radius:2px; overflow:hidden; }
+  .barfill { display:block; height:100%; background:var(--wi-accent-soft); }
+  .alltab tr.best .barfill { background:var(--wi-relax); }
+  .alltab tr.grd .barfill { background:var(--wi-examine); }
+  .badge { font-family:var(--wi-font-head); font-size:.6rem; letter-spacing:.06em; text-transform:uppercase;
+           border:1px solid var(--wi-border-soft); border-radius:3px; padding:0 4px; margin-left:6px;
+           color:var(--wi-ink-faint); }
+  .badge.opt { color:var(--wi-relax); border-color:var(--wi-relax); }
+  .badge.grd { color:var(--wi-examine); border-color:var(--wi-examine); }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:280px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+
+  .mobile-note { display:none; background:var(--wi-controls); border:1px solid var(--wi-accent-soft);
+                 border-radius:var(--wi-radius-lg); padding:11px 15px; font-size:.82rem;
+                 color:var(--wi-ink-strong); margin-bottom:14px; }
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls, .opbar { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; border-radius:var(--wi-radius); }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .mobile-note { display:block; }
+    .desk-only { display:none !important; }
+  }
+
+  /* --- SVG --------------------------------------------------------------- */
+  .cellbg { fill:var(--wi-panel-2); stroke:var(--wi-border-soft); stroke-width:1; }
+  .cellbg.base { fill:var(--wi-controls); }
+  .cellbg.unused { fill:var(--wi-bg); stroke:none; }
+  .cellbg.empty { fill:var(--wi-bg); stroke:var(--wi-border-soft); stroke-dasharray:2 3; }
+  .cellbg.read { fill:#f7edd9; stroke:var(--wi-examine); stroke-width:1.6; }
+  .cellbg.best { fill:#e8f0e2; stroke:var(--wi-relax); stroke-width:1.8; }
+  .cellbg.cur  { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2.2; }
+  .cellbg.hit  { fill:#dfeae4; stroke:var(--wi-queue); stroke-width:1.8; }
+  .cellbg.path { fill:#f0d7cd; stroke:var(--wi-accent); stroke-width:1.8; }
+  .cellbg.sel  { stroke:var(--wi-accent-dark); stroke-width:2.6; }
+  .cellbg.hovsub  { fill:#f7e9e2; stroke:var(--wi-accent-soft); stroke-width:1.6; }
+  .cellbg.hovroot { fill:#f0d7cd; stroke:var(--wi-accent-dark); stroke-width:2.6; }
+  .cellval { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-ink-strong);
+             text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .cellval.big { font-weight:bold; fill:var(--wi-accent-dark); }
+  .cellval.dash { fill:var(--wi-ink-faint); }
+  .hdrix { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-ink-faint);
+           text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .hdrix.hot { fill:var(--wi-accent); font-weight:bold; }
+  .hdrname { font-family:var(--wi-font-body); font-size:13px; fill:var(--wi-ink-soft); font-style:italic;
+             pointer-events:none; }
+  .arr { fill:none; stroke-width:2.4; pointer-events:none; }
+  .arr.read { stroke:var(--wi-examine); }
+  .arr.best { stroke:var(--wi-relax); stroke-width:3; }
+  .arr.taken { stroke:var(--wi-accent); stroke-width:3.2; }
+  .hit { fill:transparent; cursor:pointer; }
+
+  .mat { fill:#efe6d6; stroke:var(--wi-ink-strong); stroke-width:1.2; }
+  .mat.inrange { fill:#e5d9c4; }
+  .mat.left  { fill:#e6efe0; stroke:var(--wi-relax); }
+  .mat.right { fill:#dfeae4; stroke:var(--wi-queue); }
+  .mat.out   { opacity:.30; }
+  .mat.res   { fill:#f3ded4; stroke:var(--wi-accent); stroke-dasharray:4 3; }
+  .matlab { font-family:var(--wi-font-body); font-size:13px; text-anchor:middle; fill:var(--wi-ink-strong);
+            pointer-events:none; }
+  .matdim { font-family:var(--wi-font-mono); font-size:11px; text-anchor:middle; fill:var(--wi-ink-soft);
+            pointer-events:none; }
+  .dot { font-family:var(--wi-font-body); font-size:20px; text-anchor:middle; fill:var(--wi-ink-soft);
+         pointer-events:none; }
+  .brk { fill:none; stroke:var(--wi-relax); stroke-width:2; }
+  .brk.whole { stroke:var(--wi-accent); }
+  .brk.right { stroke:var(--wi-queue); }
+  .brklab { font-family:var(--wi-font-mono); font-size:12px; text-anchor:middle; fill:var(--wi-relax);
+            pointer-events:none; }
+  .brklab.whole { fill:var(--wi-accent); }
+  .brklab.right { fill:var(--wi-queue); }
+
+  .tmat { fill:#efe6d6; stroke:var(--wi-ink-strong); stroke-width:1.2; }
+  .tmat.res { fill:#f3ded4; stroke:var(--wi-accent); }
+  .tmat.hot { stroke:var(--wi-active); stroke-width:2.6; }
+  .tedge { stroke:var(--wi-border-strong); stroke-width:1.6; fill:none; }
+  .tpill { fill:var(--wi-bg); stroke:none; pointer-events:none; }
+  .tlab { font-family:var(--wi-font-body); font-size:13px; text-anchor:middle; dominant-baseline:central;
+          fill:var(--wi-ink-strong); pointer-events:none; }
+  .tcost { font-family:var(--wi-font-mono); font-size:11px; text-anchor:middle; dominant-baseline:central;
+           fill:var(--wi-accent); font-weight:bold; pointer-events:none; }
+  .tdim { font-family:var(--wi-font-mono); font-size:9px; text-anchor:middle; dominant-baseline:central;
+          fill:var(--wi-ink-soft); pointer-events:none; }
+
+  @keyframes cellpop { from { opacity:0; transform:translateY(-8px) scale(.65); }
+                       to   { opacity:1; transform:none; } }
+  .pop { animation:cellpop .34s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box;
+         transform-origin:center; }
+  @keyframes arrdraw { from { stroke-dashoffset:var(--len); } to { stroke-dashoffset:0; } }
+  .drawin { stroke-dasharray:var(--len); animation:arrdraw .38s ease-out both; }
+  @keyframes nodein { from { opacity:0; transform:scale(.5); } to { opacity:1; transform:none; } }
+  .nodein { animation:nodein .3s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box;
+            transform-origin:center; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1 id="h1title">Matrix-chain multiplication</h1>
+  <span class="seg" id="modeSeg">
+    <button id="modeBU" class="on">Table filling &amp; backtrace</button>
+    <button id="modeMemo">Memoized recursion</button>
+  </span>
+</div>
+
+<p class="subtitle" id="subBU">
+  Multiplying an <i>a</i>×<i>b</i> matrix with a <i>b</i>×<i>c</i> matrix costs <i>a·b·c</i> integer
+  multiplications, so the order in which a chain <i>M</i><sub>0</sub>·…·<i>M</i><sub>n−1</sub> is evaluated
+  changes the total dramatically. The subproblems are the <b>ranges</b> [<i>i</i>..<i>j</i>); the guess is
+  the <b>last</b> multiplication, at some split <i>k</i>. Filling the table by increasing length
+  <i>ℓ</i> = <i>j</i> − <i>i</i> means both values a cell needs are already there when it is reached.
+  Hover a cell for its range; <b>click a cell to backtrace that subproblem</b>.
+</p>
+<p class="subtitle" id="subMemo" style="display:none">
+  The same recurrence, computed top-down instead: recurse on ranges and cache every result. The table is now
+  filled in the order a depth-first traversal of the subproblem DAG happens to reach the cells, and every
+  <span style="color:var(--wi-queue)"><b>cache hit</b></span> is a subtree of the recursion that is not
+  explored a second time. Watch the call stack on the right, and compare the finished table with the
+  bottom-up mode — same numbers, different order.
+</p>
+
+<div class="mobile-note">
+  <b>Small screen:</b> this is the compact demo — the chain, the table, the tree and the scrubber.
+  The pseudocode with live line highlighting is on the desktop version.
+</div>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <label for="inR">r</label>
+    <input type="text" id="inR" class="dims" spellcheck="false">
+    <label for="inC">c</label>
+    <input type="text" id="inC" class="dims" spellcheck="false">
+    <button id="applyBtn" class="pri">Set</button>
+    <button id="randBtn">Random chain</button>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Detail</span>
+    <span class="seg" id="granSeg">
+      <button id="granCoarse" class="on">One step per cell</button>
+      <button id="granFine">Every guess k</button>
+    </span>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="traceNote"></span>
+  <button id="wholeBtn" style="display:none">Back to the whole chain</button>
+  <span class="opnote" style="margin-left:auto">Arrow keys step; click a cell or a tree node for its subproblem.</span>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">— / —</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="60" max="1400" value="420" style="width:88px">
+      <span class="stepno" id="speedVal">420ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The chain</span><span class="rhs" id="chainMeta"></span></div>
+      <div class="svgscroll"><svg id="chainSvg" class="stagesvg"></svg></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>The table m[i][j]</span><span class="rhs" id="tabMeta"></span></div>
+      <div class="svgscroll"><svg id="tabSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> current subproblem</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> read for this k</span>
+        <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> best k so far</span>
+        <span class="item" id="legHit" style="display:none"><span class="sw" style="background:#dfeae4;border-color:var(--wi-queue)"></span> cache hit</span>
+        <span class="item"><span class="sw" style="background:var(--wi-controls)"></span> base case (ℓ ≤ 1)</span>
+        <span class="item"><span class="sw" style="background:#f7e9e2;border-color:var(--wi-accent-soft)"></span> subtree of the hovered tree node</span>
+      </div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Evaluation tree</span><span class="rhs" id="treeMeta"></span></div>
+      <div class="svgscroll"><svg id="treeSvg" class="stagesvg"></svg></div>
+    </div>
+  </div>
+
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Parenthesization</span><span class="rhs" id="termMeta"></span></div>
+      <div id="termBox" class="term"></div>
+    </div>
+
+    <div class="sim-box" id="stackBox" style="display:none">
+      <div class="sim-title"><span>Call stack</span><span class="rhs" id="stackMeta"></span></div>
+      <div id="stackBody"></div>
+    </div>
+  </div>
+</div>
+
+<details class="code desk-only" id="codeBox" open style="margin-top:18px">
+  <summary>Recurrence &amp; pseudocode</summary>
+  <div class="codebody" id="codeBody"></div>
+  <div class="codenote" id="codeNote"></div>
+</details>
+
+<details id="allBox" style="margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg)">
+  <summary style="cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head); font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft)">
+    All parenthesizations (brute force)
+  </summary>
+  <div style="padding:0 16px 16px" id="allBody"></div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      Two lines, the arrays of the lecture: <code>r[0..n)</code> then <code>c[0..n)</code>, whitespace or
+      comma separated. They must satisfy <code>r[i+1] = c[i]</code>, or the product is not defined.
+      Lines starting with <code>#</code> are ignored.
+      <br><br>
+      A <b>single</b> line of <i>n</i>+1 numbers is also accepted and read as the usual chain of dimensions
+      <code>p₀ p₁ … pₙ</code>, meaning <i>M</i><sub><i>i</i></sub> is <code>p[i] × p[i+1]</code>; the two
+      arrays are then derived and shown above. At most 10 matrices — beyond that the table stops being
+      readable, and the point of the picture is lost.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Matrix-chain multiplication by dynamic programming.
+
+     m(i,j) =  0                                                if j-i <= 1
+               min { m(i,k) + m(k,j) + r[i]*r[k]*c[j-1]
+                     : k in [i+1..j) }                          otherwise
+
+   Conventions on this page
+     * ranges are half-open, [i..j) covers M_i ... M_{j-1}; the table is
+       indexed 0 <= i <= j <= n, so it has n+1 rows and columns.
+     * the guess k is the START of the right factor: the last multiplication
+       is (M_i...M_{k-1}) * (M_k...M_{j-1}).
+     * ties are shown: several k can attain the minimum, and then several
+       parenthesizations are optimal.  traceback takes the smallest such k,
+       which is what the loop in the lecture's code does.
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+/* M with a subscript: Unicode subscript digits are missing from several of the
+   fonts this page may fall back to, so use real markup in both worlds. The
+   index may be a letter ("i", "j-1"), which rules out a digit lookup anyway. */
+const Mname = i => "M<sub>" + i + "</sub>";
+const Msvg = (i, fs) => 'M<tspan font-size="' + (fs || 10) + '" dy="3">' + i + "</tspan>";
+const rng = (i, j) => "[" + i + ".." + j + ")";
+const num = x => x === Infinity ? "\u221e" : String(x);
+
+/* ---------- presets ------------------------------------------------------ */
+
+const PRESETS = {
+  lecture: { name: "lecture example (n = 4)", r: [10, 80, 50, 2],       c: [80, 50, 2, 10] },
+  clrs:    { name: "chain 30·35·15·5·10·20·25", p: [30, 35, 15, 5, 10, 20, 25] },
+  five:    { name: "5·10·3·12·5·50·6",          p: [5, 10, 3, 12, 5, 50, 6] },
+  grow:    { name: "growing dimensions",        p: [2, 4, 8, 16, 32, 64] },
+  vshape:  { name: "one thin matrix in the middle", p: [40, 20, 2, 30, 40] },
+  square:  { name: "all square (order irrelevant)", p: [10, 10, 10, 10, 10] },
+  long:    { name: "long chain (n = 8)",        p: [15, 4, 20, 6, 30, 5, 25, 7, 12] }
+};
+
+/* ---------- state -------------------------------------------------------- */
+
+let r = [10, 80, 50, 2], c = [80, 50, 2, 10], n = 4;
+let M = [], fillT = {}, clk = 0;
+let steps = [], phases = [], cur = 0;
+let mode = "bu";              /* "bu" | "memo" */
+let gran = 0;                 /* 0 = one step per cell, 1 = one step per guess */
+let traceFrom = null;         /* [i,j] the backtrace starts from; null = [0..n) */
+let selCell = null, selTree = null;
+let timer = null;
+let allTrees = [], allSel = -1;
+let preview = null;           /* {nodes, i, j, note} — a tree shown without stepping to it */
+let hoverNode = null;         /* [i,j] of the tree node under the pointer */
+
+const key = (i, j) => i + "," + j;
+
+/* ---------- the table ---------------------------------------------------- */
+
+function computeTable() {
+  n = r.length;
+  M = [];
+  for (let i = 0; i <= n; i++) M.push(new Array(n + 1).fill(0));
+  for (let len = 2; len <= n; len++)
+    for (let i = 0; i + len <= n; i++) {
+      const j = i + len;
+      M[i][j] = Infinity;
+      for (let k = i + 1; k < j; k++)
+        M[i][j] = Math.min(M[i][j], M[i][k] + M[k][j] + r[i] * r[k] * c[j - 1]);
+    }
+}
+const lastCost = (i, k, j) => r[i] * r[k] * c[j - 1];
+function bestKs(i, j) {
+  const out = [];
+  for (let k = i + 1; k < j; k++)
+    if (M[i][k] + M[k][j] + lastCost(i, k, j) === M[i][j]) out.push(k);
+  return out;
+}
+
+/* ---------- step plumbing ------------------------------------------------ */
+
+function mkPhase(name) { phases.push({ name: name, from: steps.length, to: steps.length }); }
+function add(o) {
+  o.ph = phases.length - 1;
+  o.hl = o.hl || []; o.hlp = o.hlp || [];
+  if (o.clock === undefined) o.clock = clk;
+  steps.push(o);
+  phases[phases.length - 1].to = steps.length - 1;
+}
+const cellsOf = (list, cls) => { const o = {}; list.forEach(x => o[key(x[0], x[1])] = cls); return o; };
+function setFill(i, j) { if (!fillT[key(i, j)]) fillT[key(i, j)] = ++clk; }
+
+/* the term as it is known so far: a node list from the backtrace */
+function termHTML(i, j, nodes, hotKey) {
+  const nd = nodes.find(x => x.i === i && x.j === j);
+  const hot = hotKey === key(i, j) ? " t-hot" : "";
+  if (j - i === 1) return '<span class="t-done' + hot + '">' + Mname(i) + "</span>";
+  if (!nd) return '<span class="t-pending' + hot + '">' + rng(i, j) + "</span>";
+  const inner = termHTML(i, nd.k, nodes, hotKey) + "\u00b7" + termHTML(nd.k, j, nodes, hotKey);
+  return '<span class="' + (hot ? "t-hot" : "") + '">(' + inner + ")</span>";
+}
+function termPlain(i, j, nodes) {
+  const nd = nodes.find(x => x.i === i && x.j === j);
+  if (j - i === 1) return Mname(i);
+  if (!nd) return rng(i, j);
+  return "(" + termPlain(i, nd.k, nodes) + "\u00b7" + termPlain(nd.k, j, nodes) + ")";
+}
+const stripOuter = s => (s.startsWith("(") && s.endsWith(")")) ? s.slice(1, -1) : s;
+
+/* the tree currently on screen — the step's own, or a previewed one */
+function shownNodes() {
+  const st = steps[cur] || {};
+  return preview ? preview.nodes : (st.nodes || []);
+}
+/* every range the subtree rooted at [i..j) consists of: the node itself and,
+   recursively, the two ranges its split produced */
+function subtreeRanges(nodes, i, j, acc) {
+  acc = acc || [];
+  acc.push([i, j]);
+  const nd = nodes.find(x => x.i === i && x.j === j);
+  if (nd && !nd.leaf && nd.k != null) {
+    subtreeRanges(nodes, i, nd.k, acc);
+    subtreeRanges(nodes, nd.k, j, acc);
+  }
+  return acc;
+}
+
+/* ---------- step generation: bottom-up (steps 5 and 6) ------------------- */
+
+function buildBU() {
+  if (traceFrom && (traceFrom[1] - traceFrom[0] < 1 || traceFrom[1] > n)) traceFrom = null;
+  const ti = traceFrom ? traceFrom[0] : 0, tj = traceFrom ? traceFrom[1] : n;
+
+  mkPhase("Base cases");
+  add({ txt: "<b>Subproblem " + rng("i", "j") + "</b>: the cheapest way to evaluate " +
+        "<code>" + Mname("i") + "\u00b7\u2026\u00b7" + Mname("j\u22121") + "</code>. The original problem " +
+        "is <code>" + rng(0, n) + "</code>, the top-right corner. Only <i>i</i> \u2264 <i>j</i> is used; " +
+        "the rest of the square stays empty.",
+        hl: ["rec_head"], hlp: ["bu_head"] });
+  const base = [];
+  for (let i = 0; i <= n; i++) for (let j = i; j <= Math.min(n, i + 1); j++) base.push([i, j]);
+  base.forEach(x => setFill(x[0], x[1]));
+  add({ write: base, cells: cellsOf(base, "cur"),
+        txt: "<b>Base cases</b>: a range with <code>j \u2212 i \u2264 1</code> is an empty product or a " +
+             "single matrix &mdash; nothing to multiply, so <code>m[i][j] = 0</code>.",
+        hl: ["rec_base"], hlp: ["bu_init"] });
+
+  for (let len = 2; len <= n; len++) {
+    mkPhase("\u2113 = " + len);
+    for (let i = 0; i + len <= n; i++) {
+      const j = i + len, ks = [];
+      for (let k = i + 1; k < j; k++) ks.push(k);
+      const winners = bestKs(i, j);
+
+      if (gran === 1) {
+        let best = Infinity;
+        ks.forEach(k => {
+          const q = M[i][k] + M[k][j] + lastCost(i, k, j);
+          best = Math.min(best, q);
+          add({ cell: [i, j], k: k, len: len,
+                cells: Object.assign(cellsOf([[i, k], [k, j]], "read"), cellsOf([[i, j]], "cur")),
+                arrows: [{ from: [i, k], to: [i, j], cls: "read" },
+                         { from: [k, j], to: [i, j], cls: "read" }],
+                split: { i: i, j: j, k: k },
+                txt: "<b>" + rng(i, j) + ", guess k = " + k + "</b>: last multiplication " +
+                     "<code>(" + Mname(i) + "\u2026" + Mname(k - 1) + ")\u00b7(" + Mname(k) + "\u2026" +
+                     Mname(j - 1) + ")</code>. " +
+                     '<span class="rec">m[' + i + "][" + k + "] + m[" + k + "][" + j + "] = " +
+                     M[i][k] + " + " + M[k][j] + "</span> plus " +
+                     '<span class="lastm">r[' + i + "]\u00b7r[" + k + "]\u00b7c[" + (j - 1) + "] = " +
+                     r[i] + "\u00b7" + r[k] + "\u00b7" + c[j - 1] + " = " + lastCost(i, k, j) + "</span>" +
+                     " \u21d2 <code>q = " + q + "</code>. Best so far: <code>" + num(best) + "</code>.",
+                hl: ["rec_min"], hlp: ["bu_k", "bu_q", "bu_min"] });
+        });
+      }
+
+      setFill(i, j);
+      add({ cell: [i, j], len: len, write: [[i, j]],
+            cells: Object.assign(cellsOf([].concat(...winners.map(k => [[i, k], [k, j]])), "best"),
+                                 cellsOf([[i, j]], "cur")),
+            arrows: [].concat(...winners.map(k => [{ from: [i, k], to: [i, j], cls: "best" },
+                                                   { from: [k, j], to: [i, j], cls: "best" }])),
+            split: winners.length ? { i: i, j: j, k: winners[0] } : null,
+            txt: "<b>m[" + i + "][" + j + "] = " + M[i][j] + "</b> over " + ks.length + " guess" +
+                 (ks.length === 1 ? "" : "es") + " (" +
+                 ks.map(k => "k=" + k + ": " + (M[i][k] + M[k][j] + lastCost(i, k, j))).join(", ") +
+                 "). Best: <b>k = " + winners.join(" and ") + "</b>." +
+                 (winners.length > 1 ? " <i>A tie &mdash; several parenthesizations are optimal.</i>" : ""),
+            hl: ["rec_min"], hlp: ["bu_j", "bu_inf", "bu_q", "bu_min"] });
+    }
+  }
+
+  /* --- backtrace -------------------------------------------------------- */
+  mkPhase("Backtrace");
+  const nodes = [];
+  add({ nodes: [], cells: cellsOf([[ti, tj]], "path"), cell: [ti, tj],
+        txt: "The table holds the cost only. <code>traceback</code> follows the recurrence a second time: " +
+             "for " + rng(ti, tj) + " it re-computes <code>q</code> for each <i>k</i> and stops at the " +
+             "first one that hits <code>m[" + ti + "][" + tj + "] = " + M[ti][tj] + "</code>. That <i>k</i> " +
+             "is the root of the evaluation tree.",
+        hl: ["rec_head"], hlp: ["tb_head", "tb_call"], trace: true });
+
+  (function tb(i, j, depth, path) {
+    const p2 = path.concat([[i, j]]);
+    if (j - i <= 1) {
+      if (j - i === 1) nodes.push({ i: i, j: j, k: null, d: depth, leaf: true });
+      add({ nodes: nodes.slice(), cell: [i, j], cells: cellsOf(p2, "path"),
+            txt: j - i === 1
+              ? "<code>" + rng(i, j) + "</code> is a single matrix: return <code>" + Mname(i) + "</code>."
+              : "<code>" + rng(i, j) + "</code> is the empty product \u2014 nothing to return.",
+            hl: ["rec_base"], hlp: ["tb_if", "tb_leaf"], trace: true, hotNode: key(i, j) });
+      return;
+    }
+    const winners = bestKs(i, j);
+    if (gran === 1) {
+      for (let k = i + 1; k < j; k++) {
+        const q = M[i][k] + M[k][j] + lastCost(i, k, j);
+        add({ nodes: nodes.slice(), cell: [i, j], cells: Object.assign(cellsOf(p2, "path"),
+                cellsOf([[i, k], [k, j]], "read")),
+              arrows: [{ from: [i, k], to: [i, j], cls: "read" },
+                       { from: [k, j], to: [i, j], cls: "read" }],
+              split: { i: i, j: j, k: k },
+              txt: "<code>" + rng(i, j) + "</code>: try k = " + k + " \u21d2 <code>q = " + q + "</code>" +
+                   (q === M[i][j] ? " <b>= m[" + i + "][" + j + "]</b> \u2014 that is the split."
+                                  : " \u2260 " + M[i][j] + ", keep looking."),
+              hl: ["rec_min"], hlp: ["tb_k", "tb_q", "tb_test"], trace: true });
+        if (q === M[i][j]) break;
+      }
+    }
+    const k = winners[0];
+    nodes.push({ i: i, j: j, k: k, d: depth });
+    add({ nodes: nodes.slice(), cell: [i, j], cells: Object.assign(cellsOf(p2, "path"),
+            cellsOf([[i, k], [k, j]], "best")),
+          arrows: [{ from: [i, k], to: [i, j], cls: "taken" },
+                   { from: [k, j], to: [i, j], cls: "taken" }],
+          split: { i: i, j: j, k: k }, hotNode: key(i, j),
+          txt: "<code>" + rng(i, j) + "</code> splits at <b>k = " + k + "</b>: last multiplication " +
+               "<code>(" + Mname(i) + "\u2026" + Mname(k - 1) + ")\u00b7(" + Mname(k) + "\u2026" +
+               Mname(j - 1) + ")</code>, an " + r[i] + "\u00d7" + r[k] + " by " + r[k] + "\u00d7" +
+               c[j - 1] + " product costing <b>" + lastCost(i, k, j) + "</b>." +
+               (winners.length > 1 ? " <i>(k = " + winners.join(", ") + " all tie; the loop returns the " +
+                                     "smallest.)</i>" : ""),
+          hl: ["rec_min"], hlp: ["tb_k", "tb_q", "tb_test", "tb_ret"], trace: true });
+    tb(i, k, depth + 1, p2);
+    tb(k, j, depth + 1, p2);
+  })(ti, tj, 0, []);
+
+  const whole = (ti === 0 && tj === n);
+  add({ nodes: nodes.slice(), cells: cellsOf([[ti, tj]], "path"), trace: true, done: true,
+        txt: "Done. The tree below is an optimal evaluation order for " + rng(ti, tj) + "; the leaves are " +
+             "the matrices, every internal node one multiplication, and the node costs add up to " +
+             "<code>m[" + ti + "][" + tj + "]</code>.",
+        ans: stripOuter(termPlain(ti, tj, nodes)) + "  \u2014  " + M[ti][tj] + " multiplications",
+        hl: ["rec_head"], hlp: ["tb_ret"] });
+}
+
+/* ---------- step generation: memoized recursion (step 4) ----------------- */
+
+function buildMemo() {
+  const stack = [];
+  let rootK = null;
+
+  mkPhase("Call " + rng(0, n));
+  add({ txt: "Top-down instead: <code>cachedTotalMults(" + rng(0, n) + ")</code>. Every call first asks " +
+             "the cache; only on a miss does it do any work. The table fills in depth-first order.",
+        hl: ["rec_head"], hlp: ["ct_head"], stack: [] });
+
+  function cached(i, j) {
+    stack.push([i, j]);
+    const known = !!fillT[key(i, j)];
+    add({ cell: [i, j], cells: cellsOf([[i, j]], known ? "hit" : "cur"), stack: stack.slice(),
+          txt: "<code>cachedTotalMults(" + rng(i, j) + ")</code>: " +
+               (known ? "<b>cache hit</b> \u2014 <code>m[" + i + "][" + j + "] = " + M[i][j] +
+                        "</code> is already known, return it and explore nothing."
+                      : "<code>m[" + i + "][" + j + "]</code> is still <code>NULL</code>, so compute it."),
+          hl: ["rec_head"], hlp: ["ct_if"], hit: known });
+    if (known) { stack.pop(); return; }
+    total(i, j);
+    setFill(i, j);
+    add({ cell: [i, j], write: [[i, j]], cells: cellsOf([[i, j]], "cur"), stack: stack.slice(),
+          txt: "Store and return <code>m[" + i + "][" + j + "] = " + M[i][j] + "</code>.",
+          hl: ["rec_head"], hlp: ["ct_set", "ct_ret"] });
+    stack.pop();
+  }
+
+  function total(i, j) {
+    if (j - i <= 1) {
+      add({ cell: [i, j], cells: cellsOf([[i, j]], "cur"), stack: stack.slice(),
+            txt: "<code>" + rng(i, j) + "</code> has <code>j \u2212 i \u2264 1</code>: base case, " +
+                 "return <code>0</code>.",
+            hl: ["rec_base"], hlp: ["tm_if", "tm_ret0"] });
+      return;
+    }
+    let best = Infinity;
+    for (let k = i + 1; k < j; k++) {
+      if (stack.length === 1) { rootK = k; mkPhase("root k = " + k); }
+      if (gran === 1) {
+        add({ cell: [i, j], cells: cellsOf([[i, j]], "cur"), stack: stack.slice(), split: { i: i, j: j, k: k },
+              txt: "<code>" + rng(i, j) + "</code>, guess <b>k = " + k + "</b>: recurse on <code>" +
+                   rng(i, k) + "</code> and <code>" + rng(k, j) + "</code>.",
+              hl: ["rec_min"], hlp: ["tm_k", "tm_ml", "tm_mr"] });
+      }
+      cached(i, k);
+      cached(k, j);
+      const q = M[i][k] + M[k][j] + lastCost(i, k, j);
+      best = Math.min(best, q);
+      add({ cell: [i, j], k: k, stack: stack.slice(), split: { i: i, j: j, k: k },
+            cells: Object.assign(cellsOf([[i, k], [k, j]], "read"), cellsOf([[i, j]], "cur")),
+            arrows: [{ from: [i, k], to: [i, j], cls: "read" },
+                     { from: [k, j], to: [i, j], cls: "read" }],
+            txt: "<code>" + rng(i, j) + "</code>, k = " + k + ": " +
+                 '<span class="rec">m\u2097 + m\u1d63 = ' + M[i][k] + " + " + M[k][j] + "</span> + " +
+                 '<span class="lastm">' + r[i] + "\u00b7" + r[k] + "\u00b7" + c[j - 1] + " = " +
+                 lastCost(i, k, j) + "</span> \u21d2 <code>m = " + q + "</code>; " +
+                 "best = <code>" + num(best) + "</code>.",
+            hl: ["rec_min"], hlp: ["tm_m", "tm_min"] });
+    }
+    add({ cell: [i, j], cells: cellsOf([[i, j]], "cur"), stack: stack.slice(),
+          txt: "All guesses for <code>" + rng(i, j) + "</code> tried: return <code>best = " +
+               M[i][j] + "</code>.",
+          hl: ["rec_min"], hlp: ["tm_ret"] });
+  }
+
+  cached(0, n);
+  mkPhase("Result");
+  add({ txt: "Every subproblem was computed at most once: \u0398(n\u00b2) of them, each costing O(n) " +
+             "outside the recursion, so O(n\u00b3) in total \u2014 the same table the bottom-up loop " +
+             "produces, just reached depth-first.",
+        ans: "m[0][" + n + "] = " + M[0][n] + " multiplications",
+        hl: ["rec_head"], hlp: ["ct_ret"], stack: [] });
+}
+
+function build() {
+  computeTable();
+  steps = []; phases = []; fillT = {}; clk = 0; cur = 0; hoverNode = null;
+  if (mode === "bu") buildBU(); else buildMemo();
+}
+
+/* ---------- geometry: the chain ------------------------------------------ */
+
+const CH_W = 620, CH_H = 150;
+let chainHit = [];
+
+function drawChain() {
+  const st = steps[cur] || {};
+  const svg = el("chainSvg");
+  const gap = 22, pad = 14, SLOT = 52;
+  const sumC = c.reduce((a, b) => a + b, 0), maxR = Math.max.apply(null, r);
+  const s = Math.min((CH_W - (n - 1) * gap - 2 * pad) / Math.max(1, sumC), (CH_H - 60) / maxR);
+  const mid = 52;
+  const out = [];
+  chainHit = [];
+
+  let sp = st.split || null;
+  if (hoverNode) {                       /* hovering a tree node overrides the step's own range */
+    const nd = shownNodes().find(x => x.i === hoverNode[0] && x.j === hoverNode[1]);
+    sp = (nd && !nd.leaf && nd.k != null) ? { i: nd.i, j: nd.j, k: nd.k } : null;
+  }
+  const lo = hoverNode ? hoverNode[0] : (sp ? sp.i : (st.cell ? st.cell[0] : null));
+  const hi = hoverNode ? hoverNode[1] : (sp ? sp.j : (st.cell ? st.cell[1] : null));
+
+  /* a matrix may be drawn only a few pixels wide (that is the point of the
+     picture), but its two labels are not -- so every matrix gets a slot at
+     least SLOT wide and is centred in it */
+  const xs = [];
+  let x = pad;
+  for (let i = 0; i < n; i++) {
+    const w = Math.max(3, c[i] * s), slot = Math.max(w, SLOT);
+    xs.push([x + (slot - w) / 2, w, x, slot]);
+    x += slot + gap;
+  }
+  const W = Math.max(CH_W, x - gap + pad), H = CH_H + 34;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+  for (let i = 0; i < n; i++) {
+    const bx = xs[i][0], w = xs[i][1], h = Math.max(3, r[i] * s);
+    let cls = "mat";
+    if (lo !== null && (i < lo || i >= hi)) cls += " out";
+    else if (sp) cls += (i < sp.k ? " left" : " right");
+    else if (lo !== null) cls += " inrange";
+    out.push('<rect class="' + cls + '" x="' + bx + '" y="' + (mid - h / 2) + '" width="' + w +
+             '" height="' + h + '" rx="2"/>');
+    const cxm = xs[i][2] + xs[i][3] / 2;
+    out.push('<text class="matlab" x="' + cxm + '" y="' + (mid + maxR * s / 2 + 22) + '">' +
+             Msvg(i, 10) + "</text>");
+    out.push('<text class="matdim" x="' + cxm + '" y="' + (mid + maxR * s / 2 + 37) + '">' +
+             r[i] + "\u00d7" + c[i] + "</text>");
+    chainHit.push({ i: i, x: xs[i][2], w: xs[i][3], y: mid - h / 2, h: h });
+    if (i < n - 1)
+      out.push('<text class="dot" x="' + (xs[i][2] + xs[i][3] + gap / 2) + '" y="' + (mid + 7) + '">\u00b7</text>');
+  }
+
+  /* the brackets: the current range, split into its two factors at k */
+  const yB = mid + maxR * s / 2 + 50;
+  const brk = (a, b, cls, lab) => {
+    if (a >= b) return;
+    const x1 = xs[a][2] - 4, x2 = xs[b - 1][2] + xs[b - 1][3] + 4;
+    out.push('<path class="brk ' + cls + '" d="M' + x1 + " " + (yB - 6) + "V" + yB + "H" + x2 + "V" +
+             (yB - 6) + '"/>');
+    out.push('<text class="brklab ' + cls + '" x="' + ((x1 + x2) / 2) + '" y="' + (yB + 15) + '">' +
+             lab + "</text>");
+  };
+  if (sp) {
+    brk(sp.i, sp.k, "left", "m[" + sp.i + "][" + sp.k + "] = " + M[sp.i][sp.k]);
+    brk(sp.k, sp.j, "right", "m[" + sp.k + "][" + sp.j + "] = " + M[sp.k][sp.j]);
+  } else if (lo !== null && hi !== null && hi - lo >= 1) {
+    brk(lo, hi, "whole", rng(lo, hi));
+  }
+
+  svg.innerHTML = out.join("");
+  el("chainMeta").textContent = "n = " + n + " · r = [" + r.join(",") + "] · c = [" + c.join(",") + "]";
+}
+
+/* ---------- geometry: the table ------------------------------------------ */
+
+let CW = 62, CHt = 40;
+const X0 = 54, Y0 = 44;
+const cxOf = j => X0 + j * CW + CW / 2;
+const cyOf = i => Y0 + i * CHt + CHt / 2;
+
+function drawTable() {
+  const st = steps[cur] || {};
+  const svg = el("tabSvg");
+  CW = Math.max(46, Math.min(72, Math.round(760 / (n + 1))));
+  const W = X0 + (n + 1) * CW + 20, H = Y0 + (n + 1) * CHt + 20;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const cells = Object.assign({}, st.cells || {});
+  if (hoverNode) {
+    const nds = shownNodes();
+    subtreeRanges(nds, hoverNode[0], hoverNode[1]).forEach(x => cells[key(x[0], x[1])] = "hovsub");
+    cells[key(hoverNode[0], hoverNode[1])] = "hovroot";
+  }
+  const writes = st.write || [];
+  const wrote = {}; writes.forEach(x => wrote[key(x[0], x[1])] = 1);
+  const out = [];
+
+  out.push('<defs>');
+  [["read", "var(--wi-examine)"], ["best", "var(--wi-relax)"], ["taken", "var(--wi-accent)"]].forEach(p => {
+    out.push('<marker id="mh-' + p[0] + '" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" ' +
+             'markerHeight="5.5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="' + p[1] + '"/></marker>');
+  });
+  out.push("</defs>");
+
+  out.push('<text class="hdrname" x="8" y="' + (Y0 - 22) + '">j \u2192</text>');
+  out.push('<text class="hdrname" x="8" y="' + (Y0 - 6) + '">i \u2193</text>');
+  for (let j = 0; j <= n; j++)
+    out.push('<text class="hdrix' + (st.cell && st.cell[1] === j ? " hot" : "") + '" x="' + cxOf(j) +
+             '" y="' + (Y0 - 12) + '">' + j + "</text>");
+  for (let i = 0; i <= n; i++)
+    out.push('<text class="hdrix' + (st.cell && st.cell[0] === i ? " hot" : "") + '" x="' + (X0 - 22) +
+             '" y="' + cyOf(i) + '">' + i + "</text>");
+
+  for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
+    const x = X0 + j * CW, y = Y0 + i * CHt, kk = key(i, j);
+    if (j < i) {
+      out.push('<rect class="cellbg unused" x="' + x + '" y="' + y + '" width="' + CW + '" height="' + CHt + '"/>');
+      out.push('<text class="cellval dash" x="' + cxOf(j) + '" y="' + cyOf(i) + '">\u2014</text>');
+      continue;
+    }
+    const shown = (fillT[kk] || Infinity) <= (st.clock === undefined ? clk : st.clock);
+    let cls = "cellbg";
+    if (!shown) cls += " empty"; else if (j - i <= 1) cls += " base";
+    if (cells[kk]) cls += " " + cells[kk];
+    if (selCell && selCell[0] === i && selCell[1] === j) cls += " sel";
+    out.push('<rect class="' + cls + '" x="' + x + '" y="' + y + '" width="' + CW + '" height="' + CHt +
+             '" rx="3"/>');
+    if (shown) {
+      const big = (cells[kk] === "cur" || cells[kk] === "path" || cells[kk] === "hovroot") ? " big" : "";
+      out.push('<text class="cellval' + (wrote[kk] ? " pop" : "") + big + '" x="' + cxOf(j) + '" y="' +
+               cyOf(i) + '">' + M[i][j] + "</text>");
+    }
+    out.push('<rect class="hit" data-i="' + i + '" data-j="' + j + '" x="' + x + '" y="' + y +
+             '" width="' + CW + '" height="' + CHt + '"/>');
+  }
+
+  /* m[i][k] is read along row i, m[k][j] up column j -- both would run straight
+     through the digits of the cells in between, so shift each off-centre */
+  (st.arrows || []).forEach(a => {
+    const horiz = a.from[0] === a.to[0];
+    const off = horiz ? -CHt * 0.30 : -CW * 0.32;
+    const x1 = cxOf(a.from[1]) + (horiz ? 0 : off), y1 = cyOf(a.from[0]) + (horiz ? off : 0);
+    const x2 = cxOf(a.to[1]) + (horiz ? 0 : off), y2 = cyOf(a.to[0]) + (horiz ? off : 0);
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+    const pad1 = horiz ? CW * 0.34 : CHt * 0.34, pad2 = horiz ? CW * 0.36 : CHt * 0.38;
+    const a1 = { x: x1 + (dx / L) * pad1, y: y1 + (dy / L) * pad1 };
+    const a2 = { x: x2 - (dx / L) * pad2, y: y2 - (dy / L) * pad2 };
+    const len = Math.hypot(a2.x - a1.x, a2.y - a1.y);
+    out.push('<line class="arr ' + a.cls + ' drawin" style="--len:' + len.toFixed(1) + '" x1="' + a1.x +
+             '" y1="' + a1.y + '" x2="' + a2.x + '" y2="' + a2.y + '" marker-end="url(#mh-' + a.cls + ')"/>');
+  });
+
+  svg.innerHTML = out.join("");
+  el("tabMeta").textContent = "0 \u2264 i \u2264 j \u2264 " + n + " · m[0][" + n + "] = " + M[0][n];
+}
+
+/* ---------- geometry: the evaluation tree -------------------------------- */
+
+let treeHit = [];
+
+function drawTree() {
+  const st = steps[cur] || {};
+  const svg = el("treeSvg");
+  const nodes = preview ? preview.nodes : (st.nodes || []);
+  const LW = Math.max(58, Math.min(92, Math.round(700 / Math.max(1, n))));
+  const DY = 70, TOP = 30, pad = 16;
+  const W = Math.max(320, pad * 2 + n * LW), maxD = nodes.reduce((a, x) => Math.max(a, x.d), 0);
+  treeHit = [];
+
+  if (!nodes.length) {
+    svg.setAttribute("width", W); svg.setAttribute("height", 46);
+    svg.setAttribute("viewBox", "0 0 " + W + " 46");
+    svg.innerHTML = '<text class="hdrname" x="' + pad + '" y="28">' +
+      (mode === "bu" ? "the tree is built during the backtrace"
+                     : "click a cell for its optimal tree, or pick a row in \u201call parenthesizations\u201d") +
+      "</text>";
+    el("treeMeta").textContent = "";
+    return;
+  }
+
+  /* Every node is drawn as the matrix it produces. A linear scale would be
+     useless here -- with dimensions from 2 to 80 the small results collapse to
+     dots -- so the side lengths are compressed by a square root. Both sides use
+     the same function and the same maximum, so shapes stay comparable and the
+     ordering is honest; the exact ratio is in the label and the tooltip. */
+  const SZ = 40, DY2 = 76;
+  const mx = Math.max(Math.max.apply(null, c), Math.max.apply(null, r));
+  const side = v => Math.max(6, SZ * Math.sqrt(v / mx));
+  const rowsOf = nd => r[nd.i];
+  const colsOf = nd => nd.leaf ? c[nd.i] : c[nd.j - 1];
+  const boxOf = nd => ({ w: side(colsOf(nd)), h: side(rowsOf(nd)) });
+
+  const H = TOP + maxD * DY2 + SZ / 2 + 40;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+  const leafX = i => pad + i * LW + LW / 2;
+  const xOf = nd => (leafX(nd.i) + leafX(nd.j - 1)) / 2;
+  const yOf = nd => TOP + nd.d * DY2;
+  const find = (i, j) => nodes.find(x => x.i === i && x.j === j);
+  const out = [];
+
+  /* edges run from rectangle to rectangle; the labels sit on a small pill of
+     background colour, so a passing edge never runs through a number */
+  nodes.forEach(nd => {
+    if (nd.leaf) return;
+    const b = boxOf(nd);
+    [[nd.i, nd.k], [nd.k, nd.j]].forEach(ch => {
+      const cn = find(ch[0], ch[1]);
+      if (!cn) return;
+      const cb = boxOf(cn);
+      out.push('<path class="tedge" d="M' + xOf(nd) + " " + (yOf(nd) + b.h / 2 + 2) + "L" +
+               xOf(cn) + " " + (yOf(cn) - cb.h / 2 - 3) + '"/>');
+    });
+  });
+
+  const pill = (x, y, w, inner) =>
+    '<rect class="tpill" x="' + (x - w / 2) + '" y="' + (y - 7.5) + '" width="' + w +
+    '" height="15" rx="3"/>' + inner;
+
+  nodes.forEach(nd => {
+    const x = xOf(nd), y = yOf(nd), b = boxOf(nd);
+    const hot = st.hotNode === key(nd.i, nd.j) ? " hot" : "";
+    out.push('<rect class="tmat' + (nd.leaf ? " leaf" : " res") + hot + ' nodein" x="' + (x - b.w / 2) +
+             '" y="' + (y - b.h / 2) + '" width="' + b.w + '" height="' + b.h + '" rx="2"/>');
+    const y1 = y + b.h / 2 + 13, y2 = y + b.h / 2 + 26;
+    if (nd.leaf)
+      out.push(pill(x, y1, 26, '<text class="tlab" x="' + x + '" y="' + y1 + '">' + Msvg(nd.i, 10) + "</text>"));
+    else {
+      const ct = String(lastCost(nd.i, nd.k, nd.j));
+      out.push(pill(x, y1, ct.length * 7 + 10,
+               '<text class="tcost" x="' + x + '" y="' + y1 + '">' + ct + "</text>"));
+    }
+    const dm = rowsOf(nd) + "\u00d7" + colsOf(nd);
+    out.push(pill(x, y2, dm.length * 5.6 + 8,
+             '<text class="tdim" x="' + x + '" y="' + y2 + '">' + dm + "</text>"));
+    const hw = Math.max(b.w, 44);
+    treeHit.push({ nd: nd });
+    out.push('<rect class="hit" data-ni="' + nd.i + '" data-nj="' + nd.j + '" x="' + (x - hw / 2) +
+             '" y="' + (y - b.h / 2 - 3) + '" width="' + hw + '" height="' + (b.h + 36) + '"/>');
+  });
+
+  svg.innerHTML = out.join("");
+  const inner = nodes.filter(x => !x.leaf);
+  const tot = inner.reduce((a, x) => a + lastCost(x.i, x.k, x.j), 0);
+  el("treeMeta").textContent = inner.length + " multiplications \u00b7 " + tot + " total" +
+                               (preview ? " \u00b7 preview" : "");
+}
+
+/* ---------- side panels --------------------------------------------------- */
+
+function renderTerm() {
+  const st = steps[cur] || {};
+  const nodes = preview ? preview.nodes : (st.nodes || null);
+  const box = el("termBox");
+  if (!nodes) {
+    box.innerHTML = '<div class="placeholder">' +
+      (mode === "memo"
+        ? "This mode computes the cost only. Click any cell of the table for the optimal parenthesization " +
+          "of that range \u2014 or run the other mode, where the backtrace derives it."
+        : "Built during the backtrace, from the top down.") + "</div>";
+    el("termMeta").textContent = "";
+    return;
+  }
+  const ti = preview ? preview.i : (traceFrom ? traceFrom[0] : 0);
+  const tj = preview ? preview.j : (traceFrom ? traceFrom[1] : n);
+  const done = nodes.filter(x => !x.leaf).length === (tj - ti - 1);
+  box.innerHTML = '<div class="' + (done ? "clickterm" : "") + '" id="termClick" ' +
+                  (done ? 'title="draw this as the evaluation tree"' : "") + ">" +
+                  termHTML(ti, tj, nodes, st.hotNode) + "</div>";
+  if (done) el("termClick").addEventListener("click", () => {
+    preview = { nodes: nodes.slice(), i: ti, j: tj }; allSel = -1;
+    drawTree(); renderTerm();
+  });
+  el("termMeta").textContent = done ? M[ti][tj] + " multiplications" +
+                                      (preview ? " \u00b7 " + rng(ti, tj) : "")
+                                    : "under construction";
+}
+
+function renderStack() {
+  const st = steps[cur] || {};
+  el("stackBox").style.display = mode === "memo" ? "" : "none";
+  if (mode !== "memo") return;
+  const s = st.stack || [];
+  if (!s.length) { el("stackBody").innerHTML = '<div class="placeholder">empty</div>';
+                   el("stackMeta").textContent = ""; return; }
+  el("stackBody").innerHTML = '<ul class="stack">' + s.map((x, d) =>
+    '<li class="' + (d === s.length - 1 ? "top" : "") + '">' + "  ".repeat(d) +
+    rng(x[0], x[1]) + '<span class="sz">  ' + (x[1] - x[0]) + " matrices</span></li>").join("") + "</ul>";
+  el("stackMeta").textContent = "depth " + s.length;
+}
+
+/* ---------- pseudocode ---------------------------------------------------- */
+
+const K = s => '<span class="kw">' + s + "</span>";
+const C = s => '<span class="cm">' + s + "</span>";
+
+const REC = [
+  { k: "rec_head", t: "m(i,j) =" },
+  { k: "rec_base", t: "    0                                                        if j\u2212i \u2264 1" },
+  { k: "rec_min",  t: "    min { m(i,k) + m(k,j) + r[i]\u00b7r[k]\u00b7c[j\u22121] : k \u2208 [i+1..j) }     otherwise" }
+];
+const BU = [
+  { k: "bu_head", t: K("procedure") + " totalMultsBottomUp(r[0..n), c[0..n)):" },
+  { k: "bu_init", t: "    m[0..n][0..n] := 0 " + C("// initialize to 0") },
+  { k: "bu_l",    t: "    " + K("for") + " \u2113 = 2,3,\u2026,n " + C("// iterate over subproblems \u2026") },
+  { k: "bu_i",    t: "        " + K("for") + " i = 0,1\u2026,n\u2212\u2113 " + C("// \u2026 in topological order") },
+  { k: "bu_j",    t: "            j := i+\u2113" },
+  { k: "bu_inf",  t: "            m[i][j] := +\u221e" },
+  { k: "bu_k",    t: "            " + K("for") + " k := i+1,\u2026,j\u22121" },
+  { k: "bu_q",    t: "                q := m[i][k] + m[k][j] + r[i]\u00b7r[k]\u00b7c[j\u22121]" },
+  { k: "bu_min",  t: "                m[i][j] := min{m[i][j], q}" },
+  { k: "bu_ret",  t: "    " + K("return") + " m[0..n][0..n]" }
+];
+const TB = [
+  { k: "tb_head", t: K("procedure") + " matrixChainMult(r[0..n), c[0..n)):" },
+  { k: "tb_head", t: "    m[0..n][0..n] := totalMultsBottomUp(r[0..n), c[0..n))" },
+  { k: "tb_call", t: "    " + K("return") + " traceback([0..n))" },
+  { k: "tb_sep",  t: "" },
+  { k: "tb_if",   t: K("procedure") + " traceback([i..j)):" },
+  { k: "tb_if",   t: "    " + K("if") + " j\u2212i = 1" },
+  { k: "tb_leaf", t: "        " + K("return") + " M\u1d62" },
+  { k: "tb_else", t: "    " + K("else") },
+  { k: "tb_k",    t: "        " + K("for") + " k := i+1,\u2026,j\u22121" },
+  { k: "tb_q",    t: "            q := m[i][k] + m[k][j] + r[i]\u00b7r[k]\u00b7c[j\u22121]" },
+  { k: "tb_test", t: "            " + K("if") + " m[i][j] = q" },
+  { k: "tb_ret",  t: "                " + K("return") + " (traceback([i..k)))\u00b7(traceback([k..j)))" }
+];
+const TM = [
+  { k: "tm_head", t: K("procedure") + " totalMults(r[i..j), c[i..j)):" },
+  { k: "tm_if",   t: "    " + K("if") + " j\u2212i \u2264 1" },
+  { k: "tm_ret0", t: "        " + K("return") + " 0" },
+  { k: "tm_else", t: "    " + K("else") },
+  { k: "tm_best", t: "        best := +\u221e" },
+  { k: "tm_k",    t: "        " + K("for") + " k := i+1,\u2026,j\u22121" },
+  { k: "tm_ml",   t: "            m\u2097 := cachedTotalMults(r[i..k), c[i..k))" },
+  { k: "tm_mr",   t: "            m\u1d63 := cachedTotalMults(r[k..j), c[k..j))" },
+  { k: "tm_m",    t: "            m := m\u2097 + m\u1d63 + r[i]\u00b7r[k]\u00b7c[j\u22121]" },
+  { k: "tm_min",  t: "            best := min{best, m}" },
+  { k: "tm_end",  t: "        " + K("end for") },
+  { k: "tm_ret",  t: "        " + K("return") + " best" }
+];
+const CT = [
+  { k: "ct_head", t: K("procedure") + " cachedTotalMults(r[i..j), c[i..j)):" },
+  { k: "ct_cmt",  t: "    " + C("// m[0..n][0..n] initialized to NULL at start") },
+  { k: "ct_if",   t: "    " + K("if") + " m[i][j] = NULL" },
+  { k: "ct_set",  t: "        m[i][j] := totalMults(r[i..j), c[i..j))" },
+  { k: "ct_ret",  t: "    " + K("return") + " m[i][j]" }
+];
+
+function renderCode() {
+  const st = steps[cur] || {};
+  const hl = new Set(st.hl || []), hlp = new Set(st.hlp || []);
+  const block = (label, lines, numbered, act, start) => {
+    const o = ['<div class="sublabel">' + label + "</div>"];
+    lines.forEach((l, k) => {
+      o.push('<div class="cline' + (act.has(l.k) ? " on" : "") + '">' +
+             (numbered && l.t !== "" ? '<span class="ln">' + (start + k) + "</span>" : '<span class="ln"></span>') +
+             "<span>" + l.t + "</span></div>");
+    });
+    return o.join("");
+  };
+  el("codeBody").innerHTML =
+    block("Step 3 \u00b7 recurrence", REC, false, hl, 1) +
+    (mode === "memo"
+      ? block("Step 4 \u00b7 memoization", TM, true, hlp, 1) + block("", CT, true, hlp, TM.length + 1)
+      : (st.trace ? block("Step 6 \u00b7 backtracing", TB, true, hlp, 1)
+                  : block("Step 5 \u00b7 table filling", BU, true, hlp, 1)));
+  el("codeNote").innerHTML = mode === "memo"
+    ? "Each subproblem is solved at most once, so the cost is (number of subproblems) \u00d7 (work per " +
+      "subproblem) = \u0398(n\u00b2) \u00b7 O(n) = O(n\u00b3). Without the cache the same recursion would " +
+      "explore one branch per parenthesization \u2014 exponentially many."
+    : st.trace
+    ? "<code>traceback</code> re-derives the split instead of storing it: it recomputes <code>q</code> for " +
+      "each <i>k</i> until it matches <code>m[i][j]</code>. Remembering the best <i>k</i> during step 5 " +
+      "would save that second pass \u2014 at the price of a second table."
+    : "The loop order is the topological order of the subproblem DAG: by increasing length " +
+      "<code>\u2113 = j\u2212i</code>. When cell (i,j) is reached, <code>m[i][k]</code> and " +
+      "<code>m[k][j]</code> are shorter ranges, so they are already final.";
+}
+
+/* ---------- all parenthesizations ---------------------------------------- */
+
+function enumerate(i, j) {
+  if (j - i === 1) return [{ nodes: [{ i: i, j: j, k: null, d: 0, leaf: true }], cost: 0, seq: [] }];
+  const out = [];
+  for (let k = i + 1; k < j; k++)
+    enumerate(i, k).forEach(L => enumerate(k, j).forEach(R => {
+      const nodes = [{ i: i, j: j, k: k, d: 0 }]
+        .concat(L.nodes.map(x => Object.assign({}, x, { d: x.d + 1 })))
+        .concat(R.nodes.map(x => Object.assign({}, x, { d: x.d + 1 })));
+      const last = lastCost(i, k, j);
+      out.push({ nodes: nodes, cost: L.cost + R.cost + last, seq: L.seq.concat(R.seq, [last]) });
+    }));
+  return out;
+}
+function greedyTerm() {                     /* repeatedly do the cheapest adjacent product */
+  let parts = [];
+  for (let i = 0; i < n; i++) parts.push({ i: i, j: i + 1, k: null, d: 0, leaf: true });
+  const nodes = parts.slice();
+  while (parts.length > 1) {
+    let bi = 0, bc = Infinity;
+    for (let t = 0; t + 1 < parts.length; t++) {
+      const a = parts[t], b = parts[t + 1], q = lastCost(a.i, b.i, b.j);
+      if (q < bc) { bc = q; bi = t; }
+    }
+    const a = parts[bi], b = parts[bi + 1];
+    const nd = { i: a.i, j: b.j, k: b.i, d: 0 };
+    nodes.push(nd);
+    parts.splice(bi, 2, nd);
+  }
+  return termPlain(0, n, nodes);
+}
+function renderAll() {
+  const body = el("allBody");
+  const catalan = (function (mm) { let x = 1; for (let t = 0; t < mm; t++) x = x * 2 * (2 * t + 1) / (t + 2); return Math.round(x); })(n - 1);
+  if (n > 8) {
+    body.innerHTML = '<div class="hint">A chain of ' + n + " matrices has C<sub>" + (n - 1) + "</sub> = " +
+      catalan.toLocaleString("en-US") + " parenthesizations \u2014 too many to list. " +
+      "C<sub>m</sub> ~ 4<sup>m</sup>/(\u221a\u03c0 m<sup>3/2</sup>), which is why brute force is hopeless " +
+      "and the O(n\u00b3) table is not.</div>";
+    return;
+  }
+  allTrees = enumerate(0, n);
+  const best = Math.min.apply(null, allTrees.map(t => t.cost));
+  const worst = Math.max.apply(null, allTrees.map(t => t.cost));
+  const grd = stripOuter(greedyTerm());
+  const rows = allTrees.map((t, idx) => {
+    const term = stripOuter(termPlain(0, n, t.nodes));
+    const isBest = t.cost === best, isGrd = term === grd;
+    const pct = worst > 0 ? (t.cost / worst) * 100 : 0;
+    return '<tr data-idx="' + idx + '" class="' + (isBest ? "best " : "") + (isGrd ? "grd " : "") +
+      (allSel === idx ? "sel" : "") + '">' +
+      "<td>" + term +
+      (isBest ? '<span class="badge opt">optimal</span>' : "") +
+      (isGrd ? '<span class="badge grd">greedy</span>' : "") + "</td>" +
+      '<td class="sum">' + t.seq.join(" + ") + "</td>" +
+      '<td class="num">' + t.cost.toLocaleString("en-US") + "</td>" +
+      '<td class="bar"><span class="barwrap"><span class="barfill" style="width:' + pct.toFixed(1) +
+      '%"></span></span></td></tr>';
+  });
+  const grdRow = allTrees.find(t => stripOuter(termPlain(0, n, t.nodes)) === grd);
+  body.innerHTML =
+    '<div class="hint" style="margin:6px 0 10px">A parenthesization is a binary tree with ' + n +
+    " leaves, and there are C<sub>" + (n - 1) + "</sub> = " + catalan +
+    " of them. Click a row to draw its tree above. The bars are relative to the worst order, " +
+    "so the spread is the whole point: here the best is " +
+    (best > 0 ? (worst / best).toFixed(1) + "\u00d7 cheaper than the worst" : "free") +
+    (grdRow && grdRow.cost !== best
+      ? ", and <b>greedy</b> (always do the cheapest available product next) lands at " +
+        grdRow.cost.toLocaleString("en-US") + "."
+      : ".") + "</div>" +
+    '<table class="alltab"><tr><th>Parenthesization</th><th>Cost (integer multiplications)</th>' +
+    '<th class="num">Total</th><th></th></tr>' + rows.join("") + "</table>";
+  [].forEach.call(body.querySelectorAll("tr[data-idx]"), tr => {
+    tr.addEventListener("click", () => {
+      allSel = Number(tr.dataset.idx);
+      preview = { nodes: allTrees[allSel].nodes, i: 0, j: n };
+      renderAll(); drawTree(); renderTerm();
+    });
+  });
+}
+
+/* ---------- transport / render ------------------------------------------- */
+
+function renderPhases() {
+  const bar = el("phaseBar");
+  bar.innerHTML = "";
+  phases.forEach(p => {
+    const span = p.to - p.from + 1;
+    const pct = cur > p.to ? 100 : cur < p.from ? 0 : ((cur - p.from + 1) / span) * 100;
+    const b = document.createElement("button");
+    b.className = "phasebtn" + (cur >= p.from && cur <= p.to ? " on" : (cur > p.to ? " past" : ""));
+    b.style.flexGrow = String(Math.max(1, span));
+    b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' + pct.toFixed(2) +
+                  '%"></span><span class="lab">' + esc(p.name) + "</span>";
+    b.title = p.name + " \u2014 steps " + (p.from + 1) + "\u2013" + (p.to + 1);
+    b.addEventListener("click", () => { stopPlay(); cur = p.from; render(); });
+    bar.appendChild(b);
+  });
+}
+
+function render() {
+  const st = steps[cur] || {};
+  if (st.nodes || st.trace) { allSel = -1; preview = null; }
+  drawChain(); drawTable(); drawTree(); renderTerm(); renderStack(); renderPhases();
+  if (window.innerWidth > 760) renderCode();
+  el("statusBox").innerHTML = (st.txt || "") + (st.ans ? '<b class="ans">' + st.ans + "</b>" : "");
+  el("phaseName").textContent = phases[st.ph] ? phases[st.ph].name : "";
+  el("scrubber").max = String(Math.max(0, steps.length - 1));
+  el("scrubber").value = String(cur);
+  el("stepNo").textContent = steps.length ? (cur + 1) + " / " + steps.length : "\u2014 / \u2014";
+  el("backBtn").disabled = cur <= 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+  const whole = !traceFrom || (traceFrom[0] === 0 && traceFrom[1] === n);
+  el("wholeBtn").style.display = (whole || mode !== "bu") ? "none" : "";
+  el("traceNote").innerHTML = mode !== "bu"
+    ? "Top-down with a cache; the table fills in DFS order."
+    : whole
+    ? "Backtracing from <b>" + rng(0, n) + "</b> \u2014 the whole chain."
+    : "Backtracing from <b>" + rng(traceFrom[0], traceFrom[1]) + "</b>: the best order for <code>" +
+      Mname(traceFrom[0]) + "\u2026" + Mname(traceFrom[1] - 1) + "</code> alone.";
+}
+
+const PLAY = "\u25B6\uFE0E", PAUSE = "\u23F8\uFE0E";
+function stepFwd() { if (cur < steps.length - 1) { cur++; render(); } else stopPlay(); }
+function stepBack() { if (cur > 0) { cur--; render(); } }
+function stopPlay() {
+  if (timer) { clearInterval(timer); timer = null;
+               el("playBtn").textContent = PLAY; el("playBtn").setAttribute("aria-label", "Play"); }
+}
+function togglePlay() {
+  if (timer) { stopPlay(); return; }
+  el("playBtn").textContent = PAUSE; el("playBtn").setAttribute("aria-label", "Pause");
+  timer = setInterval(stepFwd, Number(el("speed").value));
+}
+
+/* ---------- tooltips ------------------------------------------------------ */
+
+function tipCell(i, j) {
+  if (j < i) return null;
+  let h = '<span class="tt-h">m[' + i + "][" + j + "] = " + M[i][j] + "</span><br>" +
+          "range <code>" + rng(i, j) + "</code>: " +
+          (j - i === 0 ? "empty product" : Mname(i) + (j - i > 1 ? "\u2026" + Mname(j - 1) : "")) +
+          "<br>result is " + (j > i ? r[i] + "\u00d7" + c[j - 1] : "\u2014");
+  if (j - i > 1) {
+    h += "<br>best k: " + bestKs(i, j).join(", ") +
+         '<br><span class="tt-s">' + stripOuter(termPlain(i, j, optNodes(i, j))) + "</span>";
+  }
+  h += '<br><span class="tt-s">click: ' +
+       (mode === "bu" ? "backtrace this subproblem" : "draw its optimal tree") + "</span>";
+  return h;
+}
+function optNodes(i, j, d, acc) {
+  d = d || 0; acc = acc || [];
+  if (j - i === 1) { acc.push({ i: i, j: j, k: null, d: d, leaf: true }); return acc; }
+  const k = bestKs(i, j)[0];
+  acc.push({ i: i, j: j, k: k, d: d });
+  optNodes(i, k, d + 1, acc); optNodes(k, j, d + 1, acc);
+  return acc;
+}
+function moveTip(ev) {
+  const t = el("tooltip");
+  t.style.left = Math.min(ev.clientX + 14, window.innerWidth - t.offsetWidth - 10) + "px";
+  t.style.top = Math.min(ev.clientY + 16, window.innerHeight - t.offsetHeight - 10) + "px";
+}
+function hideTip() { el("tooltip").style.display = "none"; }
+function showTip(ev, html) {
+  if (!html) { hideTip(); return; }
+  const t = el("tooltip"); t.innerHTML = html; t.style.display = "block"; moveTip(ev);
+}
+
+/* ---------- input --------------------------------------------------------- */
+
+function fillPresets() {
+  const s = el("presetSel");
+  s.innerHTML = "";
+  Object.keys(PRESETS).forEach(k => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = PRESETS[k].name; s.appendChild(o);
+  });
+}
+function fromP(p) {
+  const rr = [], cc = [];
+  for (let i = 0; i + 1 < p.length; i++) { rr.push(p[i]); cc.push(p[i + 1]); }
+  return [rr, cc];
+}
+function refreshInputs() {
+  el("inR").value = r.join(" "); el("inC").value = c.join(" ");
+  el("inputText").value = "# r[0..n)  then  c[0..n)\n" + r.join(" ") + "\n" + c.join(" ");
+}
+function setChain(rr, cc) {
+  const err = el("parseErr");
+  if (!rr.length || rr.length !== cc.length) { err.textContent = "r and c must have the same, non-zero length."; return false; }
+  if (rr.length > 10) { err.textContent = "At most 10 matrices."; return false; }
+  if (rr.some(x => !(x > 0)) || cc.some(x => !(x > 0))) { err.textContent = "All dimensions must be positive."; return false; }
+  for (let i = 0; i + 1 < rr.length; i++)
+    if (rr[i + 1] !== cc[i]) {
+      err.innerHTML = "r[" + (i + 1) + "] = " + rr[i + 1] + " must equal c[" + i + "] = " + cc[i] +
+                      " \u2014 otherwise " + Mname(i) + "\u00b7" + Mname(i + 1) + " is undefined.";
+      return false;
+    }
+  err.textContent = "";
+  r = rr.slice(); c = cc.slice(); traceFrom = null; selCell = null; allSel = -1;
+  build(); refreshInputs(); renderAll(); render();
+  return true;
+}
+const nums = s => s.split(/[\s,;]+/).filter(x => x.length).map(Number);
+function loadFromText() {
+  const lines = el("inputText").value.split(/\r?\n/).filter(l => !/^\s*#/.test(l) && l.trim().length);
+  if (!lines.length) { el("parseErr").textContent = "Nothing to read."; return; }
+  if (lines.length === 1) {
+    const p = nums(lines[0]);
+    if (p.length < 2 || p.some(isNaN)) { el("parseErr").textContent = "Need at least two dimensions."; return; }
+    const rc = fromP(p); setChain(rc[0], rc[1]); return;
+  }
+  const rr = nums(lines[0]), cc = nums(lines[1]);
+  if (rr.some(isNaN) || cc.some(isNaN)) { el("parseErr").textContent = "Could not read the numbers."; return; }
+  setChain(rr, cc);
+}
+function randomChain() {
+  const k = 4 + Math.floor(Math.random() * 4);
+  const p = [];
+  for (let i = 0; i <= k; i++) p.push(2 + Math.floor(Math.random() * 60));
+  const rc = fromP(p); setChain(rc[0], rc[1]);
+}
+
+/* ---------- init ---------------------------------------------------------- */
+
+function setMode(mk) {
+  mode = mk;
+  el("modeBU").classList.toggle("on", mk === "bu");
+  el("modeMemo").classList.toggle("on", mk === "memo");
+  el("subBU").style.display = mk === "bu" ? "" : "none";
+  el("subMemo").style.display = mk === "memo" ? "" : "none";
+  el("legHit").style.display = mk === "memo" ? "" : "none";
+  el("granCoarse").textContent = mk === "memo" ? "One step per call" : "One step per cell";
+  traceFrom = null;
+  stopPlay(); build(); render();
+}
+function setGran(g) {
+  gran = g;
+  el("granCoarse").classList.toggle("on", g === 0);
+  el("granFine").classList.toggle("on", g === 1);
+  const ph = (steps[cur] || {}).ph || 0;
+  stopPlay(); build();
+  cur = phases[Math.min(ph, phases.length - 1)].from;
+  render();
+}
+
+function init() {
+  fillPresets();
+  el("presetSel").addEventListener("change", e => {
+    const p = PRESETS[e.target.value];
+    if (!p) return;
+    if (p.p) { const rc = fromP(p.p); setChain(rc[0], rc[1]); } else setChain(p.r, p.c);
+  });
+  el("applyBtn").addEventListener("click", () => setChain(nums(el("inR").value), nums(el("inC").value)));
+  [el("inR"), el("inC")].forEach(x => x.addEventListener("keydown", ev => {
+    if (ev.key === "Enter") setChain(nums(el("inR").value), nums(el("inC").value));
+  }));
+  el("randBtn").addEventListener("click", randomChain);
+  el("loadBtn").addEventListener("click", loadFromText);
+  el("modeBU").addEventListener("click", () => setMode("bu"));
+  el("modeMemo").addEventListener("click", () => setMode("memo"));
+  el("granCoarse").addEventListener("click", () => setGran(0));
+  el("granFine").addEventListener("click", () => setGran(1));
+
+  el("stepBtn").addEventListener("click", () => { stopPlay(); stepFwd(); });
+  el("backBtn").addEventListener("click", () => { stopPlay(); stepBack(); });
+  el("playBtn").addEventListener("click", togglePlay);
+  el("resetBtn").addEventListener("click", () => { stopPlay(); cur = 0; render(); });
+  el("scrubber").addEventListener("input", e => { stopPlay(); cur = Number(e.target.value); render(); });
+  el("speed").addEventListener("input", e => {
+    el("speedVal").textContent = e.target.value + "ms";
+    if (timer) { stopPlay(); togglePlay(); }
+  });
+  el("wholeBtn").addEventListener("click", () => {
+    traceFrom = null; selCell = null; stopPlay(); build();
+    cur = phases[phases.length - 1].from; render();
+  });
+
+  const tab = el("tabSvg");
+  tab.addEventListener("mousemove", ev => {
+    const t = ev.target;
+    if (t && t.classList.contains("hit") && t.dataset.i !== undefined)
+      showTip(ev, tipCell(Number(t.dataset.i), Number(t.dataset.j)));
+    else hideTip();
+  });
+  tab.addEventListener("mouseleave", hideTip);
+  tab.addEventListener("click", ev => {
+    const t = ev.target;
+    if (!t || !t.classList.contains("hit") || t.dataset.i === undefined) return;
+    const i = Number(t.dataset.i), j = Number(t.dataset.j);
+    if (j < i) return;
+    stopPlay(); selCell = [i, j];
+    if (mode !== "bu") {
+      /* no backtrace phase here, so show the optimal tree for that range directly */
+      preview = (j - i >= 1) ? { nodes: optNodes(i, j), i: i, j: j } : null;
+      allSel = -1; render(); return;
+    }
+    if (j - i < 2) { render(); return; }
+    traceFrom = (i === 0 && j === n) ? null : [i, j];
+    build(); cur = phases[phases.length - 1].from; render();
+  });
+
+  const tsvg = el("treeSvg");
+  const setHover = h => {
+    const same = (!h && !hoverNode) ||
+                 (h && hoverNode && h[0] === hoverNode[0] && h[1] === hoverNode[1]);
+    if (same) return;                    /* only redraw when the node actually changes */
+    hoverNode = h;
+    drawTable(); drawChain();
+  };
+  tsvg.addEventListener("mousemove", ev => {
+    const t = ev.target;
+    if (t && t.classList.contains("hit") && t.dataset.ni !== undefined) {
+      const i = Number(t.dataset.ni), j = Number(t.dataset.nj);
+      setHover([i, j]);
+      showTip(ev, j - i === 1
+        ? '<span class="tt-h">' + Mname(i) + "</span><br>" + r[i] + "\u00d7" + c[i] +
+          '<br><span class="tt-s">its cell m[' + i + "][" + j + "] is a base case</span>"
+        : '<span class="tt-h">' + rng(i, j) + "</span><br>this multiplication costs " +
+          lastCost(i, bestKs(i, j)[0], j) + "<br>subtree total <code>m[" + i + "][" + j + "] = " +
+          M[i][j] + "</code><br>result " + r[i] + "\u00d7" + c[j - 1] +
+          '<br><span class="tt-s">its subproblems are marked in the table</span>');
+    } else { setHover(null); hideTip(); }
+  });
+  tsvg.addEventListener("mouseleave", () => { setHover(null); hideTip(); });
+
+  const csvg = el("chainSvg");
+  csvg.addEventListener("mousemove", ev => {
+    const p = csvg.getBoundingClientRect();
+    const x = ev.clientX - p.left, y = ev.clientY - p.top;
+    const h = chainHit.find(q => x >= q.x && x <= q.x + q.w && y >= q.y - 8 && y <= q.y + q.h + 8);
+    showTip(ev, h ? '<span class="tt-h">' + Mname(h.i) + "</span><br>" + r[h.i] + "\u00d7" + c[h.i] : null);
+  });
+  csvg.addEventListener("mouseleave", hideTip);
+
+  window.addEventListener("resize", () => render());
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT") return;
+    if (ev.key === "ArrowRight") { stopPlay(); stepFwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft")  { stopPlay(); stepBack(); ev.preventDefault(); }
+  });
+
+  el("presetSel").value = "lecture";
+  setChain(PRESETS.lecture.r, PRESETS.lecture.c);
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

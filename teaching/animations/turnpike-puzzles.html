@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The turnpike problem · puzzles</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:var(--wi-font-mono);
+    --wi-radius:4px; --wi-radius-lg:5px;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 14px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code, .status code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  /* --- tabs --- */
+  .tabs { display:flex; flex-wrap:wrap; gap:0; border-bottom:2px solid var(--wi-border-soft); margin-bottom:16px; }
+  .tabs button { border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent;
+                 padding:8px 16px 7px; font-size:.86rem; color:var(--wi-ink-soft); margin-bottom:-2px; }
+  .tabs button:hover:not(:disabled) { background:var(--wi-panel); border-bottom-color:var(--wi-border); }
+  .tabs button.on { color:var(--wi-accent); border-bottom-color:var(--wi-accent); font-weight:bold; }
+  .tabs button .no { display:inline-block; font-family:var(--wi-font-mono); font-size:.8em; color:var(--wi-ink-faint);
+                     margin-right:6px; }
+  .tabs button.on .no { color:var(--wi-accent-soft); }
+  .tabpane { display:none; }
+  .tabpane.on { display:block; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.str { font-family:var(--wi-font-mono); font-size:.8rem; width:14em; }
+  input.wide { width:26em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  .opbar { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:10px 18px;
+           background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+           border-radius:var(--wi-radius-lg); margin-bottom:14px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  /* --- transport --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0; width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden; flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px;
+              font-size:.68rem; line-height:1.3; font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-left-width:0;
+              border-radius:0; color:var(--wi-ink-faint); cursor:pointer; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage --- */
+  .stage { display:grid; gap:18px; align-items:start; }
+  /* --- draggable splitter between the drawing column and the explanation column --- */
+  .stage { grid-template-columns:minmax(0,1.3fr) 12px minmax(300px,1fr); }
+  .stage.sized { grid-template-columns:minmax(0,var(--left)) 12px minmax(0,1fr); }
+  .splitter { align-self:stretch; cursor:col-resize; position:relative; touch-action:none; border-radius:3px; }
+  .splitter::before { content:""; position:absolute; left:5px; top:0; bottom:0; width:2px; background:var(--wi-border-soft); border-radius:1px; }
+  .splitter::after { content:""; position:absolute; left:3px; top:50%; width:6px; height:34px; margin-top:-17px; border-radius:3px;
+                     background:var(--wi-border); }
+  .splitter:hover::before, .splitter.drag::before { background:var(--wi-accent-soft); }
+  .splitter:hover::after, .splitter.drag::after { background:var(--wi-accent); }
+  @media (max-width:1080px) { .stage, .stage.sized { grid-template-columns:1fr; } .splitter { display:none; } }
+
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-box + .sim-box { margin-top:14px; }
+  .col-side .sim-box + .sim-box { margin-top:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:88px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status code { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-panel-2); }
+  .k-ok { color:var(--wi-relax); font-weight:bold; }
+  .k-bad { color:var(--wi-active); font-weight:bold; }
+  .k-ex { color:var(--wi-examine); font-weight:bold; }
+  .k-q { color:var(--wi-queue); font-weight:bold; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem; color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  /* --- chips (multisets) --- */
+  .chips { display:flex; flex-wrap:wrap; gap:4px 5px; align-items:flex-start; }
+  .chip { font-family:var(--wi-font-mono); font-size:.78rem; line-height:1.3; padding:2px 6px;
+          border:1px solid var(--wi-border-soft); border-radius:3px; background:var(--wi-panel-2);
+          color:var(--wi-ink-strong); position:relative; }
+  .chip.sub { font-size:.72rem; padding:1px 5px 2px; text-align:center; }
+  .chip .fr { display:block; font-size:.78em; color:var(--wi-ink-faint); line-height:1.15; letter-spacing:.02em; }
+  .chip.new { background:#f6e6df; border-color:var(--wi-active); color:var(--wi-active); font-weight:bold; }
+  .chip.used { color:var(--wi-ink-faint); background:var(--wi-panel); border-style:dashed; }
+  .chip.used::after { content:""; position:absolute; left:6px; right:6px; top:50%; border-top:1px solid var(--wi-ink-faint); }
+  .chip.ok { background:#e8f0e2; border-color:var(--wi-relax); }
+  .chip.miss { background:#f6e6df; border-color:var(--wi-active); color:var(--wi-active); }
+  .chip.extra { background:#f7edd9; border-color:var(--wi-examine); color:var(--wi-examine); }
+  .chip.max { background:#f6e6df; border-color:var(--wi-active); color:var(--wi-active); font-weight:bold; }
+  .chip.cand { background:#f7edd9; border-color:var(--wi-examine); color:var(--wi-examine); font-weight:bold; }
+  .chip.hot { box-shadow:0 0 0 2px var(--wi-accent-soft); }
+  .setline { font-family:var(--wi-font-mono); font-size:.78rem; color:var(--wi-ink-soft); margin:6px 0 0; line-height:1.5;
+             word-break:break-word; }
+  .setline b { color:var(--wi-ink-strong); }
+  .placeholder { font-size:.82rem; color:var(--wi-ink-faint); line-height:1.5; }
+  .summ { font-size:.86rem; margin:0 0 8px; }
+  .summ.good { color:var(--wi-relax); font-weight:bold; }
+  .summ.bad { color:var(--wi-ink-strong); }
+
+  /* --- amino acid table --- */
+  .aatab { display:grid; grid-template-columns:repeat(2, 1fr); gap:0 14px; font-size:.78rem; }
+  .aarow { display:grid; grid-template-columns:1.3em 1.3fr 2.4em; gap:8px; padding:1px 6px; border-radius:3px;
+           align-items:baseline; color:var(--wi-ink-soft); }
+  .aarow .lt { font-family:var(--wi-font-mono); font-weight:bold; color:var(--wi-ink-strong); }
+  .aarow .ms { font-family:var(--wi-font-mono); text-align:right; }
+  .aarow.hot { background:#f6e6df; color:var(--wi-active); }
+  .aarow.hot .lt, .aarow.hot .ms { color:var(--wi-active); }
+  .aarow.inpep .lt { color:var(--wi-accent); }
+  .aanote { font-size:.72rem; color:var(--wi-ink-faint); margin-top:8px; line-height:1.45; }
+
+  /* --- toll table --- */
+  .tolltab { border-collapse:collapse; font-family:var(--wi-font-mono); font-size:.74rem; }
+  .tolltab th, .tolltab td { padding:2px 5px; text-align:center; min-width:2.2em; border:1px solid var(--wi-border-soft); }
+  .tolltab th { color:var(--wi-ink-faint); font-weight:normal; background:var(--wi-panel-2); }
+  .tolltab td { cursor:default; }
+  .tolltab td.blank { border:0; }
+  .tolltab td.ok { background:#e8f0e2; color:var(--wi-relax); }
+  .tolltab td.extra { background:#f7edd9; color:var(--wi-examine); }
+  .tolltab td.plain { background:var(--wi-panel-2); }
+  .tolltab td.hot, .tolltab th.hot { background:#f6e6df !important; color:var(--wi-active) !important; font-weight:bold; }
+
+  /* --- recursion tree --- */
+  .tree { font-family:var(--wi-font-mono); font-size:.76rem; line-height:1.55; }
+  .frame { display:flex; gap:6px; align-items:baseline; padding:1px 6px; border-radius:3px; white-space:nowrap; }
+  .frame .st { display:inline-block; width:1.3em; text-align:center; }
+  .frame .lab { color:var(--wi-ink-faint); }
+  .frame .sset { color:var(--wi-ink-strong); }
+  .frame.open .st { color:var(--wi-examine); }
+  .frame.ok .st, .frame.ok .sset { color:var(--wi-relax); }
+  .frame.fail .st { color:var(--wi-active); }
+  .frame.fail .sset { color:var(--wi-ink-faint); text-decoration:line-through; }
+  .frame.cur { background:#f6e6df; }
+  .frame.future { opacity:.35; }
+  .treewrap { overflow-x:auto; max-height:420px; overflow-y:auto; }
+
+  /* --- pseudocode --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head); font-size:.72rem;
+                           text-transform:uppercase; letter-spacing:.1em; color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent; white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  /* --- editor --- */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head); font-size:.78rem;
+                             letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr; gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:130px; font-family:var(--wi-font-mono); font-size:.78rem; background:var(--wi-panel-2);
+             color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius); padding:6px 9px;
+             font-size:.76rem; color:var(--wi-ink-strong); box-shadow:0 3px 10px rgba(0,0,0,.12);
+             max-width:270px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls, .opbar { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    input.wide { width:100%; }
+  }
+
+  /* --- SVG classes --- */
+  .ptlab { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .road { stroke:var(--wi-border-strong); stroke-width:10; stroke-linecap:round; }
+  .roadmid { stroke:var(--wi-bg); stroke-width:1.2; stroke-dasharray:7 7; }
+  .roadhit { fill:transparent; cursor:copy; }
+  .exit { fill:var(--wi-panel-2); stroke:var(--wi-ink-strong); stroke-width:2; }
+  .exit.drag { cursor:grab; }
+  .exit.drag:active { cursor:grabbing; }
+  .exit.sel { stroke:var(--wi-accent); stroke-width:3; fill:#f0d7cd; }
+  .exit.fixed { fill:var(--wi-controls); }
+  .exit.cand { fill:#f7edd9; stroke:var(--wi-examine); stroke-dasharray:3 2; }
+  .exit.candbad { fill:#f6e6df; stroke:var(--wi-active); stroke-dasharray:3 2; }
+  .exit.hot { stroke:var(--wi-active); stroke-width:3; }
+  .exlab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .exlab.faint { fill:var(--wi-ink-faint); font-size:11px; }
+  .exlab.cand { fill:var(--wi-examine); font-weight:bold; }
+  .exlab.candbad { fill:var(--wi-active); font-weight:bold; }
+  .seglab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-accent); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .seghit { fill:transparent; cursor:pointer; }
+  .seghit:hover { fill:rgba(144,32,21,.08); }
+  .segsel { fill:rgba(144,32,21,.16); stroke:var(--wi-accent); stroke-width:1.5; stroke-dasharray:4 3; }
+  .arc { fill:none; stroke-width:1.6; }
+  .arc.ok { stroke:var(--wi-relax); }
+  .arc.bad { stroke:var(--wi-active); stroke-dasharray:4 3; }
+  .arc.neu { stroke:var(--wi-queue); }
+  .arc.faint { stroke:var(--wi-inert); stroke-width:1.2; }
+  .arc.hot { stroke:var(--wi-active); stroke-width:2.4; }
+  .arclab { font-family:var(--wi-font-mono); font-size:12px; text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .arclab.ok { fill:var(--wi-relax); font-weight:bold; }
+  .arclab.bad { fill:var(--wi-active); font-weight:bold; }
+  .arclab.neu { fill:var(--wi-queue); }
+  .arclab.faint { fill:var(--wi-ink-faint); }
+  .arclab.hot { fill:var(--wi-active); font-weight:bold; }
+  .arclabbg { fill:var(--wi-bg); }
+
+  .aabox { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.2; }
+  .aabox.hot { fill:#f6e6df; stroke:var(--wi-active); stroke-width:2; }
+  .aabox.infrag { fill:#f0d7cd; stroke:var(--wi-accent); stroke-width:1.6; }
+  .aabox.pending { fill:var(--wi-bg); stroke:var(--wi-border-soft); stroke-dasharray:3 3; }
+  .aalet { font-family:var(--wi-font-mono); font-size:19px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .aalet.pending { fill:var(--wi-ink-faint); }
+  .aamass { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-accent); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .aamass.pending { fill:var(--wi-inert); }
+  .cut { stroke:var(--wi-ink-strong); stroke-width:2; }
+  .cut.pending { stroke:var(--wi-inert); }
+  .cut.hot { stroke:var(--wi-active); stroke-width:3.5; }
+  .sumlab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; }
+  .sumlab.pending { fill:var(--wi-inert); }
+  .sumlab.hot { fill:var(--wi-active); font-weight:bold; }
+  .brace { fill:none; stroke:var(--wi-active); stroke-width:2.2; }
+  .bracelab { font-family:var(--wi-font-mono); font-size:14px; fill:var(--wi-active); text-anchor:middle; dominant-baseline:central; font-weight:bold; }
+  .axis { stroke:var(--wi-border-strong); stroke-width:1.2; }
+  .axtick { stroke:var(--wi-border-strong); stroke-width:1; }
+  .axlab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint); text-anchor:middle; }
+  .peak { fill:var(--wi-queue); stroke:var(--wi-panel-2); stroke-width:.6; }
+  .peak.new { fill:var(--wi-active); }
+  .peaklab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-soft); text-anchor:middle; }
+  .peaklab.new { fill:var(--wi-active); font-weight:bold; }
+  .ttl { font-family:var(--wi-font-body); font-size:14px; fill:var(--wi-ink-soft); font-style:italic; }
+  .hit { fill:transparent; cursor:pointer; }
+
+
+  .randbar { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
+  .randbar input[type=number] { width:4.6em; }
+  .randbar .lbl { font-size:.66rem; }
+  /* --- tab 5: tracking chart --- */
+  .trk { stroke-width:2; fill:none; }
+  .trk.top { stroke:var(--wi-queue); }
+  .trk.cut { stroke:var(--wi-examine); stroke-dasharray:4 3; }
+  .trk.true { stroke:var(--wi-accent); }
+  .trk.lead { stroke:var(--wi-relax); stroke-width:2.6; }
+  .trkdot { stroke:none; }
+  .trkdot.top { fill:var(--wi-queue); } .trkdot.cut { fill:var(--wi-examine); } .trkdot.true { fill:var(--wi-accent); } .trkdot.lead { fill:var(--wi-relax); }
+  .alive { fill:var(--wi-relax); } .dead { fill:var(--wi-active); }
+  /* --- tab 4: formula --- */
+  .formula { font-family:var(--wi-font-body); font-size:.95rem; line-height:1.7; color:var(--wi-ink-strong); overflow-x:auto; }
+  .formula .row { margin:2px 0 8px; }
+  .formula .lhs { color:var(--wi-ink-soft); }
+  .formula .term { display:inline-block; padding:0 2px; border-radius:3px; }
+  .formula .term.cur { background:#f6e6df; color:var(--wi-active); font-weight:bold; }
+  .formula .term.dim { color:var(--wi-ink-faint); }
+  .formula .term.pos { color:var(--wi-queue); }
+  .formula .term.neg { color:var(--wi-ink-faint); }
+  .formula .term.zero { color:var(--wi-examine); }
+  .formula sup { font-size:.72em; }
+  .formula .note { font-size:.8rem; color:var(--wi-ink-soft); margin-top:6px; line-height:1.5; }
+  .coefbar { fill:var(--wi-queue); }
+  .coefbar.neg { fill:var(--wi-inert); }
+  .coefbar.zero { fill:var(--wi-examine); }
+  .coefbar.cur { fill:var(--wi-active); }
+  .coeflab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-soft); text-anchor:middle; }
+  .coeflab.cur { fill:var(--wi-active); font-weight:bold; }
+
+  /* --- tab 5: leaderboard --- */
+  .board { border-collapse:collapse; font-family:var(--wi-font-mono); font-size:.76rem; width:100%; }
+  .board th { text-align:left; color:var(--wi-ink-faint); font-weight:normal; padding:2px 8px; border-bottom:1px solid var(--wi-border-soft); }
+  .board td { padding:1px 8px; border-bottom:1px solid var(--wi-border-soft); white-space:nowrap; }
+  .board tr.keep td { background:#eef4ea; }
+  .board tr.trim td { color:var(--wi-ink-faint); background:var(--wi-panel); }
+  .board tr.trim td.pep { text-decoration:line-through; }
+  .board tr.heavy td { background:#f6e6df; color:var(--wi-ink-faint); }
+  .board tr.heavy td.pep { text-decoration:line-through; }
+  .board tr.parent td { background:#f7edd9; }
+  .board tr.true td.pep { color:var(--wi-accent); font-weight:bold; }
+  .board tr.lead td.pep::after { content:" ★"; color:var(--wi-accent); }
+  .board tr.sel td { outline:2px solid var(--wi-accent-soft); outline-offset:-2px; }
+  .board tr { cursor:pointer; }
+  .board tr.cut td { border-bottom:2px solid var(--wi-accent); }
+  .board td.num { text-align:right; }
+  .board .more { color:var(--wi-ink-faint); font-style:italic; cursor:pointer; }
+  .leaderbox { font-size:.9rem; line-height:1.55; }
+  .leaderbox .big { font-family:var(--wi-font-mono); font-size:1.15rem; color:var(--wi-accent); font-weight:bold; }
+  .leaderbox .kv { color:var(--wi-ink-soft); font-size:.82rem; }
+  .spec-e { fill:var(--wi-inert); }
+  .spec-t { fill:var(--wi-active); }
+  .spec-ok { fill:var(--wi-relax); }
+
+  @keyframes pop { from { opacity:0; transform:translateY(-6px) scale(.7); } to { opacity:1; transform:none; } }
+  .pop { animation:pop .32s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box; transform-origin:center; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption { font-family: var(--wi-font-head); letter-spacing: .05em; }
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>The turnpike problem &nbsp;·&nbsp; puzzles</h1>
+</div>
+
+<p class="subtitle">
+  A toll road collects a toll between every pair of its exits, and the toll is simply the distance driven.
+  The first tab shows where the tolls come from; the second one turns the question around: given only the
+  <b>multiset D of all pairwise tolls</b>, where are the exits? Place them so that the road realizes exactly
+  these tolls &mdash; the comparison on the right updates live, and turns green when you have solved it.
+</p>
+
+<div class="tabs" id="tabs">
+  <button data-tab="fwd" class="on"><span class="no">1</span>How the tolls arise</button>
+  <button data-tab="road"><span class="no">2</span>Reconstruct the road</button>
+</div>
+
+<div class="tabpane on" id="pane-fwd">
+<div class="controls">
+  <div class="ctl">
+    <label for="fwdPreset">Road</label>
+    <select id="fwdPreset"></select>
+  </div>
+  <div class="ctl">
+    <label for="fwdIn">Exits S</label>
+    <input type="text" id="fwdIn" class="str wide" spellcheck="false" placeholder="0 3 8 9 11   or   P 3 5 1 2">
+    <button id="fwdSet" class="pri">Set</button>
+  </div>
+  <div class="ctl randbar" id="fwdRandBar" style="display:none">
+    <span class="lbl">segments</span><input type="number" id="fwdRandN" min="2" max="8" value="4">
+    <span class="lbl">max length</span><input type="number" id="fwdRandMax" min="2" max="30" value="9">
+    <button id="fwdRandGo" class="pri">New random road</button>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="ctl" style="gap:6px">
+    <button id="fwdReplay" class="pri">↻ Send the cars again</button>
+    <span class="lbl">Speed</span>
+    <input type="range" id="fwdSpeed" min="25" max="250" value="100" style="width:90px">
+    <button id="fwdSkip">Skip to the end</button>
+  </span>
+  <span class="ctl" style="gap:6px">
+    <button id="fwdAdd">+ exit</button>
+    <button id="fwdDel" disabled title="remove the selected exit (Delete)">− exit</button>
+    <button id="fwdUndo" disabled title="Ctrl+Z">Undo</button>
+  </span>
+  <span class="opnote" id="fwdNote" style="margin-left:auto">
+    <b>Click</b> the road to add an exit &middot; <b>drag</b> an exit to move it &middot; <b>double-click</b> to remove it.
+  </span>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Every pair of exits sends one car — the toll is the distance it drives</span><span class="rhs" id="fwdMeta"></span></div>
+      <div class="svgscroll"><svg id="fwdSvg" class="stagesvg"></svg></div>
+      <div class="setline" id="fwdSetline"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Toll table  S[j] − S[i]</span><span class="rhs" id="fwdTollMeta"></span></div>
+      <div class="svgscroll" id="fwdTollBox"></div>
+      <div class="opnote" style="margin-top:6px">Hover a toll to send that car on its journey once more.</div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What is going on</span><span class="rhs" id="fwdPhase"></span></div>
+      <div class="status" id="fwdStatus"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The collected tolls</span><span class="rhs" id="fwdDMeta"></span></div>
+      <div class="chips" id="fwdD"></div>
+      <div style="margin-top:12px"><button class="pri" id="fwdToRoad">Use these tolls as a puzzle &rarr;</button></div>
+    </div>
+  </div>
+</div>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="fwdText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="fwdLoad">Load</button></div>
+      <div class="err" id="fwdErr"></div>
+    </div>
+    <div class="hint">
+      One line. <code>S 0 3 8 9 11</code> or just <code>0 3 8 9 11</code> gives the exit positions (must contain 0,
+      no repetitions); <code>P 3 5 1 2</code> gives the lengths of the segments between consecutive exits instead.
+      Lines starting with <code>#</code> are ignored. At most 9 exits, so that the cars stay countable.
+    </div>
+  </div>
+</details>
+</div>
+
+
+<div class="tabpane" id="pane-road">
+<div class="controls">
+  <div class="ctl">
+    <label for="roadPreset">Puzzle</label>
+    <select id="roadPreset"></select>
+  </div>
+  <div class="ctl">
+    <label for="roadD">Target D</label>
+    <input type="text" id="roadD" class="str wide" spellcheck="false" placeholder="1 2 3 3 5 6 8 8 9 11">
+    <button id="roadSetD" class="pri">Set</button>
+    <button id="roadClearD" title="drop the target; the road is then a free sandbox">No target</button>
+  </div>
+  <div class="ctl">
+    <button id="roadFreeze" title="take the current Δ𝑆 as the target, then scramble the exits">Make a puzzle from this road</button>
+  </div>
+  <div class="ctl randbar" id="roadRandBar" style="display:none">
+    <span class="lbl">segments</span><input type="number" id="roadRandN" min="2" max="9" value="5">
+    <span class="lbl">max length</span><input type="number" id="roadRandMax" min="2" max="30" value="9">
+    <label class="chk"><input type="checkbox" id="roadRandTamper"> sometimes tamper with D (may be unsolvable)</label>
+    <button id="roadRandGo" class="pri">New random puzzle</button>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="ctl" style="gap:6px">
+    <button id="roadAdd" title="adds an exit in the middle of the widest gap">+ exit</button>
+    <button id="roadDel" disabled title="remove the selected exit (Delete)">− exit</button>
+    <button id="roadMirror" title="reverse the order of the segments — same tolls, same Δ𝑆">Mirror road</button>
+    <button id="roadReset" title="back to only the two end exits">Only end exits</button>
+    <button id="roadUndo" disabled title="Ctrl+Z">Undo</button>
+  </span>
+  <span class="opnote" id="roadNote" style="margin-left:auto">
+    <b>Drag</b> an exit to move it · <b>click</b> the road to add one · <b>double-click</b> an exit to remove it ·
+    <b>click two segment lengths</b> (the red numbers) to swap those segments.
+  </span>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The road</span><span class="rhs" id="roadMeta"></span></div>
+      <div class="svgscroll"><svg id="roadSvg" class="stagesvg"></svg></div>
+      <div class="setline" id="roadSetline"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Toll table  S[j] − S[i]</span><span class="rhs" id="tollMeta"></span></div>
+      <div class="svgscroll" id="tollBox"></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#e8f0e2;border-color:var(--wi-relax)"></span> toll occurs in D</span>
+        <span class="item"><span class="sw" style="background:#f7edd9;border-color:var(--wi-examine)"></span> toll not in D (or too often)</span>
+        <span class="item"><span class="sw" style="background:#f6e6df;border-color:var(--wi-active)"></span> distance in D not realized</span>
+      </div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>Live comparison</span><span class="rhs" id="cmpMeta"></span></div>
+      <div id="cmpSumm" class="summ"></div>
+      <div class="lbl" style="margin-bottom:4px">Target D</div>
+      <div class="chips" id="cmpD"></div>
+      <div class="lbl" style="margin:10px 0 4px">Δ𝑆 of the road</div>
+      <div class="chips" id="cmpS"></div>
+    </div>
+  </div>
+</div>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="roadText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="roadLoad">Load</button></div>
+      <div class="err" id="roadErr"></div>
+    </div>
+    <div class="hint">
+      Up to two lines. <code>D 1 2 3 3 5 6 8 8 9 11</code> sets the target multiset (integers separated by spaces,
+      order irrelevant, repetitions count). <code>S 0 3 8 9 11</code> places exits at the given prefix sums, or
+      <code>P 3 5 1 2</code> gives the segment lengths instead. A single line of numbers is taken as <i>D</i>.
+      Lines starting with <code>#</code> are ignored.
+    </div>
+  </div>
+</details>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Peptide sequencing and the turnpike problem.
+
+   Conventions on this page
+     * P[0..n)  segment lengths (amino-acid masses), S[0..n] its prefix sums,
+       D = ΔS the multiset { S[j]-S[i] : 0 <= i < j <= n } -- WITHOUT 0.
+       A checkbox in tab 1 additionally shows the empty fragment (mass 0), as
+       the textbook's spectra do; it never enters D.
+     * multisets are kept as sorted arrays of integers; "A ⊆ B" is multiset
+       inclusion (multiplicities count).
+   ========================================================================== */
+
+const el  = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const SVGNS = "http://www.w3.org/2000/svg";
+function mk(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const fmtSet = (arr, open, close) => (open || "{") + arr.join(", ") + (close || "}");
+const MS = arr => "{{" + arr.join(", ") + "}}";        /* multiset notation of the lecture */
+
+/* ---------- amino acids (integer mass table, Compeau & Pevzner Fig. 4.6) --- */
+
+const AA = [
+  ["G", "Glycine", 57], ["A", "Alanine", 71], ["S", "Serine", 87], ["P", "Proline", 97],
+  ["V", "Valine", 99], ["T", "Threonine", 101], ["C", "Cysteine", 103], ["I", "Isoleucine", 113],
+  ["L", "Leucine", 113], ["N", "Asparagine", 114], ["D", "Aspartic acid", 115], ["K", "Lysine", 128],
+  ["Q", "Glutamine", 128], ["E", "Glutamic acid", 129], ["M", "Methionine", 131], ["H", "Histidine", 137],
+  ["F", "Phenylalanine", 147], ["R", "Arginine", 156], ["Y", "Tyrosine", 163], ["W", "Tryptophan", 186]
+];
+const MASS = {}; const NAME = {};
+AA.forEach(a => { MASS[a[0]] = a[2]; NAME[a[0]] = a[1]; });
+
+/* ---------- multisets ---------------------------------------------------- */
+
+const asc = (a, b) => a - b;
+function prefSums(P) { const S = [0]; P.forEach(p => S.push(S[S.length - 1] + p)); return S; }
+function deltaOf(S) {
+  const D = [];
+  for (let i = 0; i < S.length; i++) for (let j = i + 1; j < S.length; j++) D.push(S[j] - S[i]);
+  return D.sort(asc);
+}
+function countMap(arr) { const m = new Map(); arr.forEach(x => m.set(x, (m.get(x) || 0) + 1)); return m; }
+/* A \ B as multisets (A, B sorted) */
+function msMinus(A, B) {
+  const cb = countMap(B), out = [];
+  A.forEach(x => { const c = cb.get(x) || 0; if (c > 0) cb.set(x, c - 1); else out.push(x); });
+  return out;
+}
+const msSubset = (A, B) => msMinus(A, B).length === 0;
+const msEqual  = (A, B) => A.length === B.length && A.every((x, i) => x === B[i]);
+const arrEq    = msEqual;
+
+/* ---------- parsing ------------------------------------------------------ */
+
+function parseIntList(str) {
+  const toks = str.trim().split(/[\s,;]+/).filter(Boolean);
+  const out = [];
+  for (const t of toks) {
+    if (!/^\d+$/.test(t)) throw new Error("not an integer: " + t);
+    out.push(parseInt(t, 10));
+  }
+  return out;
+}
+/* peptide text -> { P, letters|null } */
+function parsePeptide(str) {
+  const s = str.trim();
+  if (!s) throw new Error("empty input");
+  if (/^[0-9\s,;]+$/.test(s)) {
+    const P = parseIntList(s);
+    if (P.length === 0) throw new Error("empty input");
+    if (P.some(x => x < 1)) throw new Error("segment lengths must be ≥ 1");
+    if (P.length > 15) throw new Error("at most 15 segments");
+    return { P: P, letters: null };
+  }
+  const L = s.replace(/\s+/g, "").toUpperCase();
+  for (const c of L) if (!(c in MASS)) throw new Error("unknown amino acid: " + c);
+  if (L.length > 15) throw new Error("at most 15 amino acids");
+  return { P: Array.from(L).map(c => MASS[c]), letters: L };
+}
+function stripComments(txt) { return txt.split(/\r?\n/).filter(l => !/^\s*#/.test(l)).join("\n"); }
+
+/* ---------- tooltip ------------------------------------------------------ */
+
+function moveTip(ev) {
+  const tip = el("tooltip"), pad = 14;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  const r = tip.getBoundingClientRect();
+  if (x + r.width > window.innerWidth - 8) x = ev.clientX - r.width - pad;
+  if (y + r.height > window.innerHeight - 8) y = ev.clientY - r.height - pad;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function showTip(html, ev) { const t = el("tooltip"); t.innerHTML = html; t.style.display = "block"; moveTip(ev); }
+function hideTip() { el("tooltip").style.display = "none"; }
+
+/* ---------- transport (slider + phase bar), one instance per animated tab -- */
+
+function makePlayer(containerId, onRender) {
+  const box = el(containerId);
+  box.innerHTML =
+    '<div class="transport-row">' +
+    '<span class="ctl" style="gap:6px">' +
+    '<button class="icon" data-k="reset" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>' +
+    '<button class="icon" data-k="back" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>' +
+    '<button class="icon pri" data-k="fwd" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>' +
+    '<button class="icon" data-k="play" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>' +
+    '<button class="icon" data-k="end" title="Jump to the end" aria-label="Jump to the end">&#x23ED;&#xFE0E;&#x23ED;&#xFE0E;</button>' +
+    '</span>' +
+    '<span class="progress"><input type="range" min="0" max="0" value="0"><div class="phasebar"></div></span>' +
+    '<span class="stepno" data-k="no">— / —</span>' +
+    '<span class="ctl" style="gap:6px"><span class="lbl">Speed</span>' +
+    '<input type="range" data-k="speed" min="60" max="1400" value="500" style="width:88px">' +
+    '<span class="stepno" data-k="speedval">500ms</span></span></div>';
+  const q = k => box.querySelector('[data-k="' + k + '"]');
+  const scrub = box.querySelector('.progress input[type=range]'), bar = box.querySelector(".phasebar");
+  const pl = { steps: [], phases: [], cur: 0, timer: null };
+
+  pl.render = () => {
+    scrub.max = String(Math.max(0, pl.steps.length - 1)); scrub.value = String(pl.cur);
+    q("no").textContent = pl.steps.length ? (pl.cur + 1) + " / " + pl.steps.length : "— / —";
+    bar.innerHTML = "";
+    pl.phases.forEach(p => {
+      const span = p.to - p.from + 1;
+      const pct = pl.cur > p.to ? 100 : pl.cur < p.from ? 0 : ((pl.cur - p.from + 1) / span) * 100;
+      const b = document.createElement("button");
+      b.className = "phasebtn" + (pl.cur >= p.from && pl.cur <= p.to ? " on" : (pl.cur > p.to ? " past" : ""));
+      b.style.flexGrow = String(Math.max(1, span));
+      b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' + pct.toFixed(2) +
+                    '%"></span><span class="lab">' + esc(p.name) + "</span>";
+      b.title = p.name + " — steps " + (p.from + 1) + "–" + (p.to + 1);
+      b.addEventListener("click", () => { pl.stop(); pl.cur = p.from; pl.render(); });
+      bar.appendChild(b);
+    });
+    q("back").disabled = pl.cur <= 0; q("fwd").disabled = pl.cur >= pl.steps.length - 1;
+    q("end").disabled = q("fwd").disabled;
+    onRender(pl.steps[pl.cur] || {}, pl);
+  };
+  pl.goto = k => { pl.cur = Math.max(0, Math.min(pl.steps.length - 1, k)); pl.render(); };
+  pl.fwd = () => { if (pl.cur < pl.steps.length - 1) { pl.cur++; pl.render(); } else pl.stop(); };
+  pl.back = () => { if (pl.cur > 0) { pl.cur--; pl.render(); } };
+  pl.stop = () => { if (pl.timer) { clearInterval(pl.timer); pl.timer = null; } q("play").innerHTML = "&#x25B6;&#xFE0E;"; };
+  pl.play = () => {
+    if (pl.timer) { pl.stop(); return; }
+    if (pl.cur >= pl.steps.length - 1) pl.cur = 0;
+    q("play").innerHTML = "&#x23F8;&#xFE0E;";
+    pl.timer = setInterval(pl.fwd, Number(q("speed").value));
+  };
+  pl.set = (steps, phases, at) => { pl.stop(); pl.steps = steps; pl.phases = phases; pl.cur = at || 0; pl.render(); };
+  pl.phaseStartOf = k => { for (const p of pl.phases) if (k >= p.from && k <= p.to) return p.from; return 0; };
+
+  q("reset").addEventListener("click", () => { pl.stop(); pl.goto(0); });
+  q("back").addEventListener("click",  () => { pl.stop(); pl.back(); });
+  q("fwd").addEventListener("click",   () => { pl.stop(); pl.fwd(); });
+  q("end").addEventListener("click",   () => { pl.stop(); pl.goto(pl.steps.length - 1); });
+  q("play").addEventListener("click",  pl.play);
+  scrub.addEventListener("input", () => { pl.stop(); pl.goto(Number(scrub.value)); });
+  q("speed").addEventListener("input", () => {
+    q("speedval").textContent = q("speed").value + "ms";
+    if (pl.timer) { clearInterval(pl.timer); pl.timer = setInterval(pl.fwd, Number(q("speed").value)); }
+  });
+  return pl;
+}
+
+/* ---------- step-list builder shared by the animated tabs ------------------ */
+
+function StepList() {
+  this.steps = []; this.phases = [];
+}
+StepList.prototype.phase = function (name) { this.phases.push({ name: name, from: this.steps.length, to: this.steps.length }); };
+StepList.prototype.add = function (o) {
+  if (!this.phases.length) this.phase("");
+  o.ph = this.phases.length - 1; this.steps.push(o);
+  this.phases[this.phases.length - 1].to = this.steps.length - 1;
+  return o;
+};
+
+/* ---------- random instances ----------------------------------------------- */
+
+const rint = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+function randomP(n, mx) { const P = []; for (let i = 0; i < n; i++) P.push(rint(1, mx)); return P; }
+/* move one non-maximal element of D by ±1 or ±2 -- the result usually is NOT a
+   difference multiset any more, but it passes every quick sanity check */
+function tamper(D) {
+  const max = D[D.length - 1];
+  for (let tries = 0; tries < 50; tries++) {
+    const i = rint(0, D.length - 2), nv = D[i] + [-2, -1, 1, 2][rint(0, 3)];
+    if (nv >= 1 && nv < max) { const E = D.slice(); E[i] = nv; return E.sort(asc); }
+  }
+  return D;
+}
+function showRandBar(prefix, show) { el(prefix + "RandBar").style.display = show ? "" : "none"; }
+
+/* ---------- tabs ---------------------------------------------------------- */
+
+let activeTab = "fwd";
+function showTab(name) {
+  activeTab = name;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  document.querySelectorAll(".tabpane").forEach(p => p.classList.toggle("on", p.id === "pane-" + name));
+  if (name === "fwd") fwdRender(false); else roadRender();
+}
+
+/* ---------- geometry of a road drawing ------------------------------------ */
+
+/* An arc between two exits, drawn above the road.  Height grows with the
+   distance so that arcs of nested spans do not sit on top of each other. */
+function arcPath(x1, x2, y, hmax, L, dist) {
+  const h = 18 + (hmax - 18) * Math.min(1, dist / Math.max(1, L));
+  return "M" + x1 + "," + y + " Q" + ((x1 + x2) / 2) + "," + (y - 2 * h) + " " + x2 + "," + y;
+}
+const arcApex = (y, hmax, L, dist) => y - (18 + (hmax - 18) * Math.min(1, dist / Math.max(1, L)));
+
+/* ==========================================================================
+   TAB 2 -- the turnpike playground: movable exits, live ΔS vs D
+   ========================================================================== */
+
+const ROAD_PRESETS = [
+  { key: "d1",    name: "warm-up (|D| = 10)",      D: [1, 2, 3, 3, 5, 6, 8, 8, 9, 11] },
+  { key: "click", name: "warm-up {{1,1,2,2,3,4}}",    D: [1, 1, 2, 2, 3, 4] },
+  { key: "slide", name: "puzzle 1 (|D| = 15)",       D: [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 13, 14, 15, 17, 18] },
+  { key: "d2",    name: "puzzle 2 (|D| = 15)",             D: [1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5] },
+  { key: "imp",   name: "{{1,1,1}}",               D: [1, 1, 1] },
+  { key: "nqel",  name: "a mass spectrum (|D| = 10)",      D: [113, 114, 128, 129, 242, 242, 257, 370, 371, 484] },
+  { key: "two",   name: "puzzle 3 (|D| = 15)",         D: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17] },
+  { key: "hardA", name: "puzzle 4 (|D| = 15) — solvable?",     D: [1, 2, 3, 4, 5, 5, 7, 8, 10, 11, 12, 13, 14, 15, 17] },
+  { key: "hardB", name: "puzzle 5 (|D| = 15) — solvable?",     D: [2, 3, 5, 7, 7, 8, 8, 12, 13, 15, 16, 20, 21, 23, 28] },
+  { key: "hardC", name: "puzzle 6 (|D| = 21) — solvable?",     D: [2, 3, 3, 3, 3, 4, 6, 6, 6, 6, 7, 7, 9, 9, 10, 12, 12, 13, 15, 16, 18] },
+  { key: "hardD", name: "puzzle 7 (|D| = 21) — solvable?",     D: [1, 1, 3, 4, 5, 5, 6, 7, 8, 8, 8, 8, 9, 11, 12, 13, 14, 16, 17, 17, 22] },
+  { key: "random", name: "random puzzle…",                     D: "random" },
+  { key: "free",  name: "sandbox (no target)",                 D: null, S: [0, 3, 8, 9, 11] }
+];
+
+const road = { S: [0, 11], T: null, sel: null, undo: [], hover: null, drag: null };
+
+const roadMaxS = () => road.S[road.S.length - 1];
+function roadLen() {
+  const ms = roadMaxS();
+  if (road.T) return Math.max(road.T[road.T.length - 1], ms);
+  return Math.max(4, Math.ceil(ms * 1.25) + 1);
+}
+function roadPush() { road.undo.push(road.S.slice()); if (road.undo.length > 200) road.undo.shift(); el("roadUndo").disabled = false; }
+function roadUndoDo() {
+  if (!road.undo.length) return;
+  road.S = road.undo.pop(); road.sel = null;
+  el("roadUndo").disabled = !road.undo.length;
+  roadRender();
+}
+function roadSetTarget(D, resetExits) {
+  road.T = D ? D.slice().sort(asc) : null;
+  el("roadD").value = D ? D.join(" ") : "";
+  el("roadErr").textContent = "";
+  if (resetExits) { roadPush(); road.S = D ? [0, road.T[road.T.length - 1]] : [0, 11]; road.sel = null; }
+  roadRender();
+}
+
+/* match ΔS against T cell by cell: which tolls are "ok", which are "extra" */
+function roadMatch() {
+  const S = road.S, n = S.length;
+  const cells = []; /* {i,j,v,cls} */
+  const avail = road.T ? countMap(road.T) : null;
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    const v = S[j] - S[i]; let cls = "plain";
+    if (avail) { const c = avail.get(v) || 0; if (c > 0) { avail.set(v, c - 1); cls = "ok"; } else cls = "extra"; }
+    cells.push({ i: i, j: j, v: v, cls: cls });
+  }
+  const missing = [];
+  if (avail) avail.forEach((c, v) => { for (let k = 0; k < c; k++) missing.push(v); });
+  missing.sort(asc);
+  return { cells: cells, missing: missing };
+}
+
+function roadDraw() {
+  const svg = el("roadSvg"), S = road.S, n = S.length, L = roadLen();
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const y = 110, H = 168, x0 = 40, sc = (W - 80) / L, hmax = 92;
+  const xOf = v => x0 + v * sc;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.innerHTML = "";
+  const m = roadMatch();
+
+  /* road bed, extends to L */
+  mk("line", { x1: xOf(0), y1: y, x2: xOf(L), y2: y, class: "road" }, svg);
+  mk("line", { x1: xOf(0), y1: y, x2: xOf(L), y2: y, class: "roadmid" }, svg);
+  mk("rect", { x: xOf(0) - 10, y: y - 16, width: (xOf(L) - xOf(0)) + 20, height: 32, class: "roadhit" }, svg)
+    .dataset.role = "road";
+
+  /* segments: hit areas + P labels + selection */
+  for (let i = 0; i + 1 < n; i++) {
+    const xa = xOf(S[i]), xb = xOf(S[i + 1]);
+    if (road.sel && road.sel.type === "seg" && road.sel.i === i) {
+      mk("rect", { x: xa + 5, y: y - 6, width: Math.max(2, xb - xa - 10), height: 12, rx: 3, class: "segsel" }, svg);
+      mk("rect", { x: xa + 2, y: y + 35, width: Math.max(2, xb - xa - 4), height: 22, rx: 3, class: "segsel" }, svg);
+    }
+    const t = mk("text", { x: (xa + xb) / 2, y: y + 46, class: "seglab" }, svg); t.textContent = String(S[i + 1] - S[i]);
+    const r = mk("rect", { x: xa + 2, y: y + 35, width: Math.max(2, xb - xa - 4), height: 22, rx: 3, class: "seghit" }, svg);
+    r.dataset.role = "seg"; r.dataset.i = i;
+  }
+  if (n >= 2) { const t = mk("text", { x: x0 - 14, y: y + 46, class: "exlab faint", "text-anchor": "end" }, svg); t.textContent = "P"; }
+  { const t = mk("text", { x: x0 - 14, y: y + 26, class: "exlab faint", "text-anchor": "end" }, svg); t.textContent = "S"; }
+
+  /* arcs: for the selected exit, or the hovered toll-table cell */
+  let arcs = [];
+  if (road.hover) arcs = [{ i: road.hover[0], j: road.hover[1], cls: "hot" }];
+  else if (road.sel && road.sel.type === "exit") {
+    const k = road.sel.i;
+    m.cells.forEach(c => { if (c.i === k || c.j === k) arcs.push({ i: c.i, j: c.j, cls: c.cls === "extra" ? "bad" : c.cls === "ok" ? "ok" : "neu" }); });
+  }
+  arcs.forEach(a => {
+    const d = S[a.j] - S[a.i];
+    mk("path", { d: arcPath(xOf(S[a.i]), xOf(S[a.j]), y - 9, hmax, L, d), class: "arc " + a.cls }, svg);
+    const ax = (xOf(S[a.i]) + xOf(S[a.j])) / 2, ay = arcApex(y - 9, hmax, L, d);
+    mk("rect", { x: ax - 12, y: ay - 8, width: 24, height: 15, rx: 3, class: "arclabbg" }, svg);
+    const t = mk("text", { x: ax, y: ay, class: "arclab " + a.cls }, svg); t.textContent = String(d);
+  });
+
+  /* exits */
+  for (let i = 0; i < n; i++) {
+    const x = xOf(S[i]);
+    const isSel = road.sel && road.sel.type === "exit" && road.sel.i === i;
+    const hot = road.hover && (road.hover[0] === i || road.hover[1] === i);
+    const c = mk("circle", { cx: x, cy: y, r: 8.5, class: "exit" + (i === 0 ? " fixed" : " drag") + (isSel ? " sel" : "") + (hot ? " hot" : "") }, svg);
+    c.dataset.role = "exit"; c.dataset.i = i;
+    if (i === 0) c.setAttribute("title", "exit 0 stays at 0");
+    const t = mk("text", { x: x, y: y + 26, class: "exlab" }, svg); t.textContent = String(S[i]);
+  }
+  el("roadMeta").textContent = n + " exit" + (n === 1 ? "" : "s") + " · " + (n * (n - 1) / 2) + " tolls";
+  el("roadSetline").innerHTML = "<b>S</b> = " + fmtSet(S, "[", "]") + " &nbsp; <b>P</b> = " +
+    fmtSet(S.slice(1).map((v, i) => v - S[i]), "[", "]") + " &nbsp; <b>ΔS</b> = " + MS(m.cells.map(c => c.v).sort(asc));
+  return m;
+}
+
+function roadDrawToll(m) {
+  const S = road.S, n = S.length;
+  if (n < 2) { el("tollBox").innerHTML = '<span class="placeholder">Add a second exit to get a toll.</span>'; el("tollMeta").textContent = ""; return; }
+  const byPair = {}; m.cells.forEach(c => byPair[c.i + "," + c.j] = c);
+  const sel = road.sel && road.sel.type === "exit" ? road.sel.i : -1;
+  let h = '<table class="tolltab"><tr><th></th>';
+  for (let j = 1; j < n; j++) h += '<th class="' + (j === sel ? "hot" : "") + '">' + S[j] + "</th>";
+  h += "</tr>";
+  for (let i = 0; i + 1 < n; i++) {
+    h += '<tr><th class="' + (i === sel ? "hot" : "") + '">' + S[i] + "</th>";
+    for (let j = 1; j < n; j++) {
+      if (j <= i) { h += '<td class="blank"></td>'; continue; }
+      const c = byPair[i + "," + j];
+      const hot = road.hover && road.hover[0] === i && road.hover[1] === j;
+      h += '<td class="' + c.cls + (hot ? " hot" : "") + '" data-i="' + i + '" data-j="' + j + '">' + c.v + "</td>";
+    }
+    h += "</tr>";
+  }
+  h += "</table>";
+  el("tollBox").innerHTML = h;
+  el("tollMeta").textContent = "row S[i], column S[j]";
+}
+
+function roadDrawCmp(m) {
+  const S = road.S, n = S.length, T = road.T;
+  const dS = m.cells.map(c => c.v).sort(asc);
+  if (!T) {
+    el("cmpSumm").className = "summ"; el("cmpSumm").innerHTML = "Sandbox &mdash; no target. Δ<i>S</i> of the road:";
+    el("cmpD").innerHTML = '<span class="placeholder">Set a target D above, or turn this road into a puzzle.</span>';
+    el("cmpS").innerHTML = dS.map(v => '<span class="chip">' + v + "</span>").join("") || '<span class="placeholder">—</span>';
+    el("cmpMeta").textContent = "|ΔS| = " + dS.length;
+    return;
+  }
+  /* target chips: ok if realized by the road, miss otherwise */
+  const okCnt = countMap(m.cells.filter(c => c.cls === "ok").map(c => c.v));
+  const dChips = T.map(v => { const c = okCnt.get(v) || 0; if (c > 0) { okCnt.set(v, c - 1); return '<span class="chip ok">' + v + "</span>"; } return '<span class="chip miss">' + v + "</span>"; });
+  el("cmpD").innerHTML = dChips.join("");
+  const sChips = m.cells.slice().sort((a, b) => a.v - b.v || a.i - b.i).map(c => '<span class="chip ' + c.cls + '">' + c.v + "</span>");
+  el("cmpS").innerHTML = sChips.join("") || '<span class="placeholder">—</span>';
+  const nOk = m.cells.filter(c => c.cls === "ok").length, nEx = m.cells.length - nOk, nMiss = m.missing.length;
+  const need = (Math.sqrt(8 * T.length + 1) - 1) / 2;
+  const needTxt = Number.isInteger(need) ? need + 1 + " exits needed" : "|D| = " + T.length + " is not of the form n(n+1)/2 — no road can fit";
+  const solved = nEx === 0 && nMiss === 0;
+  el("cmpSumm").className = "summ " + (solved ? "good" : "bad");
+  el("cmpSumm").innerHTML = solved
+    ? "Δ<i>S</i> = D &mdash; solved! This road produces exactly the given tolls."
+    : nOk + " of " + T.length + " tolls matched &middot; <span class=\"k-bad\">" + nMiss + " missing</span> &middot; " +
+      "<span class=\"k-ex\">" + nEx + " extra</span>";
+  el("cmpMeta").textContent = needTxt + " · road has " + n;
+}
+
+function roadRender() {
+  const m = roadDraw();
+  roadDrawToll(m);
+  roadDrawCmp(m);
+  el("roadDel").disabled = !(road.sel && road.sel.type === "exit" && road.sel.i > 0);
+}
+
+/* --- mutations ------------------------------------------------------------ */
+
+function roadAddExit(v) {
+  if (v <= 0 || road.S.includes(v)) return false;
+  roadPush();
+  road.S.push(v); road.S.sort(asc);
+  road.sel = { type: "exit", i: road.S.indexOf(v) };
+  roadRender(); return true;
+}
+function roadRemoveExit(i) {
+  if (i <= 0 || i >= road.S.length) return;
+  roadPush(); road.S.splice(i, 1); road.sel = null; roadRender();
+}
+function roadSwapSeg(a, b) {
+  const P = road.S.slice(1).map((v, i) => v - road.S[i]);
+  roadPush();
+  const t = P[a]; P[a] = P[b]; P[b] = t;
+  road.S = prefSums(P); road.sel = null; roadRender();
+}
+function roadMirror() {
+  const P = road.S.slice(1).map((v, i) => v - road.S[i]).reverse();
+  roadPush(); road.S = prefSums(P); road.sel = null; roadRender();
+}
+
+function roadLoadText(txt) {
+  try {
+    const lines = stripComments(txt).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (!lines.length) throw new Error("empty input");
+    let D, S;
+    for (const l of lines) {
+      const m = l.match(/^([DSP])\b\s*[:=]?\s*(.*)$/i);
+      if (m) {
+        const vals = parseIntList(m[2]);
+        const k = m[1].toUpperCase();
+        if (k === "D") D = vals.sort(asc);
+        else if (k === "S") { S = vals.slice().sort(asc); if (S[0] !== 0) throw new Error("S must start with 0"); if (new Set(S).size !== S.length) throw new Error("S has a repeated exit"); }
+        else { if (vals.some(x => x < 1)) throw new Error("P entries must be ≥ 1"); S = prefSums(vals); }
+      } else if (lines.length === 1) D = parseIntList(l).sort(asc);
+      else throw new Error("expected a line starting with D, S or P: " + l);
+    }
+    if (D && D.some(x => x < 1)) throw new Error("D must contain positive integers");
+    el("roadErr").textContent = "";
+    roadPush();
+    road.T = D !== undefined ? D : road.T;
+    if (S) road.S = S; else if (D) road.S = [0, D[D.length - 1]];
+    el("roadD").value = road.T ? road.T.join(" ") : "";
+    road.sel = null; roadRender();
+  } catch (e) { el("roadErr").textContent = e.message; }
+}
+
+function roadInit() {
+  const svg = el("roadSvg");
+  const sc = () => (Math.max(380, (svg.parentElement.clientWidth || 900) - 2) - 80) / roadLen();
+  const valOf = ev => {
+    const r = svg.getBoundingClientRect();
+    return Math.round((ev.clientX - r.left - 40) / sc());
+  };
+
+  svg.addEventListener("pointerdown", ev => {
+    const t = ev.target, role = t.dataset && t.dataset.role;
+    if (role === "exit") {
+      const i = Number(t.dataset.i);
+      const now = performance.now();
+      if (i > 0 && road.lastDown && road.lastDown.i === i && now - road.lastDown.t < 450) {
+        road.lastDown = null; roadRemoveExit(i); ev.preventDefault(); return;
+      }
+      road.lastDown = { i: i, t: now };
+      road.sel = { type: "exit", i: i };
+      if (i > 0) {
+        road.drag = { i: i, start: road.S[i], moved: false, pushed: false };
+        svg.setPointerCapture(ev.pointerId);
+      }
+      roadRender(); ev.preventDefault();
+    }
+  });
+  svg.addEventListener("pointermove", ev => {
+    if (!road.drag) return;
+    const d = road.drag, i = d.i, S = road.S;
+    let v = valOf(ev);
+    const lo = S[i - 1] + 1, hi = i + 1 < S.length ? S[i + 1] - 1 : roadLen();
+    v = Math.max(lo, Math.min(hi, v));
+    if (v !== S[i]) {
+      if (!d.pushed) { roadPush(); road.undo[road.undo.length - 1][i] = d.start; d.pushed = true; }
+      S[i] = v; d.moved = true; roadRender();
+    }
+  });
+  const endDrag = () => { if (road.drag) { road.drag = null; roadRender(); } };
+  svg.addEventListener("pointerup", endDrag);
+  svg.addEventListener("pointercancel", endDrag);
+
+  svg.addEventListener("click", ev => {
+    const t = ev.target, role = t.dataset && t.dataset.role;
+    if (role === "road") {
+      const v = valOf(ev);
+      if (v > 0 && v <= roadLen() && !road.S.includes(v)) roadAddExit(v);
+      else { road.sel = null; roadRender(); }
+    } else if (role === "seg") {
+      const i = Number(t.dataset.i);
+      if (road.sel && road.sel.type === "seg") {
+        if (road.sel.i !== i) roadSwapSeg(road.sel.i, i); else { road.sel = null; roadRender(); }
+      } else { road.sel = { type: "seg", i: i }; roadRender(); }
+    } else if (!role) { road.sel = null; roadRender(); }
+  });
+  svg.addEventListener("dblclick", ev => ev.preventDefault());
+
+  el("tollBox").addEventListener("mouseover", ev => {
+    const td = ev.target.closest("td[data-i]");
+    if (td) { road.hover = [Number(td.dataset.i), Number(td.dataset.j)]; roadRender(); }
+  });
+  el("tollBox").addEventListener("mouseleave", () => { road.hover = null; roadRender(); });
+
+  el("roadAdd").addEventListener("click", () => {
+    const S = road.S; let best = -1, bi = 0;
+    for (let i = 0; i + 1 < S.length; i++) if (S[i + 1] - S[i] > best) { best = S[i + 1] - S[i]; bi = i; }
+    if (S.length < 2) { roadAddExit(Math.max(1, Math.round(roadLen() / 2))); return; }
+    if (best >= 2) roadAddExit(Math.floor((S[bi] + S[bi + 1]) / 2));
+    else if (!road.T) roadAddExit(S[S.length - 1] + 1);
+  });
+  el("roadDel").addEventListener("click", () => { if (road.sel && road.sel.type === "exit") roadRemoveExit(road.sel.i); });
+  el("roadMirror").addEventListener("click", roadMirror);
+  el("roadReset").addEventListener("click", () => { roadPush(); road.S = [0, roadMaxS()]; road.sel = null; roadRender(); });
+  el("roadUndo").addEventListener("click", roadUndoDo);
+  el("roadFreeze").addEventListener("click", () => {
+    if (road.S.length < 2) return;
+    roadSetTarget(deltaOf(road.S), true);
+    el("roadPreset").value = ""; showRandBar("road", false);
+  });
+  el("roadSetD").addEventListener("click", () => {
+    try { const D = parseIntList(el("roadD").value); if (!D.length) throw new Error("empty");
+          if (D.some(x => x < 1)) throw new Error("D must contain positive integers");
+          roadSetTarget(D, true); el("roadPreset").value = ""; showRandBar("road", false); }
+    catch (e) { el("roadErr").textContent = e.message; }
+  });
+  el("roadD").addEventListener("keydown", ev => { if (ev.key === "Enter") el("roadSetD").click(); });
+  el("roadClearD").addEventListener("click", () => { roadSetTarget(null, false); el("roadPreset").value = "free"; showRandBar("road", false); });
+  el("roadLoad").addEventListener("click", () => roadLoadText(el("roadText").value));
+
+  const sel = el("roadPreset");
+  sel.innerHTML = ROAD_PRESETS.map(p => '<option value="' + p.key + '">' + esc(p.name) + "</option>").join("") +
+                  '<option value="">(custom)</option>';
+  const roadRandom = () => {
+    const n = Math.max(2, Math.min(9, Number(el("roadRandN").value) || 5)), mx = Math.max(2, Math.min(30, Number(el("roadRandMax").value) || 9));
+    el("roadRandN").value = n; el("roadRandMax").value = mx;
+    let D = deltaOf(prefSums(randomP(n, mx)));
+    if (el("roadRandTamper").checked && Math.random() < 0.5) D = tamper(D);
+    roadSetTarget(D, true);
+  };
+  el("roadRandGo").addEventListener("click", roadRandom);
+  sel.addEventListener("change", () => {
+    const p = ROAD_PRESETS.find(q => q.key === sel.value); if (!p) return;
+    showRandBar("road", p.D === "random");
+    if (p.D === "random") roadRandom();
+    else if (p.D) roadSetTarget(p.D, true);
+    else { roadPush(); road.T = null; road.S = p.S.slice(); road.sel = null; el("roadD").value = ""; roadRender(); }
+  });
+  el("roadText").value = "D 1 2 3 3 5 6 8 8 9 11\n# S 0 3 8 9 11";
+  sel.value = "d1"; roadSetTarget(ROAD_PRESETS[0].D, true);
+  road.undo = []; el("roadUndo").disabled = true;
+}
+
+/* ==========================================================================
+   TAB 1 -- the forward problem, as a fleet of cars collecting toll tickets.
+
+   For every pair of exits i < j one car drives from exit i to exit j at the
+   same constant speed, so the time it needs is proportional to the distance
+   it covers -- and the toll it pays, printed on the ticket it drops at the
+   end, is exactly that distance.  All tickets together are the multiset D.
+   Cars starting at the same exit share a lane and leave in order of their
+   destination, so they never overtake each other.
+   ========================================================================== */
+
+const FWD_MAX_EXITS = 9;
+
+const FWD_PRESETS = [
+  { key: "small", name: "4 exits: 0, 3, 8, 11",     in: "S 0 3 8 11" },
+  { key: "lect",  name: "5 exits: 0, 3, 8, 9, 11",  in: "S 0 3 8 9 11" },
+  { key: "unit",  name: "6 exits, every kilometre",  in: "S 0 1 2 3 4 5" },
+  { key: "six",   name: "6 exits: 0, 4, 10, 15, 17, 18", in: "S 0 4 10 15 17 18" },
+  { key: "two",   name: "7 exits, two clusters",     in: "S 0 1 2 20 21 22 23" },
+  { key: "random", name: "random road…",             in: null }
+];
+
+const fwd = { S: [0, 3, 8, 11], cars: [], sel: null, undo: [], drag: null, hover: null,
+              anim: { t: 0, total: 0, playing: false, done: true, last: null, raf: null, rate: 1 },
+              solo: null, geo: null, el: null };
+
+const FWD_T = { lane: 130, seq: 250, travel: 1500, flight: 520, pause: 260, sort: 700 };
+
+const fwdHue = (i, j, n) => ((i * 7 + j * 3) * 360 / Math.max(3, n + 4) + i * 37) % 360;
+const fwdStroke = c => "hsl(" + c + ",50%,38%)";
+const fwdFill   = c => "hsl(" + c + ",55%,72%)";
+
+/* ---------- geometry ------------------------------------------------------- */
+
+function fwdGeo() {
+  const S = fwd.S, n = S.length, maxS = S[n - 1];
+  const svg = el("fwdSvg");
+  const W = Math.max(380, (svg.parentElement.clientWidth || 900) - 2);
+  const L = Math.max(maxS * 1.15, maxS + 1.5);
+  const x0 = 42, sc = (W - 84) / L, laneH = 17, lanes = Math.max(1, n - 1);
+  const yBand = 30, bandH = lanes * laneH;
+  const yEx = yBand + bandH + 18;
+  const yT = yEx + 46;
+  const slotW = 40, slotH = 24, perRow = Math.max(4, Math.floor((W - 60) / slotW));
+  const nT = n * (n - 1) / 2, rows = Math.ceil(nT / perRow);
+  const H = yT + rows * slotH + 14;
+  return { W: W, H: H, L: L, x0: x0, sc: sc, laneH: laneH, lanes: lanes, yBand: yBand, bandH: bandH,
+           yEx: yEx, yT: yT, slotW: slotW, slotH: slotH, perRow: perRow, rows: rows,
+           xOf: v => x0 + v * sc, laneY: i => yBand + i * laneH + laneH / 2,
+           slot: k => ({ x: 30 + (k % perRow) * slotW + slotW / 2, y: yT + Math.floor(k / perRow) * slotH + slotH / 2 }) };
+}
+
+/* ---------- the fleet ------------------------------------------------------ */
+
+function fwdMakeCars() {
+  const S = fwd.S, n = S.length, maxD = Math.max(1, S[n - 1] - S[0]);
+  const perUnit = FWD_T.travel / maxD;
+  const cars = [];
+  for (let i = 0; i + 1 < n; i++) {
+    let seq = 0;
+    for (let j = i + 1; j < n; j++) {
+      const d = S[j] - S[i];
+      const t0 = i * FWD_T.lane + seq * FWD_T.seq + (((i * 31 + j * 17) % 7) / 7) * 160;
+      const travel = Math.max(320, d * perUnit);
+      cars.push({ i: i, j: j, d: d, lane: i, t0: t0, travel: travel, arrive: t0 + travel,
+                  hue: fwdHue(i, j, n), slot: 0, sortSlot: 0 });
+      seq++;
+    }
+  }
+  /* tickets land in the order the cars arrive, then get sorted by value */
+  cars.slice().sort((a, b) => a.arrive - b.arrive).forEach((c, k) => c.slot = k);
+  cars.slice().sort((a, b) => a.d - b.d || a.arrive - b.arrive).forEach((c, k) => c.sortSlot = k);
+  fwd.cars = cars;
+  const lastArrive = Math.max(...cars.map(c => c.arrive));
+  fwd.anim.sortStart = lastArrive + FWD_T.flight + FWD_T.pause;
+  fwd.anim.total = fwd.anim.sortStart + FWD_T.sort + 200;
+}
+
+/* ---------- build the SVG once, then only move things around --------------- */
+
+function fwdBuild() {
+  const g = fwd.geo = fwdGeo(), svg = el("fwdSvg"), S = fwd.S, n = S.length;
+  svg.setAttribute("width", g.W); svg.setAttribute("height", g.H); svg.innerHTML = "";
+  const el_ = { cars: [], tickets: [] };
+
+  /* road band with lane dividers */
+  mk("rect", { x: g.xOf(0) - 8, y: g.yBand, width: g.xOf(g.L) - g.xOf(0) + 16, height: g.bandH, rx: 5,
+               style: "fill:#8d897c" }, svg);
+  for (let i = 1; i < g.lanes; i++)
+    mk("line", { x1: g.xOf(0) - 4, y1: g.yBand + i * g.laneH, x2: g.xOf(g.L) + 4, y2: g.yBand + i * g.laneH,
+                 style: "stroke:var(--wi-bg);stroke-width:1.2;stroke-dasharray:8 8;opacity:.7" }, svg);
+  const hit = mk("rect", { x: g.xOf(0) - 8, y: g.yBand, width: g.xOf(g.L) - g.xOf(0) + 16, height: g.bandH,
+                           class: "roadhit" }, svg);
+  hit.dataset.role = "road";
+
+  /* toll gates and exits */
+  S.forEach((s, i) => {
+    const x = g.xOf(s);
+    mk("line", { x1: x, y1: g.yBand - 7, x2: x, y2: g.yBand + g.bandH + 7,
+                 style: "stroke:var(--wi-ink-strong);stroke-width:2;opacity:.75" }, svg);
+    mk("rect", { x: x - 7, y: g.yBand - 15, width: 14, height: 9, rx: 2,
+                 style: "fill:var(--wi-controls);stroke:var(--wi-ink-strong);stroke-width:1.2" }, svg);
+    const c = mk("circle", { cx: x, cy: g.yEx, r: 8.5,
+                             class: "exit" + (i === 0 ? " fixed" : " drag") + (fwd.sel === i ? " sel" : "") }, svg);
+    c.dataset.role = "exit"; c.dataset.i = i;
+    const t = mk("text", { x: x, y: g.yEx + 21, class: "exlab" }, svg); t.textContent = String(s);
+  });
+  { const t = mk("text", { x: g.x0 - 16, y: g.yEx + 21, class: "exlab faint", "text-anchor": "end" }, svg); t.textContent = "S"; }
+  /* segment lengths, between the exit dots */
+  for (let i = 0; i + 1 < n; i++) {
+    const t = mk("text", { x: (g.xOf(S[i]) + g.xOf(S[i + 1])) / 2, y: g.yEx, class: "seglab" }, svg);
+    t.textContent = String(S[i + 1] - S[i]);
+  }
+
+  /* ticket board */
+  mk("line", { x1: 20, y1: g.yT - 9, x2: g.W - 20, y2: g.yT - 9,
+               style: "stroke:var(--wi-border-soft);stroke-width:1;stroke-dasharray:3 4" }, svg);
+  const bl = mk("text", { x: g.W - 20, y: g.yT - 15, class: "ttl", "text-anchor": "end" }, svg);
+  bl.textContent = "toll tickets";
+
+  /* tickets (hidden until their car arrives) */
+  fwd.cars.forEach((c, k) => {
+    const tg = mk("g", { opacity: 0 }, svg);
+    mk("rect", { x: -16, y: -9, width: 32, height: 18, rx: 3,
+                 style: "fill:" + fwdFill(c.hue) + ";stroke:" + fwdStroke(c.hue) + ";stroke-width:1.3" }, tg);
+    mk("line", { x1: -10, y1: -9, x2: -10, y2: 9, style: "stroke:" + fwdStroke(c.hue) + ";stroke-width:.8;stroke-dasharray:2 2" }, tg);
+    const txt = mk("text", { x: 3, y: 0, class: "ptlab", style: "font-size:12px;fill:" + fwdStroke(c.hue) }, tg);
+    txt.textContent = String(c.d);
+    const h = mk("rect", { x: -16, y: -9, width: 32, height: 18, class: "hit" }, tg);
+    h.dataset.pair = c.i + "," + c.j;
+    el_.tickets.push(tg);
+  });
+
+  /* cars */
+  fwd.cars.forEach((c, k) => {
+    const cg = mk("g", {}, svg), h = g.laneH - 6, w = 25;
+    mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: 3,
+                 style: "fill:" + fwdFill(c.hue) + ";stroke:" + fwdStroke(c.hue) + ";stroke-width:1.4" }, cg);
+    mk("rect", { x: -w / 2 + 4, y: -h / 2 + 1.5, width: w * 0.42, height: h - 3, rx: 1.5,
+                 style: "fill:var(--wi-bg);opacity:.65" }, cg);
+    mk("circle", { cx: -w / 4, cy: h / 2, r: 2.2, style: "fill:var(--wi-ink-strong)" }, cg);
+    mk("circle", { cx: w / 4, cy: h / 2, r: 2.2, style: "fill:var(--wi-ink-strong)" }, cg);
+    const meter = mk("text", { x: 0, y: -h / 2 - 6, class: "ptlab", style: "font-size:11px;font-weight:bold;fill:" + fwdStroke(c.hue) }, cg);
+    const hc = mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, class: "hit" }, cg);
+    hc.dataset.pair = c.i + "," + c.j;
+    el_.cars.push({ g: cg, meter: meter });
+  });
+  const ruler = mk("g", { opacity: 0 }, svg);
+  mk("line", { x1: 0, y1: 0, x2: 1, y2: 0, style: "stroke-width:3", class: "fwdruler" }, ruler);
+  mk("line", { x1: 0, y1: -4, x2: 0, y2: 4, style: "stroke-width:2", class: "fwdrulerA" }, ruler);
+  mk("line", { x1: 1, y1: -4, x2: 1, y2: 4, style: "stroke-width:2", class: "fwdrulerB" }, ruler);
+  el_.ruler = ruler;
+  fwd.el = el_;
+}
+
+/* ---------- one animation frame ------------------------------------------- */
+
+function fwdFrame() {
+  const g = fwd.geo, a = fwd.anim, S = fwd.S, showMeter = fwd.cars.length <= 21;
+  const easeOut = u => 1 - (1 - u) * (1 - u);
+  /* the stretch of road the highlighted car has to cover */
+  const hl = fwd.solo ? fwd.cars[fwd.solo.k] : fwd.hover ? fwd.cars.find(c => c.i === fwd.hover[0] && c.j === fwd.hover[1]) : null;
+  const ru = fwd.el.ruler;
+  if (hl) {
+    const xa = g.xOf(S[hl.i]), xb = g.xOf(S[hl.j]), yr = g.yBand + g.bandH + 6, col = fwdStroke(hl.hue);
+    ru.setAttribute("opacity", 1);
+    ru.querySelector(".fwdruler").setAttribute("x1", xa); ru.querySelector(".fwdruler").setAttribute("x2", xb);
+    ru.querySelector(".fwdruler").setAttribute("y1", yr); ru.querySelector(".fwdruler").setAttribute("y2", yr);
+    ["fwdruler", "fwdrulerA", "fwdrulerB"].forEach(cl => ru.querySelector("." + cl).style.stroke = col);
+    [["fwdrulerA", xa], ["fwdrulerB", xb]].forEach(([cl, x]) => { const e = ru.querySelector("." + cl);
+      e.setAttribute("x1", x); e.setAttribute("x2", x); e.setAttribute("y1", yr - 5); e.setAttribute("y2", yr + 5); });
+  } else ru.setAttribute("opacity", 0);
+  fwd.cars.forEach((c, k) => {
+    const ce = fwd.el.cars[k], te = fwd.el.tickets[k];
+    const xi = g.xOf(S[c.i]), xj = g.xOf(S[c.j]), y = g.laneY(c.lane);
+    const solo = fwd.solo && fwd.solo.k === k;
+    let x = xi, driving = false, frac = 0;
+    if (solo) {
+      frac = Math.min(1, fwd.solo.t / c.travel); driving = frac < 1;
+      x = xi + (xj - xi) * frac;
+    } else if (a.t < c.t0) { x = xi; }
+    else if (a.t < c.arrive) { frac = (a.t - c.t0) / c.travel; driving = true; x = xi + (xj - xi) * frac; }
+    else { x = xj; frac = 1; }
+    ce.g.setAttribute("transform", "translate(" + x + "," + y + ")");
+    const hovered = fwd.hover && fwd.hover[0] === c.i && fwd.hover[1] === c.j;
+    ce.g.setAttribute("opacity", solo || hovered ? 1 : driving ? 1 : a.done ? 0 : a.t < c.t0 ? .45 : .25);
+    ce.meter.textContent = showMeter && (driving || solo || hovered) ? String(Math.round(c.d * frac)) : "";
+
+    /* the ticket: flies from the car's destination into its slot, then gets sorted in */
+    const tf = (a.t - c.arrive) / FWD_T.flight;
+    let pos = null, op = 0;
+    if (a.done || a.t >= c.arrive + FWD_T.flight) {
+      const sorted = a.done || a.t >= a.sortStart + FWD_T.sort;
+      const from = g.slot(c.slot), to = g.slot(c.sortSlot);
+      const u = sorted ? 1 : a.t <= a.sortStart ? 0 : easeOut((a.t - a.sortStart) / FWD_T.sort);
+      pos = { x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u }; op = 1;
+    } else if (tf >= 0) {
+      const u = easeOut(Math.min(1, tf)), to = g.slot(c.slot);
+      pos = { x: xj + (to.x - xj) * u, y: y + (to.y - y) * u }; op = .35 + .65 * u;
+    }
+    if (pos) {
+      te.setAttribute("transform", "translate(" + pos.x + "," + pos.y + ")" + (op < 1 ? " scale(" + (0.7 + 0.3 * op) + ")" : ""));
+      te.setAttribute("opacity", hovered || solo ? 1 : op);
+    } else te.setAttribute("opacity", 0);
+    const tr = te.querySelector("rect");
+    if (hovered || solo) { tr.style.strokeWidth = "2.6"; tr.style.stroke = "var(--wi-accent)"; }
+    else { tr.style.strokeWidth = "1.3"; tr.style.stroke = fwdStroke(c.hue); }
+  });
+}
+
+function fwdTick(now) {
+  const a = fwd.anim;
+  if (a.last === null) a.last = now;
+  const dt = Math.min(60, now - a.last); a.last = now;
+  if (fwd.solo) {
+    fwd.solo.t += dt * a.rate;
+    if (fwd.solo.t > fwd.cars[fwd.solo.k].travel + 400) fwd.solo.t = 0;   /* loop while hovering */
+  }
+  if (a.playing) {
+    a.t += dt * a.rate;
+    if (a.t >= a.total) { a.t = a.total; a.playing = false; a.done = true; fwdStatus(); fwdTollTable(); fwdChips(); }
+  }
+  fwdFrame();
+  if (a.playing || fwd.solo) a.raf = requestAnimationFrame(fwdTick);
+  else { a.raf = null; a.last = null; }
+}
+function fwdKick() { if (!fwd.anim.raf) { fwd.anim.last = null; fwd.anim.raf = requestAnimationFrame(fwdTick); } }
+function fwdPlay() {
+  const a = fwd.anim;
+  a.t = 0; a.playing = true; a.done = false; a.last = null;
+  fwdStatus(); fwdTollTable(); fwdChips(); fwdKick();
+}
+function fwdSkip() { const a = fwd.anim; a.t = a.total; a.playing = false; a.done = true; fwdFrame(); fwdStatus(); fwdTollTable(); fwdChips(); }
+
+/* ---------- panels -------------------------------------------------------- */
+
+function fwdStatus() {
+  const n = fwd.S.length, m = n * (n - 1) / 2, a = fwd.anim;
+  el("fwdPhase").textContent = a.done ? "tolls collected" : a.playing ? "cars on the road" : "";
+  el("fwdStatus").innerHTML = a.done
+    ? "Each of the <b>" + m + " = n(n−1)/2</b> pairs of exits has paid its toll. Sorted, the tickets form the " +
+      "<b>multiset D</b> of all pairwise distances &mdash; that, and nothing else, is what the puzzle in the next " +
+      "tab gives you: <i>the tickets, but not the road</i>. Note that the tickets carry no hint of <i>which</i> " +
+      "pair of exits produced them. Move the exits around and watch D change; when you like it, hand it over as a puzzle."
+    : "One car for every pair of exits, all at the same speed, so <b>the distance a car covers is the time it " +
+      "takes</b> &mdash; and that is the toll it pays. Cars leaving from the same exit share a lane. Every car drops " +
+      "a <b>toll ticket</b> with the amount it owes; the tickets pile up below and are then sorted.";
+  el("fwdMeta").textContent = n + " exits · " + m + " cars";
+  el("fwdSetline").innerHTML = "<b>S</b> = " + fmtSet(fwd.S, "[", "]") + " &nbsp; <b>P</b> = " +
+    fmtSet(fwd.S.slice(1).map((v, i) => v - fwd.S[i]), "[", "]");
+  el("fwdDel").disabled = !(fwd.sel !== null && fwd.sel > 0);
+  el("fwdUndo").disabled = !fwd.undo.length;
+}
+
+function fwdTollTable() {
+  const S = fwd.S, n = S.length, box = el("fwdTollBox");
+  if (!fwd.anim.done) { box.innerHTML = '<span class="placeholder">The table appears once all cars have arrived.</span>'; el("fwdTollMeta").textContent = ""; return; }
+  const byPair = {}; fwd.cars.forEach(c => byPair[c.i + "," + c.j] = c);
+  let h = '<table class="tolltab"><tr><th></th>';
+  for (let j = 1; j < n; j++) h += "<th>" + S[j] + "</th>";
+  h += "</tr>";
+  for (let i = 0; i + 1 < n; i++) {
+    h += "<tr><th>" + S[i] + "</th>";
+    for (let j = 1; j < n; j++) {
+      if (j <= i) { h += '<td class="blank"></td>'; continue; }
+      const c = byPair[i + "," + j], hov = fwd.hover && fwd.hover[0] === i && fwd.hover[1] === j;
+      h += '<td data-i="' + i + '" data-j="' + j + '" style="cursor:pointer;background:' + fwdFill(c.hue) +
+           ";border-color:" + fwdStroke(c.hue) + ";color:" + fwdStroke(c.hue) + (hov ? ";outline:2px solid var(--wi-accent);font-weight:bold" : "") +
+           '">' + c.d + "</td>";
+    }
+    h += "</tr>";
+  }
+  box.innerHTML = h + "</table>";
+  el("fwdTollMeta").textContent = "row S[i], column S[j]";
+}
+
+function fwdChips() {
+  if (!fwd.anim.done) { el("fwdD").innerHTML = '<span class="placeholder">The tolls appear once all cars have arrived.</span>'; el("fwdDMeta").textContent = ""; return; }
+  const cs = fwd.cars.slice().sort((a, b) => a.d - b.d);
+  el("fwdD").innerHTML = cs.map(c => {
+    const hov = fwd.hover && fwd.hover[0] === c.i && fwd.hover[1] === c.j;
+    return '<span class="chip" data-i="' + c.i + '" data-j="' + c.j + '" style="cursor:pointer;background:' + fwdFill(c.hue) +
+           ";border-color:" + fwdStroke(c.hue) + ";color:" + fwdStroke(c.hue) + (hov ? ";box-shadow:0 0 0 2px var(--wi-accent)" : "") + '">' + c.d + "</span>";
+  }).join("");
+  el("fwdDMeta").textContent = "|D| = " + cs.length;
+}
+
+function fwdRender(replay) {
+  fwdMakeCars(); fwdBuild(); fwdStatus();
+  if (replay) fwdPlay(); else { fwdFrame(); fwdTollTable(); fwdChips(); }
+}
+
+/* ---------- editing the road ---------------------------------------------- */
+
+function fwdPush() { fwd.undo.push(fwd.S.slice()); if (fwd.undo.length > 200) fwd.undo.shift(); }
+function fwdAddExit(v) {
+  if (v <= 0 || fwd.S.includes(v) || fwd.S.length >= FWD_MAX_EXITS) return false;
+  fwdPush(); fwd.S.push(v); fwd.S.sort(asc); fwd.sel = fwd.S.indexOf(v);
+  fwd.anim.done = true; fwd.anim.playing = false; fwdRender(false); return true;
+}
+function fwdRemoveExit(i) {
+  if (i <= 0 || i >= fwd.S.length || fwd.S.length <= 2) return;
+  fwdPush(); fwd.S.splice(i, 1); fwd.sel = null; fwd.anim.done = true; fwd.anim.playing = false; fwdRender(false);
+}
+function fwdUndoDo() {
+  if (!fwd.undo.length) return;
+  fwd.S = fwd.undo.pop(); fwd.sel = null; fwd.anim.done = true; fwd.anim.playing = false; fwdRender(false);
+}
+
+function fwdSetInput(str, fromPreset, replay) {
+  try {
+    const txt = stripComments(str).trim();
+    if (!txt) throw new Error("empty input");
+    const m = txt.match(/^([SP])\b\s*[:=]?\s*(.*)$/i);
+    let S;
+    if (m && m[1].toUpperCase() === "P") {
+      const P = parseIntList(m[2]);
+      if (!P.length) throw new Error("empty input");
+      if (P.some(x => x < 1)) throw new Error("segment lengths must be ≥ 1");
+      S = prefSums(P);
+    } else {
+      S = parseIntList(m ? m[2] : txt).sort(asc);
+      if (!S.length) throw new Error("empty input");
+      if (S[0] !== 0) S = [0].concat(S);
+      if (new Set(S).size !== S.length) throw new Error("repeated exit");
+    }
+    if (S.length < 2) throw new Error("need at least two exits");
+    if (S.length > FWD_MAX_EXITS) throw new Error("at most " + FWD_MAX_EXITS + " exits");
+    fwdPush(); fwd.S = S; fwd.sel = null;
+    el("fwdErr").textContent = "";
+    el("fwdIn").value = "S " + S.join(" "); el("fwdText").value = "S " + S.join(" ");
+    if (!fromPreset) { el("fwdPreset").value = ""; el("fwdRandBar").style.display = "none"; }
+    fwdRender(replay !== false);
+    return true;
+  } catch (e) { el("fwdErr").textContent = e.message; return false; }
+}
+
+function fwdSetHover(pair) {
+  const same = (fwd.hover && pair && fwd.hover[0] === pair[0] && fwd.hover[1] === pair[1]) || (!fwd.hover && !pair);
+  if (same) return;
+  fwd.hover = pair;
+  if (pair) {
+    const k = fwd.cars.findIndex(c => c.i === pair[0] && c.j === pair[1]);
+    fwd.solo = k >= 0 ? { k: k, t: 0 } : null;
+  } else fwd.solo = null;
+  fwdTollTable(); fwdChips(); fwdFrame(); fwdKick();
+}
+
+function fwdInit() {
+  const svg = el("fwdSvg");
+  const valOf = ev => {
+    const r = svg.getBoundingClientRect(), g = fwd.geo;
+    return Math.round((ev.clientX - r.left - g.x0) / g.sc);
+  };
+  svg.addEventListener("pointerdown", ev => {
+    const t = ev.target;
+    if (t.dataset && t.dataset.role === "exit") {
+      const i = Number(t.dataset.i), now = performance.now();
+      if (i > 0 && fwd.lastDown && fwd.lastDown.i === i && now - fwd.lastDown.t < 450) { fwd.lastDown = null; fwdRemoveExit(i); ev.preventDefault(); return; }
+      fwd.lastDown = { i: i, t: now };
+      fwd.sel = i;
+      if (i > 0) { fwd.drag = { i: i, start: fwd.S[i], pushed: false }; svg.setPointerCapture(ev.pointerId); }
+      fwdRender(false); ev.preventDefault();
+    }
+  });
+  svg.addEventListener("pointermove", ev => {
+    if (fwd.drag) {
+      const d = fwd.drag, i = d.i, S = fwd.S, g = fwd.geo;
+      let v = Math.max(S[i - 1] + 1, Math.min(i + 1 < S.length ? S[i + 1] - 1 : Math.round(g.L), valOf(ev)));
+      if (v !== S[i]) {
+        if (!d.pushed) { fwdPush(); fwd.undo[fwd.undo.length - 1][i] = d.start; d.pushed = true; }
+        S[i] = v; fwd.anim.done = true; fwd.anim.playing = false; fwdRender(false);
+      }
+      return;
+    }
+    const t = ev.target, p = t.dataset && t.dataset.pair;
+    fwdSetHover(p ? p.split(",").map(Number) : null);
+  });
+  const endDrag = () => { if (fwd.drag) { fwd.drag = null; fwdRender(false); } };
+  svg.addEventListener("pointerup", endDrag);
+  svg.addEventListener("pointercancel", endDrag);
+  svg.addEventListener("mouseleave", () => fwdSetHover(null));
+  svg.addEventListener("click", ev => {
+    const t = ev.target;
+    if (t.dataset && t.dataset.role === "road") { const v = valOf(ev); if (!fwdAddExit(v)) { fwd.sel = null; fwdRender(false); } }
+    else if (!(t.dataset && (t.dataset.role || t.dataset.pair))) { fwd.sel = null; fwdRender(false); }
+  });
+  svg.addEventListener("dblclick", ev => ev.preventDefault());
+
+  const hoverFrom = box => {
+    el(box).addEventListener("mouseover", ev => {
+      const c = ev.target.closest("[data-i]");
+      fwdSetHover(c ? [Number(c.dataset.i), Number(c.dataset.j)] : null);
+    });
+    el(box).addEventListener("mouseleave", () => fwdSetHover(null));
+  };
+  hoverFrom("fwdTollBox"); hoverFrom("fwdD");
+
+  el("fwdSet").addEventListener("click", () => fwdSetInput(el("fwdIn").value, false, true));
+  el("fwdIn").addEventListener("keydown", ev => { if (ev.key === "Enter") fwdSetInput(el("fwdIn").value, false, true); });
+  el("fwdLoad").addEventListener("click", () => fwdSetInput(el("fwdText").value, false, true));
+  el("fwdReplay").addEventListener("click", fwdPlay);
+  el("fwdSkip").addEventListener("click", fwdSkip);
+  el("fwdSpeed").addEventListener("input", () => { fwd.anim.rate = Number(el("fwdSpeed").value) / 100; });
+  el("fwdAdd").addEventListener("click", () => {
+    const S = fwd.S; let best = -1, bi = 0;
+    for (let i = 0; i + 1 < S.length; i++) if (S[i + 1] - S[i] > best) { best = S[i + 1] - S[i]; bi = i; }
+    if (best >= 2) fwdAddExit(Math.floor((S[bi] + S[bi + 1]) / 2)); else fwdAddExit(S[S.length - 1] + 1);
+  });
+  el("fwdDel").addEventListener("click", () => { if (fwd.sel !== null) fwdRemoveExit(fwd.sel); });
+  el("fwdUndo").addEventListener("click", fwdUndoDo);
+  el("fwdToRoad").addEventListener("click", () => {
+    roadSetTarget(deltaOf(fwd.S), true);
+    el("roadPreset").value = ""; showRandBar("road", false);
+    showTab("road");
+  });
+  const fwdRandom = () => {
+    const n = Math.max(2, Math.min(8, Number(el("fwdRandN").value) || 4)), mx = Math.max(2, Math.min(30, Number(el("fwdRandMax").value) || 9));
+    el("fwdRandN").value = n; el("fwdRandMax").value = mx;
+    fwdSetInput("S " + prefSums(randomP(n, mx)).join(" "), true, true);
+  };
+  el("fwdRandGo").addEventListener("click", fwdRandom);
+  const sel = el("fwdPreset");
+  sel.innerHTML = FWD_PRESETS.map(p => '<option value="' + p.key + '">' + esc(p.name) + "</option>").join("") + '<option value="">(custom)</option>';
+  sel.addEventListener("change", () => {
+    const p = FWD_PRESETS.find(q => q.key === sel.value); if (!p) return;
+    el("fwdRandBar").style.display = p.in ? "none" : "";
+    if (p.in) fwdSetInput(p.in, true, true); else fwdRandom();
+  });
+  sel.value = "lect"; fwdSetInput("S 0 3 8 9 11", true, false);
+}
+
+/* ---------- draggable splitter between the two stage columns --------------- */
+function initSplitters() {
+  document.querySelectorAll(".stage").forEach(stage => {
+    if (stage.children.length !== 2) return;
+    const sp = document.createElement("div");
+    sp.className = "splitter"; sp.title = "drag to resize · double-click to reset";
+    stage.insertBefore(sp, stage.children[1]);
+    let dragging = false;
+    const setLeft = clientX => {
+      const r = stage.getBoundingClientRect();
+      const min = 300, max = r.width - 12 - 300;
+      if (max <= min) return;
+      const w = Math.max(min, Math.min(max, clientX - r.left - 6));
+      stage.style.setProperty("--left", w + "px"); stage.classList.add("sized");
+      window.dispatchEvent(new Event("resize"));      /* redraw the SVGs at the new width */
+    };
+    sp.addEventListener("pointerdown", ev => { dragging = true; sp.classList.add("drag"); sp.setPointerCapture(ev.pointerId); ev.preventDefault(); });
+    sp.addEventListener("pointermove", ev => { if (dragging) setLeft(ev.clientX); });
+    const stop = () => { dragging = false; sp.classList.remove("drag"); };
+    sp.addEventListener("pointerup", stop); sp.addEventListener("pointercancel", stop);
+    sp.addEventListener("dblclick", () => { stage.classList.remove("sized"); stage.style.removeProperty("--left"); window.dispatchEvent(new Event("resize")); });
+  });
+}
+
+/* ==========================================================================
+   boot
+   ========================================================================== */
+
+function init() {
+  roadInit(); fwdInit();
+  document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+  window.addEventListener("resize", () => { if (activeTab === "fwd") fwdRender(false); else roadRender(); });
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
+    if (activeTab === "fwd") {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") { fwdUndoDo(); ev.preventDefault(); }
+      if ((ev.key === "Delete" || ev.key === "Backspace") && fwd.sel !== null && fwd.sel > 0) { fwdRemoveExit(fwd.sel); ev.preventDefault(); }
+      if (ev.key === "Escape") { fwd.sel = null; fwdRender(false); }
+      if (ev.key === " ") { fwdPlay(); ev.preventDefault(); }
+      return;
+    }
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") { roadUndoDo(); ev.preventDefault(); }
+    if ((ev.key === "Delete" || ev.key === "Backspace") && road.sel && road.sel.type === "exit" && road.sel.i > 0) { roadRemoveExit(road.sel.i); ev.preventDefault(); }
+    if (ev.key === "Escape") { road.sel = null; roadRender(); }
+  });
+}
+document.addEventListener("DOMContentLoaded", () => { init(); initSplitters(); });
+</script>
+</body>
+</html>

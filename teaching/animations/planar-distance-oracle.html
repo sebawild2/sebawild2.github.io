@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Distance oracles · precomputation buys speed, space is the price</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:"TeX Gyre Cursor", "Courier Prime", "Courier New", monospace;
+    --wi-radius:4px; --wi-radius-lg:5px;
+    /* page-specific roles */
+    --sep-in:#4a7c3f;  --sep-in-fill:#e3ecd9;     /* inside the cycle / left half   */
+    --sep-out:#2a6a63; --sep-out-fill:#dbe9e6;    /* outside the cycle / right half */
+    --sep-cut:#902015; --sep-cut-fill:#f0cfc4;    /* the separator itself */
+    --sep-band:#b07d18; --sep-band-fill:#f5e6c4;  /* the middle band of levels */
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:96ch; line-height:1.5; }
+  .subtitle code, .hint code, .status code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input[type=number] { width:4.5em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* transport */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0; width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden; flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px;
+              font-size:.68rem; line-height:1.3; font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft); border-left-width:0;
+              border-radius:0; color:var(--wi-ink-faint); cursor:pointer; text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* stage */
+  .stage { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; width:100%; height:auto; background:var(--wi-bg); border-radius:var(--wi-radius); }
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:110px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status .k-in { color:var(--sep-in); font-weight:bold; }
+  .status .k-out { color:var(--sep-out); font-weight:bold; }
+  .status .k-cut { color:var(--sep-cut); font-weight:bold; }
+  .status .k-band { color:var(--sep-band); font-weight:bold; }
+  .status .ch { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-panel-2); padding:1px 4px; border-radius:3px; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem; color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:50%; border:1.5px solid var(--wi-border); display:inline-block; }
+
+  /* the argument, as a numbered outline with live highlighting */
+  .outline { list-style:none; margin:0; padding:0; font-size:.84rem; counter-reset:step; }
+  .outline li { display:flex; gap:9px; padding:5px 8px 5px 6px; border-left:3px solid transparent;
+                border-bottom:1px solid var(--wi-border-soft); line-height:1.45; color:var(--wi-ink-soft); }
+  .outline li:last-child { border-bottom:0; }
+  .outline li .no { font-family:var(--wi-font-mono); font-size:.78rem; color:var(--wi-ink-faint); min-width:1.6em; padding-top:2px; }
+  .outline li.on { background:#f6e6df; border-left-color:var(--wi-active); color:var(--wi-ink-strong); }
+  .outline li.done { color:var(--wi-ink); }
+  .outline li.done .no::after { content:" ✓"; color:var(--wi-relax); }
+  .outline li .lemma { font-family:var(--wi-font-head); letter-spacing:.06em; font-size:.7rem; text-transform:uppercase;
+                       color:var(--wi-accent); display:block; }
+  .outline li.head { background:var(--wi-panel-2); border-bottom:1px solid var(--wi-border-soft); }
+  .math { font-style:italic; }
+
+  /* editor */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr; gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:190px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:270px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    h1 { font-size:1.3rem; }
+    .controls { gap:8px 12px; padding:10px 12px; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+  }
+
+  /* ---- SVG ---- */
+  .edge { stroke:var(--wi-border); stroke-width:1.6; fill:none; }
+  .edge.dim { opacity:.25; }
+  .edge.relax { stroke:var(--wi-examine); stroke-width:3; }
+  .edge.path { stroke:var(--sep-in); stroke-width:4.5; opacity:.9; }
+  .edge.path2 { stroke:var(--sep-out); stroke-width:4.5; opacity:.9; }
+  .edge.best { stroke:var(--wi-active); stroke-width:5; opacity:.95; }
+  .edge.cand { stroke:var(--wi-examine); stroke-width:3.5; opacity:.7; stroke-dasharray:6 4; }
+  .wlab { font-family:var(--wi-font-mono); font-size:10px; fill:var(--wi-ink-faint); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .wlab.dim { opacity:.3; }
+  .node { fill:var(--wi-panel-2); stroke:var(--wi-border); stroke-width:1.6; }
+  .node.dim { opacity:.3; }
+  .node.sep1 { fill:var(--sep-cut-fill); stroke:var(--sep-cut); stroke-width:2.6; }
+  .node.sep2 { fill:#f5e6c4; stroke:var(--sep-band); stroke-width:2.6; }
+  .node.pa { fill:var(--sep-in-fill); stroke:var(--sep-in); stroke-width:1.8; }
+  .node.pb { fill:var(--sep-out-fill); stroke:var(--sep-out); stroke-width:1.8; }
+  .node.settled { fill:#e7d9c0; stroke:var(--wi-border-strong); }
+  .node.frontier { fill:#f7edd9; stroke:var(--wi-examine); stroke-width:2.2; }
+  .node.curS { fill:#f7d9cf; stroke:var(--wi-active); stroke-width:3; }
+  .node.qu, .node.qv { stroke:var(--wi-ink-strong); stroke-width:3.2; }
+  .node.qu { fill:#e8e0d3; } .node.qv { fill:#e8e0d3; }
+  .nlab { font-family:var(--wi-font-mono); font-size:12px; fill:var(--wi-ink-strong); text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .nlab.dim { opacity:.3; }
+  .dlab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-accent-dark); text-anchor:middle; pointer-events:none; font-weight:bold; }
+  .dlab.dim { opacity:.3; }
+  .qtag { font-family:var(--wi-font-head); font-size:13px; fill:var(--wi-ink-strong); text-anchor:middle; pointer-events:none; letter-spacing:.04em; }
+  .caption { font-family:var(--wi-font-head); font-size:14px; fill:var(--wi-ink-soft); letter-spacing:.04em; }
+  .caption.acc { fill:var(--wi-accent); }
+  .cycfill { fill:var(--sep-in-fill); opacity:.5; stroke:none; }
+  .cycfill.b { fill:var(--sep-out-fill); }
+  .hit { fill:transparent; cursor:pointer; }
+
+  /* meter */
+  .meter { width:100%; }
+  .mrow { display:grid; grid-template-columns:9.5em 1fr 1fr; gap:8px 12px; align-items:center; font-size:.8rem; padding:6px 0; border-bottom:1px solid var(--wi-border-soft); }
+  .mrow:last-child { border-bottom:0; }
+  .mrow.head { font-family:var(--wi-font-head); font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--wi-ink-faint); padding-bottom:2px; }
+  .mrow .nm { color:var(--wi-ink-soft); }
+  .mrow.on .nm { color:var(--wi-accent); font-weight:bold; }
+  .mbar { position:relative; height:20px; background:var(--wi-panel-2); border:1px solid var(--wi-border-soft); border-radius:3px; overflow:hidden; }
+  .mbar .f { position:absolute; left:0; top:0; bottom:0; background:#e7d9c0; border-right:1px solid var(--wi-border); transition:width .25s; }
+  .mbar.sp .f { background:var(--sep-out-fill); border-right-color:var(--sep-out); }
+  .mbar.tm .f { background:var(--sep-in-fill); border-right-color:var(--sep-in); }
+  .mrow.on .mbar .f { background:var(--sep-cut-fill); border-right-color:var(--sep-cut); }
+  .mbar .v { position:absolute; right:4px; top:2px; line-height:16px; padding:0 3px; background:rgba(252,249,243,.85); border-radius:2px; font-family:var(--wi-font-mono); font-size:.72rem; color:var(--wi-ink-strong); }
+  .mbar .tick { position:absolute; top:0; bottom:0; border-left:1px dashed var(--wi-border); }
+  .mbar .tick span { position:absolute; bottom:-1px; left:2px; font-family:var(--wi-font-mono); font-size:.58rem; color:var(--wi-ink-faint); line-height:1; }
+  .mnote { font-size:.72rem; color:var(--wi-ink-faint); margin-top:6px; line-height:1.45; }
+
+  canvas#tableCv { display:block; width:100%; background:var(--wi-bg); border-radius:var(--wi-radius); }
+  .tabnote { font-size:.74rem; color:var(--wi-ink-faint); margin-top:6px; line-height:1.45; }
+
+  /* pseudocode */
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent; white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .codebody { padding:6px 0 8px; }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em; text-transform:uppercase; color:var(--wi-ink-faint); padding:8px 12px 3px; }
+
+  /* asymptotics */
+  .asym { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+  @media (max-width:760px) { .asym { grid-template-columns:1fr; } }
+  table.asymt { border-collapse:collapse; font-size:.82rem; width:100%; }
+  table.asymt th, table.asymt td { text-align:right; padding:4px 8px; border-bottom:1px solid var(--wi-border-soft); font-variant-numeric:tabular-nums; }
+  table.asymt th { font-family:var(--wi-font-head); font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--wi-ink-faint); font-weight:normal; }
+  table.asymt td:first-child, table.asymt th:first-child { text-align:left; }
+  table.asymt td.f { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-soft); }
+
+  @keyframes pop { from { opacity:0; transform:scale(.5); } to { opacity:1; transform:none; } }
+  .pop { animation:pop .32s cubic-bezier(.2,1.3,.5,1) both; transform-box:fill-box; transform-origin:center; }
+  @media (prefers-reduced-motion:reduce) { * { animation-duration:.001ms !important; transition-duration:.001ms !important; } }
+</style>
+<style>
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption { font-family: var(--wi-font-head); letter-spacing: .05em; }
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>Distance oracles &nbsp;·&nbsp; paying for speed with space</h1>
+</div>
+
+<p class="subtitle">
+  A <b>distance oracle</b> answers <i>d</i>(<i>u</i>,<i>v</i>) queries for a fixed graph. Dijkstra's algorithm answers each
+  query from scratch; a full distance table answers instantly but stores <i>n</i>² numbers. In between sits the idea that
+  a <b>separator</b> makes precise: any path between two pieces passes through the separator, so distances <i>to the
+  separator</i> are all one needs to store. Choose a strategy, then click two vertices (or type them) to ask a query.
+  Edge labels are lengths.
+</p>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Strategy</span>
+    <span class="seg" id="stratSeg">
+      <button data-s="0">Dijkstra per query</button>
+      <button data-s="1">Full table</button>
+      <button data-s="2" class="on">Separator oracle</button>
+    </span>
+  </div>
+  <div class="ctl">
+    <label for="uIn">Query</label>
+    <input type="number" id="uIn" min="0" value="0"> <span class="opnote">→</span>
+    <input type="number" id="vIn" min="0" value="1">
+    <button id="askBtn" class="pri">Ask</button>
+    <button id="randBtn">Random</button>
+  </div>
+  <span class="opnote" style="margin-left:auto">Arrow keys step · click two vertices to set a query</span>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">— / —</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="120" max="2200" value="700" style="width:88px">
+      <span class="stepno" id="speedVal">700ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span id="stageTitle">The graph</span><span class="rhs" id="stageMeta"></span></div>
+      <svg id="stageSvg" class="stagesvg" viewBox="0 0 760 540"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="sim-box" style="margin-top:14px">
+      <div class="sim-title"><span>Stored numbers</span><span class="rhs" id="tabMeta"></span></div>
+      <canvas id="tableCv" width="720" height="120"></canvas>
+      <div class="tabnote" id="tabNote"></div>
+    </div>
+  </div>
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Space vs. time for this graph</span><span class="rhs" id="meterMeta"></span></div>
+      <div class="meter" id="meter"></div>
+      <div class="mnote">Space: numbers kept after preprocessing. Time: numbers read (and added) to answer the current query.
+        Both bars are on a log scale from 1 to <i>n</i>²; the dashed marks are at <i>n</i> and <i>n</i>√<i>n</i>.</div>
+    </div>
+    <div class="sim-box">
+      <div class="sim-title"><span>Pseudocode</span></div>
+      <div class="codebody" id="codeBody"></div>
+    </div>
+  </div>
+</div>
+
+<div class="sim-box" style="margin-top:18px">
+  <div class="sim-title"><span>The same trade-off for large n</span>
+    <span class="rhs"><span class="lbl">n</span> <input type="range" id="bigN" min="2" max="9" step="0.05" value="6" style="width:220px"> <span id="bigNVal"></span></span></div>
+  <div class="asym">
+    <table class="asymt" id="asymTable"></table>
+    <div class="hint" style="font-size:.82rem">
+      With the separator idea applied <i>recursively</i> (each piece is split again by its own separator until pieces are tiny),
+      a query walks down the recursion, adding up <i>O</i>(√<i>n</i>) + <i>O</i>(√(<sup>2</sup>&frasl;<sub>3</sub><i>n</i>)) + … = <i>O</i>(√<i>n</i>) candidates,
+      and the stored distances add up to <i>O</i>(<i>n</i>√<i>n</i>) in total, since every recursion level stores at most
+      <i>O</i>(√<i>n</i>) numbers per vertex and the piece sizes shrink geometrically. The numbers on the left use these
+      bounds with constant 1 and Dijkstra with a binary heap; they are meant to show the <i>shape</i> of the trade-off,
+      not to be exact. The general rule: <i>space</i> × <i>query time</i> ≈ <i>n</i>², and the separator lets one choose where
+      on that curve to sit.
+    </div>
+  </div>
+</div>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      First line <code>V E</code>, then one edge per line <code>u v w</code> with a positive length <code>w</code>
+      (missing lengths default to 1; the <code>EdgeWeightedGraph</code> format), then exactly <i>V</i> lines
+      <code>x y</code> giving the drawing. The drawing is the planar embedding used to find the separators,
+      so edges must not cross. Lines starting with <code>#</code> are ignored. The same file works in the
+      graph editor and on the planar-separator page.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Exact distance oracles, three strategies on one graph.
+
+   0  no preprocessing: Dijkstra from u, stop when v is settled.
+   1  full table:       Dijkstra from every vertex, store n^2 distances,
+                        a query is one lookup.
+   2  separator oracle: find a balanced separator S (a fundamental cycle in
+                        a BFS tree of the triangulated drawing, as on the
+                        planar-separator page), store dist(s, .) for every
+                        s in S, recurse into the two pieces.  A query scans S,
+                        d = min_s dist(s,u)+dist(s,v), and if u and v lie in
+                        the same piece also asks that piece's oracle -- paths
+                        that avoid S entirely live inside the piece.  Pieces
+                        of <= LEAF vertices store their (tiny) full table.
+
+   Costs are counted honestly for the current query: "space" = numbers kept
+   after preprocessing, "time" = numbers read to answer.
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const SVGNS = "http://www.w3.org/2000/svg";
+const W = 760, H = 540, LEAF = 8;
+let SEP_LEN_WEIGHT = 1;
+
+/* ---------- presets ------------------------------------------------------ */
+const DEMO = `# planar demo graph: 40 vertices, 81 edges (weights = rounded lengths, used by the distance oracle page)
+40 81
+0 1 9
+0 5 8
+0 6 11
+0 12 25
+1 2 11
+1 3 22
+1 6 13
+1 7 9
+2 3 11
+2 7 9
+2 8 11
+3 4 7
+3 8 11
+3 9 12
+4 10 11
+4 11 17
+5 6 7
+5 13 10
+5 14 11
+6 7 10
+6 14 10
+6 15 8
+8 9 6
+8 16 8
+8 17 7
+9 10 11
+9 17 7
+9 18 10
+10 11 8
+10 18 10
+10 19 8
+11 19 8
+11 27 19
+12 13 9
+12 20 9
+12 28 19
+13 14 7
+13 20 12
+13 21 12
+14 15 9
+14 21 11
+15 22 10
+15 23 10
+16 17 6
+16 23 11
+16 24 13
+17 18 11
+18 19 9
+18 26 9
+19 26 10
+20 21 7
+21 28 10
+22 23 11
+22 29 8
+22 30 11
+23 30 13
+23 31 11
+24 25 6
+24 32 6
+25 32 7
+25 33 11
+26 33 12
+26 34 12
+27 34 7
+28 29 14
+28 35 10
+29 30 10
+30 31 6
+30 36 11
+31 32 11
+31 36 13
+32 37 11
+32 38 10
+33 38 6
+33 39 7
+34 39 13
+35 36 19
+36 37 12
+36 39 30
+37 38 10
+38 39 8
+2.02 0.05
+2.94 -0.10
+4.02 0.14
+5.13 -0.05
+5.77 0.16
+1.77 0.80
+2.44 1.12
+3.34 0.73
+4.70 1.00
+5.30 1.12
+6.43 0.99
+7.22 0.99
+0.24 1.81
+1.17 1.63
+1.80 1.86
+2.74 1.83
+4.28 1.65
+4.86 1.64
+5.92 1.85
+6.83 1.72
+0.58 2.66
+1.27 2.77
+2.52 2.80
+3.52 2.46
+4.65 2.88
+5.23 2.87
+6.42 2.65
+7.53 2.87
+0.85 3.65
+2.23 3.58
+3.18 3.69
+3.79 3.52
+4.87 3.45
+5.86 3.74
+7.26 3.47
+1.54 4.37
+3.37 4.75
+4.59 4.47
+5.52 4.25
+6.30 4.28`;
+
+const BIG = `# larger planar graph: 96 vertices
+96 216
+0 1 10
+0 6 28
+0 8 9
+1 2 11
+1 9 8
+2 3 10
+2 5 27
+3 4 6
+3 10 13
+3 11 7
+4 5 12
+4 11 10
+4 12 13
+5 12 14
+5 13 11
+5 14 22
+6 7 13
+6 15 9
+6 16 11
+6 36 32
+7 16 9
+7 17 9
+7 18 15
+8 9 10
+8 18 11
+8 19 11
+9 10 10
+10 11 11
+10 20 8
+10 21 12
+11 12 10
+11 21 11
+11 22 11
+12 22 8
+12 23 10
+13 14 13
+13 23 9
+14 24 10
+14 25 6
+14 57 42
+15 16 11
+15 26 14
+16 17 7
+16 27 12
+17 18 10
+17 27 9
+17 28 10
+18 19 10
+18 28 6
+18 29 10
+19 20 13
+19 29 11
+19 30 10
+20 21 10
+20 30 10
+21 22 7
+21 31 9
+22 23 12
+22 31 10
+22 32 12
+23 24 10
+23 32 12
+23 33 11
+24 25 6
+24 33 11
+24 34 10
+25 34 12
+25 35 12
+26 27 8
+26 37 10
+26 38 7
+27 28 11
+27 38 10
+27 39 8
+28 29 8
+28 39 12
+28 40 11
+29 30 14
+29 40 7
+29 41 8
+30 41 12
+30 42 10
+31 32 9
+31 43 10
+32 33 9
+32 43 11
+32 44 8
+33 34 9
+33 44 10
+34 35 12
+34 45 11
+34 46 11
+35 46 11
+35 47 12
+36 37 11
+36 48 8
+36 58 16
+37 38 8
+37 48 8
+37 49 8
+38 39 10
+38 49 9
+38 50 9
+39 40 10
+39 50 10
+40 41 8
+40 51 10
+41 42 13
+41 51 8
+42 52 12
+42 53 10
+43 44 9
+43 54 13
+43 55 9
+44 55 10
+45 46 12
+45 67 16
+46 47 8
+46 56 9
+47 56 10
+48 49 10
+48 58 12
+49 50 8
+49 60 11
+50 60 9
+51 52 9
+51 61 13
+51 62 13
+52 53 9
+52 62 10
+52 63 11
+53 54 11
+53 63 9
+53 64 13
+54 55 11
+54 64 8
+54 65 8
+55 65 12
+55 66 13
+56 57 13
+56 68 12
+56 69 11
+57 69 8
+57 89 29
+58 59 11
+58 70 12
+59 60 13
+59 70 7
+59 71 6
+60 71 12
+60 72 9
+61 62 9
+61 73 11
+61 82 16
+62 63 10
+62 74 8
+63 64 11
+63 74 12
+63 75 6
+64 65 7
+64 75 11
+64 76 11
+65 66 13
+65 76 11
+65 77 11
+66 67 8
+66 77 13
+67 68 8
+67 78 13
+68 78 10
+69 79 13
+70 71 7
+70 80 14
+71 72 9
+71 80 11
+72 73 11
+72 80 12
+73 81 12
+73 82 7
+74 75 10
+74 83 11
+74 84 13
+75 84 14
+76 77 8
+76 85 11
+76 86 11
+77 86 10
+77 87 9
+78 79 7
+78 89 7
+79 89 8
+80 81 12
+80 90 22
+81 82 9
+81 90 12
+82 90 12
+83 84 6
+83 91 9
+83 92 9
+84 85 12
+84 92 10
+84 93 11
+85 86 12
+85 93 7
+85 94 8
+86 87 9
+86 94 8
+86 95 10
+87 88 8
+88 89 13
+89 95 25
+90 91 11
+90 92 16
+90 95 51
+91 92 6
+93 94 9
+4.14 0.16
+5.12 -0.05
+6.25 -0.23
+7.17 0.05
+7.74 -0.08
+8.93 -0.16
+1.48 0.88
+2.73 0.95
+4.40 1.01
+5.33 0.76
+6.30 1.06
+7.33 0.78
+8.33 1.05
+9.50 0.75
+10.73 1.06
+1.10 1.68
+2.20 1.67
+2.86 1.88
+3.86 1.94
+4.90 1.98
+6.20 1.85
+7.21 1.87
+7.91 1.69
+9.16 1.62
+10.13 1.82
+10.74 1.66
+1.76 2.90
+2.57 2.78
+3.62 2.51
+4.27 2.89
+5.69 2.67
+7.65 2.61
+8.56 2.65
+9.47 2.66
+10.39 2.76
+11.51 2.52
+0.02 3.70
+1.11 3.65
+1.88 3.55
+2.92 3.54
+3.96 3.52
+4.76 3.49
+6.09 3.54
+7.93 3.55
+8.85 3.41
+10.02 3.78
+11.16 3.56
+11.98 3.58
+0.52 4.26
+1.54 4.37
+2.31 4.29
+4.57 4.26
+5.43 4.57
+6.28 4.55
+7.34 4.72
+8.41 4.31
+11.46 4.42
+12.74 4.70
+-0.07 5.33
+1.02 5.61
+2.22 5.23
+4.07 5.51
+5.00 5.49
+6.05 5.45
+7.14 5.48
+7.84 5.36
+9.15 5.31
+9.93 5.35
+10.75 5.38
+12.20 5.29
+0.74 6.23
+1.41 6.10
+2.31 6.12
+3.42 6.40
+5.23 6.28
+6.23 6.06
+7.65 6.46
+8.39 6.33
+10.69 6.41
+11.39 6.34
+1.78 7.15
+2.93 7.45
+3.75 7.07
+5.25 7.39
+5.81 7.43
+7.05 7.38
+8.23 7.37
+9.01 7.00
+9.76 7.29
+11.01 7.07
+3.70 8.30
+4.76 8.16
+5.33 8.26
+6.75 7.99
+7.65 7.98
+8.76 8.22`;
+
+
+const PRESETS = {
+  demo: { name: "Planar demo graph (40 vertices)", text: DEMO, root: 4, q: [5, 13] },
+  big:  { name: "Larger planar graph (96 vertices)", text: BIG, root: 68, q: [0, 28] }
+};
+
+/* ---------- state -------------------------------------------------------- */
+let G = null, root = 0, strat = 2, qu = 0, qv = 1, pendingU = null;
+let steps = [], phases = [], cur = 0, timer = null;
+let ORACLE = null, TABLE = null;
+
+/* ---------- parsing ------------------------------------------------------ */
+function tokenizeLines(text) {
+  return text.split("\n").map(l => l.replace(/#.*$/, "").trim().split(/\s+/).filter(s => s.length)).filter(t => t.length > 0);
+}
+const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+function segCross(p1, p2, p3, p4) {
+  const d1 = cross(p3, p4, p1), d2 = cross(p3, p4, p2), d3 = cross(p1, p2, p3), d4 = cross(p1, p2, p4);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+  const on = (p, q, r) => Math.abs(cross(p, q, r)) < 1e-9 && Math.min(p.x, q.x) - 1e-9 <= r.x && r.x <= Math.max(p.x, q.x) + 1e-9 && Math.min(p.y, q.y) - 1e-9 <= r.y && r.y <= Math.max(p.y, q.y) + 1e-9;
+  return on(p1, p2, p3) || on(p1, p2, p4) || on(p3, p4, p1) || on(p3, p4, p2);
+}
+function pointInPoly(p, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+function parseGraph(text) {
+  const lines = tokenizeLines(text);
+  if (!lines.length) throw new Error("Empty input.");
+  let li = 0, v, e;
+  if (lines[0].length >= 2) { v = parseInt(lines[0][0], 10); e = parseInt(lines[0][1], 10); li = 1; }
+  else { v = parseInt(lines[0][0], 10); e = parseInt((lines[1] || [])[0], 10); li = 2; }
+  if (!Number.isFinite(v) || v <= 0) throw new Error("V must be a positive integer.");
+  if (!Number.isFinite(e) || e < 0) throw new Error("E must be a non-negative integer.");
+  const adj = Array.from({ length: v }, () => []), edges = [], seen = new Set();
+  for (let k = 0; k < e; k++) {
+    if (li >= lines.length) throw new Error("Expected " + e + " edge lines, found " + k + ".");
+    const t = lines[li++];
+    const a = parseInt(t[0], 10), b = parseInt(t[1], 10), w = t.length >= 3 ? parseFloat(t[2]) : 1;
+    if (t.length < 2 || !Number.isFinite(a) || !Number.isFinite(b)) throw new Error("Edge " + (k + 1) + ": expected \"u v w\".");
+    if (a < 0 || a >= v || b < 0 || b >= v) throw new Error("Edge " + (k + 1) + ": vertex out of range 0…" + (v - 1) + ".");
+    if (!Number.isFinite(w) || w <= 0) throw new Error("Edge " + (k + 1) + ": the length must be a positive number.");
+    if (a === b) continue;
+    const key = Math.min(a, b) + "," + Math.max(a, b);
+    if (seen.has(key)) continue; seen.add(key);
+    const id = edges.length;
+    adj[a].push({ to: b, w, id }); adj[b].push({ to: a, w, id }); edges.push([a, b, w]);
+  }
+  const rem = lines.length - li;
+  if (rem !== v) throw new Error("After the edges, exactly " + v + " coordinate lines are required (found " + rem + ").");
+  const raw = [];
+  for (let i = 0; i < v; i++) {
+    const t = lines[li++]; const x = parseFloat(t[0]), y = parseFloat(t[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("Vertex " + i + ": expected \"x y\".");
+    raw.push({ x, y });
+  }
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  raw.forEach(p => { minx = Math.min(minx, p.x); miny = Math.min(miny, p.y); maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); });
+  const w = Math.max(maxx - minx, 1e-6), h = Math.max(maxy - miny, 1e-6);
+  const pad = 34, s = Math.min((W - 2 * pad) / w, (H - 2 * pad) / h);
+  const offx = (W - w * s) / 2, offy = (H - h * s) / 2;
+  const pos = raw.map(p => ({ x: offx + (p.x - minx) * s, y: offy + (p.y - miny) * s }));
+  const comp = new Array(v).fill(false); const q = [0]; comp[0] = true; let cnt = 1;
+  while (q.length) { const x = q.pop(); for (const y of adj[x]) if (!comp[y.to]) { comp[y.to] = true; cnt++; q.push(y.to); } }
+  if (cnt !== v) throw new Error("The graph must be connected (found " + (v - cnt) + " unreachable vertices).");
+  for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
+    const [a, b] = edges[i], [c, d] = edges[j];
+    if (a === c || a === d || b === c || b === d) continue;
+    if (segCross(pos[a], pos[b], pos[c], pos[d])) throw new Error("Edges " + a + "–" + b + " and " + c + "–" + d + " cross; the coordinates must give a planar embedding.");
+  }
+  return { n: v, adj, edges, pos };
+}
+
+/* ---------- Dijkstra (on the whole graph or restricted to a vertex set) --- */
+/* returns {dist, par, parEdge, order, relaxed, trace} ; trace is a list of events for the animation */
+function dijkstra(g, s, allowed, stopAt) {
+  const n = g.n, dist = new Array(n).fill(Infinity), par = new Array(n).fill(-1), done = new Array(n).fill(false);
+  const order = [], trace = [];
+  let relaxed = 0;
+  dist[s] = 0;
+  /* simple O(n^2) selection is fine for n <= ~150 and keeps the animation deterministic */
+  for (;;) {
+    let x = -1;
+    for (let i = 0; i < n; i++) if (!done[i] && dist[i] < Infinity && (allowed === null || allowed.has(i)) && (x < 0 || dist[i] < dist[x] || (dist[i] === dist[x] && i < x))) x = i;
+    if (x < 0) break;
+    done[x] = true; order.push(x);
+    const ev = { settle: x, d: dist[x], relax: [] };
+    for (const e of g.adj[x]) {
+      const y = e.to;
+      if (allowed !== null && !allowed.has(y)) continue;
+      if (done[y]) continue;
+      relaxed++;
+      const nd = dist[x] + e.w, improved = nd < dist[y];
+      ev.relax.push({ to: y, nd, improved, old: dist[y] });
+      if (improved) { dist[y] = nd; par[y] = x; }
+    }
+    trace.push(ev);
+    if (stopAt !== undefined && x === stopAt) break;
+  }
+  return { dist, par, order, relaxed, trace };
+}
+function pathTo(par, v) { const p = []; while (v !== -1) { p.push(v); v = par[v]; } return p.reverse(); }
+
+/* ---------- separator on a vertex set: fundamental cycle of best balance --- */
+function triangulateSub(g, verts) {
+  const idx = new Map(); verts.forEach((v, i) => idx.set(v, i));
+  const segs = [];
+  for (const v of verts) for (const e of g.adj[v]) if (v < e.to && idx.has(e.to)) segs.push([v, e.to]);
+  const cand = [];
+  for (let i = 0; i < verts.length; i++) for (let j = i + 1; j < verts.length; j++) {
+    const a = verts[i], b = verts[j];
+    if (g.adj[a].some(e => e.to === b)) continue;
+    cand.push([a, b, Math.hypot(g.pos[a].x - g.pos[b].x, g.pos[a].y - g.pos[b].y)]);
+  }
+  cand.sort((u, v) => u[2] - v[2]);
+  const added = [];
+  for (const [a, b] of cand) {
+    let ok = true;
+    for (const [c, d] of segs) { if (a === c || a === d || b === c || b === d) continue; if (segCross(g.pos[a], g.pos[b], g.pos[c], g.pos[d])) { ok = false; break; } }
+    if (!ok) continue;
+    for (const w of verts) if (ok && w !== a && w !== b) {
+      const p = g.pos[w];
+      if (Math.abs(cross(g.pos[a], g.pos[b], p)) < 1e-6 && Math.min(g.pos[a].x, g.pos[b].x) <= p.x && p.x <= Math.max(g.pos[a].x, g.pos[b].x) &&
+          Math.min(g.pos[a].y, g.pos[b].y) <= p.y && p.y <= Math.max(g.pos[a].y, g.pos[b].y)) ok = false;
+    }
+    if (!ok) continue;
+    segs.push([a, b]); added.push([a, b]);
+  }
+  return segs;   /* all edges of the triangulated piece */
+}
+function bfsSub(g, verts, r) {
+  const allowed = new Set(verts), dist = new Map(), par = new Map();
+  dist.set(r, 0); par.set(r, -1);
+  const q = [r]; let h = 0;
+  while (h < q.length) {
+    const x = q[h++];
+    const nb = g.adj[x].map(e => e.to).filter(y => allowed.has(y)).sort((a, b) => a - b);
+    for (const y of nb) if (!dist.has(y)) { dist.set(y, dist.get(x) + 1); par.set(y, x); q.push(y); }
+  }
+  return { dist, par, reached: q };
+}
+function components(g, verts) {
+  const allowed = new Set(verts), seen = new Set(), comps = [];
+  for (const s of verts) {
+    if (seen.has(s)) continue;
+    const c = [s]; seen.add(s);
+    for (let h = 0; h < c.length; h++) for (const e of g.adj[c[h]]) if (allowed.has(e.to) && !seen.has(e.to)) { seen.add(e.to); c.push(e.to); }
+    comps.push(c);
+  }
+  return comps.sort((a, b) => b.length - a.length);
+}
+function centroidRoot(g, verts) {
+  let cx = 0, cy = 0; verts.forEach(v => { cx += g.pos[v].x; cy += g.pos[v].y; }); cx /= verts.length; cy /= verts.length;
+  let best = verts[0], bd = Infinity;
+  for (const v of verts) { const d = Math.hypot(g.pos[v].x - cx, g.pos[v].y - cy); if (d < bd) { bd = d; best = v; } }
+  return best;
+}
+/* returns { S, A, B, cyc } for a vertex set (A/B: the two sides, S the separator vertices) */
+function separate(g, verts, prefRoot) {
+  const comps = components(g, verts);
+  if (comps.length > 1 && comps[0].length <= 2 * verts.length / 3) {
+    /* already disconnected: split components into two groups, no separator needed */
+    const A = [], B = [];
+    for (const c of comps) (A.length <= B.length ? A : B).push(...c);
+    return { S: [], A, B, cyc: null, note: "disconnected" };
+  }
+  const main = comps[0], rest = comps.slice(1).flat();
+  const r = (prefRoot !== undefined && main.includes(prefRoot)) ? prefRoot : centroidRoot(g, main);
+  const T = bfsSub(g, main, r);
+  const segs = triangulateSub(g, main);
+  const isTree = (a, b) => T.par.get(a) === b || T.par.get(b) === a;
+  let best = null;
+  for (const [a, b] of segs) {
+    if (isTree(a, b)) continue;
+    /* fundamental cycle */
+    const pu = [], pv = []; let x = a, y = b;
+    while (x !== y) { if (T.dist.get(x) >= T.dist.get(y)) { pu.push(x); x = T.par.get(x); } else { pv.push(y); y = T.par.get(y); } }
+    const cyc = pu.concat([x], pv.reverse());
+    const on = new Set(cyc), poly = cyc.map(i => g.pos[i]);
+    const inside = [], outside = [];
+    for (const v of main) if (!on.has(v)) (pointInPoly(g.pos[v], poly) ? inside : outside).push(v);
+    /* balance first, but a cycle that is long relative to the piece is a bad cut: charge its length as well */
+    const score = [Math.max(inside.length, outside.length) + SEP_LEN_WEIGHT * cyc.length, cyc.length];
+    if (!best || score[0] < best.score[0] || (score[0] === best.score[0] && score[1] < best.score[1])) best = { score, cyc, inside, outside };
+  }
+  /* alternative: a single BFS level (levels are cuts too, Lemma A of the separator theorem); try every root */
+  let bestLvl = null;
+  for (const r2 of main) {
+    const T2 = bfsSub(g, main, r2);
+    const depth = Math.max(...main.map(v => T2.dist.get(v)));
+    for (let i = 1; i < depth; i++) {
+      const S = main.filter(v => T2.dist.get(v) === i), A2 = main.filter(v => T2.dist.get(v) < i), B2 = main.filter(v => T2.dist.get(v) > i);
+      const sc = Math.max(A2.length, B2.length) + SEP_LEN_WEIGHT * S.length;
+      if (!bestLvl || sc < bestLvl.score || (sc === bestLvl.score && S.length < bestLvl.S.length)) bestLvl = { score: sc, S, A: A2, B: B2 };
+    }
+  }
+  if (bestLvl && (!best || bestLvl.score < best.score[0])) {
+    const A = bestLvl.A.length >= bestLvl.B.length ? bestLvl.A : bestLvl.B, B = bestLvl.A.length >= bestLvl.B.length ? bestLvl.B : bestLvl.A;
+    return { S: bestLvl.S, A: A.length <= B.length ? A.concat(rest) : A, B: A.length <= B.length ? B : B.concat(rest), cyc: null, note: "level" };
+  }
+  if (!best) {   /* a tree: cut at the root */
+    const S = [r], A = [], B = [];
+    for (const v of main) if (v !== r) (A.length <= B.length ? A : B).push(v);
+    return { S, A: A.concat(rest), B, cyc: null, note: "tree" };
+  }
+  const A = best.inside.length >= best.outside.length ? best.inside : best.outside;
+  const B = best.inside.length >= best.outside.length ? best.outside : best.inside;
+  return { S: best.cyc, A: A.length <= B.length ? A.concat(rest) : A, B: A.length <= B.length ? B : B.concat(rest), cyc: best.cyc, note: "cycle" };
+}
+
+/* ---------- build the oracle (recursive) --------------------------------- */
+/* node: { verts, level, S, distS: Map s -> {dist, par} restricted to verts, children:[nodeA,nodeB], leaf, table:Map } */
+function buildOracle(g, verts, level, prefRoot, path) {
+  const node = { verts, level, path, S: [], distS: new Map(), children: [], leaf: false, table: null, space: 0 };
+  const allowed = new Set(verts);
+  if (verts.length <= LEAF) {
+    node.leaf = true; node.table = new Map();
+    for (const s of verts) node.table.set(s, dijkstra(g, s, allowed));
+    node.space = verts.length * verts.length;
+    return node;
+  }
+  const sep = separate(g, verts, prefRoot);
+  node.S = sep.S; node.cyc = sep.cyc; node.note = sep.note;
+  for (const s of sep.S) node.distS.set(s, dijkstra(g, s, allowed));
+  node.space = sep.S.length * verts.length;
+  node.children = [buildOracle(g, sep.A, level + 1, undefined, path + "A"), buildOracle(g, sep.B, level + 1, undefined, path + "B")];
+  return node;
+}
+function totalSpace(node) { return node.space + node.children.reduce((s, c) => s + totalSpace(c), 0); }
+function pieceOf(node, v) { return node.children.findIndex(c => c.verts.includes(v)); }
+
+/* ---------- step construction -------------------------------------------- */
+function mkPhase(name) { phases.push({ name, from: steps.length, to: steps.length }); }
+function add(o) { o.ph = phases.length - 1; steps.push(o); phases[phases.length - 1].to = steps.length - 1; }
+const fmt = x => x === Infinity ? "∞" : (Math.round(x * 100) / 100).toString();
+const vtx = v => '<span class="ch">' + v + "</span>";
+
+function build() {
+  steps = []; phases = []; cur = 0;
+  const n = G.n, u = qu, v = qv;
+  const truth = dijkstra(G, u, null);
+  const dTrue = truth.dist[v], truePath = pathTo(truth.par, v);
+
+  if (strat === 0) {
+    /* ---------------- Dijkstra per query ---------------- */
+    mkPhase("Query: Dijkstra from u");
+    const D = dijkstra(G, u, null, v);
+    add({ s: 0, dj: { k: -1, D }, space: n, work: 0, hl: ["d1"],
+          txt: "<b>No preprocessing.</b> Nothing is stored beyond the graph itself. To answer <i>d</i>(" + u + ", " + v + ") we run Dijkstra's algorithm from " +
+               vtx(u) + " and stop as soon as " + vtx(v) + " is settled. Each settled vertex costs a scan of its edges." });
+    let work = 0;
+    D.trace.forEach((ev, k) => {
+      work += 1 + ev.relax.length;
+      const last = ev.settle === v;
+      add({ s: 0, dj: { k, D }, space: n, work, hl: last ? ["d5"] : ["d3", "d4"],
+            txt: "Settle " + vtx(ev.settle) + " at distance <b>" + fmt(ev.d) + "</b>" + (ev.relax.length ? "; relax its " + ev.relax.length + " edge" + (ev.relax.length > 1 ? "s" : "") +
+                 (ev.relax.filter(r => r.improved).length ? " — " + ev.relax.filter(r => r.improved).map(r => vtx(r.to) + " ← " + fmt(r.nd)).join(", ") : ", nothing improves") : "") + "." +
+                 (last ? " That is " + vtx(v) + ": <b>stop</b>." : ""),
+            ans: last ? "d(" + u + ", " + v + ") = " + fmt(dTrue) + " after settling " + (k + 1) + " of " + n + " vertices (" + work + " numbers touched)." : undefined,
+            path: last ? truePath : undefined });
+    });
+    return;
+  }
+
+  if (strat === 1) {
+    /* ---------------- full table ---------------- */
+    mkPhase("Preprocess: Dijkstra from every vertex");
+    add({ s: 1, tbl: { rows: 0 }, space: 0, work: 0, hl: ["t1"],
+          txt: "<b>Precompute everything.</b> Run Dijkstra from every one of the " + n + " vertices and keep all " + n + " × " + n + " = " + (n * n) + " distances." });
+    for (let s = 0; s < n; s++) {
+      add({ s: 1, tbl: { rows: s + 1, src: s }, space: (s + 1) * n, work: 0, hl: ["t2", "t3"],
+            txt: "Row " + s + ": distances from " + vtx(s) + " to everyone — one Dijkstra run, " + n + " numbers stored." + (s === n - 1 ? " Table complete." : "") });
+    }
+    mkPhase("Query: one lookup");
+    add({ s: 1, tbl: { rows: n, cell: [u, v] }, space: n * n, work: 1, hl: ["t5"],
+          txt: "<b>Query</b> <i>d</i>(" + u + ", " + v + "): read cell (" + u + ", " + v + "). One number, no computation. The price was paid in advance: " + (n * n) + " numbers, " +
+               "and preprocessing time of " + n + " Dijkstra runs.",
+          ans: "d(" + u + ", " + v + ") = " + fmt(TABLE[u].dist[v]) + " with 1 lookup.", path: truePath });
+    return;
+  }
+
+  /* ---------------- separator oracle ---------------- */
+  const O = ORACLE, L1 = O, sp1 = L1.S.length * n;
+  mkPhase("Preprocess: level 1");
+  add({ s: 2, view: { node: L1, showS: false }, space: 0, work: 0, hl: ["p1"],
+        txt: "<b>The separator oracle.</b> Storing all <i>n</i>² distances is wasteful: most pairs are far apart, and a path between far-apart vertices must cross " +
+             "any cut that separates them. Planar graphs have small balanced cuts — that is the separator theorem — so store distances only <i>to the cut</i>." });
+  add({ s: 2, view: { node: L1, showS: true }, space: 0, work: 0, hl: ["p1"],
+        txt: "A balanced separator <span class=\"k-cut\">S</span> of the whole graph: " + L1.S.length + " vertices (" + (L1.note === "cycle" ? "a fundamental cycle" : "a BFS level") + ", as in the separator theorem; √<i>n</i> ≈ " + Math.sqrt(n).toFixed(1) + "). " +
+             "Removing it leaves piece <span class=\"k-in\">A</span> with " + L1.children[0].verts.length + " and piece <span class=\"k-out\">B</span> with " +
+             L1.children[1].verts.length + " vertices, and <b>no edge joins A and B</b>." });
+  L1.S.forEach((s, i) => {
+    add({ s: 2, view: { node: L1, showS: true, src: s }, tbl: { node: L1, rows: i + 1 }, space: (i + 1) * n, work: 0, hl: ["p2", "p3"],
+          txt: "Dijkstra from separator vertex " + vtx(s) + ": store its distance to all " + n + " vertices (row " + (i + 1) + " of " + L1.S.length + ")." });
+  });
+  add({ s: 2, view: { node: L1, showS: true }, tbl: { node: L1, rows: L1.S.length }, space: sp1, work: 0, hl: ["p3"],
+        txt: "Level 1 stores " + L1.S.length + " × " + n + " = " + sp1 + " numbers instead of " + (n * n) + ". Enough for every pair with one endpoint in A and the other in B — " +
+             "but two vertices inside the same piece might be connected by a path that never touches S. For those, <b>recurse</b> into the piece." });
+  mkPhase("Preprocess: level 2");
+  let space = sp1;
+  L1.children.forEach((ch, ci) => {
+    const nm = ci === 0 ? "A" : "B";
+    if (ch.leaf) {
+      space += ch.space;
+      add({ s: 2, view: { node: ch, showS: true, parent: L1 }, tbl: { node: ch, rows: ch.verts.length }, space, work: 0, hl: ["p5"],
+            txt: "Piece " + nm + " has only " + ch.verts.length + " vertices: small enough to store its full table of " + ch.verts.length + "² = " + ch.space + " distances <i>within the piece</i>." });
+      return;
+    }
+    add({ s: 2, view: { node: ch, showS: true, parent: L1 }, tbl: { node: ch, rows: 0 }, space, work: 0, hl: ["p4"],
+          txt: "Piece " + nm + " (" + ch.verts.length + " vertices) is a planar graph in its own right. Its own separator <span class=\"k-band\">S<sub>" + nm + "</sub></span> has " + ch.S.length +
+               " vertices and splits it into " + ch.children[0].verts.length + " + " + ch.children[1].verts.length + ". Distances are now measured <i>inside the piece</i>: paths may not leave it." });
+    ch.S.forEach((s, i) => {
+      space += ch.verts.length;
+      add({ s: 2, view: { node: ch, showS: true, parent: L1, src: s }, tbl: { node: ch, rows: i + 1 }, space, work: 0, hl: ["p4", "p3"],
+            txt: "Dijkstra from " + vtx(s) + " inside piece " + nm + ": " + ch.verts.length + " numbers." });
+    });
+  });
+  const deeper = [];
+  (function collect(node) { if (node.level >= 2) deeper.push(node); node.children.forEach(collect); })(O);
+  const total = totalSpace(O);
+  add({ s: 2, view: { node: L1, showS: true, all: true }, tbl: { node: O, rows: -1 }, space: total, work: 0, hl: ["p5"],
+        txt: "And so on: every piece with more than " + LEAF + " vertices is split again by its own separator; pieces of at most " + LEAF + " vertices store their tiny full table. " +
+             deeper.length + " smaller pieces below level 2. Altogether <b>" + total + " numbers</b> — against " + (n * n) + " for the full table. " +
+             "The separator theorem makes this <i>O</i>(<i>n</i>√<i>n</i>) in general.",
+        ans: "Preprocessing done: " + total + " numbers stored." });
+
+  /* ---- query ---- */
+  mkPhase("Query: scan the separator");
+  let work = 0, best = Infinity, bestS = -1, bestPath = null;
+  const inS = L1.S.includes(u) || L1.S.includes(v);
+  add({ s: 2, view: { node: L1, showS: true }, q: { node: L1, best, cands: [] }, space: total, work, hl: ["q1"],
+        txt: "<b>Query</b> <i>d</i>(" + u + ", " + v + "). Any path from " + vtx(u) + " to " + vtx(v) + " that touches <span class=\"k-cut\">S</span> has, at its first separator vertex <i>s</i>, length at least " +
+             "<i>d</i>(" + u + ", <i>s</i>) + <i>d</i>(<i>s</i>, " + v + ") — and both numbers are stored. So scan <i>s</i> over S and keep the minimum." });
+  const cands = [];
+  L1.S.forEach(s => {
+    const ds = L1.distS.get(s);
+    const c = ds.dist[u] + ds.dist[v];
+    work += 2;
+    const improved = c < best;
+    if (improved) { best = c; bestS = s; bestPath = pathTo(ds.par, u).reverse().concat(pathTo(ds.par, v).slice(1)); }
+    cands.push({ s, c, improved });
+    add({ s: 2, view: { node: L1, showS: true, src: s }, q: { node: L1, best, bestS, bestPath, cur: s, curPath: pathTo(ds.par, u).reverse().concat(pathTo(ds.par, v).slice(1)), cands: cands.slice() },
+          tbl: { node: L1, rows: L1.S.length, cells: [[s, u], [s, v]] }, space: total, work, hl: ["q2", "q3"],
+          txt: "<i>s</i> = " + vtx(s) + ": " + fmt(ds.dist[u]) + " + " + fmt(ds.dist[v]) + " = <b>" + fmt(c) + "</b>" + (improved ? " — new minimum." : " ≥ " + fmt(best) + ", no improvement.") });
+  });
+  const pu = pieceOf(L1, u), pv = pieceOf(L1, v);
+  if (inS) {
+    add({ s: 2, view: { node: L1, showS: true }, q: { node: L1, best, bestS, bestPath, cands, final: true }, space: total, work, hl: ["q6"],
+          txt: (L1.S.includes(u) ? vtx(u) : vtx(v)) + " is itself a separator vertex, so the scan included the direct row: the minimum <b>" + fmt(best) + "</b> is exact.",
+          ans: "d(" + u + ", " + v + ") = " + fmt(best) + (best === dTrue ? " ✓ (matches Dijkstra)" : " ✗ mismatch!") + " with " + work + " numbers read.", path: bestPath });
+  } else if (pu !== pv) {
+    add({ s: 2, view: { node: L1, showS: true }, q: { node: L1, best, bestS, bestPath, cands, final: true }, space: total, work, hl: ["q4", "q6"],
+          txt: vtx(u) + " lies in piece " + "AB"[pu] + " and " + vtx(v) + " in piece " + "AB"[pv] + ". <b>Every</b> path between them crosses S, so the scan saw every possibility: " +
+               "<i>d</i>(" + u + ", " + v + ") = <b>" + fmt(best) + "</b>, via " + vtx(bestS) + ".",
+          ans: "d(" + u + ", " + v + ") = " + fmt(best) + (best === dTrue ? " ✓ (matches Dijkstra)" : " ✗ mismatch!") + " with " + work + " numbers read." });
+  } else {
+    /* same piece: recurse */
+    const nm = "AB"[pu];
+    let node = L1.children[pu], viaS = best;
+    add({ s: 2, view: { node: L1, showS: true }, q: { node: L1, best, bestS, bestPath, cands }, space: total, work, hl: ["q4", "q5"],
+          txt: "Both " + vtx(u) + " and " + vtx(v) + " lie in piece " + nm + ". The best path through S has length " + fmt(best) + " — but a path that <b>stays inside " + nm + "</b> " +
+               "never meets S and was never considered. Ask piece " + nm + "'s own oracle, where distances are measured inside the piece." });
+    let depthNo = 2;
+    for (;;) {
+      mkPhase("Query: level " + depthNo);
+      if (node.leaf) {
+        const t = node.table.get(u).dist[v]; work += 1;
+        const pth = pathTo(node.table.get(u).par, v);
+        const improved = t < best;
+        if (improved) { best = t; bestPath = pth; bestS = -1; }
+        add({ s: 2, view: { node, showS: true, parent: L1 }, q: { node, best, bestPath, cands: [], leaf: t, leafPath: pth }, tbl: { node, rows: node.verts.length, cells: [[u, v]] }, space: total, work, hl: ["q5"],
+              txt: "This piece is tiny (" + node.verts.length + " vertices) and stores its full table: <i>d</i><sub>inside</sub>(" + u + ", " + v + ") = <b>" + fmt(t) + "</b>, one lookup." +
+                   (improved ? " Shorter than anything through the separators above." : " Not shorter than the best separator route.") });
+        break;
+      }
+      const cnd = []; let lb = Infinity, lbS = -1, lbPath = null;
+      add({ s: 2, view: { node, showS: true, parent: L1 }, q: { node, best, bestPath, cands: [] }, tbl: { node, rows: node.S.length }, space: total, work, hl: ["q2"],
+            txt: "Inside this piece: scan its separator <span class=\"k-band\">S</span> (" + node.S.length + " vertices) with the distances stored for the piece." });
+      node.S.forEach(s => {
+        const ds = node.distS.get(s); const c = ds.dist[u] + ds.dist[v]; work += 2;
+        const imp = c < lb;
+        if (imp) { lb = c; lbS = s; lbPath = pathTo(ds.par, u).reverse().concat(pathTo(ds.par, v).slice(1)); }
+        cnd.push({ s, c, improved: imp });
+        const globalImp = c < best;
+        if (globalImp) { best = c; bestS = s; bestPath = lbPath; }
+        add({ s: 2, view: { node, showS: true, parent: L1, src: s }, q: { node, best, bestS, bestPath, cur: s, curPath: pathTo(ds.par, u).reverse().concat(pathTo(ds.par, v).slice(1)), cands: cnd.slice() },
+              tbl: { node, rows: node.S.length, cells: [[s, u], [s, v]] }, space: total, work, hl: ["q2", "q3"],
+              txt: "<i>s</i> = " + vtx(s) + ": " + fmt(ds.dist[u]) + " + " + fmt(ds.dist[v]) + " = <b>" + fmt(c) + "</b>" + (globalImp ? " — new overall minimum." : imp ? " — best in this piece so far, but not below " + fmt(best) + "." : ".") });
+      });
+      const cu = pieceOf(node, u), cv = pieceOf(node, v);
+      if (cu !== cv) {
+        add({ s: 2, view: { node, showS: true, parent: L1 }, q: { node, best, bestS, bestPath, cands: cnd }, space: total, work, hl: ["q4", "q6"],
+              txt: "Within the piece, " + vtx(u) + " and " + vtx(v) + " are on different sides of its separator, so a path inside the piece must cross it and the scan was exhaustive here. Nothing deeper to ask." });
+        break;
+      }
+      node = node.children[cu]; depthNo++;
+      add({ s: 2, view: { node, showS: true, parent: L1 }, q: { node, best, bestS, bestPath, cands: [] }, space: total, work, hl: ["q4", "q5"],
+            txt: "Still on the same side: a path could avoid this separator too. Descend once more, into a piece of " + node.verts.length + " vertices." });
+    }
+    mkPhase("Answer");
+    add({ s: 2, view: { node: L1, showS: true, all: true }, q: { node: L1, best, bestS, bestPath, cands: [], final: true }, space: total, work, hl: ["q6"],
+          txt: "The overall minimum over all levels is the exact distance: every path either crosses some separator on the way down — and was counted there — or ends up inside a tiny piece, whose table has it.",
+          ans: "d(" + u + ", " + v + ") = " + fmt(best) + (best === dTrue ? " ✓ (matches Dijkstra)" : " ✗ mismatch!") + " with " + work + " numbers read (vs. " + (n * n) + " stored for the table, " + n + " Dijkstra settlings)." });
+  }
+}
+
+/* ---------- SVG helpers -------------------------------------------------- */
+function mk(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e); return e;
+}
+function txt(parent, x, y, s, cls, extra) {
+  extra = Object.assign({}, extra || {}); const anchor = extra["text-anchor"]; delete extra["text-anchor"];
+  const t = mk("text", Object.assign({ x, y, class: cls }, extra), parent);
+  if (anchor) t.style.textAnchor = anchor; t.textContent = s; return t;
+}
+
+/* ---------- drawing the graph -------------------------------------------- */
+function drawGraph(svg, st) {
+  const n = G.n, pos = G.pos, g = mk("g", {}, svg);
+  const view = st.view || null, q = st.q || null;
+  const node = view ? view.node : null;
+  const inNode = v => !node || node.verts.includes(v) || node.S.includes(v);
+  const sepSet = node ? new Set(node.S) : new Set();
+  const parentSep = view && view.parent ? new Set(view.parent.S) : new Set();
+  const A = node && node.children[0] ? new Set(node.children[0].verts) : new Set();
+  const Bs = node && node.children[1] ? new Set(node.children[1].verts) : new Set();
+  /* region fill of the separator cycle for level 1 (whole-graph view) */
+  if (node && node.cyc && view.showS && !view.parent) {
+    mk("polygon", { points: node.cyc.map(i => pos[i].x + "," + pos[i].y).join(" "), class: "cycfill" + (node.children[0].verts.some(v => pointInPoly(pos[v], node.cyc.map(i => pos[i]))) ? "" : " b") }, g);
+  }
+  /* edges */
+  const pathEdges = new Set(), pathEdges2 = new Set(), bestEdges = new Set(), candEdges = new Set(), relaxEdges = new Set();
+  const keyOf = (a, b) => Math.min(a, b) + "," + Math.max(a, b);
+  const addPath = (p, set) => { if (p) for (let i = 0; i + 1 < p.length; i++) set.add(keyOf(p[i], p[i + 1])); };
+  if (st.path) addPath(st.path, bestEdges);
+  if (q) { addPath(q.bestPath, bestEdges); if (q.curPath) addPath(q.curPath, candEdges); if (q.leafPath) addPath(q.leafPath, candEdges); }
+  let djSettled = null, djFrontier = null, djDist = null, djCur = -1;
+  if (st.dj) {
+    const { k, D } = st.dj;
+    djSettled = new Set(D.order.slice(0, k + 1)); djDist = new Array(n).fill(Infinity);
+    djFrontier = new Set();
+    for (let i = 0; i <= k; i++) { const ev = D.trace[i]; djDist[ev.settle] = ev.d; for (const r of ev.relax) if (r.improved) djDist[r.to] = r.nd; }
+    if (k >= 0) { djCur = D.trace[k].settle; for (const r of D.trace[k].relax) relaxEdges.add(keyOf(djCur, r.to)); }
+    for (let i = 0; i < n; i++) if (!djSettled.has(i) && djDist[i] < Infinity) djFrontier.add(i);
+    /* tree edges of the shortest path tree so far */
+    for (let i = 0; i <= k; i++) { const s = D.trace[i].settle; if (D.par[s] >= 0 && djSettled.has(D.par[s])) pathEdges2.add(keyOf(s, D.par[s])); }
+  }
+  let tblSrc = st.tbl && st.tbl.src !== undefined ? st.tbl.src : (view && view.src !== undefined ? view.src : -1);
+  let srcDist = null;
+  if (tblSrc >= 0) srcDist = st.tbl && st.tbl.src !== undefined ? TABLE[tblSrc].dist : (node.leaf ? node.table.get(tblSrc).dist : node.distS.get(tblSrc).dist);
+  for (const [a, b, w] of G.edges) {
+    const key = keyOf(a, b);
+    let cls = "edge";
+    const dimE = node && !(inNode(a) && inNode(b));
+    if (dimE) cls += " dim";
+    if (pathEdges2.has(key)) cls = "edge path2";
+    if (relaxEdges.has(key)) cls = "edge relax";
+    if (candEdges.has(key)) cls = "edge cand";
+    if (bestEdges.has(key)) cls = "edge best";
+    mk("line", { x1: pos[a].x, y1: pos[a].y, x2: pos[b].x, y2: pos[b].y, class: cls }, g);
+    /* weight label at midpoint, offset a little */
+    const mx = (pos[a].x + pos[b].x) / 2, my = (pos[a].y + pos[b].y) / 2;
+    const t = txt(g, mx, my, fmt(w), "wlab" + (dimE ? " dim" : ""));
+    mk("rect", { x: mx - 8, y: my - 6, width: 16, height: 12, rx: 3, fill: "var(--wi-bg)", opacity: .85 }, g);
+    g.appendChild(t);
+  }
+  /* nodes */
+  for (let i = 0; i < n; i++) {
+    let cls = "node";
+    const dim = node && !inNode(i);
+    const l2 = (view && view.all && parentSep.size === 0) ? node.children.flatMap(c => c.S) : [];
+    if (node && view.showS) {
+      if (sepSet.has(i)) cls += view.parent ? " sep2" : " sep1";
+      else if (l2.includes(i)) cls += " sep2";      /* summary view: level-2 separators as well */
+      else if (A.has(i)) cls += " pa";
+      else if (Bs.has(i)) cls += " pb";
+    }
+    if (djSettled) { if (djSettled.has(i)) cls += " settled"; else if (djFrontier.has(i)) cls += " frontier"; }
+    if (djCur === i) cls += " curS";
+    if (tblSrc === i) cls += " curS";
+    if (q && q.cur === i) cls += " curS";
+    if (st.s !== 1 || st.tbl.cell) { if (i === qu) cls += " qu"; if (i === qv) cls += " qv"; }
+    if (dim) cls += " dim";
+    const c = mk("circle", { cx: pos[i].x, cy: pos[i].y, r: 13, class: cls }, g);
+    if (djCur === i || tblSrc === i || (q && q.cur === i)) c.classList.add("pop");
+    txt(g, pos[i].x, pos[i].y, String(i), "nlab" + (dim ? " dim" : ""));
+    /* distance labels */
+    let dl = null;
+    if (djDist && djDist[i] < Infinity) dl = fmt(djDist[i]);
+    if (srcDist && srcDist[i] < Infinity && !dim) dl = fmt(srcDist[i]);
+    if (dl !== null) {
+      const t = txt(g, pos[i].x, pos[i].y - 20, dl, "dlab" + (dim ? " dim" : ""));
+      const bb = { w: dl.length * 7 + 6 };
+      mk("rect", { x: pos[i].x - bb.w / 2, y: pos[i].y - 29, width: bb.w, height: 13, rx: 3, fill: "var(--wi-panel-2)", stroke: "var(--wi-border-soft)" }, g);
+      g.appendChild(t);
+    }
+    if ((st.s !== 1 || st.tbl.cell) && (i === qu || i === qv)) txt(g, pos[i].x, pos[i].y + 27, i === qu ? "u" : "v", "qtag");
+    const h = mk("circle", { cx: pos[i].x, cy: pos[i].y, r: 16, class: "hit" }, g);
+    h.addEventListener("click", () => clickVertex(i));
+    h.addEventListener("mousemove", ev => showTip(ev, tipFor(i, st)));
+    h.addEventListener("mouseleave", hideTip);
+  }
+  /* pending selection hint */
+  if (pendingU !== null) txt(g, W - 12, H - 12, "u = " + pendingU + " — now click v", "caption acc", { "text-anchor": "end" });
+  else if (q && q.best < Infinity) txt(g, W - 12, H - 12, "best so far: " + fmt(q.best) + (q.bestS >= 0 ? " via " + q.bestS : ""), "caption acc", { "text-anchor": "end" });
+}
+function tipFor(i, st) {
+  let h = '<span class="tt-h">vertex ' + i + "</span>";
+  if (ORACLE) {
+    let node = ORACLE, path = [];
+    while (node && !node.leaf) { if (node.S.includes(i)) { path.push("in separator of " + (node.level === 0 ? "the whole graph" : "piece " + node.path)); node = null; break; } const p = pieceOf(node, i); path.push("piece " + node.path + "AB"[p]); node = node.children[p]; }
+    h += "<br>" + path.join(" › ");
+  }
+  h += "<br><span style=\"color:var(--wi-ink-faint)\">click: choose as u, then click v</span>";
+  return h;
+}
+function showTip(ev, html) {
+  const t = el("tooltip"); t.innerHTML = html; t.style.display = "block";
+  t.style.left = Math.min(ev.clientX + 14, window.innerWidth - 280) + "px"; t.style.top = Math.min(ev.clientY + 14, window.innerHeight - 90) + "px";
+}
+function hideTip() { el("tooltip").style.display = "none"; }
+
+/* ---------- table canvas ------------------------------------------------- */
+function drawTable(st) {
+  const cv = el("tableCv"), ctx = cv.getContext("2d");
+  const cssW = cv.clientWidth || 720;
+  const n = G.n;
+  const css = getComputedStyle(document.documentElement);
+  const col = name => css.getPropertyValue(name).trim();
+  const C = { bg: col("--wi-bg"), cell: "#e7d9c0", empty: "#f3eadb", grid: col("--wi-border-soft"), hot: col("--wi-active"), sep: col("--sep-cut-fill"), sepB: col("--sep-cut"),
+              in: col("--sep-in-fill"), out: col("--sep-out-fill"), ink: col("--wi-ink-soft"), band: "#f5e6c4", bandB: col("--sep-band") };
+  let rows = 0, cols = n, rowIds = [], colIds = [], filled = 0, cells = [], note = "", title = "";
+  if (st.s === 0) {
+    el("tabMeta").textContent = "nothing stored"; el("tabNote").textContent = "Dijkstra keeps only a working array of n tentative distances while it runs; nothing survives the query.";
+    cv.width = cssW; cv.height = 60; ctx.fillStyle = C.bg; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = C.ink; ctx.font = "14px " + col("--wi-font-head"); ctx.fillText("— no precomputed distances —", 14, 36);
+    return;
+  }
+  if (st.s === 1) {
+    rows = n; rowIds = [...Array(n).keys()]; colIds = rowIds; filled = st.tbl.rows;
+    if (st.tbl.cell) cells = [st.tbl.cell];
+    el("tabMeta").textContent = n + " × " + n + " = " + (n * n) + " numbers";
+    el("tabNote").textContent = "Row s holds the distances from s to every vertex. " + (st.tbl.cell ? "The highlighted cell answers the query." : filled + " of " + n + " rows computed.");
+  } else {
+    const node = st.tbl ? st.tbl.node : null;
+    if (!node) {
+      el("tabMeta").textContent = ""; el("tabNote").textContent = "Stored distances will appear here.";
+      cv.width = cssW; cv.height = 60; ctx.fillStyle = C.bg; ctx.fillRect(0, 0, cv.width, cv.height); return;
+    }
+    if (st.tbl.rows === -1) {   /* summary of the whole oracle */
+      const list = []; (function walk(nd) { list.push(nd); nd.children.forEach(walk); })(node);
+      el("tabMeta").textContent = totalSpace(node) + " numbers in total";
+      el("tabNote").textContent = "One block per piece of the recursion: rows = separator vertices (or all vertices of a tiny piece), columns = vertices of the piece. Level 1 in red, level 2 in gold, deeper in grey.";
+      const unit = Math.max(2, Math.min(6, Math.floor((cssW - 20) / n)));
+      cv.width = cssW; let y = 8;
+      const bw = unit; let x = 10, rowH = 0;
+      const blocks = list.map(nd => ({ nd, w: nd.verts.length * bw, h: (nd.leaf ? nd.verts.length : nd.S.length) * bw }));
+      let totalH = 8;
+      for (const b of blocks) { if (x + b.w > cssW - 10) { x = 10; y += rowH + 8; rowH = 0; } x += b.w + 8; rowH = Math.max(rowH, b.h); }
+      totalH = y + rowH + 10;
+      cv.height = Math.max(60, totalH);
+      ctx.fillStyle = C.bg; ctx.fillRect(0, 0, cv.width, cv.height);
+      x = 10; y = 8; rowH = 0;
+      for (const b of blocks) {
+        if (x + b.w > cssW - 10) { x = 10; y += rowH + 8; rowH = 0; }
+        ctx.fillStyle = b.nd.level === 0 ? C.sep : b.nd.level === 1 ? C.band : C.cell;
+        ctx.fillRect(x, y, b.w, b.h);
+        ctx.strokeStyle = b.nd.level === 0 ? C.sepB : b.nd.level === 1 ? C.bandB : C.grid; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, b.w - 1, b.h - 1);
+        x += b.w + 8; rowH = Math.max(rowH, b.h);
+      }
+      return;
+    }
+    rows = node.leaf ? node.verts.length : node.S.length; rowIds = node.leaf ? node.verts : node.S; colIds = node.verts.slice().sort((a, b) => a - b); cols = colIds.length;
+    filled = st.tbl.rows; cells = st.tbl.cells || [];
+    el("tabMeta").textContent = (node.level === 0 ? "level 1: " : node.leaf ? "tiny piece " + node.path + ": " : "level " + (node.level + 1) + ", piece " + node.path + ": ") + rows + " × " + cols + " = " + rows * cols + " numbers";
+    el("tabNote").textContent = node.leaf ? "A tiny piece stores all its pairwise distances, measured inside the piece."
+      : "Rows: separator vertices" + (node.level ? " of the piece" : "") + ". Columns: vertices " + (node.level ? "of the piece" : "of the whole graph") + ". A query reads two cells of one row per separator vertex.";
+  }
+  /* draw a rows x cols grid */
+  const left = 30, top = 16;
+  const unit = Math.max(3, Math.min(14, Math.floor((cssW - left - 6) / cols), Math.floor(420 / Math.max(rows, 1))));
+  cv.width = cssW; cv.height = top + rows * unit + 6;
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.font = Math.max(7, Math.min(10, unit - 2)) + "px " + col("--wi-font-mono");
+  ctx.fillStyle = C.ink; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const showColLabels = unit >= 7;
+  for (let c = 0; c < cols; c++) if (showColLabels && (unit >= 10 || c % 2 === 0)) ctx.fillText(String(colIds[c]), left + c * unit + unit / 2, top / 2);
+  for (let r = 0; r < rows; r++) {
+    if (unit >= 7) { ctx.textAlign = "right"; ctx.fillStyle = C.ink; ctx.fillText(String(rowIds[r]), left - 4, top + r * unit + unit / 2); ctx.textAlign = "center"; }
+    for (let c = 0; c < cols; c++) {
+      ctx.fillStyle = r < filled ? (st.s === 1 ? C.cell : (st.tbl.node.level === 0 ? C.sep : st.tbl.node.leaf ? C.cell : C.band)) : C.empty;
+      ctx.fillRect(left + c * unit, top + r * unit, unit, unit);
+      if (unit >= 12 && r < filled) {
+        const val = st.s === 1 ? TABLE[rowIds[r]].dist[colIds[c]] : (st.tbl.node.leaf ? st.tbl.node.table.get(rowIds[r]).dist[colIds[c]] : st.tbl.node.distS.get(rowIds[r]).dist[colIds[c]]);
+        ctx.fillStyle = C.ink; ctx.fillText(fmt(val), left + c * unit + unit / 2, top + r * unit + unit / 2);
+      }
+    }
+  }
+  ctx.strokeStyle = C.grid; ctx.lineWidth = .5;
+  for (let r = 0; r <= rows; r++) { ctx.beginPath(); ctx.moveTo(left, top + r * unit + .5); ctx.lineTo(left + cols * unit, top + r * unit + .5); ctx.stroke(); }
+  for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.moveTo(left + c * unit + .5, top); ctx.lineTo(left + c * unit + .5, top + rows * unit); ctx.stroke(); }
+  /* the freshly computed row */
+  if (st.tbl && filled > 0 && !cells.length && st.s !== 1 || (st.s === 1 && st.tbl.src !== undefined)) {
+    ctx.strokeStyle = C.hot; ctx.lineWidth = 2; ctx.strokeRect(left + 1, top + (filled - 1) * unit + 1, cols * unit - 2, unit - 2);
+  }
+  for (const [r, c] of cells) {
+    const ri = rowIds.indexOf(r), ci = colIds.indexOf(c);
+    if (ri < 0 || ci < 0) continue;
+    ctx.strokeStyle = C.hot; ctx.lineWidth = 2.5; ctx.strokeRect(left + ci * unit + 1, top + ri * unit + 1, unit - 2, unit - 2);
+  }
+}
+
+/* ---------- the meter ---------------------------------------------------- */
+let METER = null;   /* precomputed static costs per strategy for the current graph/query */
+function computeMeter() {
+  const n = G.n;
+  const D = dijkstra(G, qu, null, qv);
+  let djWork = 0; D.trace.forEach(ev => djWork += 1 + ev.relax.length);
+  const oracleWork = (() => {   /* replay the oracle query cheaply */
+    let node = ORACLE, w = 0;
+    for (;;) {
+      if (node.leaf) { w += 1; break; }
+      w += 2 * node.S.length;
+      if (node.S.includes(qu) || node.S.includes(qv)) break;
+      const a = pieceOf(node, qu), b = pieceOf(node, qv);
+      if (a !== b) break; node = node.children[a];
+    }
+    return w;
+  })();
+  METER = [
+    { name: "Dijkstra per query", space: n, time: djWork },
+    { name: "Full table", space: n * n, time: 1 },
+    { name: "Separator oracle", space: totalSpace(ORACLE), time: oracleWork }
+  ];
+}
+function renderMeter(st) {
+  const n = G.n, lmax = Math.log(n * n);
+  const bar = (v, cls, live) => {
+    const pct = v <= 0 ? 0 : Math.min(100, 100 * Math.log(Math.max(v, 1)) / lmax);
+    const ticks = [[n, "n"], [n * Math.sqrt(n), "n√n"]].map(([t, l]) => '<span class="tick" title="' + l + '" style="left:' + (100 * Math.log(t) / lmax).toFixed(1) + '%"></span>').join("");
+    return '<div class="mbar ' + cls + '"><div class="f" style="width:' + pct.toFixed(1) + '%"></div>' + ticks + '<span class="v">' + (live !== undefined ? live + " / " : "") + v + "</span></div>";
+  };
+  let h = '<div class="mrow head"><span></span><span>space (numbers stored)</span><span>time (numbers read)</span></div>';
+  METER.forEach((m, i) => {
+    const on = i === strat;
+    const liveSp = on && st.space !== undefined && st.space !== m.space ? st.space : undefined;
+    const liveTm = on && st.work !== undefined && st.work !== m.time ? st.work : undefined;
+    h += '<div class="mrow' + (on ? " on" : "") + '"><span class="nm">' + esc(m.name) + "</span>" +
+         bar(on && st.space !== undefined ? st.space : m.space, "sp", liveSp !== undefined ? undefined : undefined) +
+         bar(on && st.work !== undefined ? st.work : m.time, "tm") + "</div>";
+  });
+  el("meter").innerHTML = h;
+  el("meterMeta").textContent = "n = " + n + " · query " + qu + " → " + qv;
+}
+
+/* ---------- pseudocode --------------------------------------------------- */
+const CODE = {
+  0: [["", "Dijkstra query", "sub"], ["d1", "<span class=kw>procedure</span> Query(u, v):"], ["d2", "  dist[·] ← ∞;  dist[u] ← 0;  PQ ← {u}"], ["d3", "  <span class=kw>while</span> PQ not empty:  x ← PQ.deleteMin()"],
+      ["d4", "    <span class=kw>for</span> each edge (x, y, w):"], ["d4", "      <span class=kw>if</span> dist[x] + w < dist[y]:  dist[y] ← dist[x] + w"], ["d5", "    <span class=kw>if</span> x = v:  <span class=kw>return</span> dist[v]"]],
+  1: [["", "Full table", "sub"], ["t1", "<span class=kw>procedure</span> Preprocess():"], ["t2", "  <span class=kw>for</span> each vertex s:"], ["t3", "    D[s][·] ← Dijkstra(s)          <span class=cm>// n numbers</span>"],
+      ["", "", "gap"], ["t4", "<span class=kw>procedure</span> Query(u, v):"], ["t5", "  <span class=kw>return</span> D[u][v]"]],
+  2: [["", "Separator oracle", "sub"], ["p1", "<span class=kw>procedure</span> Preprocess(P):   <span class=cm>// P ⊆ V, initially V</span>"],
+      ["p5", "  <span class=kw>if</span> |P| ≤ " + LEAF + ":  store the full table of P;  <span class=kw>return</span>"],
+      ["p2", "  S ← balanced separator of G[P];  A, B ← the two pieces"], ["p3", "  <span class=kw>for</span> each s ∈ S:  D<sub>P</sub>[s][·] ← Dijkstra(s) inside G[P]"],
+      ["p4", "  Preprocess(A);  Preprocess(B)"], ["", "", "gap"],
+      ["q1", "<span class=kw>procedure</span> Query(P, u, v):"], ["q5", "  <span class=kw>if</span> P is tiny:  <span class=kw>return</span> table<sub>P</sub>[u][v]"],
+      ["q2", "  d ← ∞"], ["q3", "  <span class=kw>for</span> each s ∈ S:  d ← min(d, D<sub>P</sub>[s][u] + D<sub>P</sub>[s][v])"],
+      ["q4", "  <span class=kw>if</span> u, v ∈ same piece C (and neither is in S):"], ["q5b", "    d ← min(d, Query(C, u, v))"], ["q6", "  <span class=kw>return</span> d"]]
+};
+function renderCode(st) {
+  const hl = new Set(st.hl || []);
+  if (hl.has("q5") && strat === 2) hl.add("q5b");
+  let h = "", ln = 0;
+  for (const [id, text, kind] of CODE[strat]) {
+    if (kind === "sub") { h += '<div class="sublabel">' + esc(text) + "</div>"; continue; }
+    if (kind === "gap") { h += '<div style="height:6px"></div>'; continue; }
+    ln++;
+    h += '<div class="cline' + (hl.has(id) ? " on" : "") + '"><span class="ln">' + ln + "</span><span>" + text + "</span></div>";
+  }
+  el("codeBody").innerHTML = h;
+}
+
+/* ---------- asymptotics table -------------------------------------------- */
+function renderAsym() {
+  const p = Number(el("bigN").value), n = Math.round(Math.pow(10, p));
+  el("bigNVal").textContent = "n = " + n.toLocaleString("en-US");
+  const rows = [
+    ["Dijkstra per query", n, n * Math.log2(n), "n", "n log n"],
+    ["Separator oracle", n * Math.sqrt(n), Math.sqrt(n), "n √n", "√n"],
+    ["Full table", n * n, 1, "n²", "1"]
+  ];
+  const f = x => Math.round(x).toLocaleString("en-US");
+  let h = "<tr><th>strategy</th><th>space</th><th></th><th>query time</th><th></th></tr>";
+  for (const [nm, sp, tm, fs, ft] of rows) h += "<tr><td>" + nm + "</td><td>" + f(sp) + "</td><td class=f>" + fs + "</td><td>" + f(tm) + "</td><td class=f>" + ft + "</td></tr>";
+  el("asymTable").innerHTML = h;
+}
+
+/* ---------- render pass -------------------------------------------------- */
+function renderPhases() {
+  const bar = el("phaseBar"); bar.innerHTML = "";
+  phases.forEach(p => {
+    const span = p.to - p.from + 1;
+    const pct = cur > p.to ? 100 : cur < p.from ? 0 : ((cur - p.from + 1) / span) * 100;
+    const b = document.createElement("button");
+    b.className = "phasebtn" + (cur >= p.from && cur <= p.to ? " on" : (cur > p.to ? " past" : ""));
+    b.style.flexGrow = String(Math.max(1, span));
+    b.innerHTML = '<span class="fill' + (pct === 0 ? " empty" : "") + '" style="width:' + pct.toFixed(2) + '%"></span><span class="lab">' + esc(p.name) + "</span>";
+    b.title = p.name + " — steps " + (p.from + 1) + "–" + (p.to + 1);
+    b.addEventListener("click", () => { stopPlay(); cur = p.from; render(); });
+    bar.appendChild(b);
+  });
+}
+const LEGENDS = {
+  0: [["qu", "u, v"], ["settled", "settled"], ["frontier", "reached, not settled"], ["curS", "just settled"], ["relax", "edges relaxed"], ["path2", "shortest-path tree"], ["best", "shortest path"]],
+  1: [["curS", "current source"], ["qu", "u, v"], ["best", "shortest path"]],
+  2: [["sep1", "separator S (level 1)"], ["sep2", "separator of a piece"], ["pa", "piece A"], ["pb", "piece B"], ["curS", "current s"], ["cand", "u – s – v candidate"], ["best", "best so far"]]
+};
+function renderLegend() {
+  const sw = {
+    qu: "background:#e8e0d3;border-color:var(--wi-ink-strong);border-width:2.5px", settled: "background:#e7d9c0;border-color:var(--wi-border-strong)",
+    frontier: "background:#f7edd9;border-color:var(--wi-examine)", curS: "background:#f7d9cf;border-color:var(--wi-active);border-width:2.5px",
+    sep1: "background:var(--sep-cut-fill);border-color:var(--sep-cut)", sep2: "background:#f5e6c4;border-color:var(--sep-band)",
+    pa: "background:var(--sep-in-fill);border-color:var(--sep-in)", pb: "background:var(--sep-out-fill);border-color:var(--sep-out)",
+    relax: "border-radius:0;height:0;width:1.1em;border:0;border-top:3px solid var(--wi-examine)",
+    path2: "border-radius:0;height:0;width:1.1em;border:0;border-top:3px solid var(--sep-out)",
+    cand: "border-radius:0;height:0;width:1.1em;border:0;border-top:3px dashed var(--wi-examine)",
+    best: "border-radius:0;height:0;width:1.1em;border:0;border-top:4px solid var(--wi-active)"
+  };
+  el("legend").innerHTML = LEGENDS[strat].map(([k, nm]) => '<span class="item"><span class="sw" style="' + sw[k] + '"></span>' + esc(nm) + "</span>").join("");
+}
+function render() {
+  const st = steps[cur] || {};
+  const svg = el("stageSvg"); svg.innerHTML = "";
+  drawGraph(svg, st);
+  el("stageTitle").textContent = strat === 0 ? "Dijkstra from u" : strat === 1 ? "The graph and the current source" : "The graph, its separator and pieces";
+  el("stageMeta").textContent = "n = " + G.n + " · " + G.edges.length + " edges · query " + qu + " → " + qv;
+  drawTable(st); renderMeter(st); renderCode(st); renderLegend(); renderPhases();
+  el("statusBox").innerHTML = (st.txt || "") + (st.ans ? '<b class="ans">' + st.ans + "</b>" : "");
+  el("phaseName").textContent = phases[st.ph] ? phases[st.ph].name : "";
+  el("scrubber").max = String(Math.max(0, steps.length - 1)); el("scrubber").value = String(cur);
+  el("stepNo").textContent = steps.length ? (cur + 1) + " / " + steps.length : "— / —";
+  el("backBtn").disabled = cur <= 0; el("stepBtn").disabled = cur >= steps.length - 1;
+}
+const PLAY = "\u25B6\uFE0E", PAUSE = "\u23F8\uFE0E";
+function stepFwd() { if (cur < steps.length - 1) { cur++; render(); } else stopPlay(); }
+function stepBack() { if (cur > 0) { cur--; render(); } }
+function stopPlay() { if (timer) { clearInterval(timer); timer = null; el("playBtn").textContent = PLAY; el("playBtn").setAttribute("aria-label", "Play"); } }
+function togglePlay() {
+  if (timer) { stopPlay(); return; }
+  el("playBtn").textContent = PAUSE; el("playBtn").setAttribute("aria-label", "Pause");
+  timer = setInterval(stepFwd, Number(el("speed").value));
+}
+
+/* ---------- loading & interaction ---------------------------------------- */
+function rebuild(gotoQuery) {
+  build(); computeMeter();
+  if (gotoQuery) { const p = phases.find(x => x.name.startsWith("Query")); cur = p ? p.from : 0; } else cur = 0;
+  render();
+}
+function loadText(text, r, q, fromEditor) {
+  stopPlay();
+  let g;
+  try { g = parseGraph(text); el("parseErr").textContent = ""; }
+  catch (e) { el("parseErr").textContent = e.message; if (!fromEditor) console.error(e); return; }
+  G = g; root = (r !== undefined && r < g.n) ? r : Math.floor(g.n / 2);
+  el("inputText").value = text;
+  el("uIn").max = el("vIn").max = String(g.n - 1);
+  TABLE = []; for (let s = 0; s < g.n; s++) TABLE.push(dijkstra(g, s, null));
+  ORACLE = buildOracle(g, [...Array(g.n).keys()], 0, root, "");
+  qu = q && q[0] < g.n ? q[0] : 0; qv = q && q[1] < g.n ? q[1] : Math.min(1, g.n - 1);
+  el("uIn").value = String(qu); el("vIn").value = String(qv); pendingU = null;
+  rebuild(false);
+}
+function setQuery(u, v) {
+  if (!G || !(u >= 0 && u < G.n && v >= 0 && v < G.n) || u === v) return;
+  stopPlay(); qu = u; qv = v; el("uIn").value = String(u); el("vIn").value = String(v); pendingU = null;
+  rebuild(true);
+}
+function clickVertex(i) {
+  if (pendingU === null) { pendingU = i; render(); return; }
+  if (pendingU === i) { pendingU = null; render(); return; }
+  setQuery(pendingU, i);
+}
+function setStrat(s) {
+  strat = s; document.querySelectorAll("#stratSeg button").forEach(b => b.classList.toggle("on", Number(b.dataset.s) === s));
+  stopPlay(); rebuild(false);
+}
+function init() {
+  const sel = el("presetSel");
+  for (const k in PRESETS) { const o = document.createElement("option"); o.value = k; o.textContent = PRESETS[k].name; sel.appendChild(o); }
+  sel.addEventListener("change", () => loadText(PRESETS[sel.value].text, PRESETS[sel.value].root, PRESETS[sel.value].q));
+  el("loadBtn").addEventListener("click", () => loadText(el("inputText").value, undefined, undefined, true));
+  document.querySelectorAll("#stratSeg button").forEach(b => b.addEventListener("click", () => setStrat(Number(b.dataset.s))));
+  el("askBtn").addEventListener("click", () => setQuery(Number(el("uIn").value), Number(el("vIn").value)));
+  [el("uIn"), el("vIn")].forEach(x => x.addEventListener("keydown", ev => { if (ev.key === "Enter") setQuery(Number(el("uIn").value), Number(el("vIn").value)); }));
+  el("randBtn").addEventListener("click", () => { const u = Math.floor(Math.random() * G.n); let v = Math.floor(Math.random() * (G.n - 1)); if (v >= u) v++; setQuery(u, v); });
+  el("stepBtn").addEventListener("click", () => { stopPlay(); stepFwd(); });
+  el("backBtn").addEventListener("click", () => { stopPlay(); stepBack(); });
+  el("playBtn").addEventListener("click", togglePlay);
+  el("resetBtn").addEventListener("click", () => { stopPlay(); cur = 0; render(); });
+  el("scrubber").addEventListener("input", e => { stopPlay(); cur = Number(e.target.value); render(); });
+  el("speed").addEventListener("input", e => { el("speedVal").textContent = e.target.value + "ms"; if (timer) { clearInterval(timer); timer = setInterval(stepFwd, Number(e.target.value)); } });
+  el("bigN").addEventListener("input", renderAsym);
+  document.addEventListener("keydown", ev => {
+    if (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
+    if (ev.key === "ArrowRight" || ev.key === " ") { stopPlay(); stepFwd(); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft") { stopPlay(); stepBack(); ev.preventDefault(); }
+    if (ev.key === "Home") { stopPlay(); cur = 0; render(); ev.preventDefault(); }
+    if (ev.key === "End") { stopPlay(); cur = steps.length - 1; render(); ev.preventDefault(); }
+  });
+  window.addEventListener("resize", () => { if (steps.length) drawTable(steps[cur]); });
+  renderAsym();
+  loadText(PRESETS.demo.text, PRESETS.demo.root, PRESETS.demo.q);
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

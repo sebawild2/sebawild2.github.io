@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suffix Trees — Drawing Tool</title>
+<style>
+    :root{
+        --bg:#f5ebd9; --panel:#faf6ed; --panel-border:#d4c5b4;
+        --controls-bg:#ecddc5; --controls-border:#d4c5b4;
+        --ink:#6b675c; --ink-strong:#46433a; --title-muted:#8b8779;
+        --btn:#faf6ed; --btn-border:#b9a793; --btn-border-hover:#9c866d;
+        --heading:#6d180f; --heading-deep:#902015; --hi-fill:#e3c4b9;
+        --node:#5a4c3f; --leaf:#1d5c80; --grey:#b6a98d;
+        --d1:#6d180f; --d2:#1d5c80; --d3:#3f6b1e; --d4:#896c1c;
+    }
+    *{box-sizing:border-box}
+    body{background:var(--bg);color:var(--ink);
+        font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;
+        margin:0;padding:22px 26px 46px;min-height:100vh}
+    h1{font-size:1.6rem;font-weight:600;margin:0 0 4px;letter-spacing:.3px;color:var(--ink-strong)}
+    .subtitle{font-size:.92rem;color:var(--title-muted);margin:0 0 18px;max-width:64em;line-height:1.5}
+    .subtitle code{background:#ecddc5;padding:1px 6px;border-radius:3px}
+
+    .controls{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:center;background:var(--controls-bg);
+        padding:12px 18px;border-radius:6px;border:1px solid var(--controls-border);margin-bottom:16px}
+    .ctl-group{display:flex;align-items:center;gap:8px}
+    .ctl-group>label{font-size:.76rem;color:var(--ink-strong);font-weight:600;
+        text-transform:uppercase;letter-spacing:.6px}
+    button,select{background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);
+        padding:7px 13px;font-size:.87rem;border-radius:4px;cursor:pointer;font-weight:500;
+        font-family:inherit;transition:background .15s,border-color .15s}
+    button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--btn-border-hover)}
+    button:disabled{opacity:.38;cursor:not-allowed}
+    button.primary{background:#f0d9cd;border-color:#c28577}
+    .seg{display:flex;border:1px solid var(--btn-border);border-radius:4px;overflow:hidden}
+    .seg button{border:none;border-radius:0;padding:7px 12px}
+    .seg button+button{border-left:1px solid var(--btn-border)}
+    .seg button.on{background:#e3c4b9;font-weight:600}
+    .chk{display:flex;align-items:center;gap:5px;font-size:.85rem;cursor:pointer}
+
+    .stage{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,.8fr);gap:18px;align-items:start}
+    @media (max-width:1040px){.stage{grid-template-columns:1fr}}
+    .stage>div{min-width:0}
+    .sim-box{background:var(--panel);border:1px solid var(--panel-border);border-radius:6px;
+        padding:13px 16px;box-shadow:0 2px 8px rgba(0,0,0,.04);max-width:100%}
+    .sim-title{font-size:.76rem;text-transform:uppercase;letter-spacing:1px;color:var(--title-muted);
+        margin:0 0 10px;font-weight:700}
+    .side{display:flex;flex-direction:column;gap:15px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    #treeWrap{overflow:auto;max-width:100%;max-height:76vh}
+    #treeWrap.zoomable{cursor:grab}
+    #treeWrap.zoomable.drag{cursor:grabbing}
+    svg .lfbox{fill:#e4eef4;stroke:var(--leaf);stroke-width:1.3}
+    svg text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+    svg .edge{stroke:var(--node);stroke-width:1.3;fill:none}
+    svg .edge.dim{stroke:#cebfa3}
+    svg .nd{fill:#fefdf7;stroke:var(--node);stroke-width:1.4}
+    svg .nd.root{stroke-width:2.2}
+    svg .nd.allDocs{stroke:var(--heading);stroke-width:2.8}
+    svg .ndx{fill:var(--heading);font-size:11.5px;font-weight:700}
+    svg .lf{fill:#e4eef4;stroke:var(--leaf);stroke-width:1.3}
+    svg .lftx{fill:#12455f;font-size:11.5px}
+    svg .term{fill:var(--heading);stroke:none}
+    svg .el{fill:var(--ink-strong)}
+    svg .el .s{fill:var(--heading);font-weight:700}
+    svg .elbg{fill:var(--panel);stroke:none}
+    svg .rng{fill:var(--title-muted);font-size:10px}
+    svg .suffix{fill:var(--ink-strong);font-size:12px}
+    svg .suffix .pre{fill:var(--grey)}
+    svg .docdot{stroke:none}
+
+    /* hover: fade everything not kept, keep transitions smooth */
+    .edge,.el,.elbg,.rng,.nd,.lf,.lfbox,.suffix,.lftx,.docdot,.term{transition:opacity .12s}
+    .dim{opacity:.13}
+    .edgeHit{fill:none;stroke:transparent;stroke-width:14px;cursor:pointer}
+    .nd,.lf,.lfbox{cursor:pointer}
+    #treeStage{position:relative}
+    .hovertip{position:fixed;pointer-events:none;display:none;z-index:50;max-width:300px;
+        background:var(--panel);border:1px solid var(--panel-border);border-radius:5px;
+        padding:6px 10px;box-shadow:0 4px 14px rgba(0,0,0,.14);
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.76rem;
+        color:var(--ink-strong);line-height:1.5;white-space:pre-wrap}
+    .hovertip b{color:var(--heading)}
+    .hovertip .hd{color:var(--title-muted);font-size:.7rem;margin-bottom:2px;
+        font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif}
+    .hovertip .pfx{color:var(--heading);font-weight:700}
+    table.nt tr[data-node]{cursor:pointer}
+    table.nt tr[data-node]:hover{background:#f3ecd9}
+    table.txt td.ch{cursor:pointer}
+    table.txt td.ch.suf-hl{background:var(--hi-fill);border-radius:0;color:var(--heading-deep)}
+    #strings td[data-node]{cursor:pointer}
+    #strings td[data-node]:hover{outline:2px solid var(--heading);outline-offset:-1px}
+    #strings .strname[data-doc]{cursor:pointer}
+    .legend .item[data-doc]{cursor:pointer}
+
+    table.txt{border-collapse:collapse;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        margin-bottom:8px}
+    table.txt td{padding:0 1px;text-align:center;min-width:1.35em;font-size:.86rem}
+    table.txt tr.idx td{font-size:.62rem;color:var(--title-muted)}
+    table.txt td.ch{background:#f3ecd9;border-radius:2px}
+    .strwrap{overflow-x:auto;max-width:100%}
+    .strname{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;
+        color:var(--title-muted);margin-bottom:2px}
+    table.nt{width:100%;border-collapse:collapse;font-size:.78rem;
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    table.nt td,table.nt th{padding:3px 6px;border-bottom:1px dashed #ecddc5;text-align:left;
+        vertical-align:top}
+    table.nt th{font-size:.68rem;color:var(--title-muted);text-transform:uppercase;letter-spacing:.5px;
+        font-family:inherit;font-weight:700}
+    .kidchip{display:inline-block;border:1px solid #c3b295;border-radius:3px;background:#fefdf7;
+        padding:0 4px;margin:1px 2px 1px 0;font-size:.74rem;white-space:nowrap}
+    .kidchip .c{color:var(--heading);font-weight:700}
+    .kidchip.leaf{border-color:var(--leaf);background:#e4eef4}
+    .cost{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:.84rem}
+    .cost .v{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-strong)}
+    .cost .sub{padding-left:12px;font-size:.79rem;color:var(--title-muted)}
+    .cost hr{grid-column:1/-1;border:none;border-top:1px dashed #deceb2;margin:4px 0}
+    .legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.79rem;margin-top:4px}
+    .legend .item{display:flex;align-items:center;gap:6px}
+    .dotsw{width:11px;height:11px;border-radius:50%}
+    .note{font-size:.82rem;color:var(--ink);line-height:1.55;margin-top:10px;
+        border-top:1px dashed #deceb2;padding-top:8px}
+
+    details.editor{margin-top:22px}
+    details.editor summary{cursor:pointer;font-size:.82rem;color:var(--title-muted);font-weight:600;
+        text-transform:uppercase;letter-spacing:.6px}
+    .editor-body{margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+    textarea{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem;
+        background:var(--panel);color:var(--ink-strong);border:1px solid var(--panel-border);
+        border-radius:5px;padding:10px;width:360px;height:130px;resize:vertical}
+    .editor-help{font-size:.82rem;color:var(--ink);max-width:540px;line-height:1.55}
+    .editor-help code{background:#ecddc5;padding:1px 5px;border-radius:3px}
+    .err{color:#6d180f;font-weight:600;font-size:.82rem;min-height:18px}
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<h1>Suffix Trees</h1>
+<p class="subtitle">All suffixes of one text, in a trie. Since a suffix can be a prefix of another one, the text is
+    terminated by <code>$</code>; then every suffix ends in its own leaf and the leaves, read from left to
+    right, are the suffix array. Contracting the branch-free paths turns the <b>suffix trie</b>
+    (<span class="mono">&Theta;(n²)</span> nodes) into the <b>suffix tree</b>
+    (at most <span class="mono">2n</span> nodes).</p>
+
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="preset">Input</label>
+        <select id="preset"></select>
+    </div>
+    <div class="ctl-group">
+        <label>Shape</label>
+        <div class="seg" id="shapeSeg">
+            <button data-shape="trie">suffix trie</button>
+            <button data-shape="compact" class="on">suffix tree</button>
+        </div>
+    </div>
+    <div class="ctl-group">
+        <label>Labels</label>
+        <div class="seg" id="labSeg">
+            <button data-lab="human" class="on">human</button>
+            <button data-lab="machine">machine</button>
+        </div>
+    </div>
+    <div class="ctl-group">
+        <label>Edge text</label>
+        <div class="seg" id="orientSeg">
+            <button data-orient="sloped" class="on">along edge</button>
+            <button data-orient="horizontal">horizontal</button>
+        </div>
+    </div>
+    <div class="ctl-group">
+        <label class="chk"><input type="checkbox" id="cbIdx" checked> index in node</label>
+        <label class="chk"><input type="checkbox" id="cbLeafText" checked> text at leaves</label>
+    </div>
+    <div class="ctl-group">
+        <label class="chk"><input type="checkbox" id="cbZoom" checked> zoom</label>
+        <button id="zOut" title="zoom out">&minus;</button>
+        <button id="zReset" title="reset zoom">100%</button>
+        <button id="zIn" title="zoom in">+</button>
+    </div>
+</div>
+
+<div class="stage">
+    <div>
+        <div class="sim-box">
+            <p class="sim-title" id="stageTitle">Tree</p>
+            <div id="treeStage">
+                <div id="treeWrap"></div>
+                <div id="hoverTip" class="hovertip"></div>
+            </div>
+            <div class="legend" id="legend"></div>
+            <div class="note" id="note"></div>
+        </div>
+    </div>
+    <div class="side">
+        <div class="sim-box">
+            <p class="sim-title">Stored text</p>
+            <div id="strings"></div>
+        </div>
+        <div class="sim-box">
+            <p class="sim-title">Size</p>
+            <div class="cost" id="cost"></div>
+        </div>
+        <div class="sim-box">
+            <p class="sim-title">Stored representation</p>
+            <div id="nodetab"></div>
+        </div>
+    </div>
+</div>
+
+<details class="editor" id="editor">
+    <summary>Input editor</summary>
+    <div class="editor-body">
+        <div>
+            <textarea id="ta" spellcheck="false"></textarea>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+                <button id="btnLoad" class="primary">Load</button>
+                <span class="err" id="err"></span>
+            </div>
+        </div>
+        <div class="editor-help">
+            <p style="margin-top:0"><b>Format.</b> One line holding the text; a leading <code>text:</code> is
+            optional. Use <code>_</code> for a blank. A trailing <code>$</code> is added if you leave it out.</p>
+            <p style="margin:6px 0">The <b>human</b> labels spell the edges out; together they can be
+            <span class="mono">&Theta;(n²)</span> characters long. The <b>machine</b> labels show what is
+            really stored: one character per edge, the index of the next character to compare in each node,
+            and the start index of the suffix at each leaf &mdash; <span class="mono">O(n)</span> words
+            beside the text itself.</p>
+            <p style="margin:6px 0">For several texts at once, use the generalized suffix tree page.</p>
+        </div>
+    </div>
+</details>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   ENGINE START
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* end markers live in a private range so they compare as distinct characters */
+const MODE = "suffix";
+const SENT = ["\uE001", "\uE002", "\uE003", "\uE004", "\uE005", "\uE006"];
+function isSent(c) { return SENT.indexOf(c) >= 0 || c === "$"; }
+function dispChar(c, multi) {
+    const k = SENT.indexOf(c);
+    if (k < 0) return c;
+    return multi ? "$" + "₁₂₃₄₅₆"[k] : "$";
+}
+function dispStr(s, multi) { return s.split("").map(c => dispChar(c, multi)).join(""); }
+
+/* --------------------------------------------------------------------------
+   input:  items = [{s, doc, start, label}]   (label = what a leaf shows)
+   -------------------------------------------------------------------------- */
+function parseInput(raw) {
+    const clean = (x) => x.replace(/^text\s*:\s*/i, "").replace(/\s+/g, "").replace(/_/g, "\u2423");
+    if (MODE === "words") {
+        const words = raw.split(/\s+/).filter(x => x.length).map(x => x.replace(/_/g, "\u2423"));
+        if (!words.length) throw new Error("no words given");
+        if (words.length > 40) throw new Error("at most 40 words");
+        if (new Set(words).size !== words.length) throw new Error("the words must be distinct");
+        /* an end-of-word marker makes the set prefix-free, so every word ends in a leaf */
+        return { items: words.map((w, k) => ({ s: w + "$", doc: 0, start: 0, label: w, word: k })),
+                 texts: words, mode: "words", multi: false };
+    }
+    const texts = raw.split("\n").map(x => x.trim()).filter(x => x.length)
+                     .map(clean).map(t => t.replace(/\$+$/, "")).filter(t => t.length);
+    if (!texts.length) throw new Error("no text given");
+    if (MODE === "suffix" && texts.length > 1)
+        throw new Error("one text per drawing here — several texts belong on the generalized page");
+    if (MODE === "generalized" && texts.length < 2)
+        throw new Error("give at least two texts, one per line");
+    if (texts.length > 6) throw new Error("at most 6 texts");
+    const multi = (MODE === "generalized");
+    const items = [];
+    texts.forEach((t, d) => {
+        const full = t + (multi ? SENT[d] : "$");
+        for (let i = 0; i < full.length; i++)
+            items.push({ s: full.slice(i), doc: d, start: i, label: String(i) });
+    });
+    if (items.length > 90) throw new Error("too many suffixes (at most 90)");
+    return { items, texts: texts.map((t, d) => t + (multi ? SENT[d] : "$")), mode: "suffix", multi };
+}
+
+/* --------------------------------------------------------------------------
+   the trie of all items; then optional path compaction
+   node = {id, depth, kids:[{c, sub, id}], term:[itemIdx], item, docs:Set}
+   For an item i, `src` records where its characters live: text index and offset,
+   so that machine labels can print T[a..b).
+   -------------------------------------------------------------------------- */
+function buildTree(items, compact) {
+    const nodes = [];
+    const mk = (depth) => { nodes.push({ id: nodes.length, depth, kids: [], term: [], leaf: false }); return nodes[nodes.length - 1]; };
+    const root = mk(0);
+    items.forEach((it, k) => {
+        let v = root;
+        for (let d = 0; d < it.s.length; d++) {
+            const c = it.s[d];
+            let e = v.kids.find(x => x.c === c);
+            if (!e) { const u = mk(d + 1); e = { c, to: u.id }; v.kids.push(e); v.kids.sort((a, b) => a.c < b.c ? -1 : 1); }
+            v = nodes[e.to];
+        }
+        v.term.push(k);
+    });
+    /* a node with exactly one item ending in it and no children is a leaf */
+    for (const v of nodes) if (!v.kids.length && v.term.length) { v.leaf = true; v.item = v.term[0]; }
+
+    if (!compact) return { nodes, root: root.id };
+
+    /* contract unary paths: keep root, branching nodes, terminal nodes, leaves */
+    const keep = (v) => v.id === root.id || v.kids.length > 1 || v.term.length > 0;
+    const cnodes = [];
+    const map = {};
+    const copy = (v) => {
+        if (map[v.id] !== undefined) return map[v.id];
+        const w = { id: cnodes.length, depth: v.depth, kids: [], term: v.term.slice(), leaf: v.leaf, item: v.item };
+        cnodes.push(w); map[v.id] = w.id;
+        return w.id;
+    };
+    const walk = (vid) => {
+        const v = nodes[vid];
+        const w = cnodes[map[vid]];
+        for (const e of v.kids) {
+            let u = nodes[e.to], len = 1;
+            while (!keep(u) && u.kids.length === 1) { u = nodes[u.kids[0].to]; len++; }
+            const uid = copy(u);
+            w.kids.push({ c: e.c, to: uid, len });
+            walk(u.id);
+        }
+    };
+    copy(root); walk(root.id);
+    return { nodes: cnodes, root: 0 };
+}
+
+/* the first item in the subtree of v — gives the text positions of every edge */
+function anyItem(tree, id) {
+    const v = tree.nodes[id];
+    if (v.term.length) return v.term[0];
+    for (const e of v.kids) { const r = anyItem(tree, e.to); if (r !== null) return r; }
+    return null;
+}
+/* set of documents occurring in the subtree */
+function docsOf(tree, items, id, memo) {
+    memo = memo || {};
+    if (memo[id]) return memo[id];
+    const v = tree.nodes[id];
+    const s = new Set(v.term.map(k => items[k].doc));
+    for (const e of v.kids) for (const d of docsOf(tree, items, e.to, memo)) s.add(d);
+    return (memo[id] = s);
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   ENGINE END
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const PRESETS = [
+    { n: "bananaban$", t: "bananaban$" },
+    { n: "mississippi$", t: "mississippi$" },
+    { n: "hannahban$", t: "hannahban$" },
+    { n: "abracadabra$", t: "abracadabra$" },
+    { n: "alf_eats_alfalfa$", t: "alf_eats_alfalfa$" },
+    { n: "aaaaaaa$   (a path)", t: "aaaaaaa$" },
+    { n: "abababab$", t: "abababab$" },
+    { n: "GATTACAGATTACA$", t: "GATTACAGATTACA$" }
+];
+
+let ST = { items: [], texts: [], mode: "suffix", multi: false,
+           shape: "compact", lab: "human", edgeOrient: "sloped", showIdx: true, showLeafText: true,
+           tree: null, maps: null, leafPos: null,
+           zoomOn: true, z: 1, baseW: 0, baseH: 0, markAll: true,
+           hoverActive: null, flippedEdge: null };
+const $ = id => document.getElementById(id);
+const CW = 7.3, LEVEL_H = 74, NODE_R = 13, TRIE_R = 6;
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+const SHAPE_NAMES = ["suffix trie", "suffix tree"];
+const DOCCOL = ["var(--d1)", "var(--d2)", "var(--d3)", "var(--d4)", "#8c407f", "#1a8080"];
+
+/* what a leaf stores: an index into the stored strings */
+function leafIndex(items, v) {
+    if (ST.mode !== "suffix") return String(v.item);
+    return String(items[v.item].start) + (ST.multi ? "₁₂₃₄₅₆"[items[v.item].doc] : "");
+}
+
+/* the characters an edge spells, and where they sit in their text */
+function edgeInfo(tree, items, pid, e) {
+    const p = tree.nodes[pid], k = anyItem(tree, e.to);
+    const it = items[k];
+    const len = e.len || 1;
+    const from = p.depth, to = p.depth + len;
+    return { str: it.s.slice(from, to), doc: it.doc, a: it.start + from, b: it.start + to, len, item: k };
+}
+
+function render() {
+    const items = ST.items;
+    const tree = ST.tree = buildTree(items, ST.shape === "compact");
+    const nodes = tree.nodes;
+    const memoDocs = {};
+
+    /* ---- leaf order and x positions ------------------------------------ */
+    const leaves = [];
+    (function collect(id) {
+        const v = nodes[id];
+        if (!v.kids.length) { leaves.push(id); return; }
+        v.kids.forEach(e => collect(e.to));
+    })(tree.root);
+
+    const leafText = (id) => {
+        const v = nodes[id];
+        if (v.item === undefined) return "";
+        const it = items[v.item];
+        return ST.mode === "suffix" ? dispStr(it.s, ST.multi) : it.s;
+    };
+    const boxed = ST.showLeafText && ST.lab === "human";     /* leaves drawn as text boxes */
+    let gap = 46;
+    if (ST.showLeafText) for (const id of leaves) gap = Math.max(gap, leafText(id).length * CW + (boxed ? 26 : 16));
+    if (ST.lab === "machine" && !ST.showLeafText) gap = Math.max(gap, 54);
+
+    const X = {}, lvlOf = {};
+    leaves.forEach((id, k) => { X[id] = k * gap; });
+    (function place(id, lvl) {
+        const v = nodes[id];
+        lvlOf[id] = lvl;
+        v.kids.forEach(e => place(e.to, lvl + 1));
+        if (v.kids.length) X[id] = (X[v.kids[0].to] + X[v.kids[v.kids.length - 1].to]) / 2;
+    })(tree.root, 0);
+    const maxLvl = Math.max(...Object.values(lvlOf));
+
+    /* a label written along its edge needs the edge to be at least that long,
+       so every level gets its own height                                      */
+    const minLH = ST.shape === "compact" ? LEVEL_H : 50;
+    const LH = new Array(maxLvl + 1).fill(minLH);
+    const labelChars = (info) =>
+        ST.shape === "trie" ? 1
+      : ST.lab === "human" ? dispStr(info.str, ST.multi).length : 1;
+    for (const v of nodes) {
+        for (const e of v.kids) {
+            const info = edgeInfo(tree, items, v.id, e);
+            if (!(ST.edgeOrient === "sloped" && ST.shape === "compact" && ST.lab === "human" && info.str.length > 1)) continue;
+            const need = labelChars(info) * CW + 30;
+            const dx = Math.abs(X[e.to] - X[v.id]);
+            const dy = Math.sqrt(Math.max(0, need * need - dx * dx));
+            LH[lvlOf[v.id]] = Math.max(LH[lvlOf[v.id]], dy);
+        }
+    }
+    const YPX = {}; const yLevel = [0];
+    for (let l = 1; l <= maxLvl; l++) yLevel[l] = yLevel[l - 1] + LH[l - 1];
+    for (const v of nodes) YPX[v.id] = yLevel[lvlOf[v.id]];
+
+    const MX = 40, MY = 34;
+    const W = (leaves.length - 1) * gap + 2 * MX + 60;
+    const H = MY + yLevel[maxLvl] + (boxed ? 40 : ST.showLeafText ? 54 : 40);
+    const px = id => MX + X[id] + 30, py = id => MY + YPX[id];
+
+    /* ---- draw ----------------------------------------------------------- */
+    const p = [];
+    /* label of one edge; for the human-readable form it runs along the edge */
+    const drawEdgeLabel = (x1, y1, x2, y2, info, childId) => {
+        const sloped = (ST.edgeOrient === "sloped") &&
+                       (ST.shape === "compact" && ST.lab === "human" && info.str.length > 1);
+        let main, extra = null, txt;
+        if (ST.shape === "trie") {
+            main = `<tspan class="s">${esc(dispChar(info.str, ST.multi))}</tspan>`;
+            txt = dispChar(info.str, ST.multi);
+        } else if (ST.lab === "human") {
+            main = `<tspan class="s">${esc(dispChar(info.str[0], ST.multi))}</tspan>` +
+                   esc(dispStr(info.str.slice(1), ST.multi));
+            txt = dispStr(info.str, ST.multi);
+        } else {
+            /* only the one character needed to pick this edge among its siblings;
+               the rest of the label is implicit — its length is the difference of
+               the two node indices, its characters sit in the stored strings.     */
+            main = `<tspan class="s">${esc(dispChar(info.str[0], ST.multi))}</tspan>`;
+            txt = dispChar(info.str[0], ST.multi);
+        }
+        const wpx = txt.length * CW + 8;
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        /* rotate by the true direction of the edge, never flipped: the label
+           always reads from the parent towards the child, even past 90 degrees */
+        const a = sloped ? Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI : 0;
+        p.push(`<g class="elLabel" data-edge="${childId}" data-tx="${mx.toFixed(1)}" ` +
+               `data-ty="${my.toFixed(1)}" data-rot="${a.toFixed(1)}" ` +
+               `transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${a.toFixed(1)})">` +
+               `<rect class="elbg" x="${-wpx / 2}" y="-9" width="${wpx}" height="15" rx="2"/>` +
+               `<text class="el" x="0" y="2" text-anchor="middle">${main}</text>` +
+               (extra ? `<text class="rng" x="0" y="14" text-anchor="middle">${esc(extra)}</text>` : ``) +
+               `</g>`);
+    };
+
+    (function drawEdges(id) {
+        const v = nodes[id];
+        v.kids.forEach(e => {
+            /* centre to centre — the filled nodes are painted on top afterwards */
+            const x1 = px(id), y1 = py(id), x2 = px(e.to), y2 = py(e.to);
+            p.push(`<line class="edge" data-edge="${e.to}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
+            p.push(`<line class="edgeHit" data-edge="${e.to}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);
+            drawEdgeLabel(x1, y1, x2, y2, edgeInfo(tree, items, id, e), e.to);
+            drawEdges(e.to);
+        });
+    })(tree.root);
+
+    for (const v of nodes) {
+        const x = px(v.id), y = py(v.id);
+        const isLeaf = !v.kids.length;
+        if (isLeaf) {
+            if (boxed) {
+                const str = leafText(v.id);
+                const w = str.length * CW + 12;
+                p.push(`<rect class="lfbox" data-node="${v.id}" x="${x - w / 2}" y="${y - 11}" width="${w}" height="22" rx="3"/>`);
+                p.push(`<text class="suffix" data-node="${v.id}" x="${x}" y="${y + 4}" text-anchor="middle">${esc(str)}</text>`);
+            } else {
+                const lbl = leafIndex(items, v);
+                const w = Math.max(20, lbl.length * 8 + 12);
+                p.push(`<rect class="lf" data-node="${v.id}" x="${x - w / 2}" y="${y - 10}" width="${w}" height="20" rx="3"/>`);
+                p.push(`<text class="lftx" data-node="${v.id}" x="${x}" y="${y + 4}" text-anchor="middle">${esc(lbl)}</text>`);
+            }
+        } else {
+            const r = ST.shape === "compact" ? NODE_R : TRIE_R;
+            const all = ST.multi && ST.markAll &&
+                        docsOf(tree, items, v.id, memoDocs).size === ST.texts.length;
+            p.push(`<circle class="nd${v.id === tree.root ? " root" : ""}${all ? " allDocs" : ""}" ` +
+                   `data-node="${v.id}" cx="${x}" cy="${y}" r="${r}"/>`);
+            if (ST.shape === "compact" && ST.showIdx)
+                p.push(`<text class="ndx" data-node="${v.id}" x="${x}" y="${y + 4}" text-anchor="middle">${v.depth}</text>`);
+        }
+        /* a word that ends inside the tree */
+        if (v.term.length && v.kids.length)
+            p.push(`<rect class="term" data-node="${v.id}" x="${x + 9}" y="${y - 4}" width="8" height="8"/>`);
+        /* which documents occur below */
+        if (ST.multi) {
+            const ds = [...docsOf(tree, items, v.id, memoDocs)].sort();
+            ds.forEach((d, k) => p.push(`<circle class="docdot" data-node="${v.id}" cx="${x - (ds.length - 1) * 4 + k * 8}" ` +
+                `cy="${y - (ST.shape === "compact" ? NODE_R : TRIE_R) - 7}" r="3.2" fill="${DOCCOL[d]}"/>`));
+        }
+    }
+
+    ST.baseW = W; ST.baseH = H;
+    $("treeWrap").innerHTML =
+        `<svg id="treeSvg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" ` +
+        `xmlns="http://www.w3.org/2000/svg">${p.join("")}</svg>`;
+    applyZoom();
+
+    ST.maps = computeMaps(tree);
+    ST.leafPos = {}; leaves.forEach((id, k) => { ST.leafPos[id] = k; });
+    /* which leaf (tree-node id) a given item, or a given (text, position), maps to —
+       used to highlight a leaf when hovering the stored strings/text panel */
+    ST.itemLeaf = {};
+    nodes.forEach(v => { if (!v.kids.length) ST.itemLeaf[v.item] = v.id; });
+    if (ST.mode === "suffix") {
+        ST.posLeaf = {};
+        items.forEach((it, k) => {
+            (ST.posLeaf[it.doc] = ST.posLeaf[it.doc] || {})[it.start] = ST.itemLeaf[k];
+        });
+    }
+    if (ST.multi) ST.memoDocs = memoDocs;
+    ST.hoverActive = null; ST.flippedEdge = null;
+
+    renderSide(tree, items, memoDocs);
+    renderStrings();
+    $("stageTitle").innerHTML = `<span style="color:var(--heading);font-weight:700">` +
+        (ST.shape === "trie" ? SHAPE_NAMES[0] : SHAPE_NAMES[1]) + `</span>` +
+        (ST.multi ? ` &mdash; ${ST.texts.length} texts` : ``) +
+        ` &nbsp;<span style="color:var(--title-muted);font-weight:400">` +
+        (ST.lab === "human" ? "human-readable labels" : "as stored") + `</span>`;
+}
+
+/* ---------------------------------------------------------- tree traversal */
+function computeMaps(tree) {
+    const parent = {}, kidsList = {};
+    (function walk(id) {
+        const v = tree.nodes[id];
+        kidsList[id] = v.kids.map(e => e.to);
+        v.kids.forEach(e => { parent[e.to] = id; walk(e.to); });
+    })(tree.root);
+    return { parent, kidsList };
+}
+function subtreeIds(kidsList, id) {
+    const out = new Set([id]), stack = [id];
+    while (stack.length) {
+        const cur = stack.pop();
+        (kidsList[cur] || []).forEach(c => { out.add(c); stack.push(c); });
+    }
+    return out;
+}
+function ancestryIds(parent, id) {
+    const out = new Set();
+    let cur = parent[id];
+    while (cur !== undefined) { out.add(cur); cur = parent[cur]; }
+    return out;
+}
+/* the lines of a hover tooltip: every leaf below `id`, in left-to-right order.
+   Every one of them shares the first tree.nodes[id].depth characters (that is
+   the trie invariant), so that shared prefix is picked out in the heading
+   colour; the "T[i..n]" tags are padded to a common width so the strings
+   line up underneath, matching your T[i..n] convention (n = index of $). */
+function subtreeLeafLines(tree, items, id, cap) {
+    const ids = subtreeIds(ST.maps.kidsList, id);
+    let leafIds = [...ids].filter(nid => !tree.nodes[nid].kids.length);
+    leafIds.sort((a, b) => (ST.leafPos[a] ?? 0) - (ST.leafPos[b] ?? 0));
+    const total = leafIds.length;
+    const shown = leafIds.slice(0, cap);
+    const hasKids = tree.nodes[id].kids.length > 0;
+    const pref = hasKids ? tree.nodes[id].depth : 0;     /* nothing "shared" for a single leaf */
+
+    if (ST.mode === "words") {
+        const lines = shown.map(nid => {
+            const w = items[tree.nodes[nid].item].label;
+            const cut = Math.min(pref, w.length);
+            return `<span class="pfx">${esc(w.slice(0, cut))}</span>${esc(w.slice(cut))}`;
+        });
+        return { lines, total };
+    }
+    const raw = shown.map(nid => {
+        const it = items[tree.nodes[nid].item];
+        const nEnd = ST.texts[it.doc].length - 1;
+        const tag = ST.multi ? `T${"₁₂₃₄₅₆"[it.doc]}` : "T";
+        return { label: `${tag}[${it.start}..${nEnd}]`, s: it.s };
+    });
+    const maxLen = Math.max(0, ...raw.map(r => r.label.length));
+    const lines = raw.map(r => {
+        const cut = Math.min(pref, r.s.length);
+        const body = `<span class="pfx">${esc(dispStr(r.s.slice(0, cut), ST.multi))}</span>` +
+                     esc(dispStr(r.s.slice(cut), ST.multi));
+        return `${esc(r.label.padEnd(maxLen))} = ${body}`;
+    });
+    return { lines, total };
+}
+
+/* -------------------------------------------------------------- hovering */
+function applyDim(keep) {
+    document.querySelectorAll("#treeWrap [data-node]").forEach(el => {
+        el.classList.toggle("dim", !keep.has(+el.dataset.node));
+    });
+    document.querySelectorAll("#treeWrap [data-edge]").forEach(el => {
+        el.classList.toggle("dim", !keep.has(+el.dataset.edge));
+    });
+}
+function clearDim() {
+    document.querySelectorAll("#treeWrap .dim").forEach(el => el.classList.remove("dim"));
+}
+function setLabelRotation(childId, deg) {
+    const g = document.querySelector(`#treeWrap g.elLabel[data-edge="${childId}"]`);
+    if (!g) return;
+    g.setAttribute("transform", `translate(${g.dataset.tx},${g.dataset.ty}) rotate(${deg})`);
+}
+function restoreFlippedEdge() {
+    if (ST.flippedEdge === null) return;
+    setLabelRotation(ST.flippedEdge, document.querySelector(
+        `#treeWrap g.elLabel[data-edge="${ST.flippedEdge}"]`)?.dataset.rot || 0);
+    ST.flippedEdge = null;
+}
+function hideTip() { $("hoverTip").style.display = "none"; }
+function positionTip(px, py) {
+    const tip = $("hoverTip");
+    tip.style.left = (px + 16) + "px";
+    tip.style.top = (py + 16) + "px";
+}
+function showNodeTip(id) {
+    const tree = ST.tree, items = ST.items, v = tree.nodes[id];
+    const isLeaf = !v.kids.length;
+    const cap = subtreeLeafLines(tree, items, id, 8);
+    let h;
+    if (isLeaf) {
+        h = `<div class="hd">leaf</div><div><b>${cap.lines[0] || ""}</b></div>`;
+    } else {
+        h = `<div class="hd">${id === tree.root ? "root" : "v" + id} &nbsp;&middot;&nbsp; depth ${v.depth} ` +
+            `&nbsp;&middot;&nbsp; ${cap.total} string${cap.total === 1 ? "" : "s"} below</div>` +
+            cap.lines.join("<br>") +
+            (cap.total > cap.lines.length ? `<br>&hellip; and ${cap.total - cap.lines.length} more` : ``);
+    }
+    $("hoverTip").innerHTML = h;
+    $("hoverTip").style.display = "block";
+}
+function activateNodeHover(id) {
+    restoreFlippedEdge();
+    ST.hoverActive = "n" + id;
+    const keep = subtreeIds(ST.maps.kidsList, id);
+    ancestryIds(ST.maps.parent, id).forEach(a => keep.add(a));
+    keep.add(ST.tree.root);
+    applyDim(keep);
+    showNodeTip(id);
+}
+function activateEdgeHover(id) {
+    restoreFlippedEdge();
+    ST.hoverActive = "e" + id;
+    const keep = subtreeIds(ST.maps.kidsList, id);
+    keep.add(ST.tree.root);
+    applyDim(keep);
+    setLabelRotation(id, 0);
+    ST.flippedEdge = id;
+    hideTip();
+}
+function clearHover() {
+    restoreFlippedEdge();
+    ST.hoverActive = null;
+    clearDim();
+    hideTip();
+    clearSufHL();
+}
+/* box the whole suffix T[i..n] in the stored-text ruler, not just one cell */
+function highlightSuffixRun(td) {
+    const tr = td.closest("tr"); if (!tr) return;
+    const pos = +td.dataset.pos;
+    tr.querySelectorAll("td.ch[data-pos]").forEach(c => {
+        c.classList.toggle("suf-hl", +c.dataset.pos >= pos);
+    });
+}
+function clearSufHL() {
+    document.querySelectorAll("#strings td.ch.suf-hl").forEach(c => c.classList.remove("suf-hl"));
+}
+/* light-weight highlight: a node and only its direct children (for the
+   "stored representation" table, which shows exactly that relationship) */
+function highlightNodeAndChildren(id) {
+    restoreFlippedEdge();
+    ST.hoverActive = "t" + id;
+    const v = ST.tree.nodes[id];
+    const keep = new Set([id, ...v.kids.map(e => e.to)]);
+    keep.add(ST.tree.root);
+    applyDim(keep);
+    hideTip();
+}
+/* every node lying on some root-to-leaf path of text d — i.e. exactly the
+   nodes whose subtree contains a suffix of that text */
+function highlightDoc(d) {
+    restoreFlippedEdge();
+    ST.hoverActive = "d" + d;
+    const keep = new Set();
+    if (ST.memoDocs) ST.tree.nodes.forEach(v => { if (ST.memoDocs[v.id] && ST.memoDocs[v.id].has(d)) keep.add(v.id); });
+    keep.add(ST.tree.root);
+    applyDim(keep);
+    hideTip();
+}
+
+/* -------------------------------------------------- the strings themselves */
+function renderStrings() {
+    if (ST.mode === "words") {
+        let h = `<table class="nt"><tr><th>k</th><th>S<sub>k</sub></th></tr>`;
+        ST.items.forEach((it, k) => {
+            h += `<tr><td>${k}</td><td data-node="${ST.itemLeaf[k]}">${esc(it.s)}</td></tr>`;
+        });
+        $("strings").innerHTML = h + `</table>` +
+            `<div class="strname" style="margin-top:6px">a leaf stores the index k</div>`;
+        return;
+    }
+    let h = "";
+    ST.texts.forEach((t, d) => {
+        let idx = "<tr class='idx'>", ch = "<tr>";
+        for (let i = 0; i < t.length; i++) {
+            idx += `<td>${i}</td>`;
+            ch += `<td class="ch" data-node="${ST.posLeaf[d][i]}" data-pos="${i}"` +
+                  `${ST.multi ? ` style="color:${DOCCOL[d]}"` : ``}>${esc(dispChar(t[i], ST.multi))}</td>`;
+        }
+        h += `<div class="strname"${ST.multi ? ` style="color:${DOCCOL[d]}" data-doc="${d}"` : ``}>` +
+             (ST.multi ? `T${"₁₂₃₄₅₆"[d]}` : `T`) + `</div>` +
+             `<div class="strwrap"><table class="txt">${idx}</tr>${ch}</tr></table></div>`;
+    });
+    $("strings").innerHTML = h +
+        `<div class="strname">a leaf stores the start index of its suffix</div>`;
+}
+
+/* ------------------------------------------------------------------ zoom */
+function applyZoom() {
+    const svg = document.getElementById("treeSvg");
+    if (!svg) return;
+    svg.setAttribute("width", Math.round(ST.baseW * ST.z));
+    svg.setAttribute("height", Math.round(ST.baseH * ST.z));
+    $("zReset").textContent = Math.round(ST.z * 100) + "%";
+    $("treeWrap").classList.toggle("zoomable", ST.zoomOn);
+    ["zIn", "zOut", "zReset"].forEach(id => { $(id).disabled = !ST.zoomOn; });
+}
+function setZoom(z, cx, cy) {
+    const wrap = $("treeWrap");
+    const old = ST.z;
+    ST.z = Math.max(0.3, Math.min(4, z));
+    const sx = (wrap.scrollLeft + (cx === undefined ? wrap.clientWidth / 2 : cx)) / old;
+    const sy = (wrap.scrollTop + (cy === undefined ? wrap.clientHeight / 2 : cy)) / old;
+    applyZoom();
+    wrap.scrollLeft = sx * ST.z - (cx === undefined ? wrap.clientWidth / 2 : cx);
+    wrap.scrollTop = sy * ST.z - (cy === undefined ? wrap.clientHeight / 2 : cy);
+}
+
+function renderSide(tree, items, memoDocs) {
+    const nodes = tree.nodes;
+    const inner = nodes.filter(v => v.kids.length).length;
+    const leaves = nodes.length - inner;
+    let labLen = 0;
+    for (const v of nodes) for (const e of v.kids) labLen += (e.len || 1);
+
+    $("cost").innerHTML =
+        `<div class="k">strings</div><div class="v">${items.length}</div>` +
+        `<div class="k">leaves</div><div class="v">${leaves}</div>` +
+        `<div class="k">internal nodes</div><div class="v">${inner}</div>` +
+        `<div class="k">edges</div><div class="v">${nodes.length - 1}</div>` +
+        `<hr>` +
+        `<div class="k">&sum; edge label lengths</div><div class="v">${labLen}</div>` +
+        `<div class="k sub">${ST.shape === "trie"
+            ? "one character per edge, so this is the number of edges"
+            : "never stored: one character per edge plus the node indices suffice"}</div><div class="v"></div>` +
+        `<hr>` +
+        `<div class="k">&sum; string lengths</div><div class="v">${items.reduce((a, x) => a + x.s.length, 0)}</div>`;
+
+    /* legend */
+    let lg = `<div class="item"><span style="display:inline-block;width:13px;height:13px;border-radius:50%;` +
+             `background:#fefdf7;border:1.4px solid var(--node)"></span> internal node` +
+             (ST.shape === "compact" && ST.showIdx ? ` &mdash; the number is the index of the next character to compare` : ``) + `</div>`;
+    lg += `<div class="item"><span style="display:inline-block;width:13px;height:13px;border-radius:3px;` +
+          `background:#e4eef4;border:1.3px solid var(--leaf)"></span> leaf` +
+          (ST.mode === "suffix" ? ` &mdash; stores the start index in the text` : ``) + `</div>`;
+    if (ST.mode === "words")
+        lg += `<div class="item"><span style="display:inline-block;width:9px;height:9px;background:var(--heading)"></span> a word ends here</div>`;
+    if (ST.multi) ST.texts.forEach((t, d) =>
+        lg += `<div class="item" data-doc="${d}"><span class="dotsw" style="background:${DOCCOL[d]}"></span> ` +
+              `<span class="mono">T${"₁₂₃₄₅₆"[d]} = ${esc(dispStr(t, true))}</span></div>`);
+    $("legend").innerHTML = lg;
+
+    $("note").innerHTML = ST.lab === "human"
+        ? `The labels here are the strings themselves. A program cannot afford that: the labels of all ` +
+          `edges together can be quadratic in the input length.`
+        : `Each edge stores <b>one character</b> &mdash; the one needed to pick it among its siblings. ` +
+          `The rest of the label is not stored anywhere: every string below the edge continues the same way, ` +
+          `the label's length is the difference of the two node indices, and its characters can be read off ` +
+          `the stored strings. Each leaf stores an index into them.`;
+    if (ST.multi && ST.markAll)
+        $("note").innerHTML += ` A node ringed in <span style="color:var(--heading)">red</span> has all ` +
+            `texts below it, so its path label occurs in every text &mdash; the deepest such node spells ` +
+            `the longest common substring.`;
+
+    /* stored representation */
+    let h = `<table class="nt"><tr><th>node</th><th>d</th><th>children</th></tr>`;
+    for (const v of nodes) {
+        if (!v.kids.length) continue;
+        const kids = v.kids.map(e => {
+            const info = edgeInfo(tree, items, v.id, e);
+            const c = nodes[e.to];
+            const tgt = c.kids.length ? "v" + c.id : "&#9633;" + esc(leafIndex(items, c));
+            return `<span class="kidchip ${c.kids.length ? "" : "leaf"}">` +
+                   `<span class="c">${esc(dispChar(info.str[0], ST.multi))}</span> &rarr; ${tgt}</span>`;
+        }).join("");
+        h += `<tr data-node="${v.id}"><td>${v.id === tree.root ? "root" : "v" + v.id}</td><td>${v.depth}</td><td>${kids}</td></tr>`;
+    }
+    $("nodetab").innerHTML = h + `</table>`;
+}
+
+function load(raw) {
+    let p;
+    try { p = parseInput(raw); } catch (e) { $("err").textContent = e.message; return; }
+    $("err").textContent = "";
+    ST.items = p.items; ST.texts = p.texts; ST.mode = p.mode; ST.multi = p.multi;
+    render();
+}
+
+(function init() {
+    let drag = null;                                /* shared with the pan handler below */
+    const sel = $("preset");
+    PRESETS.forEach((q, i) => { const o = document.createElement("option"); o.value = i; o.textContent = q.n; sel.appendChild(o); });
+    sel.onchange = () => { $("ta").value = PRESETS[+sel.value].t; load($("ta").value); };
+    $("btnLoad").onclick = () => load($("ta").value);
+    $("shapeSeg").onclick = e => {
+        const b = e.target.closest("button"); if (!b) return;
+        [...$("shapeSeg").children].forEach(x => x.classList.toggle("on", x === b));
+        ST.shape = b.dataset.shape; render();
+    };
+    $("labSeg").onclick = e => {
+        const b = e.target.closest("button"); if (!b) return;
+        [...$("labSeg").children].forEach(x => x.classList.toggle("on", x === b));
+        ST.lab = b.dataset.lab; render();
+    };
+    $("orientSeg").onclick = e => {
+        const b = e.target.closest("button"); if (!b) return;
+        [...$("orientSeg").children].forEach(x => x.classList.toggle("on", x === b));
+        ST.edgeOrient = b.dataset.orient; render();
+    };
+    if ($("cbAll")) $("cbAll").onchange = () => { ST.markAll = $("cbAll").checked; render(); };
+    $("cbZoom").onchange = () => { ST.zoomOn = $("cbZoom").checked; applyZoom(); };
+    $("zIn").onclick = () => setZoom(ST.z * 1.25);
+    $("zOut").onclick = () => setZoom(ST.z / 1.25);
+    $("zReset").onclick = () => setZoom(1);
+    const wrap = $("treeWrap");
+    /* hover on the canvas: node takes priority over edge; nothing under the
+       cursor clears it. Tooltip position is viewport-fixed, so the same
+       positionTip() call works from the side panels below too. */
+    wrap.addEventListener("pointermove", ev => {
+        if (drag) return;
+        const tNode = ev.target.closest("[data-node]");
+        const tEdge = !tNode ? ev.target.closest("[data-edge]") : null;
+        if (tNode) {
+            const id = +tNode.dataset.node;
+            if (ST.hoverActive !== "n" + id) activateNodeHover(id);
+            positionTip(ev.clientX, ev.clientY);
+        } else if (tEdge) {
+            const id = +tEdge.dataset.edge;
+            if (ST.hoverActive !== "e" + id) activateEdgeHover(id);
+        } else {
+            clearHover();
+        }
+    });
+    wrap.addEventListener("pointerleave", () => clearHover());
+
+    /* hover in the "stored representation" table: a node and its direct children */
+    $("nodetab").addEventListener("mouseover", ev => {
+        const tr = ev.target.closest("tr[data-node]"); if (!tr) return;
+        const id = +tr.dataset.node;
+        if (ST.hoverActive !== "t" + id) highlightNodeAndChildren(id);
+    });
+    $("nodetab").addEventListener("mouseout", ev => {
+        const tr = ev.target.closest("tr[data-node]");
+        if (tr && (!ev.relatedTarget || !tr.contains(ev.relatedTarget))) clearHover();
+    });
+
+    /* hover in the stored strings/text panel: a character or word highlights its
+       leaf; a text's own name (or its legend entry) highlights its whole subgraph */
+    $("strings").addEventListener("mouseover", ev => {
+        const nodeEl = ev.target.closest("[data-node]");
+        if (nodeEl && nodeEl.dataset.node !== "" && nodeEl.dataset.node !== "undefined") {
+            const id = +nodeEl.dataset.node;
+            if (ST.hoverActive !== "n" + id) activateNodeHover(id);
+            if (nodeEl.dataset.pos !== undefined) highlightSuffixRun(nodeEl);
+            positionTip(ev.clientX, ev.clientY);
+            return;
+        }
+        const docEl = ev.target.closest("[data-doc]");
+        if (docEl) {
+            const d = +docEl.dataset.doc;
+            if (ST.hoverActive !== "d" + d) highlightDoc(d);
+        }
+    });
+    $("strings").addEventListener("mousemove", ev => {
+        if (ST.hoverActive && ST.hoverActive[0] === "n") positionTip(ev.clientX, ev.clientY);
+    });
+    $("strings").addEventListener("mouseout", ev => {
+        const el = ev.target.closest("[data-node],[data-doc]");
+        if (el && (!ev.relatedTarget || !el.contains(ev.relatedTarget))) clearHover();
+    });
+
+    /* hover in the legend: a text's entry highlights its whole subgraph */
+    $("legend").addEventListener("mouseover", ev => {
+        const docEl = ev.target.closest("[data-doc]"); if (!docEl) return;
+        const d = +docEl.dataset.doc;
+        if (ST.hoverActive !== "d" + d) highlightDoc(d);
+    });
+    $("legend").addEventListener("mouseout", ev => {
+        const docEl = ev.target.closest("[data-doc]");
+        if (docEl && (!ev.relatedTarget || !docEl.contains(ev.relatedTarget))) clearHover();
+    });
+    wrap.addEventListener("wheel", ev => {
+        if (!ST.zoomOn) return;
+        ev.preventDefault();
+        const r = wrap.getBoundingClientRect();
+        setZoom(ST.z * (ev.deltaY < 0 ? 1.12 : 1 / 1.12), ev.clientX - r.left, ev.clientY - r.top);
+    }, { passive: false });
+    /* drag to pan */
+    wrap.addEventListener("pointerdown", ev => {
+        if (!ST.zoomOn) return;
+        drag = { x: ev.clientX, y: ev.clientY, l: wrap.scrollLeft, t: wrap.scrollTop };
+        wrap.classList.add("drag"); wrap.setPointerCapture(ev.pointerId);
+        clearHover();
+    });
+    wrap.addEventListener("pointermove", ev => {
+        if (!drag) return;
+        wrap.scrollLeft = drag.l - (ev.clientX - drag.x);
+        wrap.scrollTop = drag.t - (ev.clientY - drag.y);
+    });
+    const endDrag = () => { drag = null; wrap.classList.remove("drag"); };
+    wrap.addEventListener("pointerup", endDrag);
+    wrap.addEventListener("pointercancel", endDrag);
+    $("cbIdx").onchange = () => { ST.showIdx = $("cbIdx").checked; render(); };
+    $("cbLeafText").onchange = () => { ST.showLeafText = $("cbLeafText").checked; render(); };
+    $("ta").value = PRESETS[0].t;
+    load($("ta").value);
+})();
+</script>
+</body>
+</html>

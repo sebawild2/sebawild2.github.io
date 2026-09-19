@@ -1,0 +1,2413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Huffman Codes — Animated</title>
+<style>
+:root{
+  --bg:#f5ebd9; --panel:#faf6ed; --panel-border:#d4c5b4; --controls-bg:#ecddc5;
+  --ink:#6b675c; --ink-strong:#46433a; --muted:#8b8779;
+  --btn:#faf6ed; --btn-border:#b9a793; --btn-border-hover:#9c866d;
+  --accent:#cc2f22; --deep:#902015; --pink:#e5c0b4; --pinkline:#6d180f;
+  --leaf-fill:#faf6ed; --leaf-border:#b9a793; --inner:#8b8779;
+  --sel:#cc2f22; --new:#2f6b3a; --dim:#a89880;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;
+     margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+.container{width:100%;max-width:1600px;display:flex;flex-direction:column}
+h1{font-size:1.5rem;font-weight:500;margin:0 0 4px;letter-spacing:.5px;color:var(--ink-strong);text-transform:uppercase}
+.subtitle{font-size:.9rem;color:var(--muted);margin:0 0 18px;line-height:1.5}
+.subtitle code{background:#ecddc5;padding:1px 6px;border-radius:3px}
+
+.card{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:14px 18px;
+      margin-bottom:14px;width:100%;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lbl{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.sep{width:1px;height:22px;background:#d4c5b4;margin:0 4px}
+
+button,select{background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);
+  padding:7px 14px;font-size:.85rem;border-radius:5px;cursor:pointer;font-weight:500;font-family:inherit;
+  transition:background .15s,border-color .15s;white-space:nowrap}
+button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--btn-border-hover)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:#46433a;color:#faf6ed;border-color:#46433a}
+button.primary:hover:not(:disabled){background:#5c5043;border-color:#5c5043}
+button.phase{font-size:.75rem;padding:5px 10px}
+button.phase.on{background:#f7e6e0;border-color:var(--accent);color:var(--accent)}
+button.mode.on{background:#f7e6e0;border-color:var(--accent);color:var(--accent);font-weight:600}
+.cfull{font-family:var(--wi-font-mono);font-size:.8rem;word-break:break-all;
+  line-height:1.8;letter-spacing:.5px;margin-top:4px}
+.cfull .hb{background:#dce6ee;border-bottom:2px solid #2f5f8a;color:#24506f}
+.cfull .bb{background:#f3e4dd;border-bottom:2px solid var(--pinkline);color:var(--deep)}
+.cfull .cur{outline:2px solid var(--accent);border-radius:2px}
+.cfull .todo{opacity:.3}
+.cfull-key{font-size:.72rem;color:var(--muted);margin-top:6px}
+.cfull-key b{font-weight:600}
+input[type=text],textarea{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);border-radius:5px;padding:8px 10px;font-size:.85rem}
+input[type=text]{height:34px}
+input[type=text].wide{flex:1;min-width:260px}
+textarea{width:100%;height:120px;resize:vertical;line-height:1.5}
+input[type=range]{accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+#stepSlider{flex:1;min-width:220px}
+.phasebar{display:flex;height:15px;margin:1px 9px 0;border-radius:3px;overflow:hidden;
+  border:1px solid var(--panel-border)}
+.pseg{flex-grow:1;flex-basis:0;min-width:0;display:flex;align-items:center;justify-content:center;
+  font-size:.58rem;letter-spacing:.2px;color:var(--muted);background:#ecddc5;cursor:pointer;
+  overflow:hidden;white-space:nowrap;border-right:1px solid var(--btn-border);transition:.15s}
+.pseg:last-child{border-right:none}
+.pseg:nth-child(even){background:#e8ddc0}
+.pseg:hover{color:var(--ink-strong)}
+.pseg.on{background:#f7e6e0;color:var(--accent);font-weight:700}
+label.chk{font-size:.78rem;color:var(--muted);display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.steplabel{font-size:.78rem;color:var(--muted);min-width:150px;font-variant-numeric:tabular-nums}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);gap:14px;align-items:start}
+@media(max-width:1050px){.stage{grid-template-columns:1fr}}
+.side{display:flex;flex-direction:column;gap:14px}
+.box{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;padding:12px 16px;
+     box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.box-title{font-size:.75rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin:0 0 10px}
+.status{background:#ecddc5;border:1px solid var(--panel-border);border-radius:5px;padding:11px 13px;
+        font-size:.9rem;color:var(--ink-strong);min-height:44px;line-height:1.55;
+        display:block;text-align:left;word-spacing:normal}
+.status code{background:#e4d5bb;padding:0 4px;border-radius:3px;
+        font-family:var(--wi-font-mono);font-size:.86em}
+.status b{color:var(--accent)}
+svg#forest{display:block;margin:0 auto;background:transparent;touch-action:none}
+.svg-wrap{background:var(--bg);border-radius:5px;overflow-x:auto;overflow-y:hidden}
+
+/* priority queue */
+.pq{display:flex;flex-wrap:wrap;gap:6px;min-height:38px}
+.pq-chip{display:flex;align-items:center;gap:6px;border:1px solid var(--btn-border);background:var(--btn);
+  border-radius:14px;padding:3px 10px 3px 4px;font-size:.8rem;color:var(--ink-strong);transition:.2s}
+.pq-chip .w{background:#ecddc5;border:1px solid #d4c5b4;border-radius:10px;min-width:24px;text-align:center;
+  padding:1px 5px;font-variant-numeric:tabular-nums;font-weight:700}
+.pq-chip .lab{font-family:var(--wi-font-mono)}
+.pq-chip .mini{display:flex;align-items:center;padding:1px 0}
+.pq-chip.sel{border-color:var(--sel);background:#f7e6e0;box-shadow:0 0 0 2px rgba(196,51,51,.15)}
+.pq-chip.sel .w{background:var(--pink);border-color:var(--pinkline)}
+.pq-chip.fresh{border-color:var(--new);background:#e7f0e4}
+.pq-chip.fresh .w{background:#cfe3c8;border-color:var(--new)}
+.pq-empty{font-size:.82rem;color:var(--dim);font-style:italic}
+
+/* tables */
+table.tbl{border-collapse:collapse;font-size:.82rem;width:100%}
+table.tbl th{font-size:.68rem;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);
+  text-align:left;font-weight:700;padding:3px 7px;border-bottom:1px solid var(--panel-border)}
+table.tbl td{padding:3px 7px;border-bottom:1px dashed #ecddc5;font-variant-numeric:tabular-nums}
+table.tbl tr:last-child td{border-bottom:none}
+table.tbl td.ch,table.tbl td.cw{font-family:var(--wi-font-mono);color:var(--ink-strong)}
+table.tbl td.cw{letter-spacing:.5px}
+table.tbl tr.hot td{background:#f7e6e0}
+table.tbl tr.hot td.ch{color:var(--accent);font-weight:700}
+.bar{display:inline-block;height:9px;background:var(--pink);border:1px solid var(--pinkline);border-radius:2px;vertical-align:middle}
+
+/* stats */
+.stats{font-size:.82rem;line-height:1.75}
+.stats .k{color:var(--muted)}
+.stats .v{color:var(--ink-strong);font-weight:600;font-variant-numeric:tabular-nums}
+.stats .note{font-size:.75rem;color:var(--dim);font-style:italic}
+.stats hr{border:none;border-top:1px dashed #ecddc5;margin:7px 0}
+
+/* text strips */
+.strip{display:flex;flex-wrap:wrap;gap:3px;font-family:var(--wi-font-mono);line-height:1.1}
+.cell{min-width:22px;padding:4px 3px;text-align:center;border-radius:3px;background:#ecddc5;
+  border:1px solid #d4c5b4;color:var(--ink);font-size:.85rem;transition:.15s}
+.cell.done{opacity:.45}
+.cell.cur{background:#fcf9f3;border:2px solid var(--sel);color:var(--ink-strong);font-weight:700}
+.bitgroup{display:flex;flex-direction:column;align-items:center;gap:2px}
+.bits{font-family:var(--wi-font-mono);font-size:.72rem;color:var(--pinkline);letter-spacing:.5px}
+.bitstream{font-family:var(--wi-font-mono);font-size:.85rem;color:var(--ink-strong);
+  word-break:break-all;line-height:1.7;letter-spacing:1px}
+.bitstream .b{padding:1px 0}
+.bitstream .b.done{opacity:.4}
+.bitstream .b.cur{background:#f7e6e0;color:var(--accent);font-weight:700;border-radius:2px}
+.bitstream .b.fresh{color:var(--accent);font-weight:700}
+.strip-label{font-size:.78rem;color:var(--muted);font-weight:600;margin:0 0 5px}
+.strip-label span{color:var(--ink-strong);font-weight:400}
+
+/* canonical panel */
+.canon-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:22px}
+@media(max-width:900px){.canon-grid{grid-template-columns:1fr}}
+.hdr{display:flex;flex-wrap:wrap;gap:4px;align-items:flex-end}
+.hfield{display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px 5px;border-radius:4px;
+  border:1px solid #d4c5b4;background:#ecddc5;transition:.15s}
+.hfield .hb{font-family:var(--wi-font-mono);font-size:.72rem;letter-spacing:.5px;color:var(--ink-strong)}
+.hfield .hl{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.hfield.meta{background:#e7ecf0;border-color:#b9c6cf}
+.hfield.char{background:#faf6ed;border-color:#b9a793}
+.hfield.len{background:#f3e4dd;border-color:#d3a99b}
+.hfield.cur{border-color:var(--sel);box-shadow:0 0 0 2px rgba(196,51,51,.15)}
+.hfield.pending{opacity:.25}
+.lengroup{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;
+  padding:5px 7px 2px;font-weight:700}
+tr.pending td{opacity:.3}
+
+/* panels */
+details.panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;width:100%;
+  margin-top:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+details.panel>summary{cursor:pointer;padding:13px 18px;font-size:.88rem;font-weight:600;color:var(--ink-strong);
+  list-style:none;user-select:none}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::before{content:"▶ ";font-size:.72rem;color:var(--btn-border-hover)}
+details.panel[open]>summary::before{content:"▼ "}
+.panel-body{padding:0 18px 16px}
+.code-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
+.code-section{border:1px solid var(--panel-border);border-radius:6px;overflow:hidden;background:#fbf8f0;
+  transition:box-shadow .25s,border-color .25s}
+.code-section.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(196,51,51,.18)}
+.code-head{font-size:.72rem;font-weight:600;color:var(--muted);padding:6px 10px;background:#f0e7d0;
+  border-bottom:1px solid var(--panel-border)}
+.code-section.active .code-head{color:var(--accent);background:#f7e6e0}
+pre.code{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.74rem;
+  line-height:1.6;color:var(--ink-strong);overflow-x:auto}
+pre.code .ln{display:block;padding:0 10px;white-space:pre;border-left:3px solid transparent}
+pre.code .ln.hot{background:#f6dfd8;border-left-color:var(--accent)}
+.help{font-size:.82rem;line-height:1.6;color:var(--ink)}
+.help code{background:#ecddc5;padding:1px 5px;border-radius:3px}
+.help pre{background:#faf6ed;border:1px solid var(--panel-border);border-radius:5px;padding:9px 12px;
+  font-size:.78rem;overflow-x:auto;margin:8px 0}
+.err{color:var(--accent);font-weight:600;font-size:.8rem;min-height:17px;margin-top:6px}
+#test-out{font-family:var(--wi-font-mono);font-size:.75rem;line-height:1.6;white-space:pre-wrap;
+  margin-top:10px;color:#46433a;max-height:360px;overflow-y:auto;background:#faf6ed;border:1px solid var(--panel-border);
+  border-radius:6px;padding:12px}
+.t-pass{color:#2f6b3a;font-weight:600}
+.t-fail{color:var(--accent);font-weight:700}
+.t-head{color:var(--ink-strong);font-weight:700}
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Huffman Codes</h1>
+<p class="subtitle">
+  Building the Huffman tree from character weights, then encoding and decoding a text with it. The forest is
+  drawn in <b>priority-queue order</b>, so the two tries to merge are always the leftmost two; ties follow the
+  fixed rule in the code panel, so every input has exactly one Huffman tree. Encoding is a <b>table lookup</b>
+  per character; only decoding walks the trie. The tick box in the step bar adds the optional strand on
+  <b>canonical codes</b> and on storing the code itself as bits; the decode view uses those throughout.
+</p>
+
+<!-- ─────────── input ─────────── -->
+<div class="card">
+  <div class="row" style="margin-bottom:10px">
+    <span class="lbl">View</span>
+    <button class="mode" id="mode-enc" onclick="setDir('enc')">Encode</button>
+    <button class="mode" id="mode-dec" onclick="setDir('dec')">Decode</button>
+    <span class="lbl" style="text-transform:none;font-weight:400" id="dirNote"></span>
+  </div>
+  <div class="row" style="margin-bottom:10px" id="inputKindRow">
+    <span class="lbl">Input</span>
+    <label class="chk"><input type="radio" name="mode" value="text" checked onchange="onModeChange()"> source text <code>S</code></label>
+    <label class="chk"><input type="radio" name="mode" value="weights" onchange="onModeChange()"> alphabet + weights</label>
+    <div class="sep"></div>
+    <span class="lbl">Preset</span>
+    <select id="presetSel" onchange="loadPreset(this.value)"></select>
+  </div>
+  <div id="textMode">
+    <div class="row">
+      <input type="text" class="wide" id="textInput" spellcheck="false" value="LOSSLESS">
+      <button class="primary" onclick="loadFromInput()">Load</button>
+    </div>
+  </div>
+  <div id="bitsMode" style="display:none">
+    <div class="row">
+      <input type="text" class="wide" id="bitsInput" spellcheck="false"
+             placeholder="the coded text C: code header followed by the body, as 0s and 1s">
+      <button class="primary" onclick="loadFromInput()">Load</button>
+    </div>
+  </div>
+  <div id="weightsMode" style="display:none">
+    <textarea id="weightsInput" spellcheck="false">E 1
+L 2
+O 1
+S 4</textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="primary" onclick="loadFromInput()">Load</button>
+      <span class="lbl" style="text-transform:none;font-weight:400">one <code>character weight</code> per line — no text, so no encoding phase</span>
+    </div>
+  </div>
+  <div class="err" id="inputErr"></div>
+</div>
+
+<!-- ─────────── step navigation ─────────── -->
+<div class="card">
+  <div class="row" style="margin-bottom:9px">
+    <button id="btnFirst" onclick="goto(0)">⏮</button>
+    <button id="btnPrev" onclick="stepBy(-1)">← Prev</button>
+    <button id="btnNext" class="primary" onclick="stepBy(1)">Next →</button>
+    <button id="btnLast" onclick="goto(steps.length-1)">⏭</button>
+    <button id="btnPlay" onclick="togglePlay()">▶ Play</button>
+    <div class="sep"></div>
+    <span style="flex:1;min-width:220px;display:block">
+      <input type="range" id="stepSlider" min="0" max="0" value="0" style="width:100%"
+             oninput="goto(+this.value,false)">
+      <span class="phasebar" id="phaseBar"></span>
+    </span>
+    <span class="steplabel" id="stepLabel"></span>
+  </div>
+  <div class="row">
+    <span class="lbl">Jump to</span>
+    <span class="row" id="phaseBtns" style="gap:6px"></span>
+    <div class="sep"></div>
+    <span class="lbl">Speed</span>
+    <input type="range" id="speedSlider" min="1" max="10" value="6" oninput="setSpeed(this.value)" style="width:110px">
+    <span class="steplabel" id="speedLabel" style="min-width:34px">1×</span>
+    <div class="sep"></div>
+    <label class="chk"><input type="checkbox" id="animToggle" checked> animate motion</label>
+    <div class="sep"></div>
+    <span class="lbl">Drawing</span>
+    <button class="phase on" id="draw-tree"  onclick="setDraw('tree')">tree</button>
+    <button class="phase" id="draw-boxes" onclick="setDraw('boxes')">nested boxes</button>
+    <label class="chk" id="bitsChk" style="display:none"><input type="checkbox" id="bitsToggle" checked
+      onchange="showBits=this.checked;render(false)"> 0/1 in the corners</label>
+    <div class="sep"></div>
+    <label class="chk"><input type="checkbox" id="canonToggle" onchange="loadFromInput()">
+      <b>canonical codes</b> &amp; code header</label>
+  </div>
+</div>
+
+<!-- ─────────── stage ─────────── -->
+<div class="stage">
+  <div>
+    <div class="box">
+      <div class="box-title" id="forestTitle">Forest of tries</div>
+      <div class="svg-wrap"><svg id="forest" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div id="drawKey" style="font-size:.75rem;color:var(--dim);margin-top:8px;display:none">
+        Each box holds its <b>0</b>-subtree immediately followed by its <b>1</b>-subtree, so a codeword is
+        read from the outside in. Box heights follow the height of the subtree, so siblings line up.
+      </div>
+    </div>
+
+    <div class="box" style="margin-top:14px" id="stripBox">
+      <div class="box-title">Source text S &nbsp;·&nbsp; coded text C</div>
+      <div class="strip-label">S = <span id="sMeta"></span></div>
+      <div class="strip" id="sStrip"></div>
+      <div class="strip-label" style="margin-top:12px">C = <span id="cMeta"></span></div>
+      <div class="bitstream" id="cStream"></div>
+      <div id="cFullBox" style="display:none">
+        <div class="strip-label" style="margin-top:14px">
+          complete coded text C = <span id="cFullMeta"></span></div>
+        <div class="cfull" id="cFull"></div>
+        <div class="cfull-key">
+          <b style="color:#24506f">code header</b> — σ, the field width, and one (character, length) pair
+          per character &nbsp;·&nbsp; <b style="color:#6d180f">body</b> — the canonical codewords of S
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="box">
+      <div class="box-title">Status</div>
+      <div class="status" id="statusText">Press <b>&nbsp;Next&nbsp;</b> to begin.</div>
+    </div>
+
+    <div class="box">
+      <div class="box-title" id="pqTitle">Priority queue (min-oriented, by weight)</div>
+      <div class="pq" id="pqView"></div>
+    </div>
+
+    <div class="box">
+      <div class="box-title">Weights w &nbsp;·&nbsp; code E</div>
+      <div id="tblView"></div>
+    </div>
+
+    <div class="box">
+      <div class="box-title">Numbers</div>
+      <div class="stats" id="statsView"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────── canonical code + header ─────────── -->
+<div class="box" style="margin-top:14px" id="canonBox">
+  <div class="box-title">Canonical code &nbsp;·&nbsp; storing the code in C</div>
+  <div class="canon-grid">
+    <div>
+      <div class="strip-label">Codeword lengths &rarr; canonical codewords</div>
+      <div id="canonTbl"></div>
+    </div>
+    <div>
+      <div class="strip-label">Code header — the lengths are all that is stored</div>
+      <div class="hdr" id="hdrFields"></div>
+      <div class="bitstream" id="hdrBits" style="margin-top:10px"></div>
+      <div id="hdrSum" class="stats" style="margin-top:10px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────── pseudocode ─────────── -->
+<details class="panel" open id="codePanel">
+  <summary>Pseudocode — the active lines are highlighted</summary>
+  <div class="panel-body"><div class="code-grid" id="codeGrid"></div></div>
+</details>
+
+<!-- ─────────── format help ─────────── -->
+<details class="panel">
+  <summary>Input format</summary>
+  <div class="panel-body help">
+    <p><b>Source text.</b> Anything you type is the source text <code>S</code>; the alphabet
+      <code>Σ<sub>S</sub></code> is the set of characters that actually occur in it, and the weights are the
+      character frequencies <code>|S|<sub>c</sub></code>. A space is drawn as <code>␣</code>, a newline as
+      <code>↵</code>, a tab as <code>⇥</code>; they are ordinary characters of the alphabet.</p>
+    <p><b>Alphabet + weights.</b> One character and one non-negative integer per line, separated by whitespace:</p>
+    <pre>E 1
+L 2
+O 1
+S 4</pre>
+    <p>Use <code>\s</code> for a space character and <code>\\</code> for a backslash. This mode feeds the weights
+      <code>w</code> straight into Huffman's algorithm, exactly as on the slide where only <code>Σ</code> and
+      <code>w</code> are given. There is no text, so the encoding and decoding phases are skipped and the
+      compression ratio is not defined.</p>
+    <p><b>Canonical code and header.</b> The canonical code keeps every codeword <i>length</i> of the Huffman
+      code but reassigns the codewords so that the lengths alone determine them. That is what lets the header
+      store the code as a list of (character, length) pairs rather than a tree. The exact header layout on this
+      page — 8 bits for σ−1, 5 bits for the length-field width b, then σ pairs — is one concrete convention;
+      the slide leaves the details open. The tick box in the step bar switches encoding and decoding between the
+      tree's codewords and the canonical ones; |C| is identical either way, since the lengths are.</p>
+    <p><b>Two drawings of the same trie.</b> The step bar switches between the tree and a
+      <b>nested-box</b> picture: a leaf is a box holding its character, and an inner node is a box holding its
+      0-subtree immediately followed by its 1-subtree. A codeword is then read from the outside in, and the
+      small digits in the corners spell it out; they can be turned off. Box heights follow the height of the
+      subtree, so siblings always line up. The picture is much flatter than the tree — for
+      <code>LOSSLESS</code> 200&times;126 against 212&times;222, and for a worst-case path-shaped tree
+      332&times;162 against 344&times;378 — which is what makes it the quicker thing to draw when working an
+      example by hand. In this drawing the priority-queue entries show the tries themselves instead of a name.</p>
+    <p><b>Decoding.</b> The decode view takes the complete coded text <code>C</code> — code header followed
+      by body — as a string of 0s and 1s, and is always canonical: the header stores codeword
+      <i>lengths</i>, so only the canonical rule makes the codewords recoverable. Selecting any preset while
+      in this view encodes that example and puts its bits in the box, so the two views are two ways of
+      looking at the same example. A weights preset has no text, so it is realised as one character repeated
+      per unit of weight, which has exactly those frequencies.</p>
+    <p><b>Degenerate case.</b> With a one-character alphabet the algorithm performs no merge and the code trie is a
+      single leaf, whose codeword would be the empty string. This page assigns <code>0</code> instead, so that the
+      text is still decodable.</p>
+  </div>
+</details>
+
+<!-- ─────────── tests ─────────── -->
+<details class="panel">
+  <summary>Self-tests — algorithm vs. the lecture example and a brute-force optimum</summary>
+  <div class="panel-body">
+    <button class="primary" onclick="runTests()">Run all tests</button>
+    <div id="test-out">Not run yet.</div>
+  </div>
+</details>
+
+</div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   0.  Display helpers
+   ══════════════════════════════════════════════════════════════════════════ */
+function disp(ch){
+  if(ch===' ') return '␣';
+  if(ch==='\n') return '↵';
+  if(ch==='\t') return '⇥';
+  return ch;
+}
+function lg(x){ return Math.log(x)/Math.LN2; }
+function fmt(x,d){ return (Math.round(x*Math.pow(10,d))/Math.pow(10,d)).toFixed(d); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1.  Huffman's algorithm
+   ──────────────────────────────────────────────────────────────────────────
+   Tie-breaking rule (as stated in the lecture):
+     1. To break ties when SELECTING the two tries to merge, first use the trie
+        containing the smallest letter in alphabetical order.
+     2. When combining two tries of DIFFERENT values, place the lower-valued
+        trie on the left (a 0-bit).
+     3. When combining tries of EQUAL value, place the one containing the
+        smallest letter to the left.
+   Rule 1 makes the selection deterministic; rules 2+3 fix left/right.
+   Nodes are immutable, so a step snapshot is just a list of root references.
+   ══════════════════════════════════════════════════════════════════════════ */
+let _nid = 0;
+function leafNode(ch,w){ return {id:++_nid, ch, w, minCh:ch, left:null, right:null}; }
+function innerNode(l,r){
+  return {id:++_nid, ch:null, w:l.w+r.w,
+          minCh:(l.minCh<r.minCh?l.minCh:r.minCh), left:l, right:r};
+}
+/* priority-queue order: by weight, ties by smallest letter contained (rule 1) */
+function cmpTrie(a,b){
+  if(a.w!==b.w) return a.w-b.w;
+  if(a.minCh!==b.minCh) return a.minCh<b.minCh ? -1 : 1;
+  return 0;
+}
+function isLeaf(t){ return t.left===null && t.right===null; }
+
+/* label of a trie = its leaves in in-order, e.g. "EO" */
+function trieLabel(t){
+  const out=[];
+  (function go(n){ if(!n) return; if(isLeaf(n)){out.push(disp(n.ch));return;} go(n.left); go(n.right); })(t);
+  const s=out.join('');
+  return s.length<=6 ? s : s.slice(0,5)+'…';
+}
+function leavesOf(t){
+  const out=[];
+  (function go(n){ if(!n) return; if(isLeaf(n)){out.push(n);return;} go(n.left); go(n.right); })(t);
+  return out;
+}
+
+function huffmanRun(entries){
+  /* entries: [{ch,w}] with w >= 0, at least one entry */
+  let forest = entries.map(e=>leafNode(e.ch,e.w)).sort(cmpTrie);
+  const merges=[];
+  while(forest.length>1){
+    /* --- step 1: two deleteMin calls (rule 1 already baked into cmpTrie) --- */
+    const t1=forest[0], t2=forest[1];
+    /* --- rules 2 and 3: which one goes left? --- */
+    let left,right;
+    if(t1.w!==t2.w){ left = (t1.w<t2.w)?t1:t2; }        // rule 2
+    else            { left = (t1.minCh<t2.minCh)?t1:t2; } // rule 3
+    right = (left===t1)?t2:t1;
+    const nn=innerNode(left,right);
+    /* --- step 2: insert the combined trie --- */
+    const rest=forest.slice(2);
+    const after=rest.concat([nn]).sort(cmpTrie);
+    merges.push({before:forest, sel:[t1,t2], left, right, node:nn, after});
+    forest=after;
+  }
+  return {root:forest[0], merges};
+}
+
+/* codewords by walking the trie; degenerate single-leaf trie gets "0" */
+function codeOf(root){
+  const code={};
+  if(isLeaf(root)){ code[root.ch]='0'; return code; }
+  (function go(n,pre){
+    if(isLeaf(n)){ code[n.ch]=pre; return; }
+    go(n.left, pre+'0'); go(n.right, pre+'1');
+  })(root,'');
+  return code;
+}
+function encodeText(text,code){ let c=''; for(const ch of text) c+=code[ch]; return c; }
+function decodeBits(bits,root){
+  if(isLeaf(root)) return root.ch.repeat(bits.length); // degenerate code "0"
+  let out='', n=root;
+  for(const b of bits){
+    n = (b==='0')?n.left:n.right;
+    if(isLeaf(n)){ out+=n.ch; n=root; }
+  }
+  return out;
+}
+function frequencies(text){
+  const m=new Map();
+  for(const ch of text) m.set(ch,(m.get(ch)||0)+1);
+  return [...m.entries()].map(([ch,w])=>({ch,w})).sort((a,b)=>a.ch<b.ch?-1:a.ch>b.ch?1:0);
+}
+function entropy0(entries){
+  const W=entries.reduce((s,e)=>s+e.w,0);
+  if(W===0) return 0;
+  let H=0;
+  for(const e of entries){ if(e.w>0){ const p=e.w/W; H-=p*lg(p);} }
+  return H;
+}
+
+/* ── canonical Huffman code ────────────────────────────────────────────────
+   Only the codeword LENGTHS of a Huffman code matter for |C|.  Fixing a
+   canonical assignment of codewords to those lengths means the lengths alone
+   determine the code, so the header need not store the tree at all.
+   Order: by (length, character).  Then repeatedly emit the running counter v
+   and increment it, shifting left whenever the length grows.                */
+function canonicalOrder(code){
+  return Object.keys(code).map(ch=>({ch,len:code[ch].length}))
+              .sort((a,b)=> a.len-b.len || (a.ch<b.ch?-1:1));
+}
+function canonicalCode(code){
+  const ord=canonicalOrder(code), out={};
+  if(!ord.length) return out;
+  let v=0, prev=ord[0].len;
+  for(const e of ord){
+    v*=Math.pow(2,e.len-prev); prev=e.len;
+    out[e.ch]=v.toString(2).padStart(e.len,'0');
+    v++;
+  }
+  return out;
+}
+/* build a code trie from an arbitrary prefix-free code map */
+function trieFromCode(codeMap,wOf){
+  const mk=()=>({id:++_nid,ch:null,w:0,minCh:null,left:null,right:null});
+  const root=mk();
+  for(const e of canonicalOrder(codeMap)){
+    let n=root; const cw=codeMap[e.ch];
+    for(let i=0;i<cw.length;i++){
+      const side = cw[i]==='0'?'left':'right';
+      if(!n[side]) n[side]=mk();
+      n=n[side];
+    }
+    n.ch=e.ch;
+  }
+  (function fill(n){
+    if(n.ch!==null){ n.w=wOf(n.ch); n.minCh=n.ch; return n.w; }
+    let s=0;
+    if(n.left) s+=fill(n.left);
+    if(n.right) s+=fill(n.right);
+    n.w=s;
+    const l=n.left&&n.left.minCh, r=n.right&&n.right.minCh;
+    n.minCh = (l&&r) ? (l<r?l:r) : (l||r);
+    return s;
+  })(root);
+  return root;
+}
+/* the sub-trie spanned by a subset of the leaves (for the growing animation) */
+function pruneTrie(n,allowed){
+  if(!n) return null;
+  if(n.ch!==null) return allowed.has(n.ch) ? Object.assign({},n) : null;
+  const l=pruneTrie(n.left,allowed), r=pruneTrie(n.right,allowed);
+  if(!l&&!r) return null;
+  return {id:n.id, ch:null, w:(l?l.w:0)+(r?r.w:0),
+          minCh:(l&&r)?(l.minCh<r.minCh?l.minCh:r.minCh):(l||r).minCh,
+          left:l, right:r};
+}
+
+/* ── the code header: store the codeword lengths, nothing else ─────────────
+   The slide says "store the Huffman code in C (details omitted)".  This is one
+   concrete, self-describing convention:
+        8 bits  σ−1                  number of used characters, minus one
+        5 bits  b−1                  bits used per length field
+        then, in canonical order, for each character:
+             cb bits  the character  (cb = 8, or 16 if the text needs it)
+              b bits  its length ℓ(c)
+   The decoder reads the pairs, sorts them, and rebuilds the canonical code.  */
+function buildHeader(code,entries){
+  const ord=canonicalOrder(code);
+  const Lmax=Math.max(...ord.map(e=>e.len));
+  const b=Math.max(1,Math.floor(lg(Lmax))+1);
+  const maxCode=Math.max(...entries.map(e=>e.ch.charCodeAt(0)));
+  if(maxCode>255)
+    throw new Error('the code header of this page stores characters in 8 bits, '+
+                    'so the text may only use characters with code < 256');
+  const cb = 8;
+  const fields=[];
+  fields.push({kind:'meta',label:'σ−1',bits:(ord.length-1).toString(2).padStart(8,'0')});
+  fields.push({kind:'meta',label:'b−1',bits:(b-1).toString(2).padStart(5,'0')});
+  for(const e of ord){
+    fields.push({kind:'char',label:disp(e.ch),ch:e.ch,
+                 bits:e.ch.charCodeAt(0).toString(2).padStart(cb,'0')});
+    fields.push({kind:'len',label:'ℓ='+e.len,ch:e.ch,
+                 bits:e.len.toString(2).padStart(b,'0')});
+  }
+  const bits=fields.map(f=>f.bits).join('');
+  return {fields,bits,b,cb,Lmax,sigma:ord.length,length:bits.length};
+}
+
+/* Read a code header back out of a bit string; the exact inverse of
+   buildHeader, and the first thing the decoder does.                        */
+function parseHeader(bits){
+  let q=0;
+  const rd=k=>{
+    if(q+k>bits.length) throw new Error('the bit string ends in the middle of the code header');
+    const v=parseInt(bits.slice(q,q+k),2); q+=k; return v;
+  };
+  const fields=[];
+  const sigma=rd(8)+1;
+  fields.push({kind:'meta',label:'σ−1',bits:bits.slice(0,8)});
+  const b=rd(5)+1;
+  fields.push({kind:'meta',label:'b−1',bits:bits.slice(8,13)});
+  const cb=8, pairs=[];
+  for(let i=0;i<sigma;i++){
+    const p0=q, code=rd(cb), p1=q, len=rd(b);
+    if(len<1) throw new Error('the header gives codeword length 0 for a character');
+    const ch=String.fromCharCode(code);
+    pairs.push({ch,len});
+    fields.push({kind:'char',label:disp(ch),ch,bits:bits.slice(p0,p1)});
+    fields.push({kind:'len',label:'ℓ='+len,ch,bits:bits.slice(p1,q)});
+  }
+  const seen=new Set();
+  for(const p of pairs){
+    if(seen.has(p.ch)) throw new Error('character "'+disp(p.ch)+'" appears twice in the header');
+    seen.add(p.ch);
+  }
+  /* A one-character alphabet is the one degenerate case: its trie is a single
+     leaf, the codeword is 0, and Σ2^−ℓ = 1/2 rather than 1.                 */
+  if(sigma===1){
+    if(pairs[0].len!==1)
+      throw new Error('a one-character alphabet must have codeword length 1');
+  } else {
+    const kraft=pairs.reduce((a,p)=>a+Math.pow(2,-p.len),0);
+    if(Math.abs(kraft-1)>1e-9)
+      throw new Error('the codeword lengths do not describe a complete prefix-free code '+
+                      '(Σ2^−ℓ = '+fmt(kraft,4)+', it must be exactly 1)');
+  }
+  const lens={}; pairs.forEach(p=>{ lens[p.ch]='x'.repeat(p.len); });
+  return {header:{fields,bits:bits.slice(0,q),b,cb,sigma,length:q,
+                  Lmax:Math.max(...pairs.map(p=>p.len))},
+          pairs, body:bits.slice(q), code:canonicalCode(lens)};
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2.  Pseudocode panel
+   ══════════════════════════════════════════════════════════════════════════ */
+/* Lines carry tags rather than numbers, so the highlighting keeps working
+   when the set of procedures changes with the canonical switch.            */
+const L=(t,k)=>({t,k});
+function codeSections(useCanon){
+  const secs=[];
+  if(!useCanon){
+    secs.push({key:'enc',head:'procedure HuffmanEncode(S[0..n))',lines:[
+      L('procedure HuffmanEncode(S[0..n)):'),
+      L('    w ← CountFrequencies(S)                    // Pass 1','count'),
+      L('    T ← BuildHuffmanTrie(Σ_S, w)','build'),
+      L('    E[c] ← codeword of c in T,  for all c ∈ Σ_S','lengths'),
+      L('    C ← WriteCode(E)                           // details omitted','header'),
+      L('    for i ← 0,…,n−1 do                         // Pass 2','pass2'),
+      L('        C ← C · E[S[i]]','pass2'),
+      L('    return C','pass2')
+    ]});
+  } else {
+    secs.push({key:'enc',head:'procedure HuffmanEncode(S[0..n))',lines:[
+      L('procedure HuffmanEncode(S[0..n)):'),
+      L('    w ← CountFrequencies(S)                    // Pass 1','count'),
+      L('    T ← BuildHuffmanTrie(Σ_S, w)','build'),
+      L('    ℓ[c] ← depth of c in T,  for all c ∈ Σ_S','lengths'),
+      L('    E ← CanonicalCode(ℓ)','canon'),
+      L('    C ← WriteHeader(ℓ)','header'),
+      L('    for i ← 0,…,n−1 do                         // Pass 2','pass2'),
+      L('        C ← C · E[S[i]]','pass2'),
+      L('    return C','pass2')
+    ]});
+  }
+  secs.push({key:'huffman',head:'procedure BuildHuffmanTrie(Σ, w)',lines:[
+    L('procedure BuildHuffmanTrie(Σ, w):'),
+    L('    Q ← empty min-oriented priority queue','init'),
+    L('    for c ∈ Σ do','init'),
+    L('        Q.insert(single leaf c,  key w(c))','init'),
+    L('    while Q.size() > 1 do','loop'),
+    L('        T₁ ← Q.deleteMin()          // smallest key','select'),
+    L('        T₂ ← Q.deleteMin()          // second smallest','select'),
+    L('        T  ← new trie, T₁ as 0-child and T₂ as 1-child','merge'),
+    L('        Q.insert(T,  key w(T₁) + w(T₂))','merge'),
+    L('    return Q.deleteMin()','ret')
+  ]});
+  secs.push({key:'ties',head:'Tie-breaking rule',lines:[
+    L('1.  To break ties when selecting the two tries to merge,','r1'),
+    L('      first use the trie containing the smallest letter','r1'),
+    L('      in alphabetical order.','r1'),
+    L('2.  When combining two tries of different values,','r2'),
+    L('      place the lower-valued trie on the left (a 0-bit).','r2'),
+    L('3.  When combining tries of equal value,','r3'),
+    L('      place the one containing the smallest letter to the left.','r3')
+  ]});
+  if(useCanon){
+    secs.push({key:'canon',head:'procedure CanonicalCode(ℓ[·])',lines:[
+      L('procedure CanonicalCode(ℓ[·]):'),
+      L('    order Σ_S by (ℓ(c), c)                     // lengths first','sort'),
+      L('    v ← 0;   prev ← ℓ(first character)','init'),
+      L('    for c ∈ Σ_S in this order do','loop'),
+      L('        v ← v · 2^(ℓ(c) − prev);   prev ← ℓ(c)','loop'),
+      L('        E[c] ← v written with ℓ(c) bits','loop'),
+      L('        v ← v + 1','loop'),
+      L('    return E          // the lengths alone fixed every codeword','ret')
+    ]});
+    secs.push({key:'header',head:'procedure WriteHeader(ℓ[·])',lines:[
+      L('procedure WriteHeader(ℓ[·]):'),
+      L('    b ← number of bits needed for max_c ℓ(c)','meta'),
+      L('    H ← (σ−1) in 8 bits  ·  (b−1) in 5 bits','meta'),
+      L('    for c ∈ Σ_S in canonical order do','pairs'),
+      L('        H ← H · c in 8 bits · ℓ(c) in b bits','pairs'),
+      L('    return H          // no tree shape is stored','ret')
+    ]});
+    secs.push({key:'readheader',head:'procedure ReadHeader(C)',lines:[
+      L('procedure ReadHeader(C):'),
+      L('    σ ← C[0..8)  as an integer, plus 1','meta'),
+      L('    b ← C[8..13) as an integer, plus 1','meta'),
+      L('    j ← 13','meta'),
+      L('    for i ← 1,…,σ do','pairs'),
+      L('        c    ← C[j..j+8) as a character;  j ← j+8','pairs'),
+      L('        ℓ[c] ← C[j..j+b) as an integer;   j ← j+b','pairs'),
+      L('    return (ℓ, j)     // j is where the body starts','ret')
+    ]});
+    secs.push({key:'dec',head:'procedure HuffmanDecode(C[0..m))',lines:[
+      L('procedure HuffmanDecode(C[0..m)):'),
+      L('    (ℓ, j) ← ReadHeader(C)','readheader'),
+      L('    E ← CanonicalCode(ℓ)          // same procedure as above','canon'),
+      L('    T ← CodeTrie(E)','canon'),
+      L('    S ← ε;   v ← root of T','walk'),
+      L('    while j < m do','walk'),
+      L('        v ← child of v for bit C[j];   j ← j+1','walk'),
+      L('        if v is a leaf then','walk'),
+      L('            S ← S · character(v);   v ← root of T','walk'),
+      L('    return S','walk')
+    ]});
+  } else {
+    secs.push({key:'dec',head:'procedure HuffmanDecode(C[0..m))',lines:[
+      L('procedure HuffmanDecode(C[0..m)):'),
+      L('    (E, j) ← ReadCode(C)          // details omitted','readheader'),
+      L('    T ← CodeTrie(E)','readheader'),
+      L('    S ← ε;   v ← root of T','walk'),
+      L('    while j < m do','walk'),
+      L('        v ← child of v for bit C[j];   j ← j+1','walk'),
+      L('        if v is a leaf then','walk'),
+      L('            S ← S · character(v);   v ← root of T','walk'),
+      L('    return S','walk')
+    ]});
+  }
+  secs.push({key:'tables',head:'Which data structure is used where',lines:[
+    L('encoding:  E is a TABLE indexed by character','enc'),
+    L('           C ← C · E[S[i]]      one array lookup per character','enc'),
+    L('decoding:  E is the CODE TRIE','dec'),
+    L('           one node step per bit, output on reaching a leaf','dec')
+  ]});
+  return secs;
+}
+let CODE_SECTIONS=codeSections(false);
+const codeLineEls={};
+function buildCodePanel(useCanon){
+  CODE_SECTIONS=codeSections(!!useCanon);
+  const grid=document.getElementById('codeGrid');
+  grid.innerHTML='';
+  for(const k in codeLineEls) delete codeLineEls[k];
+  for(const sec of CODE_SECTIONS){
+    const box=document.createElement('div');
+    box.className='code-section'; box.id='cs-'+sec.key;
+    const h=document.createElement('div'); h.className='code-head'; h.textContent=sec.head;
+    const pre=document.createElement('pre'); pre.className='code';
+    codeLineEls[sec.key]=[];
+    sec.lines.forEach(l=>{
+      const sp=document.createElement('span'); sp.className='ln'; sp.textContent=l.t;
+      pre.appendChild(sp); codeLineEls[sec.key].push({el:sp,k:l.k});
+    });
+    box.appendChild(h); box.appendChild(pre); grid.appendChild(box);
+  }
+}
+function highlightCode(map){
+  for(const sec of CODE_SECTIONS){
+    const b=document.getElementById('cs-'+sec.key);
+    if(b) b.classList.remove('active');
+    (codeLineEls[sec.key]||[]).forEach(o=>o.el.classList.remove('hot'));
+  }
+  for(const k in map){
+    const lines=codeLineEls[k];
+    if(!lines) continue;                      // section absent in this variant
+    const tags=new Set(map[k]);
+    let any=false;
+    lines.forEach(o=>{ if(o.k&&tags.has(o.k)){ o.el.classList.add('hot'); any=true; } });
+    if(any){ const b=document.getElementById('cs-'+k); if(b) b.classList.add('active'); }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3.  Step sequence
+   ──────────────────────────────────────────────────────────────────────────
+   A step is a complete, valid snapshot:
+     {phase, forest:[roots], sel:[ids], fresh:id, code:{...}, msg, hi:{sec:[lines]}, ...}
+   ══════════════════════════════════════════════════════════════════════════ */
+let steps=[], cur=0, model=null;
+
+function buildSteps(text, entries, useCanon){
+  const S=[];
+  const run=huffmanRun(entries);
+  const codeTree=codeOf(run.root);
+  const codeCanon=canonicalCode(codeTree);
+  const wMap={}; entries.forEach(e=>{ wMap[e.ch]=e.w; });
+  const canonRoot=trieFromCode(codeCanon, ch=>wMap[ch]||0);
+  const header=buildHeader(codeTree,entries);
+  const ord=canonicalOrder(codeTree);
+
+  const encCode = useCanon ? codeCanon : codeTree;
+  const encRoot = useCanon ? canonRoot : run.root;
+  const bits = text!==null ? encodeText(text,encCode) : '';
+  const alpha=entries.slice().sort((a,b)=>a.ch<b.ch?-1:1);
+
+  const push=o=>S.push(Object.assign({forest:[],sel:[],fresh:null,counts:null,code:null,
+                                      sIdx:-1,cIdx:-1,path:null,codeRow:null,bitsShown:0,
+                                      canonRows:0,canonCur:null,hdrFields:0,hdrCur:null},o));
+
+  /* ---------- phase 1: count frequencies (only in text mode) ----------
+     The tally is drawn as a forest of leaves whose weights grow.  Each display
+     leaf reuses the id of the real leaf it will become, so the transition into
+     the build phase is a continuous motion rather than a jump.               */
+  const realLeaf={};
+  leavesOf(run.root).forEach(n=>{ realLeaf[n.ch]=n; });
+  const tallyForest=counts=>{
+    const f=[];
+    for(const [ch,w] of counts) f.push({id:realLeaf[ch].id,ch,w,minCh:ch,left:null,right:null});
+    return f.sort(cmpTrie);
+  };
+  if(text!==null){
+    const counts=new Map();
+    push({phase:'count',counts:new Map(counts),forest:[],sIdx:-1,
+          msg:'<b>Pass 1</b>: count the character frequencies in <i>S</i>.',
+          hi:{enc:['count']}});
+    for(let i=0;i<text.length;i++){
+      counts.set(text[i],(counts.get(text[i])||0)+1);
+      push({phase:'count',counts:new Map(counts),forest:tallyForest(counts),sIdx:i,
+            msg:'<b>Pass 1</b>: counting — <code>'+disp(text[i])+'</code> now occurs '+
+                counts.get(text[i])+'&times;.',
+            hi:{enc:['count']}});
+    }
+  }
+
+  /* ---------- phase 2: build the tree ---------- */
+  const initForest=run.merges.length?run.merges[0].before:[run.root];
+  push({phase:'pqinit',forest:initForest,
+        msg:'Insert all '+entries.length+' character'+(entries.length===1?'':'s')+
+            ' into the priority queue, each with its weight as key.',
+        hi:{enc:['build'],huffman:['init']}});
+
+  run.merges.forEach(m=>{
+    const t1=m.sel[0], t2=m.sel[1];
+    const tie = t1.w===t2.w;
+    push({phase:'select',forest:m.before,sel:[t1.id,t2.id],
+          msg:'<b>Step 1</b> — two <code>deleteMin</code> calls: the lowest weights are '+
+              '<code>'+trieLabel(t1)+'</code>&thinsp;('+t1.w+') and <code>'+trieLabel(t2)+'</code>&thinsp;('+t2.w+').'+
+              (tie?' Equal weights, so rule 1 picks the trie with the smaller letter first.':''),
+          hi:{huffman:['loop','select'],ties:['r1']}});
+    push({phase:'merge',forest:m.after,fresh:m.node.id,
+          msg:'<b>Step 2</b> — merge into <code>⟨'+trieLabel(m.node)+'⟩</code> of weight '+
+              m.left.w+'&thinsp;+&thinsp;'+m.right.w+'&thinsp;=&thinsp;'+m.node.w+'. '+
+              (m.left.w!==m.right.w
+                ? 'Rule 2: the lower-valued trie <code>'+trieLabel(m.left)+'</code> goes left (bit&nbsp;<code>0</code>).'
+                : 'Rule 3: equal values, so <code>'+trieLabel(m.left)+'</code> — containing the smaller letter — goes left (bit&nbsp;<code>0</code>).')+
+              ' Insert it back into the queue.',
+          hi:{huffman:['merge'],ties:['r2','r3']}});
+  });
+
+  push({phase:'built',forest:[run.root],
+        msg:'The queue holds a single trie — this is the <b>Huffman tree</b>, the code trie of the Huffman code.',
+        hi:{huffman:['ret'],enc:['build']}});
+
+  /* ---------- phase 3: read the code table off the trie ---------- */
+  alpha.forEach((e,k)=>{
+    push({phase:'code',forest:[run.root],path:pathTo(run.root,e.ch),codeRow:e.ch,
+          code:Object.fromEntries(alpha.slice(0,k+1).map(x=>[x.ch,codeTree[x.ch]])),
+          msg:'Root-to-leaf path of <code>'+disp(e.ch)+'</code> — left child is <code>0</code>, '+
+              'right child is <code>1</code> — gives E(<code>'+disp(e.ch)+'</code>) = <code>'+codeTree[e.ch]+'</code>.',
+          hi:{enc:['build','lengths']}});
+  });
+  push({phase:'code',forest:[run.root],code:codeTree,
+        msg:'The code is now stored as a <b>table indexed by character</b>. Encoding is one table '+
+            'lookup per character — the trie is only needed for <i>de</i>coding.',
+        hi:{enc:['build','lengths'],tables:['enc','dec']}});
+
+  /* ---------- phases 4 and 5 exist only when canonical codes are switched on ---------- */
+  if(useCanon){
+  const lenList=ord.map(e=>disp(e.ch)+':'+e.len).join(', ');
+  push({phase:'canon',forest:[run.root],code:codeTree,canonRows:0,
+        msg:'Now forget the shape of the tree and keep only the <b>codeword lengths</b> — '+
+            lenList+'. Any prefix-free code with these lengths gives exactly the same |C|.',
+        hi:{enc:['canon'],canon:['sort','init']}});
+  let prevLen=null;
+  ord.forEach((e,k)=>{
+    const allowed=new Set(ord.slice(0,k+1).map(x=>x.ch));
+    const shift = prevLen===null ? 0 : e.len-prevLen;
+    push({phase:'canon',forest:[pruneTrie(canonRoot,allowed)],code:codeTree,
+          canonRows:k+1,canonCur:e.ch,path:pathTo(canonRoot,e.ch),
+          msg:'ℓ(<code>'+disp(e.ch)+'</code>) = '+e.len+
+              (prevLen===null ? ': start the counter at 0.'
+                              : (shift>0 ? ': the length grew by '+shift+', so shift the counter left by '+shift+'.'
+                                         : ': same length, so just increment the counter.'))+
+              ' Canonical codeword <code>'+codeCanon[e.ch]+'</code>.',
+          hi:{enc:['canon'],canon:['loop']}});
+    prevLen=e.len;
+  });
+  push({phase:'canon',forest:[canonRoot],code:codeTree,canonRows:ord.length,
+        msg:'The canonical code trie is filled left to right by increasing length. Its leaf depths '+
+            'are the same as the Huffman tree\'s, so |C| is unchanged — but now the '+
+            '<b>lengths alone</b> determine every codeword.',
+        hi:{enc:['canon'],canon:['ret']}});
+
+  /* ---------- phase 5: the code header ---------- */
+  push({phase:'header',forest:[canonRoot],code:codeTree,canonRows:ord.length,hdrFields:0,
+        msg:'That is what makes the header cheap: we store only σ, the field width, and one '+
+            '(character, length) pair per character.',
+        hi:{enc:['header'],header:['meta','pairs','ret']}});
+  push({phase:'header',forest:[canonRoot],code:codeTree,canonRows:ord.length,hdrFields:2,
+        msg:'σ−1 = '+(ord.length-1)+' in 8 bits, and b−1 = '+(header.b-1)+' in 5 bits: every length '+
+            'fits in b = '+header.b+' bit'+(header.b===1?'':'s')+' (the longest codeword has '+header.Lmax+').',
+        hi:{enc:['header'],header:['meta']}});
+  ord.forEach((e,k)=>{
+    push({phase:'header',forest:[canonRoot],code:codeTree,canonRows:ord.length,
+          hdrFields:2+2*(k+1),hdrCur:e.ch,
+          msg:'Character <code>'+disp(e.ch)+'</code> in '+header.cb+' bits, then its length '+
+              e.len+' in '+header.b+' bits.',
+          hi:{enc:['header'],header:['pairs']}});
+  });
+  push({phase:'header',forest:[canonRoot],code:codeTree,canonRows:ord.length,
+        hdrFields:header.fields.length,
+        msg:'The whole code costs <b>'+header.length+' bits</b> = 8 + 5 + '+ord.length+'·('+
+            header.cb+'+'+header.b+'). No tree shape is transmitted.',
+        hi:{enc:['header'],header:['ret']}});
+
+  }  /* end of the canonical strand */
+
+  /* ---------- phase 6: encode, via the TABLE ---------- */
+  if(text!==null){
+    let sofar=0;
+    push({phase:'encode',forest:[encRoot],code:encCode,sIdx:-1,bitsShown:0,
+          msg:'<b>Pass 2</b>: encode <i>S</i> character by character. Each step is a single lookup '+
+              'in the table E — the code trie is <i>not</i> traversed here.'+
+              (useCanon?' Using the <b>canonical</b> codewords.':''),
+          hi:{enc:['pass2'],tables:['enc']}});
+    for(let i=0;i<text.length;i++){
+      const cw=encCode[text[i]];
+      sofar+=cw.length;
+      push({phase:'encode',forest:[encRoot],code:encCode,sIdx:i,codeRow:text[i],
+            bitsShown:sofar,
+            msg:'Look up E[<code>'+disp(text[i])+'</code>] = <code>'+cw+'</code>&nbsp;('+cw.length+
+                (cw.length===1?' bit':' bits')+') and append it. |C| = '+sofar+' bits so far.',
+            hi:{enc:['pass2'],tables:['enc']}});
+    }
+    /* ---------- phase 7: decode, via the TRIE ---------- */
+    push({phase:'decode',forest:[encRoot],code:encCode,cIdx:-1,decoded:'',walk:[],
+          msg:'<b>Decoding</b> is where the code trie is needed: walk down from the root, one bit '+
+              'at a time, and output a character on reaching a leaf.',
+          hi:{dec:['readheader','walk'],tables:['dec']}});
+    let node=encRoot, decoded='', walk=[encRoot.id];
+    const degenerate=isLeaf(encRoot);
+    for(let j=0;j<bits.length;j++){
+      if(degenerate){
+        decoded+=encRoot.ch;
+        push({phase:'decode',forest:[encRoot],code:encCode,cIdx:j,decoded,walk:[encRoot.id],
+              msg:'Degenerate one-character code: bit <code>0</code> &rarr; <code>'+disp(encRoot.ch)+'</code>.',
+              hi:{dec:['walk']}});
+        continue;
+      }
+      node = bits[j]==='0' ? node.left : node.right;
+      walk = walk.concat([node.id]);
+      let msg;
+      if(isLeaf(node)){
+        decoded+=node.ch;
+        msg='Bit <code>'+bits[j]+'</code> reaches the leaf <code>'+disp(node.ch)+'</code> — output it and '+
+            'restart at the root.';
+      } else {
+        msg='Bit <code>'+bits[j]+'</code>: go '+(bits[j]==='0'?'left':'right')+', still inside the trie.';
+      }
+      push({phase:'decode',forest:[encRoot],code:encCode,cIdx:j,decoded,walk,path:walk.slice(),msg,
+            hi:{dec:['walk'],tables:['dec']}});
+      if(isLeaf(node)){ node=encRoot; walk=[encRoot.id]; }
+    }
+    push({phase:'done',forest:[encRoot],code:encCode,decoded,cIdx:bits.length-1,
+          msg:'Decoded '+bits.length+' bits back to the original '+text.length+' characters. '+
+              (decoded===text?'Identical to <i>S</i>. ✓':'<b>MISMATCH</b>'),
+          hi:{dec:['walk']}});
+  }
+
+  return {steps:S, root:run.root, canonRoot, encRoot, code:encCode,
+          codeTree, codeCanon, header, ord, bits, entries:alpha, text,
+          merges:run.merges, useCanon:!!useCanon};
+}
+
+/* ── decoding: header → canonical code → trie walk ────────────────────────
+   Decoding always uses the canonical code: the header carries lengths only,
+   so the canonical rule is what makes the codewords recoverable at all.    */
+function buildDecodeSteps(bits){
+  const P=parseHeader(bits);
+  const S=[];
+  const ord=canonicalOrder(P.code);
+  const wMap={}; ord.forEach(e=>{ wMap[e.ch]=0; });
+  const root=trieFromCode(P.code, ()=>0);
+  const push=o=>S.push(Object.assign({forest:[],path:null,canonRows:0,canonCur:null,
+      hdrFields:0,hdrCur:null,cIdx:-1,decoded:'',code:null},o));
+
+  push({phase:'hparse',hdrFields:0,
+        msg:'The coded text starts with the <b>code header</b>. Read it first — without it the '+
+            'bits that follow mean nothing.',hi:{enc:['header'],header:['meta','pairs','ret']}});
+  push({phase:'hparse',hdrFields:2,
+        msg:'σ−1 = '+(P.header.sigma-1)+' in 8 bits and b−1 = '+(P.header.b-1)+' in 5 bits: there are '+
+            P.header.sigma+' characters and each length field is '+P.header.b+' bit'+
+            (P.header.b===1?'':'s')+' wide.',hi:{enc:['header'],header:['meta']}});
+  P.pairs.forEach((pr,k)=>{
+    push({phase:'hparse',hdrFields:2+2*(k+1),hdrCur:pr.ch,
+          msg:'Character <code>'+disp(pr.ch)+'</code> (code '+pr.ch.charCodeAt(0)+
+              ') with codeword length ℓ = '+pr.len+'.',hi:{enc:['header'],header:['pairs']}});
+  });
+  push({phase:'hparse',hdrFields:P.header.fields.length,
+        msg:'The header is '+P.header.length+' bits long. It gave us the lengths — and nothing else. '+
+            'Σ2<sup>−ℓ</sup> = 1, so these lengths do describe a complete prefix-free code.',
+        hi:{enc:['header'],header:['ret']}});
+
+  ord.forEach((e,k)=>{
+    const allowed=new Set(ord.slice(0,k+1).map(x=>x.ch));
+    push({phase:'canon',canonRows:k+1,canonCur:e.ch,hdrFields:P.header.fields.length,
+          forest:[pruneTrie(root,allowed)],path:pathTo(root,e.ch),
+          msg:'Rebuild the codewords in canonical order: ℓ(<code>'+disp(e.ch)+'</code>) = '+e.len+
+              ' gives <code>'+P.code[e.ch]+'</code>.',hi:{dec:['canon'],canon:['sort','loop']}});
+  });
+  push({phase:'canon',canonRows:ord.length,hdrFields:P.header.fields.length,forest:[root],
+        msg:'The whole code trie is back, reconstructed from '+P.header.length+
+            ' bits of lengths. Now the body can be decoded.',hi:{enc:['canon'],canon:['ret']}});
+
+  let node=root, decoded='', walk=[root.id];
+  for(let j=0;j<P.body.length;j++){
+    node = P.body[j]==='0' ? node.left : node.right;
+    if(!node) throw new Error('the body walks off the code trie at bit '+j);
+    walk=walk.concat([node.id]);
+    let msg;
+    if(isLeaf(node)){
+      decoded+=node.ch;
+      msg='Bit <code>'+P.body[j]+'</code> reaches the leaf <code>'+disp(node.ch)+
+          '</code> — output it and restart at the root.';
+    } else {
+      msg='Bit <code>'+P.body[j]+'</code>: go '+(P.body[j]==='0'?'left':'right')+'.';
+    }
+    push({phase:'decode',forest:[root],cIdx:j,decoded,path:walk.slice(),
+          canonRows:ord.length,hdrFields:P.header.fields.length,msg,hi:{dec:['walk']}});
+    if(isLeaf(node)){ node=root; walk=[root.id]; }
+  }
+  if(node!==root)
+    push({phase:'done',forest:[root],cIdx:P.body.length-1,decoded,canonRows:ord.length,
+          hdrFields:P.header.fields.length,
+          msg:'The body ends part-way down the trie — the last '+
+              '</b>bits do not form a complete codeword.',hi:{dec:['walk']}});
+  else
+    push({phase:'done',forest:[root],cIdx:P.body.length-1,decoded,canonRows:ord.length,
+          hdrFields:P.header.fields.length,
+          msg:'Done. '+bits.length+' bits ('+P.header.length+' of header, '+P.body.length+
+              ' of body) decoded to <code>'+dstr(decoded)+'</code>.',hi:{dec:['walk']}});
+
+  return {dir:'dec',steps:S,root,canonRoot:root,encRoot:root,code:P.code,codeCanon:P.code,
+          codeTree:null,header:P.header,ord,body:P.body,bits,text:decoded,
+          entries:ord.map(e=>({ch:e.ch,w:0})),useCanon:true,decoded};
+}
+function dstr(x){ return [...x].map(disp).join(''); }
+
+function pathTo(root,ch){
+  const out=[];
+  (function go(n){
+    if(!n) return false;
+    out.push(n.id);
+    if(isLeaf(n)){ if(n.ch===ch) return true; out.pop(); return false; }
+    if(go(n.left)) return true;
+    if(go(n.right)) return true;
+    out.pop(); return false;
+  })(root);
+  return out;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   4.  Layout — leaves on slots, roots aligned, stable bounding box
+   ══════════════════════════════════════════════════════════════════════════ */
+const LEAF_W=44, LEVEL_H=52, TRIE_GAP=30, TOP=34, PAD=18;
+
+function layoutForest(forest){
+  const pos={}; let x=PAD;
+  let maxDepth=0;
+  for(const t of forest){
+    const lv=leavesOf(t);
+    const w=Math.max(1,lv.length)*LEAF_W;
+    /* assign leaf x in in-order */
+    let k=0;
+    (function go(n,d){
+      maxDepth=Math.max(maxDepth,d);
+      if(isLeaf(n)){ pos[n.id]={x:x+k*LEAF_W+LEAF_W/2, y:TOP+d*LEVEL_H, d}; k++; return; }
+      if(n.left)  go(n.left ,d+1);
+      if(n.right) go(n.right,d+1);
+      const xs=[];
+      if(n.left)  xs.push(pos[n.left.id].x);
+      if(n.right) xs.push(pos[n.right.id].x);
+      pos[n.id]={x:xs.reduce((a,b)=>a+b,0)/xs.length, y:TOP+d*LEVEL_H, d};
+    })(t,0);
+    x+=w+TRIE_GAP;
+  }
+  return {pos, width:x-TRIE_GAP+PAD, height:TOP+maxDepth*LEVEL_H+PAD+14};
+}
+
+/* ── nested boxes ──────────────────────────────────────────────────────────
+   The same trie drawn as boxes inside boxes: a leaf is a box holding its
+   character, an inner node is a box holding its 0-subtree immediately
+   followed by its 1-subtree.  A codeword is read from the outside in, and
+   the whole picture is far flatter than the tree — which is why it is the
+   quicker thing to draw by hand.
+   Heights are fixed by the height of the subtree, so siblings line up:
+        h(n) = BLH + 2·BP·height(n)                                        */
+const BLW=32, BLH=28, BP=6, SIBGAP=4, BOX_GAP=22, BOX_TOP=34;
+function bw(n){ if(!n||isLeaf(n)) return BLW; return bw(n.left)+SIBGAP+bw(n.right)+2*BP; }
+function bh(n){ if(!n||isLeaf(n)) return BLH; return Math.max(bh(n.left),bh(n.right))+2*BP; }
+
+function layoutBoxes(forest){
+  const pos={}, meta={}, ghosts=[];
+  let x=PAD, maxH=0;
+  const place=(n,X,Y,H,bit)=>{
+    pos[n.id]={x:X,y:Y,w:bw(n),h:H};
+    meta[n.id]={bit,leaf:isLeaf(n),ch:n.ch};
+    if(isLeaf(n)) return;
+    const ih=H-2*BP;
+    const lw = n.left?bw(n.left):BLW;
+    if(n.left)  place(n.left ,X+BP,      Y+BP, ih, '0');
+    else        ghosts.push({x:X+BP,      y:Y+BP, w:BLW, h:ih, bit:'0'});
+    if(n.right) place(n.right,X+BP+lw+SIBGAP, Y+BP, ih, '1');
+    else        ghosts.push({x:X+BP+lw+SIBGAP, y:Y+BP, w:BLW, h:ih, bit:'1'});
+  };
+  for(const t of forest){
+    place(t,x,BOX_TOP,bh(t),null);
+    x+=bw(t)+BOX_GAP;
+    maxH=Math.max(maxH,bh(t));
+  }
+  return {pos,meta,ghosts,width:x-BOX_GAP+PAD,height:BOX_TOP+maxH+PAD+10};
+}
+function activeLayout(forest){
+  return drawMode==='boxes' ? layoutBoxes(forest) : layoutForest(forest);
+}
+
+/* a small inline picture of one trie, for the priority-queue chips */
+function miniBox(t){
+  const LW=13,LH=12,P=2.5;
+  /* a missing child still takes up its half, so 0 and 1 keep their sides */
+  const G=1.5;
+  const W=n=>(!n||isLeaf(n))?LW:W(n.left)+G+W(n.right)+2*P;
+  const H=n=>(!n||isLeaf(n))?LH:Math.max(H(n.left),H(n.right))+2*P;
+  const parts=[];
+  const go=(n,X,Y,Hh)=>{
+    const w=W(n);
+    if(!n){
+      parts.push('<rect x="'+X+'" y="'+Y+'" width="'+w+'" height="'+Hh+'" rx="2" fill="none" '+
+        'stroke="#d4c5b4" stroke-width="0.8" stroke-dasharray="2 2"/>');
+      return;
+    }
+    parts.push('<rect x="'+X+'" y="'+Y+'" width="'+w+'" height="'+Hh+'" rx="2" fill="'+
+      (isLeaf(n)?'#faf6ed':'rgba(114,98,83,.06)')+'" stroke="#b9a793" stroke-width="0.8"/>');
+    if(isLeaf(n)){
+      parts.push('<text x="'+(X+w/2)+'" y="'+(Y+Hh/2+3.2)+'" text-anchor="middle" font-size="8.5" '+
+        'font-family="var(--wi-font-mono)" fill="#46433a">'+
+        escapeXml(disp(n.ch))+'</text>');
+      return;
+    }
+    const ih=Hh-2*P;
+    go(n.left ,X+P,             Y+P, ih);
+    go(n.right,X+P+W(n.left)+G, Y+P, ih);
+  };
+  go(t,0.5,0.5,H(t));
+  return '<svg width="'+(W(t)+1)+'" height="'+(H(t)+1)+'" viewBox="0 0 '+(W(t)+1)+' '+(H(t)+1)+
+         '" xmlns="http://www.w3.org/2000/svg" style="display:block">'+parts.join('')+'</svg>';
+}
+function escapeXml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+
+/* global viewBox: max over all snapshots, so the frame never jumps */
+let VIEW={w:600,h:300};
+function computeViewBox(allSteps){
+  let w=0,h=0;
+  for(const s of allSteps){
+    if(!s.forest||!s.forest.length) continue;
+    const L=activeLayout(s.forest);
+    w=Math.max(w,L.width); h=Math.max(h,L.height);
+  }
+  VIEW={w:Math.max(w,320), h:Math.max(h,180)};
+  const svg=document.getElementById('forest');
+  svg.setAttribute('viewBox','0 0 '+VIEW.w+' '+VIEW.h);
+  /* The viewBox is the maximum over all snapshots, so the frame never jumps.
+     Narrow forests scale to the panel; wide ones keep full size and scroll,
+     so the glyphs stay legible from the back of the lecture hall.           */
+  /* A small forest in a wide panel must not be blown up to several times the
+     size of the surrounding text; a large one stays at 1:1 and scrolls.      */
+  const wrap=svg.parentElement;
+  wrap.style.overflowX='auto';
+  const avail=wrap.clientWidth||0;
+  const scale=avail>0 ? Math.min(1.4,Math.max(1,avail/VIEW.w)) : 1;
+  svg.style.width=(VIEW.w*scale)+'px';
+  svg.style.height=(VIEW.h*scale)+'px';
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   5.  SVG rendering with interpolated motion
+   ══════════════════════════════════════════════════════════════════════════ */
+const SVGNS='http://www.w3.org/2000/svg';
+let livePos={};           // id -> geometry currently on screen
+let animHandle=null;
+let speedFactor=1;
+let drawMode='tree';      // 'tree' | 'boxes'
+let showBits=true;        // corner 0/1 digits in the box drawing
+
+function el(tag,attrs){
+  const e=document.createElementNS(SVGNS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  return e;
+}
+
+function renderForest(step, animate){
+  const svg=document.getElementById('forest');
+  const L=activeLayout(step.forest||[]);
+  const target=L.pos;
+  const from={};
+  for(const id in target) from[id] = livePos[id] || target[id];
+
+  if(animHandle){ cancelAnimationFrame(animHandle); animHandle=null; }
+  const dur = animate ? 420/speedFactor : 0;
+  const t0=performance.now();
+
+  function frame(now){
+    const t = dur===0 ? 1 : Math.min(1,(now-t0)/dur);
+    const e = t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;   // ease in-out
+    const p={};
+    for(const id in target){
+      const a=from[id], b=target[id], o={};
+      for(const k in b) o[k] = (typeof b[k]==='number' && typeof a[k]==='number')
+                             ? a[k]+(b[k]-a[k])*e : b[k];
+      p[id]=o;
+    }
+    if(drawMode==='boxes') paintBoxes(svg,step,p,e,L);
+    else paint(svg,step,p,e);
+    if(t<1){ animHandle=requestAnimationFrame(frame); }
+    else { livePos=p; animHandle=null; }
+  }
+  animHandle=requestAnimationFrame(frame);
+}
+
+/* ── painting the nested-box drawing ─────────────────────────────────────── */
+function paintBoxes(svg,step,p,progress,L){
+  svg.innerHTML='';
+  const forest=step.forest||[];
+  if(!forest.length) return;
+  const selSet=new Set(step.sel||[]);
+  const pathSet=new Set(step.path||[]);
+  const meta=L.meta;
+  const selNodes=new Set();
+  for(const t of forest)
+    if(selSet.has(t.id))
+      (function go(n){ selNodes.add(n.id); if(n.left)go(n.left); if(n.right)go(n.right); })(t);
+
+  /* empty halves of a partially built trie */
+  (L.ghosts||[]).forEach(g=>{
+    svg.appendChild(el('rect',{x:g.x,y:g.y,width:g.w,height:g.h,rx:4,
+      fill:'none',stroke:'#d4c5b4','stroke-width':1,'stroke-dasharray':'3 3',opacity:.7}));
+  });
+
+  /* deepest boxes last, so the leaves sit on top of their ancestors */
+  const ids=Object.keys(p).sort((a,b)=>(p[b].w||0)-(p[a].w||0));
+  for(const id of ids){
+    const b=p[id], m=meta[id]||{};
+    const isSel=selNodes.has(+id), onP=pathSet.has(+id), isFresh=step.fresh===+id;
+    svg.appendChild(el('rect',{x:b.x,y:b.y,width:b.w,height:b.h,rx:4,
+      fill: m.leaf ? '#faf6ed' : 'rgba(114,98,83,.05)',
+      stroke: onP?'var(--accent)':isFresh?'var(--new)':isSel?'var(--sel)':'var(--btn-border)',
+      'stroke-width': (onP||isFresh)?2.4:isSel?2:1.2,
+      opacity: isFresh?progress:1}));
+    if(m.leaf){
+      const t=txtEl(b.x+b.w/2,b.y+b.h/2+5,disp(m.ch),
+        {'font-size':14,'font-family':'var(--wi-font-mono)',
+         'font-weight':600,fill:onP?'var(--accent)':'var(--ink-strong)'});
+      svg.appendChild(t);
+    }
+    /* the bit that leads into this box, in its top-left corner: reading the
+       corners from the outside in spells the codeword                      */
+    if(showBits && m.bit && b.w>=13)
+      svg.appendChild(txtEl(b.x+3.5,b.y+7.5,m.bit,
+        {'font-size':7.5,'text-anchor':'start','font-family':'var(--wi-font-mono)',
+         fill:onP?'var(--accent)':'var(--muted)','font-weight':onP?700:400}));
+  }
+  /* weight above each root of the forest */
+  for(const t of forest){
+    const b=p[t.id]; if(!b) continue;
+    const isSel=selSet.has(t.id), isFresh=step.fresh===t.id;
+    const lab=txtEl(b.x+b.w/2,b.y-8,String(t.w),
+      {'font-size':15,'font-weight':700,'font-family':'var(--wi-font-mono)',
+       fill:isSel?'#cc2f22':isFresh?'#2f6b3a':'#46433a'});
+    if(isFresh) lab.setAttribute('opacity',String(progress));
+    svg.appendChild(lab);
+  }
+}
+function txtEl(x,y,s,a){
+  const t=el('text',Object.assign({x,y,'text-anchor':'middle'},a||{}));
+  t.textContent=s; return t;
+}
+
+function paint(svg,step,p,progress){
+  svg.innerHTML='';
+  const forest=step.forest||[];
+  if(!forest.length) return;
+  const selSet=new Set(step.sel||[]);
+  const pathSet=new Set(step.path||[]);
+  const pathArr=step.path||[];
+
+  const gEdges=el('g',{}), gNodes=el('g',{}), gLabels=el('g',{});
+  svg.appendChild(gEdges); svg.appendChild(gNodes); svg.appendChild(gLabels);
+
+  /* which tries are selected? mark all their nodes */
+  const selNodes=new Set();
+  for(const t of forest)
+    if(selSet.has(t.id))
+      (function go(n){ selNodes.add(n.id); if(n.left)go(n.left); if(n.right)go(n.right); })(t);
+
+  for(const t of forest){
+    /* weight label above each root */
+    const rp=p[t.id];
+    if(rp){
+      const isSel=selSet.has(t.id), isFresh=step.fresh===t.id;
+      const lab=el('text',{x:rp.x,y:rp.y-15,'text-anchor':'middle',
+        'font-size':15,'font-weight':700,'font-family':'var(--wi-font-mono)',
+        fill:isSel?'#cc2f22':isFresh?'#2f6b3a':'#46433a'});
+      lab.textContent=t.w;
+      if(isFresh) lab.setAttribute('opacity',String(progress));
+      gLabels.appendChild(lab);
+    }
+    /* edges + nodes */
+    (function go(n){
+      const np=p[n.id]; if(!np) return;
+      if(!isLeaf(n)){
+        for(const [child,bit] of [[n.left,'0'],[n.right,'1']]){
+          if(!child) continue;
+          const cp=p[child.id]; if(!cp) continue;
+          const onPath = pathSet.has(n.id)&&pathSet.has(child.id)&&
+                         adjacentOnPath(pathArr,n.id,child.id);
+          const line=el('line',{x1:np.x,y1:np.y,x2:cp.x,y2:cp.y,
+            stroke:onPath?'#cc2f22':selNodes.has(n.id)?'#6d180f':'#b9a793',
+            'stroke-width':onPath?3.2:selNodes.has(n.id)?2.2:1.8,
+            'stroke-linecap':'round'});
+          gEdges.appendChild(line);
+          const mx=(np.x+cp.x)/2, my=(np.y+cp.y)/2;
+          const bl=el('text',{x:mx+(bit==='0'?-9:9),y:my+4,'text-anchor':'middle','font-size':12,
+            'font-family':'var(--wi-font-mono)',
+            fill:onPath?'#cc2f22':'#8b8779','font-weight':onPath?700:400});
+          bl.textContent=bit;
+          gEdges.appendChild(bl);
+        }
+        if(n.left) go(n.left);
+        if(n.right) go(n.right);
+      }
+      /* node glyph */
+      const isSel=selNodes.has(n.id), onP=pathSet.has(n.id);
+      if(isLeaf(n)){
+        const g=el('g',{transform:'translate('+np.x+','+np.y+')'});
+        const r=el('rect',{x:-15,y:-15,width:30,height:30,rx:6,
+          fill:onP?'#f7e6e0':isSel?'#f7e6e0':'#faf6ed',
+          stroke:onP?'#cc2f22':isSel?'#cc2f22':'#b9a793','stroke-width':onP||isSel?2.4:1.5});
+        const tx=el('text',{x:0,y:5,'text-anchor':'middle','font-size':15,
+          'font-family':'var(--wi-font-mono)',
+          'font-weight':600,fill:'#46433a'});
+        tx.textContent=disp(n.ch);
+        g.appendChild(r); g.appendChild(tx); gNodes.appendChild(g);
+      } else {
+        const c=el('circle',{cx:np.x,cy:np.y,r:onP?7.5:6,
+          fill:onP?'#cc2f22':isSel?'#6d180f':'#8b8779',
+          stroke:'#f5ebd9','stroke-width':1.5});
+        if(step.fresh===n.id) c.setAttribute('opacity',String(progress));
+        gNodes.appendChild(c);
+      }
+    })(t);
+  }
+}
+function adjacentOnPath(arr,a,b){
+  for(let i=0;i+1<arr.length;i++) if(arr[i]===a&&arr[i+1]===b) return true;
+  return false;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   6.  Side panels
+   ══════════════════════════════════════════════════════════════════════════ */
+function renderPQ(step){
+  const v=document.getElementById('pqView');
+  v.innerHTML='';
+  const forest=step.forest||[];
+  document.getElementById('pqTitle').textContent =
+    step.phase==='count' ? 'Character counts (future queue keys)'
+                         : 'Priority queue (min-oriented, by weight)';
+  if(!forest.length){
+    v.innerHTML='<span class="pq-empty">'+
+      (step.phase==='count'?'nothing counted yet':'empty')+'</span>';
+    return;
+  }
+  const sel=new Set(step.sel||[]);
+  forest.forEach(t=>{
+    const c=document.createElement('span');
+    c.className='pq-chip'+(sel.has(t.id)?' sel':'')+(step.fresh===t.id?' fresh':'');
+    /* in the box drawing the chip shows the trie itself rather than a name —
+       which is the point of the notation: it fits on one line             */
+    const nLeaves=leavesOf(t).length;
+    const body = (drawMode==='boxes'&&nLeaves<=9)
+        ? '<span class="mini">'+miniBox(t)+'</span>'
+        : '<span class="lab">'+(isLeaf(t)?disp(t.ch):'⟨'+trieLabel(t)+'⟩')+'</span>';
+    c.innerHTML='<span class="w">'+t.w+'</span>'+body;
+    v.appendChild(c);
+  });
+}
+
+function renderTable(step){
+  const v=document.getElementById('tblView');
+  if(model.dir==='dec'){
+    const ord=model.ord, k=step.canonRows||0;
+    let rows='';
+    ord.forEach((e,i)=>{
+      const pend=i>=k, hot=step.canonCur===e.ch||step.hdrCur===e.ch;
+      rows+='<tr class="'+(pend?'pending':'')+(hot?' hot':'')+'">'+
+            '<td class="ch">'+disp(e.ch)+'</td><td>'+e.len+'</td>'+
+            '<td class="cw">'+(pend?'':model.codeCanon[e.ch])+'</td></tr>';
+    });
+    v.innerHTML='<table class="tbl"><thead><tr><th>c</th><th>ℓ(c)</th>'+
+                '<th>E<sub>can</sub>(c)</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+                '<div style="font-size:.7rem;color:var(--dim);margin-top:6px">'+
+                'the weights are not transmitted — the decoder never learns them</div>';
+    return;
+  }
+  const ents=model.entries;
+  const counts=step.counts;
+  const maxW=Math.max(1,...ents.map(e=>e.w));
+  const useCanon = model.useCanon;
+  const showCanon = useCanon &&
+        (step.canonRows>0 || ['canon','header','encode','decode','done'].includes(step.phase));
+  let rows='';
+  for(const e of ents){
+    const w = counts ? (counts.get(e.ch)||0) : e.w;
+    const cw = step.code&&step.code[e.ch]!==undefined ? step.code[e.ch] : '';
+    const cc = showCanon ? (model.codeCanon[e.ch]||'') : '';
+    const hot = (step.codeRow===e.ch) || (step.canonCur===e.ch) || (step.hdrCur===e.ch) ||
+                (step.phase==='count'&&step.sIdx>=0&&model.text&&model.text[step.sIdx]===e.ch);
+    rows+='<tr class="'+(hot?'hot':'')+'"><td class="ch">'+disp(e.ch)+'</td>'+
+          '<td>'+w+' <span class="bar" style="width:'+(w/maxW*40)+'px"></span></td>'+
+          '<td>'+(cw?cw.length:'')+'</td>'+
+          '<td class="cw">'+cw+'</td>'+
+          (useCanon?'<td class="cw">'+cc+'</td>':'')+'</tr>';
+  }
+  const mark=t=>'<span style="color:var(--accent)">'+t+'</span>';
+  v.innerHTML='<table class="tbl"><thead><tr><th>c</th><th>w(c)</th><th>ℓ</th>'+
+              '<th>'+(useCanon?'E<sub>tree</sub>':'E(c)')+'</th>'+
+              (useCanon?'<th>'+mark('E<sub>can</sub>')+'</th>':'')+'</tr></thead>'+
+              '<tbody>'+rows+'</tbody></table>'+
+              (useCanon?'<div style="font-size:.7rem;color:var(--dim);margin-top:6px">'+
+                        'the canonical codewords are the ones being used</div>':'');
+}
+
+function renderCanon(step){
+  const box=document.getElementById('canonBox');
+  if(!model.useCanon&&model.dir!=='dec'){ box.style.display='none'; return; }
+  box.style.display='';
+  const started = step.canonRows>0 || ['canon','header','encode','decode','done'].includes(step.phase);
+  const tbl=document.getElementById('canonTbl');
+  const hf=document.getElementById('hdrFields');
+  const hb=document.getElementById('hdrBits');
+  const hs=document.getElementById('hdrSum');
+  if(!started){
+    tbl.innerHTML='<div style="font-size:.82rem;color:var(--dim);font-style:italic">'+
+                  'available once the code table has been read off the tree</div>';
+    hf.innerHTML=''; hb.innerHTML=''; hs.innerHTML='';
+    return;
+  }
+  const ord=model.ord, k=step.canonRows||ord.length;
+  /* --- length table, grouped by length --- */
+  let rows='', lastLen=null;
+  ord.forEach((e,i)=>{
+    if(e.len!==lastLen){
+      rows+='<tr><td colspan="4" class="lengroup">length '+e.len+'</td></tr>';
+      lastLen=e.len;
+    }
+    const pend=i>=k;
+    const hot=step.canonCur===e.ch||step.hdrCur===e.ch;
+    rows+='<tr class="'+(pend?'pending':'')+(hot?' hot':'')+'">'+
+          '<td class="ch">'+disp(e.ch)+'</td><td>'+e.len+'</td>'+
+          (model.codeTree?'<td class="cw">'+model.codeTree[e.ch]+'</td>':'')+
+          '<td class="cw">'+(pend?'<span style="color:var(--dim)">?</span>':model.codeCanon[e.ch])+'</td></tr>';
+  });
+  tbl.innerHTML='<table class="tbl"><thead><tr><th>c</th><th>ℓ(c)</th>'+
+                (model.codeTree?'<th>from the tree</th>':'')+
+                '<th>canonical</th></tr></thead><tbody>'+rows+'</tbody></table>';
+
+  /* --- header fields --- */
+  const H=model.header;
+  const shown = (step.phase==='header'||step.phase==='hparse') ? step.hdrFields
+              : (['encode','decode','done','canon'].includes(step.phase)&&model.dir==='dec')
+                  ? H.fields.length
+              : (['encode','decode','done'].includes(step.phase) ? H.fields.length : 0);
+  hf.innerHTML='';
+  H.fields.forEach((f,i)=>{
+    const d=document.createElement('span');
+    d.className='hfield '+f.kind+(i>=shown?' pending':'')+
+                ((f.ch&&f.ch===step.hdrCur&&i<shown)?' cur':'');
+    d.innerHTML='<span class="hb">'+f.bits+'</span><span class="hl">'+f.label+'</span>';
+    hf.appendChild(d);
+  });
+  hb.innerHTML='';
+  for(let j=0;j<H.bits.length;j++){
+    const emitted=j<H.fields.slice(0,shown).reduce((a,f)=>a+f.bits.length,0);
+    const sp=document.createElement('span');
+    sp.className='b'+(emitted?'':' done');
+    sp.style.opacity=emitted?1:0.25;
+    sp.textContent=H.bits[j]; hb.appendChild(sp);
+  }
+  if(model.dir==='dec'){
+    document.getElementById('hdrSum').innerHTML=
+      '<span class="k">|header| =</span> <span class="v">'+H.length+'</span> bits'+
+      ' &nbsp;·&nbsp; <span class="k">|body| =</span> <span class="v">'+model.body.length+'</span> bits'+
+      '<br><span class="note">the header alone determines every codeword; no tree was transmitted</span>';
+    return;
+  }
+  const n=model.text!==null?model.text.length:0;
+  const sigma=model.entries.length;
+  let sum='<span class="k">|header| =</span> <span class="v">'+H.length+'</span> bits'+
+          ' <span class="note">= 8 + 5 + '+sigma+'·('+H.cb+'+'+H.b+')</span>';
+  if(model.text!==null && ['encode','decode','done'].includes(step.phase)){
+    const body=model.bits.length, tot=H.length+body;
+    sum+='<br><span class="k">|body| =</span> <span class="v">'+body+'</span> bits'+
+         ' &nbsp;·&nbsp; <span class="k">total =</span> <span class="v">'+tot+'</span> bits';
+    if(sigma>1){
+      const den=n*lg(sigma);
+      sum+='<br><span class="k">ratio incl. header =</span> <span class="v">'+
+           fmt(tot/den*100,1)+'%</span> <span class="note">(body only: '+
+           fmt(body/den*100,1)+'%)</span>';
+      if(tot>den) sum+='<br><span class="note">the header dominates on such a short text — '+
+                       'this is why Huffman is used on long inputs</span>';
+    }
+  }
+  hs.innerHTML=sum;
+}
+
+function renderStats(step){
+  const v=document.getElementById('statsView');
+  if(model.dir==='dec'){
+    const H=model.header;
+    let h='<span class="k">σ =</span> <span class="v">'+H.sigma+'</span>'+
+          ' &nbsp;·&nbsp; <span class="k">b =</span> <span class="v">'+H.b+'</span> bits per length'+
+          '<br><span class="k">|C| =</span> <span class="v">'+model.bits.length+'</span> bits'+
+          ' <span class="note">= '+H.length+' header + '+model.body.length+' body</span><hr>';
+    if(step.phase==='hparse') h+='<span class="note">reading the header</span>';
+    else if(step.phase==='canon') h+='<span class="k">codewords rebuilt =</span> <span class="v">'+
+          step.canonRows+' of '+H.sigma+'</span>';
+    else h+='<span class="k">characters decoded =</span> <span class="v">'+
+          (step.decoded||'').length+'</span>'+
+          '<br><span class="k">bits consumed =</span> <span class="v">'+
+          (step.cIdx+1)+' of '+model.body.length+'</span>';
+    v.innerHTML=h; return;
+  }
+  const ents=model.entries, sigma=ents.length;
+  const phase=step.phase;
+  const counting = phase==='count';
+  /* during Pass 1 the totals reflect what has been counted so far */
+  const W = counting
+      ? [...(step.counts||new Map()).values()].reduce((a,b)=>a+b,0)
+      : ents.reduce((s2,e)=>s2+e.w,0);
+
+  let html='<span class="k">σ = |Σ<sub>S</sub>| =</span> <span class="v">'+
+           (counting?(step.counts?step.counts.size:0)+' so far':sigma)+'</span>';
+  if(model.text!==null) html+=' &nbsp;·&nbsp; <span class="k">n = |S| =</span> <span class="v">'+model.text.length+'</span>';
+  html+='<br><span class="k">'+(counting?'counted so far':'total weight W')+' =</span> <span class="v">'+W+'</span>';
+  html+='<hr>';
+
+  if(counting){
+    html+='<span class="note">the code does not exist yet</span>';
+    v.innerHTML=html; return;
+  }
+
+  /* H0 depends only on the weights, so it is available once Pass 1 is done */
+  html+='<span class="k">H<sub>0</sub> =</span> <span class="v">'+fmt(entropy0(ents),3)+'</span> bits/char';
+
+  /* l(E) only once every codeword has been read off the tree */
+  const codeComplete = step.code && ents.every(e=>step.code[e.ch]!==undefined);
+  if(!codeComplete){
+    html+='<br><span class="note">ℓ(E) once the code table is complete</span>';
+    v.innerHTML=html; return;
+  }
+  const H=entropy0(ents);
+  const lenSum=ents.reduce((s2,e)=>s2+e.w*model.code[e.ch].length,0);
+  const ell=W>0?lenSum/W:0;
+  html+='<br><span class="k">ℓ(E) = Σ w(c)·|E(c)| / W =</span> <span class="v">'+fmt(ell,3)+'</span> bits/char';
+  html+='<br><span class="note">H<sub>0</sub> ≤ ℓ(E) ≤ H<sub>0</sub>+1 &nbsp; '+
+        (H-1e-9<=ell&&ell<=H+1+1e-9?'✓':'✗')+'</span>';
+
+  /* |C| and the ratio only while Pass 2 is actually running */
+  if(model.text!==null){
+    const n=model.text.length, full=model.bits.length;
+    if(phase==='encode'){
+      html+='<hr><span class="k">|C| so far =</span> <span class="v">'+(step.bitsShown||0)+'</span> bits';
+      if(step.sIdx===n-1&&sigma>1){
+        const den=n*lg(sigma);
+        html+='<br><span class="k">ratio = |C| / (n·lg σ) =</span> <span class="v">'+
+              full+' / '+fmt(den,1)+' = '+fmt(full/den*100,1)+'%</span>';
+      }
+    } else if(phase==='decode'||phase==='done'){
+      html+='<hr><span class="k">|C| =</span> <span class="v">'+full+'</span> bits';
+      if(sigma>1){
+        const den=n*lg(sigma);
+        html+='<br><span class="k">ratio = |C| / (n·lg σ) =</span> <span class="v">'+
+              fmt(full/den*100,1)+'%</span>';
+      } else {
+        html+='<br><span class="note">ratio undefined for σ = 1 (lg σ = 0)</span>';
+      }
+    } else {
+      html+='<hr><span class="note">|C| once Pass 2 has run</span>';
+    }
+  }
+  v.innerHTML=html;
+}
+
+/* the complete coded text: code header, then the body */
+function renderFullC(step){
+  const box=document.getElementById('cFullBox');
+  const H=model.header;
+  const showIt = model.dir==='dec' ||
+                 (model.useCanon && ['encode','decode','done'].includes(step.phase));
+  if(!showIt){ box.style.display='none'; return; }
+  box.style.display='';
+  const body = model.dir==='dec' ? model.body : model.bits;
+  const consumed = model.dir==='dec'
+      ? (step.phase==='hparse'
+           ? H.fields.slice(0,step.hdrFields).reduce((a,f)=>a+f.bits.length,0)
+           : H.length + (step.cIdx+1))
+      : (step.phase==='encode' ? H.length + (step.bitsShown||0) : H.length+body.length);
+  const el2=document.getElementById('cFull');
+  el2.innerHTML='';
+  const all=H.bits+body;
+  for(let j=0;j<all.length;j++){
+    const sp=document.createElement('span');
+    sp.className=(j<H.length?'hb':'bb')+(j>=consumed?' todo':'')+(j===consumed-1?' cur':'');
+    sp.textContent=all[j];
+    el2.appendChild(sp);
+  }
+  document.getElementById('cFullMeta').textContent=
+    all.length+' bits = '+H.length+' header + '+body.length+' body';
+}
+
+function renderDecStrips(step){
+  const box=document.getElementById('stripBox');
+  box.style.display='';
+  document.getElementById('sMeta').textContent=
+    (step.decoded||'').length+' characters recovered so far';
+  const sS=document.getElementById('sStrip'); sS.innerHTML='';
+  const dec=[...(step.decoded||'')];
+  if(!dec.length){
+    sS.innerHTML='<span style="color:var(--dim);font-style:italic;font-size:.82rem">'+
+                 'nothing decoded yet</span>';
+  } else dec.forEach((ch,i)=>{
+    const c=document.createElement('span');
+    c.className='cell'+(i===dec.length-1&&step.phase==='decode'?' cur':'');
+    c.textContent=disp(ch); sS.appendChild(c);
+  });
+  const cS=document.getElementById('cStream'); cS.innerHTML='';
+  const body=model.body;
+  for(let j=0;j<body.length;j++){
+    const sp=document.createElement('span');
+    sp.className='b'+(j<step.cIdx?' done':j===step.cIdx?' cur':'');
+    if(j>step.cIdx) sp.style.opacity=.3;
+    sp.textContent=body[j]; cS.appendChild(sp);
+  }
+  document.getElementById('cMeta').textContent=
+    'body only, '+body.length+' bits — '+Math.max(0,step.cIdx+1)+' consumed';
+  renderFullC(step);
+}
+
+function renderStrips(step){
+  if(model.dir==='dec') return renderDecStrips(step);
+  const box=document.getElementById('stripBox');
+  if(model.text===null){
+    box.style.display='none';
+    document.getElementById('cFullBox').style.display='none';
+    document.getElementById('sStrip').innerHTML='';
+    document.getElementById('cStream').innerHTML='';   /* clear stale content */
+    return;
+  }
+  box.style.display='';
+  const text=model.text, code=step.code||model.code;
+
+  /* --- S --- */
+  const sS=document.getElementById('sStrip');
+  sS.innerHTML='';
+  const showBits = step.phase==='encode';
+  for(let i=0;i<text.length;i++){
+    const wrap=document.createElement('span');
+    wrap.className='bitgroup';
+    const c=document.createElement('span');
+    c.className='cell'+(step.sIdx===i?' cur':(step.sIdx>i&&(step.phase==='count'||step.phase==='encode')?' done':''));
+    c.textContent=disp(text[i]);
+    wrap.appendChild(c);
+    if(showBits&&step.sIdx>=i&&code&&code[text[i]]!==undefined){
+      const b=document.createElement('span'); b.className='bits'; b.textContent=code[text[i]];
+      wrap.appendChild(b);
+    }
+    sS.appendChild(wrap);
+  }
+  document.getElementById('sMeta').textContent=
+    text.length+' characters over σ = '+model.entries.length;
+
+  /* --- C --- */
+  const cS=document.getElementById('cStream');
+  cS.innerHTML='';
+  const bits=model.bits;
+  if(step.phase==='encode'){
+    const shown=step.bitsShown||0;
+    const curCw = step.sIdx>=0 ? (code[text[step.sIdx]]||'') : '';
+    const prev  = shown-curCw.length;   /* bits that were already there */
+    for(let j=0;j<shown;j++){
+      const s=document.createElement('span');
+      s.className='b'+(j>=prev?' fresh':'');
+      s.textContent=bits[j]; cS.appendChild(s);
+    }
+    document.getElementById('cMeta').textContent=shown+' of '+bits.length+' bits';
+  } else if(step.phase==='decode'||step.phase==='done'){
+    for(let j=0;j<bits.length;j++){
+      const s=document.createElement('span');
+      s.className='b'+(j<step.cIdx?' done':j===step.cIdx?' cur':'');
+      s.textContent=bits[j]; cS.appendChild(s);
+    }
+    const dec=document.createElement('div');
+    dec.style.cssText='margin-top:10px;font-size:.8rem;color:#8b8779';
+    dec.innerHTML='decoded so far: <span style="color:#46433a;letter-spacing:1px">'+
+      ([...(step.decoded||'')].map(disp).join('')||'—')+'</span>';
+    cS.appendChild(dec);
+    document.getElementById('cMeta').textContent=bits.length+' bits';
+  } else {
+    /* before Pass 2 there is no C yet — showing it here would give the answer away */
+    cS.innerHTML='<span style="color:var(--dim);font-style:italic;font-size:.82rem;letter-spacing:0">'+
+                 'C is empty until Pass 2</span>';
+    document.getElementById('cMeta').textContent='—';
+  }
+  renderFullC(step);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7.  Driver
+   ══════════════════════════════════════════════════════════════════════════ */
+const PHASE_LABELS={count:'Frequencies',pqinit:'Build tree',select:'Build tree',merge:'Build tree',
+  built:'Build tree',code:'Code table',canon:'Canonical',header:'Code header',
+  hparse:'Read header',encode:'Encode',decode:'Decode',done:'Decode'};
+
+function render(animate){
+  const step=steps[cur];
+  document.getElementById('statusText').innerHTML=step.msg;
+  document.getElementById('forestTitle').textContent=
+    (model.dir==='dec') ? (step.phase==='hparse'?'Nothing to draw yet — the code is still in the header'
+                                                :'Canonical code trie, rebuilt from the lengths')
+    : (step.phase==='canon'&&step.canonRows>0) ? 'Canonical code trie'
+    : (step.phase==='header') ? 'Canonical code trie'
+    : ((step.phase==='encode'||step.phase==='decode'||step.phase==='done')&&model.useCanon)
+        ? 'Canonical code trie'
+    : (step.phase!=='count'&&step.phase!=='pqinit'&&step.forest&&step.forest.length===1)
+        ? 'Huffman tree (code trie)' : 'Forest of tries';
+  document.getElementById('drawKey').style.display = drawMode==='boxes'?'':'none';
+  renderForest(step,animate);
+  const pqBox=document.getElementById('pqTitle').parentElement;
+  const pqLive = model.dir!=='dec' && !['canon','header'].includes(step.phase);
+  pqBox.style.display = pqLive ? '' : 'none';
+  if(pqLive) renderPQ(step);
+  renderTable(step); renderCanon(step); renderStats(step); renderStrips(step);
+  highlightCode(step.hi||{});
+  document.getElementById('stepSlider').value=cur;
+  document.getElementById('stepLabel').textContent=
+    'step '+(cur+1)+' / '+steps.length+'  ·  '+(PHASE_LABELS[step.phase]||'');
+  document.getElementById('btnPrev').disabled=cur===0;
+  document.getElementById('btnFirst').disabled=cur===0;
+  document.getElementById('btnNext').disabled=cur===steps.length-1;
+  document.getElementById('btnLast').disabled=cur===steps.length-1;
+  updatePhaseButtons();
+}
+function goto(i,animate){
+  if(animate===undefined) animate=document.getElementById('animToggle').checked;
+  cur=Math.max(0,Math.min(steps.length-1,i));
+  render(animate&&document.getElementById('animToggle').checked);
+}
+function stepBy(d){ stopPlay(); goto(cur+d,true); }
+
+let playTimer=null;
+function togglePlay(){ playTimer?stopPlay():startPlay(); }
+function startPlay(){
+  if(cur>=steps.length-1) cur=0;
+  document.getElementById('btnPlay').textContent='⏸ Pause';
+  const tick=()=>{
+    if(cur>=steps.length-1){ stopPlay(); return; }
+    goto(cur+1,true);
+    playTimer=setTimeout(tick, 620/speedFactor);
+  };
+  playTimer=setTimeout(tick,10);
+}
+function stopPlay(){ if(playTimer){clearTimeout(playTimer);playTimer=null;} document.getElementById('btnPlay').textContent='▶ Play'; }
+function setDraw(m){
+  if(drawMode===m) return;
+  drawMode=m;
+  document.getElementById('draw-tree').classList.toggle('on',m==='tree');
+  document.getElementById('draw-boxes').classList.toggle('on',m==='boxes');
+  document.getElementById('bitsChk').style.display = m==='boxes'?'':'none';
+  livePos={};                       /* the two drawings mean different things */
+  computeViewBox(steps);
+  render(false);
+}
+function setSpeed(v){
+  speedFactor=Math.pow(1.35,v-6);
+  document.getElementById('speedLabel').textContent=fmt(speedFactor,1)+'×';
+}
+
+function phaseStarts(){
+  const out=[];
+  const seen=new Set();
+  steps.forEach((s,i)=>{
+    const lab=PHASE_LABELS[s.phase];
+    if(lab&&!seen.has(lab)){ seen.add(lab); out.push({lab,i}); }
+  });
+  return out;
+}
+function buildPhaseButtons(){
+  const ps=phaseStarts();
+  const v=document.getElementById('phaseBtns'); v.innerHTML='';
+  ps.forEach(p=>{
+    const b=document.createElement('button');
+    b.className='phase'; b.textContent=p.lab; b.dataset.idx=p.i;
+    b.onclick=()=>{ stopPlay(); goto(p.i,false); };
+    v.appendChild(b);
+  });
+  /* the same phases as proportional markings under the slider */
+  const bar=document.getElementById('phaseBar'); bar.innerHTML='';
+  ps.forEach((p,k)=>{
+    const end=(k+1<ps.length)?ps[k+1].i:steps.length;
+    const seg=document.createElement('span');
+    seg.className='pseg';
+    seg.style.flexGrow=String(Math.max(1,end-p.i));
+    seg.textContent=p.lab;
+    seg.title=p.lab+' — steps '+(p.i+1)+'…'+end;
+    seg.onclick=()=>{ stopPlay(); goto(p.i,false); };
+    bar.appendChild(seg);
+  });
+}
+function updatePhaseButtons(){
+  const ps=phaseStarts();
+  const btns=document.getElementById('phaseBtns').children;
+  const segs=document.getElementById('phaseBar').children;
+  for(let k=0;k<ps.length;k++){
+    const start=ps[k].i, end=(k+1<ps.length)?ps[k+1].i:steps.length;
+    const on = cur>=start&&cur<end;
+    if(btns[k]) btns[k].classList.toggle('on',on);
+    if(segs[k]) segs[k].classList.toggle('on',on);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   8.  Input handling
+   ══════════════════════════════════════════════════════════════════════════ */
+const PRESETS={
+  'LOSSLESS  (the slide)':{mode:'text',v:'LOSSLESS'},
+  'E1 L2 O1 S4  (same, as weights)':{mode:'weights',v:'E 1\nL 2\nO 1\nS 4'},
+  'ABRACADABRA':{mode:'text',v:'ABRACADABRA'},
+  'alf eats alfalfa':{mode:'text',v:'alf eats alfalfa'},
+  'the quick brown fox':{mode:'text',v:'the quick brown fox jumps over the lazy dog'},
+  'MISSISSIPPI':{mode:'text',v:'MISSISSIPPI'},
+  'many ties  (A..H all weight 1)':{mode:'weights',v:'A 1\nB 1\nC 1\nD 1\nE 1\nF 1\nG 1\nH 1'},
+  'Fibonacci weights  (worst case: a path)':{mode:'weights',v:'A 1\nB 1\nC 2\nD 3\nE 5\nF 8\nG 13'},
+  'AAAA  (σ = 1, degenerate)':{mode:'text',v:'AAAA'},
+  'ABBCCCC  (small, good for decoding)':{mode:'text',v:'ABBCCCC'}
+};
+function initPresets(){
+  const sel=document.getElementById('presetSel');
+  for(const k in PRESETS){ const o=document.createElement('option'); o.value=k; o.textContent=k; sel.appendChild(o); }
+}
+function loadPreset(k){
+  const p=PRESETS[k]; if(!p) return;
+  document.getElementById('presetSel').value=k;
+  /* A weights preset carries no text; realise it as one character repeated
+     per unit of weight, which has exactly those frequencies.               */
+  let text=p.v;
+  if(p.mode==='weights'){
+    try{ text=parseWeights(p.v).map(e=>e.ch.repeat(e.w)).join(''); }
+    catch(e){ text=null; }
+  }
+  if(dir==='dec'){
+    if(text) putText(text);
+    return;
+  }
+  document.querySelector('input[name=mode][value='+p.mode+']').checked=true;
+  onModeChange();
+  if(p.mode==='text') document.getElementById('textInput').value=p.v;
+  else document.getElementById('weightsInput').value=p.v;
+  loadFromInput();
+}
+function onModeChange(){
+  const m=document.querySelector('input[name=mode]:checked').value;
+  document.getElementById('textMode').style.display = m==='text'?'':'none';
+  document.getElementById('weightsMode').style.display = m==='weights'?'':'none';
+}
+function parseWeights(src){
+  const ents=[]; const seen=new Set();
+  const lines=src.split('\n');
+  for(let i=0;i<lines.length;i++){
+    const L=lines[i].trim();
+    if(!L) continue;
+    const m=L.match(/^(\\s|\\\\|\S)\s+(\d+)$/);
+    if(!m) throw new Error('line '+(i+1)+': expected "character weight", got "'+L+'"');
+    let ch=m[1];
+    if(ch==='\\s') ch=' '; else if(ch==='\\\\') ch='\\';
+    if(seen.has(ch)) throw new Error('line '+(i+1)+': character "'+disp(ch)+'" appears twice');
+    seen.add(ch);
+    ents.push({ch,w:parseInt(m[2],10)});
+  }
+  if(!ents.length) throw new Error('no entries');
+  return ents.sort((a,b)=>a.ch<b.ch?-1:1);
+}
+let dir='enc', canonWasOn=false;
+function setDir(d){
+  const was=dir;
+  const text=currentText(was);
+  dir=d;
+  document.getElementById('mode-enc').classList.toggle('on',d==='enc');
+  document.getElementById('mode-dec').classList.toggle('on',d==='dec');
+  document.getElementById('inputKindRow').style.display = d==='dec'?'none':'';
+  document.getElementById('bitsMode').style.display = d==='dec'?'':'none';
+  document.getElementById('dirNote').innerHTML = d==='dec'
+    ? 'decoding always uses the canonical code — the header stores lengths only'
+    : '';
+  const ct=document.getElementById('canonToggle');
+  if(d==='dec'){
+    if(was!=='dec') canonWasOn=ct.checked;   /* remember, decoding forces it on */
+    ct.checked=true; ct.disabled=true;
+  } else {
+    ct.disabled=false;
+    if(was==='dec') ct.checked=canonWasOn;
+  }
+  if(d!=='enc') onModeChange();
+  if(text===null){ loadPreset(Object.keys(PRESETS)[0]); return; }
+  putText(text);
+}
+/* Read whatever is in the input box back as a plain source text. */
+function currentText(fromDir){
+  try{
+    if(fromDir==='dec'){
+      const bits=document.getElementById('bitsInput').value.replace(/\s+/g,'');
+      if(!/^[01]+$/.test(bits)) return null;
+      return buildDecodeSteps(bits).decoded || null;
+    }
+    const m=document.querySelector('input[name=mode]:checked').value;
+    if(m==='text'){
+      const t=document.getElementById('textInput').value;
+      return t.length?t:null;
+    }
+    /* weights carry no text, so realise them as one: c repeated w times */
+    const ents=parseWeights(document.getElementById('weightsInput').value);
+    const t=ents.map(e=>e.ch.repeat(e.w)).join('');
+    return t.length?t:null;
+  }catch(e){ return null; }
+}
+/* Write a source text into the input box in the form this view expects. */
+function putText(text){
+  if(dir==='dec'){
+    const ents=frequencies(text);
+    const code=codeOf(huffmanRun(ents).root);
+    document.getElementById('bitsInput').value=
+      buildHeader(code,ents).bits+encodeText(text,canonicalCode(code));
+  } else {
+    document.querySelector('input[name=mode][value=text]').checked=true;
+    onModeChange();
+    document.getElementById('textInput').value=text;
+  }
+  loadFromInput();
+}
+
+function loadFromInput(){
+  const err=document.getElementById('inputErr'); err.textContent='';
+  try{
+    if(dir==='dec'){
+      const bits=document.getElementById('bitsInput').value.replace(/\s+/g,'');
+      if(!bits.length) throw new Error('the coded text is empty');
+      if(!/^[01]+$/.test(bits)) throw new Error('the coded text may only contain 0s and 1s');
+      startDecode(bits);
+      return;
+    }
+    const m=document.querySelector('input[name=mode]:checked').value;
+    let text=null, ents;
+    if(m==='text'){
+      text=document.getElementById('textInput').value;
+      if(!text.length) throw new Error('the source text is empty');
+      ents=frequencies(text);
+    } else {
+      ents=parseWeights(document.getElementById('weightsInput').value);
+    }
+    start(text,ents);
+  }catch(e){ err.textContent=e.message; }
+}
+function startDecode(bits){
+  stopPlay(); _nid=0;
+  buildCodePanel(true);
+  model=buildDecodeSteps(bits);
+  steps=model.steps; livePos={};
+  document.getElementById('stepSlider').max=steps.length-1;
+  buildPhaseButtons();
+  computeViewBox(steps);
+  cur=0; render(false);
+}
+function start(text,ents){
+  stopPlay();
+  _nid=0;
+  const useCanon=document.getElementById('canonToggle').checked;
+  buildCodePanel(useCanon);
+  model=buildSteps(text,ents,useCanon);
+  model.dir='enc';
+  steps=model.steps;
+  livePos={};
+  document.getElementById('stepSlider').max=steps.length-1;
+  buildPhaseButtons();
+  computeViewBox(steps);
+  cur=0; render(false);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   9.  Self-tests
+   ══════════════════════════════════════════════════════════════════════════ */
+function runTests(){
+  const out=[]; let pass=0, fail=0;
+  const ok=(name,cond,detail)=>{
+    if(cond){pass++; out.push('<span class="t-pass">PASS</span>  '+name);}
+    else {fail++; out.push('<span class="t-fail">FAIL</span>  '+name+(detail?'\n         '+detail:''));}
+  };
+  const head=t=>out.push('<span class="t-head">'+t+'</span>');
+
+  /* ---- 1. the lecture example ---- */
+  head('1 — Lecture example  S = LOSSLESS');
+  {
+    const ents=frequencies('LOSSLESS');
+    const r=huffmanRun(ents), code=codeOf(r.root);
+    ok('frequencies E:1 L:2 O:1 S:4',
+       ents.map(e=>e.ch+':'+e.w).join(' ')==='E:1 L:2 O:1 S:4',
+       ents.map(e=>e.ch+':'+e.w).join(' '));
+    ok('E(E)=000',  code['E']==='000', 'got '+code['E']);
+    ok('E(O)=001',  code['O']==='001', 'got '+code['O']);
+    ok('E(L)=01',   code['L']==='01',  'got '+code['L']);
+    ok('E(S)=1',    code['S']==='1',   'got '+code['S']);
+    const bits=encodeText('LOSSLESS',code);
+    ok('C = 01001110100011', bits==='01001110100011', 'got '+bits);
+    ok('|C| = 14 bits', bits.length===14, 'got '+bits.length);
+    const ratio=bits.length/(8*lg(4));
+    ok('compression ratio = 14/16 = 87.5%', Math.abs(ratio-0.875)<1e-12, 'got '+ratio);
+    ok('root weight = 8', r.root.w===8, 'got '+r.root.w);
+    ok('merge order ⟨EO⟩, ⟨EOL⟩, ⟨EOLS⟩',
+       r.merges.map(m=>trieLabel(m.node)).join('|')==='EO|EOL|EOLS',
+       r.merges.map(m=>trieLabel(m.node)).join('|'));
+    ok('decode(encode(S)) = S', decodeBits(bits,r.root)==='LOSSLESS');
+  }
+
+  /* ---- 2. tie-breaking rules ---- */
+  head('2 — Tie-breaking rules');
+  {
+    /* rule 3: equal values -> smaller letter left */
+    const r=huffmanRun([{ch:'A',w:1},{ch:'B',w:1}]);
+    ok('rule 3: equal weights, A goes left', r.root.left.ch==='A', 'left is '+r.root.left.ch);
+    /* rule 2: different values -> lower-valued left */
+    const r2=huffmanRun([{ch:'A',w:5},{ch:'B',w:2}]);
+    ok('rule 2: lower-valued B goes left', r2.root.left.ch==='B', 'left is '+r2.root.left.ch);
+    /* rule 1: selection tie broken by smallest letter */
+    const r3=huffmanRun([{ch:'A',w:1},{ch:'B',w:1},{ch:'C',w:1},{ch:'D',w:9}]);
+    const first=r3.merges[0];
+    ok('rule 1: first merge takes A and B (not C)',
+       trieLabel(first.node)==='AB', 'merged '+trieLabel(first.node));
+    /* determinism */
+    const a=codeOf(huffmanRun(frequencies('the quick brown fox')).root);
+    const b=codeOf(huffmanRun(frequencies('the quick brown fox')).root);
+    ok('deterministic across runs', JSON.stringify(a)===JSON.stringify(b));
+  }
+
+  /* ---- 3. structural invariants over random inputs ---- */
+  head('3 — Invariants over 300 random inputs');
+  {
+    let prefixFree=true, kraft=true, mergeCount=true, roundTrip=true, entBound=true;
+    let bad='';
+    for(let t=0;t<300;t++){
+      const sigma=2+Math.floor(Math.random()*12);
+      const ents=[];
+      for(let i=0;i<sigma;i++) ents.push({ch:String.fromCharCode(65+i),w:1+Math.floor(Math.random()*20)});
+      const r=huffmanRun(ents), code=codeOf(r.root);
+      /* prefix-free */
+      const cws=Object.values(code);
+      for(let i=0;i<cws.length&&prefixFree;i++)
+        for(let j=0;j<cws.length;j++)
+          if(i!==j&&cws[j].startsWith(cws[i])){prefixFree=false;bad=cws[i]+' prefix of '+cws[j];break;}
+      /* Kraft equality (a Huffman trie is full) */
+      const k=cws.reduce((s,c)=>s+Math.pow(2,-c.length),0);
+      if(Math.abs(k-1)>1e-9){kraft=false;bad='Kraft sum '+k;}
+      /* number of merges */
+      if(r.merges.length!==sigma-1){mergeCount=false;bad='merges '+r.merges.length+' for σ='+sigma;}
+      /* round trip on a text drawn from that alphabet */
+      let s='';
+      for(let i=0;i<60;i++) s+=ents[Math.floor(Math.random()*sigma)].ch;
+      if(decodeBits(encodeText(s,code),r.root)!==s){roundTrip=false;bad='round trip';}
+      /* H <= l(E) <= H+1 */
+      const W=ents.reduce((a2,e)=>a2+e.w,0);
+      const ell=ents.reduce((a2,e)=>a2+e.w*code[e.ch].length,0)/W;
+      const H=entropy0(ents);
+      if(!(H-1e-9<=ell&&ell<=H+1+1e-9)){entBound=false;bad='H='+H+' l='+ell;}
+    }
+    ok('all codes prefix-free',prefixFree,bad);
+    ok('Kraft sum Σ2^-ℓ = 1 (full trie)',kraft,bad);
+    ok('exactly σ−1 merges',mergeCount,bad);
+    ok('decode(encode(S)) = S',roundTrip,bad);
+    ok('H₀ ≤ ℓ(E) ≤ H₀+1',entBound,bad);
+  }
+
+  /* ---- 4. optimality vs. brute force ---- */
+  head('4 — Optimality vs. brute force over all code tries (σ ≤ 7)');
+  {
+    /* all multisets of leaf depths of a full binary tree with m leaves */
+    const memo={};
+    function shapes(m){
+      if(memo[m]) return memo[m];
+      if(m===1) return memo[1]=[[0]];
+      const res=[], seen=new Set();
+      for(let i=1;i<m;i++)
+        for(const L of shapes(i))
+          for(const R of shapes(m-i)){
+            const d=L.map(x=>x+1).concat(R.map(x=>x+1)).sort((a,b)=>a-b);
+            const key=d.join(',');
+            if(!seen.has(key)){seen.add(key);res.push(d);}
+          }
+      return memo[m]=res;
+    }
+    function bruteOptimal(ws){
+      const m=ws.length;
+      if(m===1) return 0;
+      const sortedW=ws.slice().sort((a,b)=>b-a);   // heaviest first
+      let best=Infinity;
+      for(const d of shapes(m)){                    // depths ascending
+        let cost=0;
+        for(let i=0;i<m;i++) cost+=sortedW[i]*d[i]; // heaviest gets shallowest
+        best=Math.min(best,cost);
+      }
+      return best;
+    }
+    let allOk=true, bad='';
+    for(let t=0;t<180;t++){
+      const sigma=2+Math.floor(Math.random()*6);   // 2..7
+      const ents=[];
+      for(let i=0;i<sigma;i++) ents.push({ch:String.fromCharCode(65+i),w:1+Math.floor(Math.random()*15)});
+      const r=huffmanRun(ents), code=codeOf(r.root);
+      const huff=ents.reduce((s,e)=>s+e.w*code[e.ch].length,0);
+      const opt=bruteOptimal(ents.map(e=>e.w));
+      if(huff!==opt){allOk=false;bad='σ='+sigma+' w=['+ents.map(e=>e.w)+'] huffman='+huff+' optimal='+opt;break;}
+    }
+    ok('Huffman cost = brute-force optimum (180 random weight vectors)',allOk,bad);
+  }
+
+  /* ---- 4b. canonical codes and the header ---- */
+  head('4b — Canonical code and code header');
+  {
+    const ents=frequencies('LOSSLESS');
+    const r=huffmanRun(ents), code=codeOf(r.root), can=canonicalCode(code);
+    /* lecture example: lengths E:3 O:3 L:2 S:1 -> canonical S=0, L=10, E=110, O=111 */
+    ok('canonical E(S)=0',   can['S']==='0',   'got '+can['S']);
+    ok('canonical E(L)=10',  can['L']==='10',  'got '+can['L']);
+    ok('canonical E(E)=110', can['E']==='110', 'got '+can['E']);
+    ok('canonical E(O)=111', can['O']==='111', 'got '+can['O']);
+    ok('same |C| as the tree code',
+       encodeText('LOSSLESS',can).length===encodeText('LOSSLESS',code).length);
+
+    let lensOk=true, pfOk=true, kraftOk=true, roundOk=true, orderOk=true, bad='';
+    for(let t=0;t<300;t++){
+      const sigma=2+Math.floor(Math.random()*14), es=[];
+      for(let i=0;i<sigma;i++) es.push({ch:String.fromCharCode(65+i),w:1+Math.floor(Math.random()*25)});
+      const rr=huffmanRun(es), cd=codeOf(rr.root), cn=canonicalCode(cd);
+      for(const e of es) if(cn[e.ch].length!==cd[e.ch].length){lensOk=false;bad='length changed for '+e.ch;}
+      const cws=Object.values(cn);
+      for(let i=0;i<cws.length&&pfOk;i++) for(let j=0;j<cws.length;j++)
+        if(i!==j&&cws[j].startsWith(cws[i])){pfOk=false;bad=cws[i]+' prefix of '+cws[j];break;}
+      const kr=cws.reduce((a,c)=>a+Math.pow(2,-c.length),0);
+      if(Math.abs(kr-1)>1e-9){kraftOk=false;bad='Kraft '+kr;}
+      /* canonical order = numerically increasing codewords */
+      const ord=canonicalOrder(cd);
+      for(let i=0;i+1<ord.length;i++){
+        const a=cn[ord[i].ch], b=cn[ord[i+1].ch];
+        if(a.length===b.length && parseInt(b,2)!==parseInt(a,2)+1){orderOk=false;bad='not consecutive';}
+      }
+      /* the trie rebuilt from the canonical code decodes correctly */
+      _nid+=1000;
+      const root2=trieFromCode(cn,ch=>1);
+      let str='';
+      for(let i=0;i<40;i++) str+=es[Math.floor(Math.random()*sigma)].ch;
+      if(decodeBits(encodeText(str,cn),root2)!==str){roundOk=false;bad='canonical round trip';}
+    }
+    ok('canonical code preserves every codeword length',lensOk,bad);
+    ok('canonical code is prefix-free',pfOk,bad);
+    ok('canonical Kraft sum = 1',kraftOk,bad);
+    ok('equal-length codewords are consecutive integers',orderOk,bad);
+    ok('trie rebuilt from the canonical code decodes correctly',roundOk,bad);
+
+    /* header */
+    const H=buildHeader(code,ents);
+    ok('header bit count = 8 + 5 + σ·(cb+b)',
+       H.length===8+5+ents.length*(H.cb+H.b), 'got '+H.length);
+    ok('header bit string length matches fields',
+       H.bits.length===H.fields.reduce((a,f)=>a+f.bits.length,0));
+    ok('b is wide enough for the longest codeword',
+       H.Lmax < Math.pow(2,H.b), 'Lmax='+H.Lmax+' b='+H.b);
+    /* a decoder reading the header back must recover the canonical code */
+    const recovered=(function(){
+      let q=0;
+      const rd=k=>{const v=parseInt(H.bits.slice(q,q+k),2); q+=k; return v;};
+      const sg=rd(8)+1, bb=rd(5)+1, pairs=[];
+      for(let i=0;i<sg;i++){ const c=String.fromCharCode(rd(H.cb)); pairs.push({ch:c,len:rd(bb)}); }
+      const m={}; pairs.forEach(x=>m[x.ch]='x'.repeat(x.len));
+      return canonicalCode(m);
+    })();
+    ok('decoder rebuilds the canonical code from the header alone',
+       JSON.stringify(recovered)===JSON.stringify(can),
+       JSON.stringify(recovered));
+  }
+
+  /* ---- 4c. decoding from the coded text alone ---- */
+  head('4c — Decoding: header → canonical code → text');
+  {
+    const roundTrip=t=>{
+      const ents=frequencies(t);
+      const code=codeOf(huffmanRun(ents).root);
+      const bits=buildHeader(code,ents).bits+encodeText(t,canonicalCode(code));
+      return {bits,out:buildDecodeSteps(bits).decoded};
+    };
+    const r=roundTrip('LOSSLESS');
+    ok('LOSSLESS decodes back from its 67-bit coded text',
+       r.out==='LOSSLESS'&&r.bits.length===67, r.out+' / '+r.bits.length+' bits');
+    let allOK=true, bad='';
+    const corpus=['ABRACADABRA','MISSISSIPPI','alf eats alfalfa','A','AAAA','ABBCCCC',
+                  'the quick brown fox jumps over the lazy dog','aabbccddeeff'];
+    for(const t of corpus){
+      const q=roundTrip(t);
+      if(q.out!==t){ allOK=false; bad=JSON.stringify(t)+' -> '+JSON.stringify(q.out); break; }
+    }
+    ok('the whole corpus round-trips through header + body',allOK,bad);
+    let fuzzOK=true;
+    for(let i=0;i<200&&fuzzOK;i++){
+      const sig=1+Math.floor(Math.random()*8);
+      let t=''; const n=1+Math.floor(Math.random()*40);
+      for(let j=0;j<n;j++) t+=String.fromCharCode(65+Math.floor(Math.random()*sig));
+      if(roundTrip(t).out!==t){ fuzzOK=false; bad=t; }
+    }
+    ok('200 random texts round-trip',fuzzOK,bad);
+    ok('σ = 1 round-trips (the degenerate single-leaf trie)', roundTrip('AAAA').out==='AAAA');
+    /* the decoder must reject nonsense rather than produce garbage */
+    const rejects=(bits,why)=>{ try{ buildDecodeSteps(bits); return false; }catch(e){ return true; } };
+    ok('a truncated header is rejected', rejects('0101'));
+    ok('lengths that violate Kraft are rejected',
+       rejects('00000001'+'00001'+'01000001'+'0001'+'01000010'+'0001'+'0'));
+    /* the decoder learns the lengths only, never the weights */
+    const ents=frequencies('MISSISSIPPI');
+    const m=buildDecodeSteps(buildHeader(codeOf(huffmanRun(ents).root),ents).bits+
+                             encodeText('MISSISSIPPI',canonicalCode(codeOf(huffmanRun(ents).root))));
+    ok('the decoder carries no weights', m.entries.every(e=>e.w===0));
+    ok('the decoder rebuilds exactly the canonical code',
+       JSON.stringify(m.codeCanon)===JSON.stringify(canonicalCode(codeOf(huffmanRun(ents).root))));
+  }
+
+  /* ---- 5. edge cases ---- */
+  head('5 — Edge cases');
+  {
+    const r=huffmanRun([{ch:'A',w:4}]);
+    const code=codeOf(r.root);
+    ok('σ = 1: single leaf, no merge', r.merges.length===0&&isLeaf(r.root));
+    ok('σ = 1: codeword "0" assigned', code['A']==='0', 'got '+code['A']);
+    ok('σ = 1: decode round-trips', decodeBits(encodeText('AAAA',code),r.root)==='AAAA');
+    const rz=huffmanRun([{ch:'A',w:0},{ch:'B',w:0},{ch:'C',w:5}]);
+    ok('zero weights are handled', codeOf(rz.root)['C'].length>=1);
+    const sp=frequencies('a b');
+    ok('space is an ordinary character', sp.length===3&&sp[0].ch===' ');
+  }
+
+  /* ---- 6. step sequence integrity ---- */
+  head('6 — Step sequence');
+  {
+    const saveNid=_nid;
+    const m=buildSteps('LOSSLESS',frequencies('LOSSLESS'),false);
+    const merges=m.steps.filter(s=>s.phase==='merge').length;
+    const selects=m.steps.filter(s=>s.phase==='select').length;
+    ok('3 select steps and 3 merge steps for σ=4', merges===3&&selects===3, merges+'/'+selects);
+    ok('every step has a message', m.steps.every(s=>s.msg&&s.msg.length>0));
+    ok('every step after counting has a forest',
+       m.steps.filter(s=>s.phase!=='count').every(s=>s.forest&&s.forest.length>0));
+    ok('final forest is a single trie',
+       m.steps[m.steps.length-1].forest.length===1);
+    ok('count steps = |S| + 1', m.steps.filter(s=>s.phase==='count').length===9,
+       String(m.steps.filter(s=>s.phase==='count').length));
+    ok('encode steps = |S| + 1', m.steps.filter(s=>s.phase==='encode').length===9,
+       String(m.steps.filter(s=>s.phase==='encode').length));
+    ok('decode ends with the original text',
+       m.steps[m.steps.length-1].decoded==='LOSSLESS', m.steps[m.steps.length-1].decoded);
+    /* layout sanity: no NaN, leaves never overlap within a snapshot */
+    let layoutOk=true, bad='';
+    for(const s of m.steps){
+      if(!s.forest||!s.forest.length) continue;
+      const L=layoutForest(s.forest);
+      const xs=[];
+      for(const id in L.pos){
+        const p=L.pos[id];
+        if(!isFinite(p.x)||!isFinite(p.y)){layoutOk=false;bad='NaN position';}
+      }
+      for(const t of s.forest) leavesOf(t).forEach(n=>xs.push(L.pos[n.id].x));
+      xs.sort((a,b)=>a-b);
+      for(let i=0;i+1<xs.length;i++) if(xs[i+1]-xs[i]<LEAF_W-1e-6){layoutOk=false;bad='leaves overlap';}
+    }
+    ok('layout well-formed, no overlapping leaves',layoutOk,bad);
+    /* the nested-box drawing must be a faithful alternative rendering */
+    let boxOk=true; bad='';
+    for(const st of m.steps){
+      if(!st.forest||!st.forest.length) continue;
+      const L=layoutBoxes(st.forest), P=L.pos;
+      const walk=n=>{
+        const b=P[n.id];
+        if(!isFinite(b.x)||!isFinite(b.w)){ boxOk=false; bad='NaN geometry'; return; }
+        if(n.left&&n.right){
+          const l=P[n.left.id], r=P[n.right.id];
+          if(Math.abs(l.x+l.w+SIBGAP-r.x)>1e-6){ boxOk=false; bad='sibling gap wrong'; }
+          if(Math.abs(b.w-(l.w+r.w+SIBGAP+2*BP))>1e-6){ boxOk=false; bad='parent width wrong'; }
+          if(Math.abs(l.h-r.h)>1e-6){ boxOk=false; bad='siblings differ in height'; }
+          if(!(l.x>=b.x&&r.x+r.w<=b.x+b.w+1e-6)){ boxOk=false; bad='child outside parent'; }
+        }
+        if(n.left) walk(n.left);
+        if(n.right) walk(n.right);
+      };
+      for(const t of st.forest) walk(t);
+      /* the tries of the forest must not run into each other */
+      for(let a=0;a<st.forest.length;a++)
+        for(let b2=a+1;b2<st.forest.length;b2++){
+          const A=P[st.forest[a].id], B=P[st.forest[b2].id];
+          if(A.x<B.x+B.w&&B.x<A.x+A.w){ boxOk=false; bad='tries overlap'; }
+        }
+    }
+    ok('nested-box drawing: children nested, 0-box left of 1-box, no overlaps',boxOk,bad);
+    ok('the box drawing is flatter than the tree',
+       layoutBoxes([mRoot()]).height < layoutForest([mRoot()]).height);
+    function mRoot(){ return m.steps[m.steps.length-1].forest[0]; }
+    ok('encode steps never highlight a trie path (table lookup only)',
+       m.steps.filter(s=>s.phase==='encode').every(s=>!s.path));
+    ok('decode steps do walk the trie',
+       m.steps.filter(s=>s.phase==='decode'&&s.cIdx>=0).every(s=>s.path&&s.path.length>0));
+    const mc=buildSteps('LOSSLESS',frequencies('LOSSLESS'),true);
+    ok('canonical strand absent when the switch is off',
+       m.steps.every(s=>s.phase!=='canon'&&s.phase!=='header'));
+    ok('canonical phase present when on, σ+2 steps',
+       mc.steps.filter(s=>s.phase==='canon').length===4+2,
+       String(mc.steps.filter(s=>s.phase==='canon').length));
+    ok('header phase emits every field',
+       mc.steps.filter(s=>s.phase==='header').pop().hdrFields===mc.header.fields.length);
+    ok('canonical mode encodes with the canonical codewords',
+       mc.bits===encodeText('LOSSLESS',mc.codeCanon));
+    ok('canonical mode still round-trips',
+       mc.steps[mc.steps.length-1].decoded==='LOSSLESS',
+       mc.steps[mc.steps.length-1].decoded);
+    ok('canonical mode has the same |C|', mc.bits.length===m.bits.length);
+    /* suspense: nothing before the code phase may carry a complete code table */
+    const early=m.steps.filter(s=>['count','pqinit','select','merge','built'].includes(s.phase));
+    ok('no step before the code phase exposes the finished code',
+       early.every(s=>!s.code));
+    _nid=saveNid;
+  }
+
+  out.push('');
+  out.push('<span class="'+(fail===0?'t-pass':'t-fail')+'">'+pass+' passed, '+fail+' failed</span>');
+  document.getElementById('test-out').innerHTML=out.join('\n');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   10.  Boot
+   ══════════════════════════════════════════════════════════════════════════ */
+initPresets();
+buildCodePanel(false);
+setSpeed(6);
+document.getElementById('mode-enc').classList.add('on');
+loadFromInput();
+window.addEventListener('resize',()=>{ if(model){ computeViewBox(steps); render(false); } });
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
+  if(e.key==='ArrowRight'){e.preventDefault();stepBy(1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stepBy(-1);}
+  else if(e.key===' '){e.preventDefault();togglePlay();}
+});
+</script>
+</body>
+</html>

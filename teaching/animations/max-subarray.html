@@ -1,0 +1,1903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maximum Subarray — Animated</title>
+<style>
+    :root {
+        --bg: #f5ebd9;
+        --panel: #faf6ed;
+        --panel-border: #d4c5b4;
+        --controls-bg: #ecddc5;
+        --controls-border: #d4c5b4;
+        --ink: #6b675c;
+        --ink-strong: #46433a;
+        --title-muted: #8b8779;
+        --btn: #faf6ed;
+        --btn-border: #b9a793;
+        --btn-border-hover: #9c866d;
+
+        --bar: #c2b393;          /* plain array entry */
+        --bar-border: #a2937a;
+        --bar-neg: #d9cab0;
+        --window: #f0d9cd;       /* current subarray window */
+        --window-border: #c28577;
+        --acc: #902015;          /* summed into t so far */
+        --acc-light: #c28577;
+        --active: #cc2f22;
+        --best: #1b6b45;         /* best-so-far / witness */
+        --grid: #d4c5b4;
+
+        --c-brute:  #6d180f;
+        --c-reuse:  #b07d18;
+        --c-dc:     #3f7d86;
+        --c-kadane: #1b6b45;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        background-color: var(--bg);
+        color: var(--ink);
+        font-family: var(--wi-font-body)"Segoe UI", Roboto, sans-serif;
+        margin: 0;
+        padding: 22px 26px 60px;
+        min-height: 100vh;
+    }
+
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 4px; letter-spacing: .3px; color: var(--ink-strong); }
+    .subtitle { font-size: .92rem; color: var(--title-muted); margin: 0 0 18px; max-width: 1000px; line-height: 1.5; }
+    .subtitle code, code.inl { background: #ecddc5; padding: 1px 6px; border-radius: 3px; font-size: .88em; }
+
+    /* ---- tabs ---- */
+    .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab {
+        background: #ecddc5; border: 1px solid var(--controls-border); border-bottom-color: transparent;
+        color: var(--ink-strong); padding: 9px 20px; border-radius: 6px 6px 0 0; cursor: pointer;
+        font-size: .92rem; font-weight: 600; font-family: inherit;
+    }
+    .tab.on { background: var(--panel); border-color: var(--panel-border); color: #902015; }
+
+    /* ---- controls ---- */
+    .controls {
+        display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
+        background-color: var(--controls-bg); padding: 13px 20px; border-radius: 6px;
+        border: 1px solid var(--controls-border); margin-bottom: 18px;
+    }
+    .ctl-group { display: flex; align-items: center; gap: 9px; }
+    .ctl-group label, .cap {
+        font-size: .82rem; color: var(--ink-strong); font-weight: 600;
+        text-transform: uppercase; letter-spacing: .6px;
+    }
+    .btn-group { display: flex; gap: 8px; }
+
+    button, select, input[type="number"], input[type="text"] {
+        background-color: var(--btn); color: var(--ink-strong); border: 1px solid var(--btn-border);
+        padding: 7px 14px; font-size: .9rem; border-radius: 4px; cursor: pointer;
+        transition: background .15s, border-color .15s; font-weight: 500; font-family: inherit;
+    }
+    input[type="number"], input[type="text"] { cursor: text; font-variant-numeric: tabular-nums; }
+    button:hover:not(:disabled), select:hover { background-color: #fcf9f3; border-color: var(--btn-border-hover); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    button.primary { background-color: #f0d9cd; border-color: #c28577; }
+    button.primary:hover:not(:disabled) { background-color: #fcf9f3; }
+
+    input[type="range"] { accent-color: #cc2f22; cursor: pointer; vertical-align: middle; }
+    .slider-group { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: #46433a; }
+    .slider-group span.val { min-width: 46px; font-variant-numeric: tabular-nums; }
+
+    .switch { position: relative; display: inline-block; width: 42px; height: 23px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; cursor: pointer; inset: 0; background: #d4c5b4; border: 1px solid #b9a793; border-radius: 23px; transition: .2s; }
+    .switch .track:before { content: ""; position: absolute; height: 17px; width: 17px; left: 3px; top: 2px; background: #faf6ed; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .track { background: #6d180f; border-color: #7c2f25; }
+    .switch input:checked + .track:before { transform: translateX(19px); }
+
+    /* ---- panels ---- */
+    .sim-box {
+        background-color: var(--panel); border: 1px solid var(--panel-border); border-radius: 6px;
+        padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,.04);
+    }
+    .sim-title {
+        font-size: .8rem; text-transform: uppercase; letter-spacing: 1px;
+        color: var(--title-muted); margin: 0 0 12px; font-weight: 700;
+    }
+    .stage { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(340px,.95fr); gap: 18px; align-items: start; }
+    @media (max-width: 1050px) { .stage { grid-template-columns: 1fr; } }
+    .side { display: flex; flex-direction: column; gap: 16px; }
+
+    .status {
+        background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 5px;
+        padding: 11px 14px; font-size: .95rem; color: var(--ink-strong); min-height: 66px;
+        display: flex; align-items: center; line-height: 1.45;
+    }
+    .status b { color: #902015; }
+
+    /* ---- code panel ---- */
+    .code { font-family: "SF Mono", var(--wi-font-mono); font-size: .84rem; line-height: 1.55; }
+    .code .ln { display: flex; gap: 10px; padding: 0 6px; border-radius: 3px; white-space: pre; }
+    .code .ln .no { color: #b9a793; min-width: 18px; text-align: right; user-select: none; }
+    .code .ln.hi { background: #f0d9cd; }
+    .code .ln.hi .no { color: #6d180f; font-weight: 700; }
+    .code .cm { color: #a2937a; font-style: italic; }
+    .code sub { font-size: .72em; }
+
+    /* ---- variable readout ---- */
+    .vars { display: flex; flex-wrap: wrap; gap: 8px 10px; font-size: .88rem; }
+    .var {
+        background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 4px;
+        padding: 4px 9px; font-variant-numeric: tabular-nums;
+    }
+    .var i { color: var(--title-muted); font-style: normal; font-weight: 600; }
+    .var.hot { background: #fcf9f3; border-color: var(--active); }
+    .var.best-v { border-color: var(--best); }
+
+    table.cost { width: 100%; border-collapse: collapse; font-size: .86rem; font-variant-numeric: tabular-nums; }
+    table.cost td { padding: 4px 2px; border-bottom: 1px dashed #ecddc5; }
+    table.cost td:last-child { text-align: right; font-weight: 600; color: var(--ink-strong); }
+    table.cost tr:last-child td { border-bottom: none; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: .78rem; color: var(--ink); margin-top: 10px; }
+    .legend .item { display: flex; align-items: center; gap: 6px; }
+    .swatch { width: 15px; height: 15px; border-radius: 3px; border: 1.5px solid; }
+
+    svg.view { display: block; width: 100%; background: var(--bg); border-radius: 4px; }
+    svg text { font-family: var(--wi-font-body)"Segoe UI", Roboto, sans-serif; }
+    .mv { transition: transform .18s ease, x .18s ease, width .18s ease, opacity .18s ease; }
+
+    /* ---- plots ---- */
+    .plots { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 900px) { .plots { grid-template-columns: 1fr; } }
+    canvas.plot { display: block; width: 100%; height: 320px; background: var(--bg); border-radius: 4px; }
+
+    /* ---- race ---- */
+    .npresets { display: flex; flex-wrap: wrap; gap: 5px; }
+    .npresets button { padding: 4px 9px; font-size: .78rem; font-variant-numeric: tabular-nums; }
+    .npresets button.on { background: #902015; border-color: #470e0a; color: #faf6ed; }
+    canvas.strip { display: block; width: 100%; height: 76px; background: var(--bg); border-radius: 4px; }
+    .lane2 { padding: 9px 0 4px; border-bottom: 1px dashed #ecddc5; }
+    .lane2:last-child { border-bottom: none; }
+    .lane2.off { opacity: .32; }
+    .lhead { display: grid; grid-template-columns: 22px 210px 1fr 250px; align-items: center; gap: 12px; }
+    @media (max-width: 900px) { .lhead { grid-template-columns: 22px 1fr; } .lhead .tbar, .lhead .res { grid-column: 1 / -1; } }
+    .lhead .nm { font-size: .88rem; font-weight: 600; color: var(--ink-strong); }
+    .lhead .nm .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; }
+    .lhead .nm .sub { color: var(--title-muted); font-weight: 500; }
+    .tbar { position: relative; height: 22px; background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 11px; overflow: hidden; }
+    .tbar .tfill { position: absolute; inset: 0 auto 0 0; width: 0; opacity: .34; border-radius: 11px; transition: width .1s linear; }
+    .tbar .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: #d4c5b4; }
+    .tbar .tlab { position: absolute; bottom: 1px; font-size: .6rem; color: #b9a793; transform: translateX(2px); }
+    .tbar .tval { position: absolute; right: 8px; top: 3px; font-size: .74rem; font-variant-numeric: tabular-nums; color: var(--ink-strong); font-weight: 700; }
+    .lane2 .res { font-size: .82rem; font-variant-numeric: tabular-nums; color: var(--title-muted); text-align: right; }
+    .lane2.fin .res { color: var(--ink-strong); font-weight: 600; }
+    canvas.lstrip { display: block; width: 100%; height: 46px; margin-top: 6px; background: var(--bg); border-radius: 3px; }
+    .lane {
+        display: grid; grid-template-columns: 24px 200px 1fr 130px; align-items: center; gap: 10px;
+        padding: 7px 0; border-bottom: 1px dashed #ecddc5;
+    }
+    .lane:last-child { border-bottom: none; }
+    .lane .nm { font-size: .88rem; font-weight: 600; color: var(--ink-strong); }
+    .lane .nm .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; }
+    .track2 { position: relative; height: 30px; background: #ecddc5; border: 1px solid var(--panel-border); border-radius: 15px; overflow: hidden; }
+    .track2 .fill { position: absolute; inset: 0 auto 0 0; opacity: .28; border-radius: 15px; }
+    .runner { position: absolute; top: 2px; font-size: 20px; line-height: 26px;
+              transform: translateX(-50%) scaleX(-1); transition: left .12s linear; }
+    .lane .ct { font-size: .82rem; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+    .lane.done .ct { color: var(--best); font-weight: 700; }
+    .lane.off { opacity: .35; }
+
+    .podium { display: flex; align-items: flex-end; justify-content: center; gap: 14px; min-height: 210px; margin-top: 8px; }
+    .pod-col { display: flex; flex-direction: column; align-items: center; width: 150px; }
+    .pod-block {
+        width: 100%; background: #ecddc5; border: 1px solid var(--controls-border);
+        border-radius: 5px 5px 0 0; display: flex; align-items: flex-start; justify-content: center;
+        color: var(--title-muted); font-weight: 700; font-size: 1.1rem; padding-top: 6px;
+    }
+    .pod-occ { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 4px; transition: opacity .3s; }
+    .pod-occ .medal { font-size: 22px; }
+    .pod-occ .who { font-size: .78rem; font-weight: 700; text-align: center; line-height: 1.2; }
+    .pod-occ .tm { font-size: .72rem; color: var(--title-muted); font-variant-numeric: tabular-nums; }
+
+    details.editor { margin-top: 22px; }
+    details.editor summary { cursor: pointer; font-size: .85rem; color: var(--title-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
+    .editor-body { margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    textarea {
+        font-family: "SF Mono", var(--wi-font-mono); font-size: .85rem;
+        background: var(--panel); color: var(--ink-strong); border: 1px solid var(--panel-border);
+        border-radius: 5px; padding: 10px; width: 340px; height: 120px; resize: vertical;
+    }
+    .editor-help { font-size: .82rem; color: var(--ink); max-width: 520px; line-height: 1.5; }
+    .err { color: #6d180f; font-weight: 600; font-size: .82rem; min-height: 18px; }
+    .note { font-size: .8rem; color: var(--title-muted); line-height: 1.5; margin-top: 10px; }
+    .hidden { display: none !important; }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<h1>Maximum Subarray</h1>
+<p class="subtitle">
+    Four algorithms for <code>max { A[i] + … + A[j−1] : 0 ≤ i ≤ j ≤ n }</code> on the same input:
+    brute force, reusing sums, divide &amp; conquer, and the linear sweep.
+    Step through them one operation at a time, measure them, or race them against each other.
+    The cost measure throughout is the <b>number of additions</b>.
+</p>
+
+<div class="tabs">
+    <button class="tab on" id="tab-step"    onclick="setMode('step')">Step through</button>
+    <button class="tab"    id="tab-measure" onclick="setMode('measure')">Measure &amp; plot</button>
+    <button class="tab"    id="tab-race"    onclick="setMode('race')">Race</button>
+</div>
+
+<!-- ==================================================================== STEP -->
+<div id="panel-step">
+    <div class="controls">
+        <div class="ctl-group">
+            <label for="algSel">Algorithm</label>
+            <select id="algSel" onchange="onAlgChange()"></select>
+        </div>
+        <div class="ctl-group">
+            <label for="presetSel">Input</label>
+            <select id="presetSel" onchange="onPreset()"></select>
+        </div>
+        <div class="btn-group">
+            <button id="backBtn" onclick="stepBack()">‹ Back</button>
+            <button id="stepBtn" class="primary" onclick="stepFwd()">Step ›</button>
+            <button id="playBtn" onclick="togglePlay()">Play</button>
+            <button onclick="resetRun()">Reset</button>
+        </div>
+        <div class="slider-group">
+            <span class="cap">Delay</span>
+            <input type="range" id="speedSlider" min="0" max="900" value="260" oninput="updateSpeed(this.value)">
+            <span class="val" id="speedVal">260ms</span>
+        </div>
+        <div class="ctl-group">
+            <label for="witnessToggle">Show (i,j)</label>
+            <label class="switch"><input type="checkbox" id="witnessToggle" onchange="render()"><span class="track"></span></label>
+        </div>
+    </div>
+
+    <div class="controls" style="margin-top:-8px">
+        <div class="slider-group" style="flex:1;min-width:340px">
+            <span class="cap">Step</span>
+            <input type="range" id="frameSlider" min="0" max="0" value="0" style="flex:1" oninput="gotoFrame(+this.value)">
+            <span class="val" id="frameVal" style="min-width:96px">0 / 0</span>
+        </div>
+    </div>
+
+    <div class="stage">
+        <div class="sim-box">
+            <div class="sim-title">Array A[0..n) &nbsp;·&nbsp; state of the algorithm</div>
+            <svg id="view" class="view" viewBox="0 0 900 460" preserveAspectRatio="xMidYMid meet"></svg>
+            <div class="legend" id="legend"></div>
+        </div>
+        <div class="side">
+            <div class="sim-box">
+                <div class="sim-title">Status</div>
+                <div class="status"><span id="statusText">Press <b>&nbsp;Step&nbsp;</b> or <b>&nbsp;Play&nbsp;</b> to begin.</span></div>
+            </div>
+            <div class="sim-box">
+                <div class="sim-title">Variables</div>
+                <div class="vars" id="varsView"></div>
+            </div>
+            <div class="sim-box">
+                <div class="sim-title">Pseudocode</div>
+                <div class="code" id="codeView"></div>
+            </div>
+            <div class="sim-box">
+                <div class="sim-title">Cost &nbsp;·&nbsp; additions</div>
+                <table class="cost" id="costView"></table>
+            </div>
+        </div>
+    </div>
+
+    <details class="editor">
+        <summary>Edit / paste an input</summary>
+        <div class="editor-body">
+            <textarea id="inputText" spellcheck="false"></textarea>
+            <div>
+                <button class="primary" onclick="loadFromText()">Load this array</button>
+                <button onclick="randomInput()">Random</button>
+                <div class="err" id="parseErr"></div>
+                <div class="editor-help" style="margin-top:10px">
+                    <b>Format:</b> whitespace- or comma-separated integers, one array. Comments after <code>#</code>
+                    are ignored, so a preset can carry a caption. Example:
+                    <code>31 -41 59 26 -53 58 97 -93 -23 84</code>.
+                    <br><br>
+                    Stepping is meant for small inputs — the brute-force trace has
+                    <code>n(n+1)(n+2)/6</code> additions, so <code>n = 30</code> already means about 5000 of them.
+                    Traces are cut off after 40 000 steps; for anything bigger, use the measure and race tabs.
+                </div>
+            </div>
+        </div>
+    </details>
+</div>
+
+<!-- ================================================================= MEASURE -->
+<div id="panel-measure" class="hidden">
+    <div class="controls">
+        <div class="ctl-group">
+            <label for="mAlgSel">Algorithm</label>
+            <select id="mAlgSel"></select>
+        </div>
+        <div class="ctl-group">
+            <label for="mN">n</label>
+            <input type="number" id="mN" value="200" min="1" max="4000" style="width:92px">
+        </div>
+        <div class="btn-group">
+            <button class="primary" onclick="measureOnce()">Run once</button>
+        </div>
+        <div class="ctl-group">
+            <label>Bulk</label>
+            <input type="number" id="mFrom" value="1" min="1" max="4000" style="width:74px" title="smallest n">
+            <span style="color:var(--title-muted)">…</span>
+            <input type="number" id="mTo" value="300" min="1" max="4000" style="width:74px" title="largest n">
+            <span style="color:var(--title-muted)">×</span>
+            <input type="number" id="mReps" value="1" min="1" max="20" style="width:60px" title="random inputs per n">
+        </div>
+        <div class="btn-group">
+            <button class="primary" id="bulkBtn" onclick="toggleBulk()">Run bulk</button>
+            <button onclick="clearPlots()">Clear plot</button>
+        </div>
+        <div class="ctl-group">
+            <label for="analysisToggle">Analysis</label>
+            <label class="switch"><input type="checkbox" id="analysisToggle" checked onchange="drawPlots()"><span class="track"></span></label>
+        </div>
+        <div class="ctl-group">
+            <label for="logToggle">log–log</label>
+            <label class="switch"><input type="checkbox" id="logToggle" onchange="drawPlots()"><span class="track"></span></label>
+        </div>
+    </div>
+
+    <div class="plots">
+        <div class="sim-box">
+            <div class="sim-title">Abstract cost &nbsp;·&nbsp; number of additions</div>
+            <canvas id="costPlot" class="plot"></canvas>
+            <div class="note" id="costNote"></div>
+        </div>
+        <div class="sim-box">
+            <div class="sim-title">Measured running time &nbsp;·&nbsp; ms per run</div>
+            <canvas id="timePlot" class="plot"></canvas>
+            <div class="note" id="timeNote"></div>
+        </div>
+    </div>
+
+    <div class="sim-box" style="margin-top:18px">
+        <div class="sim-title">Last run</div>
+        <div class="vars" id="mVars"></div>
+        <div class="note">
+            Every point is one execution on one input. Points stay on the plot, so runs accumulate into a curve;
+            colours distinguish the algorithms. Short runs are repeated automatically until they take a few
+            milliseconds, and the reported time is the average of those repetitions — otherwise the clock is
+            too coarse for small <i>n</i>.
+            <br><br>
+            <b>Worth noticing:</b> all four algorithms perform a number of additions that depends on <i>n</i> alone,
+            never on the values in the array. So for this cost measure, worst case = best case = average case,
+            and the left plot is a clean function of <i>n</i>. The scatter you see on the right is measurement
+            noise (and cache behaviour), not input-dependence.
+        </div>
+    </div>
+</div>
+
+<!-- ==================================================================== RACE -->
+<div id="panel-race" class="hidden">
+    <div class="controls">
+        <div class="ctl-group">
+            <label for="rN">n</label>
+            <input type="number" id="rN" value="1200" min="1" max="50000000" style="width:118px">
+            <button onclick="newRace()">New input</button>
+        </div>
+        <div class="ctl-group">
+            <label for="modeSel">Mode</label>
+            <select id="modeSel" onchange="onModeChange()">
+                <option value="workers">parallel — one worker thread each</option>
+                <option value="sliced">time-sliced — one thread, interleaved</option>
+            </select>
+        </div>
+        <div class="ctl-group">
+            <label for="spoilTog">Show costs</label>
+            <label class="switch"><input type="checkbox" id="spoilTog" onchange="raceRedraw()"><span class="track"></span></label>
+        </div>
+        <div class="btn-group">
+            <button class="primary" id="raceBtn" onclick="startRace()">Start</button>
+            <button id="stopBtn" onclick="stopRace()" disabled>Stop</button>
+        </div>
+    </div>
+
+    <div class="controls" style="margin-top:-8px">
+        <span class="cap">n =</span>
+        <div class="npresets" id="nPresets"></div>
+    </div>
+
+    <div class="sim-box">
+        <div class="sim-title">The input &nbsp;·&nbsp; <span id="inputCap"></span></div>
+        <canvas id="inputStrip" class="strip"></canvas>
+    </div>
+
+    <div class="sim-box" style="margin-top:18px">
+        <div class="sim-title">Contenders &nbsp;·&nbsp; each lane shows the best candidate found so far</div>
+        <div id="lanes"></div>
+        <div class="note" id="raceNote"></div>
+    </div>
+
+    <div class="sim-box" style="margin-top:18px">
+        <div class="sim-title">Podium</div>
+        <div class="podium" id="podium"></div>
+    </div>
+</div>
+
+<script>
+/* ======================================================================
+   input
+   ====================================================================== */
+const PRESETS = {
+    "Mixed signs (10)":            "31 -41 59 26 -53 58 97 -93 -23 84",
+    "Best block in the middle (12)":"3 -2 -6 4 -1 8 -2 5 -7 2 3 -4",
+    "All positive (8)":            "4 1 7 2 9 3 6 5",
+    "All negative (7)":            "-3 -1 -7 -2 -9 -4 -6",
+    "One big spike (9)":           "-2 -3 -1 12 -4 -2 -5 -1 -3",
+    "Alternating (12)":            "5 -5 5 -5 5 -5 5 -5 5 -5 5 -5",
+    "Best is a prefix (8)":        "9 4 -1 -2 -8 3 -7 -2",
+    "Best is a suffix (8)":        "-4 2 -9 -1 3 6 -2 8",
+    "Tiny (4)":                    "2 -3 4 -1",
+    "Price changes (16)":          "1 -2 3 5 -7 2 2 -1 -4 6 3 -2 -8 4 1 2"
+};
+
+let A = [];
+
+function parseArray(txt) {
+    const clean = txt.replace(/#[^\n]*/g, " ").replace(/[,;]/g, " ").trim();
+    if (!clean) throw new Error("empty input");
+    const parts = clean.split(/\s+/);
+    const out = parts.map(p => {
+        const v = Number(p);
+        if (!Number.isFinite(v)) throw new Error('"' + p + '" is not a number');
+        return v;
+    });
+    if (out.length > 400) throw new Error("please keep it under 400 entries");
+    return out;
+}
+
+/* ======================================================================
+   pseudocode  (verbatim from the slides)
+   ====================================================================== */
+const CODE = {
+brute: [
+ "s = 0",
+ "for i = 0, …, n−1",
+ "    for j = i, …, n",
+ "        t = 0",
+ "        for k = i, …, j−1",
+ "            t = t + A[k]",
+ "        end for",
+ "        if t &gt; s then s := t",
+ "    end for",
+ "end for"
+],
+reuse: [
+ "s = 0",
+ "for i = 0, …, n−1",
+ "    t = 0",
+ "    for j = i+1, …, n",
+ "        t = t + A[j−1]",
+ "        if t &gt; s then s := t",
+ "    end for",
+ "end for"
+],
+dc: [
+ "procedure findMaxSubarraySum(A[ℓ..r)):",
+ "    if r − ℓ ≤ 0",
+ "        return 0",
+ "    if r − ℓ == 1",
+ "        return max{0, A[ℓ]}",
+ "    m := ⌈(ℓ + r)/2⌉",
+ "    s<sub>(a)</sub> := findMaxSubarraySum(A[ℓ, m))",
+ "    s<sub>(b)</sub> := findMaxSubarraySum(A[m, r))",
+ "    <span class='cm'>// Find left endpoint of straddle:</span>",
+ "    s<sub>ℓ</sub> := 0;  t := 0",
+ "    for i = m−1, m−2, …, ℓ",
+ "        t := A[i] + t",
+ "        s<sub>ℓ</sub> := max{s<sub>ℓ</sub>, t}",
+ "    end for",
+ "    <span class='cm'>// Find right endpoint of straddle:</span>",
+ "    s<sub>r</sub> := 0;  t := 0",
+ "    for j = m+1, …, r",
+ "        t := t + A[j−1]",
+ "        s<sub>r</sub> := max{s<sub>r</sub>, t}",
+ "    end for",
+ "    s<sub>(c)</sub> := s<sub>ℓ</sub> + s<sub>r</sub>",
+ "    return max{s<sub>(a)</sub>, s<sub>(b)</sub>, s<sub>(c)</sub>}"
+],
+kadane: [
+ "procedure findMaxSubarraySum(A[0..n))",
+ "    suffixMax := 0;  globalMax := 0",
+ "    for r = 1, …, n",
+ "        suffixMax := max{suffixMax + A[r−1], 0}",
+ "        globalMax := max{globalMax, suffixMax}",
+ "    return globalMax"
+]
+};
+
+const ALGS = {
+    brute:  { name: "Brute force",        sub: "Θ(n³)",      color: "var(--c-brute)",  cost: n => n*(n+1)*(n+2)/6, formula: "n(n+1)(n+2)/6", asym: "~ n³/6" },
+    reuse:  { name: "Reusing sums",       sub: "Θ(n²)",      color: "var(--c-reuse)",  cost: n => n*(n+1)/2,       formula: "n(n+1)/2",      asym: "~ n²/2" },
+    dc:     { name: "Divide &amp; conquer",sub: "Θ(n log n)", color: "var(--c-dc)",     cost: costDC,               formula: "C(⌈n/2⌉)+C(⌊n/2⌋)+n+1", asym: "~ n log₂ n" },
+    kadane: { name: "Linear sweep",       sub: "Θ(n)",       color: "var(--c-kadane)", cost: n => n,               formula: "n",             asym: "= n" }
+};
+const ALG_KEYS = ["brute", "reuse", "dc", "kadane"];
+const CSS_COLOR = { brute: "#6d180f", reuse: "#b07d18", dc: "#3f7d86", kadane: "#1b6b45" };
+
+const _dcMemo = {0:0, 1:0};
+function costDC(n) {
+    if (n in _dcMemo) return _dcMemo[n];
+    return _dcMemo[n] = costDC(Math.ceil(n/2)) + costDC(Math.floor(n/2)) + n + 1;
+}
+
+/* ======================================================================
+   traces — one frame per elementary step, following the code line by line
+   ====================================================================== */
+function frame(line, msg, st) { return { line, msg, st }; }
+
+function* traceBrute(A) {
+    const n = A.length;
+    let s = 0, adds = 0, best = null;
+    yield frame(1, "Initialise the best sum found so far, <b>s := 0</b> (the empty subarray).",
+                { s, adds, best });
+    for (let i = 0; i < n; i++) {
+        yield frame(2, `Left endpoint <b>i = ${i}</b>.`, { i, s, adds, best });
+        for (let j = i; j <= n; j++) {
+            yield frame(3, `Right endpoint <b>j = ${j}</b> — consider the subarray A[${i}..${j}).`,
+                        { i, j, s, adds, best });
+            let t = 0;
+            yield frame(4, "Start the sum of this subarray from scratch: <b>t := 0</b>.",
+                        { i, j, t, s, adds, best });
+            for (let k = i; k < j; k++) {
+                t += A[k]; adds++;
+                yield frame(6, `Add A[${k}] = ${A[k]} &nbsp;⟶&nbsp; t = ${t}.`,
+                            { i, j, k, t, s, adds, best });
+            }
+            if (t > s) {
+                s = t; best = [i, j];
+                yield frame(8, `t = ${t} beats the old best — <b>s := ${t}</b>, attained by A[${i}..${j}).`,
+                            { i, j, t, s, adds, best, upd: true, sumTo: j - 1 });
+            } else {
+                yield frame(8, `t = ${t} does not beat s = ${s}; keep s.`,
+                            { i, j, t, s, adds, best, sumTo: j - 1 });
+            }
+        }
+    }
+    yield frame(10, `Done. Each of the ${n*(n+1)/2 + n} subarrays was summed from scratch: <b>s = ${s}</b>.`,
+                { s, adds, best, done: true });
+}
+
+function* traceReuse(A) {
+    const n = A.length;
+    let s = 0, adds = 0, best = null;
+    yield frame(1, "Initialise <b>s := 0</b> (the empty subarray).", { s, adds, best });
+    for (let i = 0; i < n; i++) {
+        yield frame(2, `Left endpoint <b>i = ${i}</b>.`, { i, s, adds, best });
+        let t = 0;
+        yield frame(3, "<b>t := 0</b> — from here on we only ever extend this sum to the right.",
+                    { i, t, s, adds, best });
+        for (let j = i + 1; j <= n; j++) {
+            t += A[j-1]; adds++;
+            yield frame(5, `Extend by A[${j-1}] = ${A[j-1]}: &nbsp;s(${i},${j}) = s(${i},${j-1}) + A[${j-1}] = ${t}. One addition, not ${j-i}.`,
+                        { i, j, t, s, adds, best });
+            if (t > s) {
+                s = t; best = [i, j];
+                yield frame(6, `t = ${t} beats the old best — <b>s := ${t}</b>, attained by A[${i}..${j}).`,
+                            { i, j, t, s, adds, best, upd: true });
+            } else {
+                yield frame(6, `t = ${t} does not beat s = ${s}; keep s.`, { i, j, t, s, adds, best });
+            }
+        }
+    }
+    yield frame(8, `Done: <b>s = ${s}</b>, using one addition per pair (i,j).`,
+                { s, adds, best, done: true });
+}
+
+/* --- divide & conquer: nodes of the recursion, aligned with the array --- */
+function* traceDC(A) {
+    const n = A.length;
+    const nodes = [];
+    const state = { adds: 0 };
+
+    function snap(extra) {
+        return Object.assign({ nodes, adds: state.adds, stack: stack.slice() }, extra);
+    }
+    const stack = [];
+
+    function* rec(l, r, depth) {
+        const id = nodes.length;
+        const node = { id, l, r, depth, status: "active", m: null, sa: null, sb: null,
+                       sl: null, sr: null, sc: null, res: null, wit: null,
+                       witL: null, witR: null, scanI: null, scanJ: null, t: null };
+        nodes.push(node);
+        stack.push(id);
+        yield frame(1, `Call on A[${l}..${r}) &nbsp;(n = ${r-l}).`, snap({ cur: id }));
+
+        if (r - l <= 0) {
+            yield frame(2, `r − ℓ = ${r-l} ≤ 0 — empty range.`, snap({ cur: id }));
+            node.res = 0; node.wit = [l, l]; node.status = "done";
+            yield frame(3, "Return 0.", snap({ cur: id, ret: id }));
+            stack.pop();
+            return 0;
+        }
+        yield frame(2, `r − ℓ = ${r-l} &gt; 0.`, snap({ cur: id }));
+        if (r - l === 1) {
+            yield frame(4, "A single element — base case.", snap({ cur: id }));
+            const v = Math.max(0, A[l]);
+            node.res = v; node.wit = A[l] > 0 ? [l, l+1] : [l, l]; node.status = "done";
+            yield frame(5, `Return max{0, A[${l}]} = ${v}.`, snap({ cur: id, ret: id }));
+            stack.pop();
+            return v;
+        }
+        yield frame(4, `r − ℓ = ${r-l} ≠ 1.`, snap({ cur: id }));
+        const m = Math.ceil((l + r) / 2);
+        node.m = m;
+        yield frame(6, `Split at <b>m = ⌈(${l}+${r})/2⌉ = ${m}</b>.`, snap({ cur: id }));
+
+        yield frame(7, "Recurse on the left half — case (a).", snap({ cur: id }));
+        const sa = yield* rec(l, m, depth + 1);
+        node.sa = sa; node.witA = nodes.find(x => x.l === l && x.r === m && x.depth === depth+1).wit;
+        yield frame(7, `Left half returned s<sub>(a)</sub> = ${sa}.`, snap({ cur: id }));
+
+        yield frame(8, "Recurse on the right half — case (b).", snap({ cur: id }));
+        const sb = yield* rec(m, r, depth + 1);
+        node.sb = sb;
+        const rightNode = nodes.filter(x => x.l === m && x.r === r && x.depth === depth+1).pop();
+        node.witB = rightNode.wit;
+        yield frame(8, `Right half returned s<sub>(b)</sub> = ${sb}.`, snap({ cur: id }));
+
+        let sl = 0, t = 0, wl = m;
+        node.sl = 0; node.witL = m; node.t = 0; node.scanI = null;
+        yield frame(10, "Case (c): a straddling subarray. First the best left endpoint — scan left from m.",
+                    snap({ cur: id }));
+        for (let i = m - 1; i >= l; i--) {
+            t = A[i] + t; state.adds++;
+            node.t = t; node.scanI = i;
+            yield frame(12, `t := A[${i}] + t = ${t} &nbsp;— that is s(${i}, ${m}).`, snap({ cur: id }));
+            if (t > sl) { sl = t; wl = i; }
+            node.sl = sl; node.witL = wl;
+            yield frame(13, `s<sub>ℓ</sub> = max{s<sub>ℓ</sub>, t} = ${sl}.`, snap({ cur: id }));
+        }
+        node.scanI = null;
+
+        let sr = 0, wr = m;
+        t = 0; node.t = 0; node.sr = 0; node.witR = m; node.scanJ = null;
+        yield frame(16, "Now the best right endpoint — scan right from m.", snap({ cur: id }));
+        for (let j = m + 1; j <= r; j++) {
+            t = t + A[j-1]; state.adds++;
+            node.t = t; node.scanJ = j;
+            yield frame(18, `t := t + A[${j-1}] = ${t} &nbsp;— that is s(${m}, ${j}).`, snap({ cur: id }));
+            if (t > sr) { sr = t; wr = j; }
+            node.sr = sr; node.witR = wr;
+            yield frame(19, `s<sub>r</sub> = max{s<sub>r</sub>, t} = ${sr}.`, snap({ cur: id }));
+        }
+        node.scanJ = null;
+
+        const sc = sl + sr; state.adds++;
+        node.sc = sc;
+        yield frame(21, `s<sub>(c)</sub> = s<sub>ℓ</sub> + s<sub>r</sub> = ${sl} + ${sr} = ${sc}. &nbsp;(the one extra addition)`,
+                    snap({ cur: id }));
+
+        const res = Math.max(sa, sb, sc);
+        node.res = res;
+        node.wit = res === sa ? node.witA : (res === sb ? node.witB : [wl, wr]);
+        node.winner = res === sa ? "a" : (res === sb ? "b" : "c");
+        node.status = "done";
+        yield frame(22, `Return max{${sa}, ${sb}, ${sc}} = <b>${res}</b> &nbsp;(case ${node.winner}).`,
+                    snap({ cur: id, ret: id }));
+        stack.pop();
+        return res;
+    }
+
+    const res = yield* rec(0, n, 0);
+    yield frame(22, `Done: <b>s = ${res}</b>.`, snap({ done: true, result: res, cur: 0 }));
+}
+
+function* traceKadane(A) {
+    const n = A.length;
+    let suffixMax = 0, globalMax = 0, adds = 0, start = 0, best = null;
+    yield frame(1, "Sweep the array once, keeping two numbers.", { suffixMax, globalMax, adds, start, best });
+    yield frame(2, "<b>suffixMax := 0</b> (best sum ending here) and <b>globalMax := 0</b> (best sum anywhere).",
+                { suffixMax, globalMax, adds, start, best, r: 0 });
+    for (let r = 1; r <= n; r++) {
+        yield frame(3, `<b>r = ${r}</b> — extend the window to A[..${r}).`,
+                    { suffixMax, globalMax, adds, start, best, r });
+        const sum = suffixMax + A[r-1]; adds++;
+        let msg;
+        if (sum > 0) {
+            suffixMax = sum;
+            msg = `suffixMax + A[${r-1}] = ${sum} &gt; 0 — keep extending: the best subarray ending at ${r} is A[${start}..${r}).`;
+        } else {
+            suffixMax = 0; start = r;
+            msg = `suffixMax + A[${r-1}] = ${sum} ≤ 0 — a suffix with a negative sum can never help, so <b>drop it</b> and restart at ${r}.`;
+        }
+        yield frame(4, msg, { suffixMax, globalMax, adds, start, best, r, reset: sum <= 0 });
+        if (suffixMax > globalMax) {
+            globalMax = suffixMax; best = [start, r];
+            yield frame(5, `New record: <b>globalMax := ${globalMax}</b>, attained by A[${start}..${r}).`,
+                        { suffixMax, globalMax, adds, start, best, r, upd: true });
+        } else {
+            yield frame(5, `globalMax stays ${globalMax}.`,
+                        { suffixMax, globalMax, adds, start, best, r });
+        }
+    }
+    yield frame(6, `Done after a single pass: <b>globalMax = ${globalMax}</b>.`,
+                { suffixMax, globalMax, adds, start, best, r: n, done: true });
+}
+
+const TRACERS = { brute: traceBrute, reuse: traceReuse, dc: traceDC, kadane: traceKadane };
+
+/* ======================================================================
+   step mode
+   ====================================================================== */
+let alg = "brute";
+let frames = [];
+let cur = 0;
+let timer = null, delay = 260;
+
+function buildTrace() {
+    computeSumScale();
+    const gen = TRACERS[alg](A);
+    frames = [];
+    const CAP = 40000;
+    for (const f of gen) {
+        frames.push(f);
+        if (frames.length >= CAP) {
+            frames.push(frame(0, "Trace truncated — too many steps for this input size. Use a shorter array.", { adds: 0 }));
+            break;
+        }
+    }
+    cur = 0;
+    const sl = document.getElementById("frameSlider");
+    sl.max = frames.length - 1; sl.value = 0;
+    buildCode();
+    render();
+}
+
+function gotoFrame(i) {
+    cur = Math.max(0, Math.min(frames.length - 1, i));
+    document.getElementById("frameSlider").value = cur;
+    render();
+}
+function stepFwd() { if (cur < frames.length - 1) gotoFrame(cur + 1); else stopPlay(); }
+function stepBack() { gotoFrame(cur - 1); }
+function resetRun() { stopPlay(); gotoFrame(0); }
+function updateSpeed(v) {
+    delay = +v; document.getElementById("speedVal").textContent = delay + "ms";
+    if (timer) { clearInterval(timer); timer = setInterval(stepFwd, Math.max(16, delay)); }
+}
+function togglePlay() {
+    if (timer) stopPlay();
+    else {
+        if (cur >= frames.length - 1) gotoFrame(0);
+        timer = setInterval(stepFwd, Math.max(16, delay));
+        document.getElementById("playBtn").textContent = "Pause";
+    }
+}
+function stopPlay() {
+    if (timer) clearInterval(timer);
+    timer = null;
+    document.getElementById("playBtn").textContent = "Play";
+}
+
+function onAlgChange() { stopPlay(); alg = document.getElementById("algSel").value; buildTrace(); }
+function onPreset() {
+    const t = document.getElementById("presetSel").value;
+    document.getElementById("inputText").value = t;
+    loadFromText();
+}
+function loadFromText() {
+    try {
+        A = parseArray(document.getElementById("inputText").value);
+        document.getElementById("parseErr").textContent = "";
+    } catch (e) {
+        document.getElementById("parseErr").textContent = e.message;
+        return;
+    }
+    stopPlay();
+    buildTrace();
+}
+function randomInput() {
+    const n = 10;
+    const a = Array.from({length: n}, () => Math.floor(Math.random() * 21) - 10);
+    document.getElementById("inputText").value = a.join(" ");
+    loadFromText();
+}
+
+/* --------------------------- pseudocode panel -------------------------- */
+function buildCode() {
+    const box = document.getElementById("codeView");
+    box.innerHTML = CODE[alg].map((s, i) =>
+        `<div class="ln" data-line="${i+1}"><span class="no">${i+1}</span><span>${s}</span></div>`).join("");
+}
+function highlightCode(line) {
+    document.querySelectorAll("#codeView .ln").forEach(el => {
+        el.classList.toggle("hi", +el.dataset.line === line);
+    });
+}
+
+/* ------------------------------ drawing -------------------------------- */
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, txt) {
+    const n = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (txt !== undefined) n.textContent = txt;
+    return n;
+}
+
+function geom() {
+    const n = A.length;
+    const W = 900, L = 46, R = 20;
+    const cw = Math.max(10, (W - L - R) / Math.max(1, n));
+    const maxAbs = Math.max(1, ...A.map(Math.abs));
+    const barMid = 130, barH = 92;
+    const idxY = barMid + barH + 30;
+    const sumsH = 80;
+    const sumsMid = idxY + 30 + sumsH;
+    return { n, W, L, R, cw, maxAbs, barMid, barH, idxY, sumsH, sumsMid,
+             bottom: sumsMid + sumsH + 26,
+             x: i => L + i * cw, mid: barMid, H: barH };
+}
+
+/* largest |s(i,j)| over all subarrays — the scale of the sum band */
+let SUMMAX = 1;
+function computeSumScale() {
+    let curMax = 0, curMin = 0, maxS = 0, minS = 0;
+    for (const v of A) {
+        curMax = Math.max(curMax + v, 0); maxS = Math.max(maxS, curMax);
+        curMin = Math.min(curMin + v, 0); minS = Math.min(minS, curMin);
+    }
+    SUMMAX = Math.max(1, maxS, -minS);
+}
+
+function drawArray(g, opts) {
+    const { n, L, cw, maxAbs, mid, H } = g;
+    const out = [];
+    out.push(el("line", { x1: L - 8, y1: mid, x2: L + n*cw + 8, y2: mid, stroke: "#b9a793", "stroke-width": 1.2 }));
+    for (let i = 0; i < n; i++) {
+        const v = A[i], h = Math.abs(v) / maxAbs * H;
+        const x = L + i*cw + cw*0.14, w = cw*0.72;
+        const y = v >= 0 ? mid - h : mid;
+        const cls = opts.fill ? opts.fill(i) : {};
+        out.push(el("rect", Object.assign({
+            x, y, width: w, height: Math.max(1.5, h), rx: 2,
+            fill: cls.fill || (v >= 0 ? "var(--bar)" : "var(--bar-neg)"),
+            stroke: cls.stroke || "var(--bar-border)", "stroke-width": cls.sw || 1,
+            opacity: cls.opacity === undefined ? 1 : cls.opacity, class: "mv"
+        })));
+        if (cw > 22) {
+            out.push(el("text", {
+                x: L + i*cw + cw/2, y: v >= 0 ? mid - h - 6 : mid + h + 15,
+                "text-anchor": "middle", "font-size": Math.min(13, cw*0.55),
+                fill: cls.label || "var(--ink-strong)", "font-weight": 600
+            }, String(v)));
+        }
+        if (cw > 16) {
+            out.push(el("text", {
+                x: L + i*cw + cw/2, y: g.idxY, "text-anchor": "middle",
+                "font-size": Math.min(11, cw*0.45), fill: "#b9a793"
+            }, String(i)));
+        }
+    }
+    return out;
+}
+
+/* ---- the sum band: a horizontal bar over a range, height = its sum ---- */
+function drawSumAxis(g, title) {
+    const out = [];
+    const x2 = g.L + g.n*g.cw + 10;
+    out.push(el("line", { x1: g.L - 12, y1: g.sumsMid, x2, y2: g.sumsMid,
+        stroke: "#b9a793", "stroke-width": 1, "stroke-dasharray": "3 4" }));
+    out.push(el("text", { x: g.L - 16, y: g.sumsMid + 4, "text-anchor": "end",
+        "font-size": 10.5, fill: "#b9a793" }, "0"));
+    out.push(el("text", { x: g.L - 16, y: g.sumsMid - g.sumsH + 4, "text-anchor": "end",
+        "font-size": 10.5, fill: "#b9a793" }, String(SUMMAX)));
+    out.push(el("text", { x: 4, y: g.sumsMid - g.sumsH - 14, "font-size": 11.5,
+        fill: "var(--title-muted)", "font-weight": 700, "letter-spacing": ".8" },
+        title || "SUM OVER THE RANGE  ·  higher = better"));
+    return out;
+}
+
+function sumBar(g, i, j, value, color, label, opts) {
+    opts = opts || {};
+    const out = [];
+    const clamped = Math.max(-1, Math.min(1, value / SUMMAX));
+    const y = g.sumsMid - clamped * g.sumsH;
+    const x1 = g.x(i) + 2;
+    const x2 = Math.max(g.x(j) - 2, x1 + 7);
+    const th = opts.thick ? 6 : 4;
+    const op = opts.faint ? .4 : 1;
+    out.push(el("line", { x1, y1: g.sumsMid, x2: x1, y2: y, stroke: color,
+        "stroke-width": 1, "stroke-dasharray": "2 3", opacity: .55 * op, class: "mv" }));
+    out.push(el("line", { x1: x2, y1: g.sumsMid, x2: x2, y2: y, stroke: color,
+        "stroke-width": 1, "stroke-dasharray": "2 3", opacity: .55 * op, class: "mv" }));
+    out.push(el("rect", { x: x1, y: y - th/2, width: x2 - x1, height: th, rx: 2,
+        fill: color, opacity: op, class: "mv" }));
+    if (label !== false) {
+        out.push(el("text", { x: (x1 + x2) / 2, y: value >= 0 ? y - 9 : y + 17,
+            "text-anchor": "middle", "font-size": 11.5, fill: color,
+            "font-weight": 700, opacity: op, class: "mv" },
+            (label ? label + " = " : "") + value));
+    }
+    return out;
+}
+
+function render() {
+    if (!frames.length) return;
+    const f = frames[cur];
+    const st = f.st || {};
+    document.getElementById("statusText").innerHTML = f.msg;
+    document.getElementById("frameVal").textContent = cur + " / " + (frames.length - 1);
+    document.getElementById("frameSlider").value = cur;
+    highlightCode(f.line);
+
+    const svg = document.getElementById("view");
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const g = geom();
+    svg.setAttribute("viewBox", "0 0 900 " + Math.round(g.bottom));
+    const showWit = document.getElementById("witnessToggle").checked;
+
+    if (alg === "brute" || alg === "reuse") renderWindowAlg(svg, g, st, showWit);
+    else if (alg === "kadane") renderKadane(svg, g, st, showWit);
+    else renderDC(svg, g, st, showWit);
+
+    renderVars(st);
+    renderCost(st);
+    renderLegend();
+}
+
+function renderWindowAlg(svg, g, st, showWit) {
+    const { i, j, k, t, s, best } = st;
+    const inWindow = (idx) => i !== undefined && j !== undefined && idx >= i && idx < j;
+    const summed = (idx) => {
+        if (alg === "brute")
+            return (k !== undefined && idx >= i && idx <= k) ||
+                   (st.sumTo !== undefined && idx >= i && idx <= st.sumTo);
+        return i !== undefined && j !== undefined && idx >= i && idx < j;
+    };
+    drawArray(g, { fill: (idx) => {
+        if (summed(idx)) return { fill: "var(--acc-light)", stroke: "var(--acc)", sw: 1.6 };
+        if (inWindow(idx)) return { fill: "var(--window)", stroke: "var(--window-border)", sw: 1.4 };
+        return { opacity: .55 };
+    }}).forEach(n => svg.appendChild(n));
+
+    // pointer at the element currently being added
+    const ptr = alg === "brute" ? k : (j !== undefined ? j - 1 : undefined);
+    if (ptr !== undefined && ptr >= 0 && ptr < g.n) {
+        svg.appendChild(el("path", {
+            d: `M ${g.x(ptr)+g.cw/2} ${g.mid + g.H + 4} l -6 12 l 12 0 z`,
+            fill: "var(--active)", class: "mv"
+        }));
+    }
+
+    drawSumAxis(g).forEach(n => svg.appendChild(n));
+    // the sum currently held in t, over exactly the range it covers
+    if (t !== undefined && i !== undefined) {
+        let hi = i;
+        if (alg === "brute") hi = k !== undefined ? k + 1 : (st.sumTo !== undefined ? st.sumTo + 1 : i);
+        else hi = j !== undefined ? j : i;
+        sumBar(g, i, hi, t, "var(--acc)", "t").forEach(n => svg.appendChild(n));
+    }
+    // the best sum found so far
+    if (best) {
+        sumBar(g, best[0], best[1], s, "var(--best)",
+               showWit ? `s on A[${best[0]}..${best[1]})` : "s", { thick: true })
+            .forEach(n => svg.appendChild(n));
+    } else if (s !== undefined) {
+        sumBar(g, 0, 0, s, "var(--best)", "s", { thick: true }).forEach(n => svg.appendChild(n));
+    }
+}
+
+function renderKadane(svg, g, st, showWit) {
+    const { r, start, suffixMax, globalMax, best, reset } = st;
+    drawArray(g, { fill: (idx) => {
+        if (r !== undefined && idx === r - 1) return { fill: "var(--window)", stroke: "var(--active)", sw: 2 };
+        if (start !== undefined && r !== undefined && idx >= start && idx < r)
+            return { fill: "var(--acc-light)", stroke: "var(--acc)", sw: 1.5 };
+        if (r !== undefined && idx < r) return { opacity: .45 };
+        return { opacity: .3 };
+    }}).forEach(n => svg.appendChild(n));
+
+    if (r !== undefined) {
+        svg.appendChild(el("line", {
+            x1: g.x(r), y1: g.mid - g.H - 26, x2: g.x(r), y2: g.sumsMid + g.sumsH,
+            stroke: "var(--active)", "stroke-width": 2, "stroke-dasharray": "4 4", class: "mv"
+        }));
+    }
+    drawSumAxis(g).forEach(n => svg.appendChild(n));
+    if (r !== undefined && start !== undefined)
+        sumBar(g, start, r, suffixMax, "var(--acc)", "suffixMax").forEach(n => svg.appendChild(n));
+    if (best)
+        sumBar(g, best[0], best[1], globalMax, "var(--best)",
+               showWit ? `globalMax on A[${best[0]}..${best[1]})` : "globalMax", { thick: true })
+            .forEach(n => svg.appendChild(n));
+    if (reset) svg.appendChild(el("text", { x: g.x(r) + 8, y: g.sumsMid - 8, "font-size": 12,
+        fill: "var(--active)", "font-weight": 700 }, "↺ suffix dropped"));
+}
+
+function renderDC(svg, g, st, showWit) {
+    const { nodes = [], cur: curId, stack = [] } = st;
+    const node = curId !== undefined ? nodes[curId] : null;
+    const inCur = (idx) => node && idx >= node.l && idx < node.r;
+
+    drawArray(g, { fill: (idx) => {
+        if (node && node.scanI !== null && node.scanI !== undefined && idx >= node.scanI && idx < node.m)
+            return { fill: "var(--acc-light)", stroke: "var(--acc)", sw: 1.6 };
+        if (node && node.scanJ !== null && node.scanJ !== undefined && idx >= node.m && idx < node.scanJ)
+            return { fill: "var(--acc-light)", stroke: "var(--acc)", sw: 1.6 };
+        if (inCur(idx)) return { fill: "var(--window)", stroke: "var(--window-border)", sw: 1.4 };
+        return { opacity: .4 };
+    }}).forEach(n => svg.appendChild(n));
+
+    if (node && node.m !== null) {
+        svg.appendChild(el("line", {
+            x1: g.x(node.m), y1: g.mid - g.H - 26, x2: g.x(node.m), y2: g.sumsMid + g.sumsH,
+            stroke: "var(--active)", "stroke-width": 2, class: "mv"
+        }));
+        svg.appendChild(el("text", { x: g.x(node.m) + 5, y: g.mid - g.H - 30, "font-size": 12,
+            fill: "var(--active)", "font-weight": 700 }, "m = " + node.m));
+    }
+
+    drawSumAxis(g).forEach(n => svg.appendChild(n));
+    if (node) {
+        const win = node.winner;
+        if (node.sa !== null && node.sa !== undefined && node.m !== null)
+            sumBar(g, node.l, node.m, node.sa, "var(--c-dc)", "s(a)", { faint: win !== "a" })
+                .forEach(n => svg.appendChild(n));
+        if (node.sb !== null && node.sb !== undefined && node.m !== null)
+            sumBar(g, node.m, node.r, node.sb, "var(--c-dc)", "s(b)", { faint: win !== "b" })
+                .forEach(n => svg.appendChild(n));
+        // running scan sum
+        if (node.t !== null && node.t !== undefined && node.m !== null) {
+            if (node.scanI !== null && node.scanI !== undefined)
+                sumBar(g, node.scanI, node.m, node.t, "var(--acc)", "t").forEach(n => svg.appendChild(n));
+            else if (node.scanJ !== null && node.scanJ !== undefined)
+                sumBar(g, node.m, node.scanJ, node.t, "var(--acc)", "t").forEach(n => svg.appendChild(n));
+        }
+        if (node.sl !== null && node.sl !== undefined && node.sc === null && node.witL !== null)
+            sumBar(g, node.witL, node.m, node.sl, "#8c6f3f", "s_l").forEach(n => svg.appendChild(n));
+        if (node.sr !== null && node.sr !== undefined && node.sc === null && node.witR !== null)
+            sumBar(g, node.m, node.witR, node.sr, "#8c6f3f", "s_r").forEach(n => svg.appendChild(n));
+        if (node.sc !== null && node.sc !== undefined)
+            sumBar(g, node.witL, node.witR, node.sc, "var(--c-dc)", "s(c)", { faint: win !== undefined && win !== "c" })
+                .forEach(n => svg.appendChild(n));
+        if (node.status === "done" && node.wit && showWit)
+            sumBar(g, node.wit[0], node.wit[1], node.res, "var(--best)",
+                   `result on A[${node.wit[0]}..${node.wit[1]})`, { thick: true })
+                .forEach(n => svg.appendChild(n));
+    }
+
+    // recursion tree, aligned with the array columns
+    const top = g.bottom + 18, rowH = 26;
+    const maxDepth = Math.max(0, ...nodes.map(x => x.depth));
+    svg.appendChild(el("text", { x: 4, y: top - 8, "font-size": 11.5, fill: "var(--title-muted)",
+        "font-weight": 700, "letter-spacing": ".8" }, "RECURSION"));
+    for (const nd of nodes) {
+        const x = g.x(nd.l) + 1, w = Math.max(4, g.x(nd.r) - g.x(nd.l) - 2);
+        const y = top + nd.depth * rowH;
+        const onStack = stack.includes(nd.id);
+        let fill = "#ecddc5", stroke = "#d4c5b4";
+        if (nd.status === "done") { fill = "#dceadf"; stroke = "var(--best)"; }
+        if (onStack) { fill = "var(--window)"; stroke = "var(--window-border)"; }
+        if (nd.id === curId) { stroke = "var(--active)"; }
+        svg.appendChild(el("rect", { x, y, width: w, height: rowH - 6, rx: 3,
+            fill, stroke, "stroke-width": nd.id === curId ? 2 : 1 }));
+        if (w > 30 && nd.res !== null)
+            svg.appendChild(el("text", { x: x + w/2, y: y + rowH - 12, "text-anchor": "middle",
+                "font-size": 11, fill: "var(--ink-strong)", "font-weight": 700 }, String(nd.res)));
+    }
+    svg.setAttribute("viewBox", `0 0 900 ${Math.round(top + (maxDepth + 1) * rowH + 14)}`);
+}
+
+function renderVars(st) {
+    const box = document.getElementById("varsView");
+    const items = [];
+    const add = (k, v, cls) => { if (v !== undefined && v !== null) items.push(`<span class="var ${cls||''}"><i>${k}</i> = ${v}</span>`); };
+    if (alg === "brute" || alg === "reuse") {
+        add("i", st.i); add("j", st.j); add("k", st.k);
+        add("t", st.t, "hot"); add("s", st.s, "best-v");
+    } else if (alg === "kadane") {
+        add("r", st.r); add("suffixMax", st.suffixMax, "hot"); add("globalMax", st.globalMax, "best-v");
+        if (st.start !== undefined) add("suffix starts at", st.start);
+    } else {
+        const node = st.cur !== undefined && st.nodes ? st.nodes[st.cur] : null;
+        if (node) {
+            add("ℓ", node.l); add("r", node.r); add("m", node.m);
+            add("s(a)", node.sa); add("s(b)", node.sb);
+            add("s<sub>ℓ</sub>", node.sl); add("s<sub>r</sub>", node.sr);
+            add("t", node.t, "hot"); add("s(c)", node.sc);
+            add("result", node.res, "best-v");
+        }
+        if (st.stack) items.push(`<span class="var"><i>call depth</i> = ${st.stack.length}</span>`);
+    }
+    if (document.getElementById("witnessToggle").checked && st.best)
+        items.push(`<span class="var best-v"><i>(i,j)</i> = (${st.best[0]}, ${st.best[1]})</span>`);
+    box.innerHTML = items.join("");
+}
+
+function renderCost(st) {
+    const n = A.length, a = ALGS[alg];
+    const total = a.cost(n);
+    const done = st.adds || 0;
+    document.getElementById("costView").innerHTML = `
+      <tr><td>additions so far</td><td>${done}</td></tr>
+      <tr><td>additions in total</td><td>${total}</td></tr>
+      <tr><td>closed form</td><td>${a.formula}</td></tr>
+      <tr><td>asymptotically</td><td>${a.asym} &nbsp;=&nbsp; ${a.sub}</td></tr>`;
+}
+
+function renderLegend() {
+    const L = [];
+    const sw = (f, s, d) => `<span class="swatch" style="background:${f};border-color:${s};${d?'border-style:dashed;':''}"></span>`;
+    L.push(`<div class="item">${sw('var(--bar)','var(--bar-border)')}array entry</div>`);
+    if (alg === "brute" || alg === "reuse") {
+        L.push(`<div class="item">${sw('var(--window)','var(--window-border)')}current subarray A[i..j)</div>`);
+        L.push(`<div class="item">${sw('var(--acc-light)','var(--acc)')}already summed into t</div>`);
+    } else if (alg === "kadane") {
+        L.push(`<div class="item">${sw('var(--acc-light)','var(--acc)')}current suffix (suffixMax)</div>`);
+        L.push(`<div class="item">${sw('var(--window)','var(--active)')}element being added</div>`);
+    } else {
+        L.push(`<div class="item">${sw('var(--window)','var(--window-border)')}active call / on the stack</div>`);
+        L.push(`<div class="item">${sw('var(--acc-light)','var(--acc)')}straddle scan</div>`);
+        L.push(`<div class="item">${sw('#dceadf','var(--best)')}call finished (value returned)</div>`);
+    }
+    L.push(`<div class="item">${sw('var(--best)','var(--best)')}best sum so far (bar height = its value)</div>`);
+    document.getElementById("legend").innerHTML = L.join("");
+}
+
+/* ======================================================================
+   measure mode
+   ====================================================================== */
+const RUNNERS = {
+    brute(A) {
+        const n = A.length; let s = 0;
+        for (let i = 0; i < n; i++)
+            for (let j = i; j <= n; j++) {
+                let t = 0;
+                for (let k = i; k < j; k++) t = t + A[k];
+                if (t > s) s = t;
+            }
+        return s;
+    },
+    reuse(A) {
+        const n = A.length; let s = 0;
+        for (let i = 0; i < n; i++) {
+            let t = 0;
+            for (let j = i + 1; j <= n; j++) { t = t + A[j-1]; if (t > s) s = t; }
+        }
+        return s;
+    },
+    dc(A) {
+        function go(l, r) {
+            if (r - l <= 0) return 0;
+            if (r - l === 1) return Math.max(0, A[l]);
+            const m = Math.ceil((l + r) / 2);
+            const sa = go(l, m), sb = go(m, r);
+            let sl = 0, t = 0;
+            for (let i = m - 1; i >= l; i--) { t = A[i] + t; if (t > sl) sl = t; }
+            let sr = 0; t = 0;
+            for (let j = m + 1; j <= r; j++) { t = t + A[j-1]; if (t > sr) sr = t; }
+            const sc = sl + sr;
+            return Math.max(sa, sb, sc);
+        }
+        return go(0, A.length);
+    },
+    kadane(A) {
+        const n = A.length; let suffixMax = 0, globalMax = 0;
+        for (let r = 1; r <= n; r++) {
+            suffixMax = Math.max(suffixMax + A[r-1], 0);
+            globalMax = Math.max(globalMax, suffixMax);
+        }
+        return globalMax;
+    }
+};
+
+let points = { brute: [], reuse: [], dc: [], kadane: [] };
+let bulkTimer = null;
+
+function randArray(n) {
+    const a = new Array(n);
+    for (let i = 0; i < n; i++) a[i] = Math.floor(Math.random() * 21) - 10;
+    return a;
+}
+
+function timeRun(key, n) {
+    const arr = randArray(n);
+    const f = RUNNERS[key];
+    f(arr); // warm up
+    let reps = 1, ms = 0;
+    while (true) {
+        const t0 = performance.now();
+        for (let q = 0; q < reps; q++) f(arr);
+        ms = performance.now() - t0;
+        if (ms >= 4 || reps >= 4096 || ms > 400) break;
+        reps *= 4;
+    }
+    return { n, ms: ms / reps, cost: ALGS[key].cost(n), reps, result: f(arr) };
+}
+
+function measureOnce() {
+    const key = document.getElementById("mAlgSel").value;
+    const n = Math.max(1, Math.min(4000, +document.getElementById("mN").value || 1));
+    const p = timeRun(key, n);
+    points[key].push(p);
+    document.getElementById("mVars").innerHTML =
+        `<span class="var"><i>algorithm</i> = ${ALGS[key].name}</span>` +
+        `<span class="var"><i>n</i> = ${p.n}</span>` +
+        `<span class="var"><i>additions</i> = ${p.cost.toLocaleString()}</span>` +
+        `<span class="var hot"><i>time</i> = ${p.ms.toFixed(4)} ms</span>` +
+        `<span class="var"><i>averaged over</i> = ${p.reps} run(s)</span>` +
+        `<span class="var best-v"><i>result</i> = ${p.result}</span>`;
+    drawPlots();
+}
+
+function toggleBulk() {
+    if (bulkTimer) { clearTimeout(bulkTimer); bulkTimer = null; document.getElementById("bulkBtn").textContent = "Run bulk"; return; }
+    const key = document.getElementById("mAlgSel").value;
+    const from = Math.max(1, +document.getElementById("mFrom").value || 1);
+    const to   = Math.max(from, +document.getElementById("mTo").value || from);
+    const reps = Math.max(1, +document.getElementById("mReps").value || 1);
+    const steps = 60;
+    const list = [];
+    for (let q = 0; q <= steps; q++) {
+        const n = Math.round(from + (to - from) * q / steps);
+        for (let rr = 0; rr < reps; rr++) list.push(n);
+    }
+    document.getElementById("bulkBtn").textContent = "Stop";
+    let idx = 0;
+    const tick = () => {
+        const t0 = performance.now();
+        while (idx < list.length && performance.now() - t0 < 60) {
+            points[key].push(timeRun(key, list[idx++]));
+        }
+        drawPlots();
+        if (idx < list.length) bulkTimer = setTimeout(tick, 0);
+        else { bulkTimer = null; document.getElementById("bulkBtn").textContent = "Run bulk"; }
+    };
+    tick();
+}
+
+function clearPlots() {
+    points = { brute: [], reuse: [], dc: [], kadane: [] };
+    document.getElementById("mVars").innerHTML = "";
+    drawPlots();
+}
+
+function plotSetup(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h, pad: { l: 62, r: 14, t: 14, b: 34 } };
+}
+
+function drawOnePlot(canvas, field, noteEl, label) {
+    const { ctx, w, h, pad } = plotSetup(canvas);
+    const logMode = document.getElementById("logToggle").checked;
+    const all = [];
+    for (const k of ALG_KEYS) for (const p of points[k]) all.push(p);
+    const note = noteEl;
+    if (!all.length) {
+        ctx.fillStyle = "#b9a793"; ctx.font = "13px sans-serif";
+        ctx.fillText("no measurements yet", pad.l, pad.t + 20);
+        note.textContent = "";
+        return;
+    }
+    const nMax = Math.max(...all.map(p => p.n)), nMin = Math.max(1, Math.min(...all.map(p => p.n)));
+    const vMax = Math.max(...all.map(p => p[field])) * 1.08 || 1;
+    const vMin = Math.max(1e-6, Math.min(...all.filter(p => p[field] > 0).map(p => p[field])) * 0.8);
+
+    const X = n => logMode
+        ? pad.l + (Math.log(n) - Math.log(nMin)) / Math.max(1e-9, Math.log(nMax) - Math.log(nMin)) * (w - pad.l - pad.r)
+        : pad.l + n / nMax * (w - pad.l - pad.r);
+    const Y = v => logMode
+        ? h - pad.b - (Math.log(Math.max(v, vMin)) - Math.log(vMin)) / Math.max(1e-9, Math.log(vMax) - Math.log(vMin)) * (h - pad.t - pad.b)
+        : h - pad.b - v / vMax * (h - pad.t - pad.b);
+
+    // axes + grid
+    ctx.strokeStyle = "#d4c5b4"; ctx.lineWidth = 1;
+    ctx.fillStyle = "#a2937a"; ctx.font = "11px sans-serif";
+    for (let q = 0; q <= 4; q++) {
+        const y = pad.t + q * (h - pad.t - pad.b) / 4;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+        const v = logMode
+            ? Math.exp(Math.log(vMin) + (4 - q) / 4 * (Math.log(vMax) - Math.log(vMin)))
+            : vMax * (4 - q) / 4;
+        ctx.textAlign = "right";
+        ctx.fillText(v >= 1000 ? v.toExponential(1) : (+v.toPrecision(3)).toString(), pad.l - 6, y + 4);
+    }
+    ctx.textAlign = "center";
+    for (let q = 0; q <= 4; q++) {
+        const nv = logMode ? Math.exp(Math.log(nMin) + q/4*(Math.log(nMax)-Math.log(nMin))) : nMax * q / 4;
+        ctx.fillText("n = " + Math.round(nv), X(nv), h - pad.b + 16);
+    }
+    ctx.strokeStyle = "#b9a793";
+    ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+
+    // analysis curves
+    const notes = [];
+    if (document.getElementById("analysisToggle").checked) {
+        for (const k of ALG_KEYS) {
+            if (!points[k].length) continue;
+            let scale = 1;
+            if (field === "ms") {
+                let num = 0, den = 0;
+                for (const p of points[k]) { num += p.cost * p.ms; den += p.cost * p.cost; }
+                scale = den > 0 ? num / den : 0;
+                notes.push(`${ALGS[k].name.replace('&amp;','&')}: ≈ ${(scale*1e6).toPrecision(3)} ns per addition`);
+            }
+            ctx.strokeStyle = CSS_COLOR[k]; ctx.lineWidth = 1.6; ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            let first = true;
+            for (let q = 0; q <= 200; q++) {
+                const nv = logMode
+                    ? Math.exp(Math.log(nMin) + q/200*(Math.log(nMax)-Math.log(nMin)))
+                    : nMin + (nMax - nMin) * q / 200;
+                const c = ALGS[k].cost(Math.round(nv)) * scale;
+                const px = X(nv), py = Y(c);
+                if (first) { ctx.moveTo(px, py); first = false; } else ctx.lineTo(px, py);
+            }
+            ctx.stroke(); ctx.setLineDash([]);
+        }
+    }
+
+    // points
+    for (const k of ALG_KEYS) {
+        ctx.fillStyle = CSS_COLOR[k];
+        for (const p of points[k]) {
+            ctx.beginPath(); ctx.arc(X(p.n), Y(p[field]), 2.6, 0, 7); ctx.fill();
+        }
+    }
+    // legend
+    let lx = pad.l + 8, ly = pad.t + 12;
+    ctx.font = "11.5px sans-serif"; ctx.textAlign = "left";
+    for (const k of ALG_KEYS) {
+        if (!points[k].length) continue;
+        ctx.fillStyle = CSS_COLOR[k];
+        ctx.beginPath(); ctx.arc(lx + 4, ly - 4, 3.4, 0, 7); ctx.fill();
+        ctx.fillText(ALGS[k].name.replace('&amp;','&') + "  " + ALGS[k].sub, lx + 13, ly);
+        ly += 15;
+    }
+    note.textContent = field === "cost"
+        ? "Dashed: the closed form from the analysis — it goes exactly through the points, because the count is exact."
+        : (notes.length ? "Dashed: the same cost function, scaled by a least-squares fit — " + notes.join("; ") + "." : "");
+}
+
+function drawPlots() {
+    drawOnePlot(document.getElementById("costPlot"), "cost", document.getElementById("costNote"));
+    drawOnePlot(document.getElementById("timePlot"), "ms", document.getElementById("timeNote"));
+}
+
+/* ======================================================================
+   race mode — real execution, either on worker threads or time-sliced
+   ====================================================================== */
+
+/* Source shared by the workers and by the single-thread scheduler.
+   The generators are the algorithms themselves; they yield only at the
+   publication points, which are chosen so that the number of yields is
+   roughly the same for every contender and negligible against its work.
+   Unlike the versions in the step-through tab these also carry the witness
+   (i, j) along, so that each runner can announce the range it found.      */
+const ALGO_SRC = String.raw`
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
+
+function makeArray(seed,n){var rnd=mulberry32(seed);var A=new Int32Array(n);
+  for(var i=0;i<n;i++)A[i]=Math.floor(rnd()*201)-100;return A;}
+
+function newState(n){return {sum:0,i:0,j:0,lo:0,hi:n,ops:0};}
+
+function* gBrute(A,pub){
+  var n=A.length,s=0,bi=0,bj=0,st=newState(n);
+  for(var i=0;i<n;i++){
+    for(var j=i;j<=n;j++){var t=0;for(var k=i;k<j;k++)t=t+A[k];if(t>s){s=t;bi=i;bj=j;}}
+    st.ops+=(n-i)*(n-i+1)/2;st.sum=s;st.i=bi;st.j=bj;st.lo=i;st.hi=n;
+    yield st;
+  }
+  st.sum=s;st.i=bi;st.j=bj;st.lo=0;st.hi=n;return st;
+}
+
+function* gReuse(A,pub){
+  var n=A.length,s=0,bi=0,bj=0,st=newState(n);
+  for(var i=0;i<n;i++){
+    var t=0;
+    for(var j=i+1;j<=n;j++){t=t+A[j-1];if(t>s){s=t;bi=i;bj=j;}}
+    st.ops+=n-i;st.sum=s;st.i=bi;st.j=bj;st.lo=i;st.hi=n;
+    yield st;
+  }
+  st.sum=s;st.i=bi;st.j=bj;st.lo=0;st.hi=n;return st;
+}
+
+function* gDC(A,pub){
+  var n=A.length,st=newState(n),bs=0,bi=0,bj=0;
+  function* rec(l,r){
+    if(r-l<=0)return {s:0,i:l,j:l};
+    if(r-l===1){var v=A[l]>0?A[l]:0;var res={s:v,i:l,j:A[l]>0?l+1:l};
+      if(v>bs){bs=v;bi=res.i;bj=res.j;}return res;}
+    var m=Math.ceil((l+r)/2);
+    var a=yield* rec(l,m);
+    var b=yield* rec(m,r);
+    var sl=0,t=0,wl=m,i,j;
+    for(i=m-1;i>=l;i--){t=A[i]+t;if(t>sl){sl=t;wl=i;}}
+    var sr=0,wr=m;t=0;
+    for(j=m+1;j<=r;j++){t=t+A[j-1];if(t>sr){sr=t;wr=j;}}
+    var sc=sl+sr;
+    var res;
+    if(a.s>=b.s&&a.s>=sc)res=a;else if(b.s>=sc)res=b;else res={s:sc,i:wl,j:wr};
+    st.ops+=(r-l)+1;
+    if(res.s>bs){bs=res.s;bi=res.i;bj=res.j;}
+    if(r-l>=pub){st.sum=bs;st.i=bi;st.j=bj;st.lo=l;st.hi=r;yield st;}
+    return res;
+  }
+  var top=yield* rec(0,n);
+  st.sum=top.s;st.i=top.i;st.j=top.j;st.lo=0;st.hi=n;return st;
+}
+
+function* gKadane(A,pub){
+  var n=A.length,suffixMax=0,globalMax=0,start=0,bi=0,bj=0,st=newState(n);
+  for(var r=1;r<=n;r++){
+    var v=suffixMax+A[r-1];
+    if(v>0)suffixMax=v;else{suffixMax=0;start=r;}
+    if(suffixMax>globalMax){globalMax=suffixMax;bi=start;bj=r;}
+    if(r%pub===0){st.ops=r;st.sum=globalMax;st.i=bi;st.j=bj;st.lo=start;st.hi=r;yield st;}
+  }
+  st.ops=n;st.sum=globalMax;st.i=bi;st.j=bj;st.lo=0;st.hi=n;return st;
+}
+
+function makeGen(alg,A,pub){
+  if(alg==="brute")return gBrute(A,pub);
+  if(alg==="reuse")return gReuse(A,pub);
+  if(alg==="dc")return gDC(A,pub);
+  return gKadane(A,pub);
+}
+
+function pubFor(alg,n){
+  if(alg==="dc")return Math.max(2,Math.floor(n/2048));
+  if(alg==="kadane")return Math.max(1,Math.floor(n/2048));
+  return 1;
+}
+
+function warmUp(alg){
+  var W=makeArray(12345,64),g=makeGen(alg,W,pubFor(alg,64)),r;
+  while(!(r=g.next()).done){}
+  return r.value;
+}
+`;
+
+const WORKER_SRC = ALGO_SRC + String.raw`
+var A=null, ALG=null, PUB=1;
+self.onmessage=function(e){
+  var d=e.data;
+  if(d.type==="init"){
+    ALG=d.alg; A=makeArray(d.seed,d.n); PUB=pubFor(ALG,d.n);
+    warmUp(ALG);
+    self.postMessage({type:"ready"});
+  } else if(d.type==="go"){
+    var g=makeGen(ALG,A,PUB), r, last=performance.now();
+    var t0=performance.now();
+    while(!(r=g.next()).done){
+      var now=performance.now();
+      if(now-last>=16){
+        last=now;
+        var v=r.value;
+        self.postMessage({type:"p",sum:v.sum,i:v.i,j:v.j,lo:v.lo,hi:v.hi,ops:v.ops});
+      }
+    }
+    var t1=performance.now();
+    var f=r.value;
+    self.postMessage({type:"done",ms:t1-t0,sum:f.sum,i:f.i,j:f.j,ops:f.ops});
+  }
+};
+`;
+
+let ALGO_MOD = null;
+function algoModule() {
+    if (!ALGO_MOD) ALGO_MOD = new Function(ALGO_SRC + "\nreturn {makeArray, makeGen, pubFor, warmUp};")();
+    return ALGO_MOD;
+}
+
+/* ------------------------------------------------------------- state ---- */
+let race = null, raceRAF = null, workerURL = null;
+
+function blankRunner(k) {
+    return { key: k, enabled: true, on: false, done: false, ms: 0, ops: 0,
+             snap: { sum: 0, i: 0, j: 0, lo: 0, hi: 0, ops: 0 }, place: null,
+             worker: null, gen: null };
+}
+
+function newRace() {
+    stopRace();
+    const n = Math.max(1, Math.min(50000000, +document.getElementById("rN").value || 1));
+    const keep = race ? race.runners : null;
+    race = {
+        n, seed: (Math.random() * 2 ** 31) | 0, mode: document.getElementById("modeSel").value,
+        goTime: 0, running: false, finished: [],
+        runners: ALG_KEYS.map(k => {
+            const r = blankRunner(k);
+            if (keep) { const old = keep.find(x => x.key === k); if (old) r.enabled = old.enabled; }
+            return r;
+        })
+    };
+    race.A = algoModule().makeArray(race.seed, n);
+    markNPreset();
+    buildLanes();
+    buildStrip();
+    raceRedraw();
+}
+
+const N_PRESETS = [];
+for (let k = 4; k <= 22; k++) N_PRESETS.push(1 << k);
+
+function fmtN(v) {
+    if (v >= 1048576) return (v / 1048576) + "M";
+    if (v >= 1024) return (v / 1024) + "k";
+    return String(v);
+}
+
+function buildNPresets() {
+    document.getElementById("nPresets").innerHTML = N_PRESETS.map((v, q) =>
+        `<button onclick="setN(${v})" data-n="${v}" title="2^${q + 4} = ${v.toLocaleString()}">${fmtN(v)}</button>`).join("");
+    markNPreset();
+}
+
+function markNPreset() {
+    const n = +document.getElementById("rN").value;
+    document.querySelectorAll("#nPresets button").forEach(b => {
+        b.classList.toggle("on", +b.dataset.n === n);
+    });
+}
+
+function setN(v) {
+    document.getElementById("rN").value = v;
+    newRace();
+}
+
+function onModeChange() { stopRace(); if (race) race.mode = document.getElementById("modeSel").value; raceRedraw(); }
+
+function toggleRunner(key, on) {
+    const r = race.runners.find(x => x.key === key);
+    if (!r) return;
+    r.enabled = on;
+    raceRedraw();
+}
+
+/* ------------------------------------------------------------ drawing --- */
+let stripCache = null;             // offscreen canvas with the input drawn once
+
+function buildStrip() {
+    const host = document.getElementById("inputStrip");
+    const w = Math.max(300, host.clientWidth), h = 76;
+    const dpr = window.devicePixelRatio || 1;
+    host.width = w * dpr; host.height = h * dpr;
+    const ctx = host.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawInputInto(ctx, w, h, 1);
+    // the faint copy reused in every lane
+    stripCache = document.createElement("canvas");
+    stripCache.width = w * dpr; stripCache.height = 46 * dpr;
+    const c2 = stripCache.getContext("2d"); c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawInputInto(c2, w, 46, .35);
+    stripCache.cssW = w; stripCache.cssH = 46;
+    document.getElementById("inputCap").textContent =
+        `${race.n.toLocaleString()} random integers in [−100, 100], one column per pixel (min and max)`;
+}
+
+function drawInputInto(ctx, w, h, alpha) {
+    const A = race.A, n = A.length, mid = h / 2, sc = (h / 2 - 3) / 100;
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = "#b9a793"; ctx.globalAlpha = alpha * .8;
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#a2937a"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let px = 0; px < w; px++) {
+        const from = Math.floor(px * n / w), to = Math.max(from + 1, Math.floor((px + 1) * n / w));
+        let mn = Infinity, mx = -Infinity;
+        for (let i = from; i < to && i < n; i++) { const v = A[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+        if (mn === Infinity) continue;
+        ctx.moveTo(px + .5, mid - mx * sc); ctx.lineTo(px + .5, mid - mn * sc);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+}
+
+function buildLanes() {
+    const ticks = [0.1, 1, 10, 100, 1000, 10000, 60000];
+    const tickHTML = ticks.map(t => {
+        const p = tFrac(t) * 100;
+        const lab = t < 1 ? t + "ms" : (t < 1000 ? t + "ms" : (t / 1000) + "s");
+        return `<div class="tick" style="left:${p}%"></div><div class="tlab" style="left:${p}%">${lab}</div>`;
+    }).join("");
+    document.getElementById("lanes").innerHTML = race.runners.map(r => `
+      <div class="lane2" id="lane-${r.key}">
+        <div class="lhead">
+          <input type="checkbox" ${r.enabled ? "checked" : ""} onchange="toggleRunner('${r.key}', this.checked)">
+          <span class="nm"><span class="dot" style="background:${CSS_COLOR[r.key]}"></span>${ALGS[r.key].name}
+            <span class="sub">${ALGS[r.key].sub}</span></span>
+          <div class="tbar">${tickHTML}<div class="tfill" style="background:${CSS_COLOR[r.key]}"></div><span class="tval"></span></div>
+          <div class="res"></div>
+        </div>
+        <canvas class="lstrip" id="strip-${r.key}"></canvas>
+      </div>`).join("");
+    for (const r of race.runners) {
+        const c = document.getElementById("strip-" + r.key);
+        const dpr = window.devicePixelRatio || 1;
+        c.width = Math.max(300, c.clientWidth) * dpr; c.height = 46 * dpr;
+        c.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+}
+
+/* time → position on a logarithmic track from 0.1 ms to 60 s */
+function tFrac(ms) {
+    const lo = Math.log10(0.1), hi = Math.log10(60000);
+    return Math.max(0, Math.min(1, (Math.log10(Math.max(ms, 0.1)) - lo) / (hi - lo)));
+}
+function fmtMs(ms) {
+    if (ms >= 1000) return (ms / 1000).toFixed(2) + " s";
+    if (ms >= 1) return ms.toFixed(1) + " ms";
+    return ms.toFixed(3) + " ms";
+}
+
+function raceRedraw() { if (race) drawRace(); }
+
+function drawRace() {
+    const spoil = document.getElementById("spoilTog").checked;
+    const now = performance.now();
+    for (const r of race.runners) {
+        const lane = document.getElementById("lane-" + r.key);
+        if (!lane) continue;
+        lane.classList.toggle("off", !r.enabled && !r.done);
+        lane.classList.toggle("fin", r.done);
+        const live = r.done ? r.ms : (r.on ? (race.mode === "sliced" ? r.ms : now - race.goTime) : 0);
+        lane.querySelector(".tfill").style.width = (tFrac(live) * 100) + "%";
+        lane.querySelector(".tval").textContent = live > 0 ? fmtMs(live) : "";
+        const res = lane.querySelector(".res");
+        if (r.done) {
+            res.innerHTML = `sum <b>${r.snap.sum}</b> on A[${r.snap.i}..${r.snap.j})` +
+                (spoil ? ` &nbsp;·&nbsp; ${r.ops.toLocaleString()} additions` : "");
+        } else if (r.on) {
+            res.innerHTML = spoil
+                ? `${Math.round(100 * Math.min(1, r.snap.ops / Math.max(1, ALGS[r.key].cost(race.n))))}% · best so far ${r.snap.sum}`
+                : `best so far ${r.snap.sum}`;
+        } else {
+            res.innerHTML = spoil ? `${ALGS[r.key].cost(race.n).toLocaleString()} additions to do` : "";
+        }
+        drawLane(r);
+    }
+    drawPodium();
+    const modeTxt = race.mode === "workers"
+        ? "Each contender runs in its own worker thread, so they really do run at the same time; the clock is each " +
+          "runner's own measurement of its own execution."
+        : "All contenders share one thread and take turns in small slices; each is timed on the slices it actually " +
+          "used, so the numbers stay comparable — but nothing runs simultaneously.";
+    document.getElementById("raceNote").innerHTML =
+        modeTxt + " Untick a contender to leave it out — useful once n gets large enough that the cubic one " +
+        "would hold up the class.";
+}
+
+function drawLane(r) {
+    const c = document.getElementById("strip-" + r.key);
+    if (!c || !stripCache) return;
+    const w = stripCache.cssW, h = 46;
+    const ctx = c.getContext("2d");
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(stripCache, 0, 0, w, h);
+    if (!r.on && !r.done) return;
+    const n = race.n, mid = h / 2;
+    const X = i => Math.max(0, Math.min(w, i / n * w));
+    // the region currently being worked on
+    if (!r.done && r.snap.hi > r.snap.lo) {
+        ctx.fillStyle = CSS_COLOR[r.key]; ctx.globalAlpha = .1;
+        ctx.fillRect(X(r.snap.lo), 0, Math.max(1, X(r.snap.hi) - X(r.snap.lo)), h);
+        ctx.globalAlpha = 1;
+    }
+    // the best candidate so far, drawn as a line over its range
+    const x1 = X(r.snap.i), x2 = X(r.snap.j);
+    ctx.strokeStyle = CSS_COLOR[r.key]; ctx.lineWidth = r.done ? 4 : 3;
+    ctx.beginPath(); ctx.moveTo(x1, mid); ctx.lineTo(Math.max(x2, x1 + 2), mid); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x1, mid - 7); ctx.lineTo(x1, mid + 7);
+    ctx.moveTo(Math.max(x2, x1 + 2), mid - 7); ctx.lineTo(Math.max(x2, x1 + 2), mid + 7);
+    ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+function drawPodium() {
+    const spoil = document.getElementById("spoilTog").checked;
+    const heights = { 1: 120, 2: 88, 3: 62, 4: 34 };
+    const medals = { 1: "🥇", 2: "🥈", 3: "🥉", 4: "" };
+    const box = document.getElementById("podium");
+    box.innerHTML = [2, 1, 3, 4].map(place => {
+        const occ = race.runners.filter(r => r.place === place);
+        const who = occ.map(r =>
+            `<div class="pod-occ"><span class="medal">${medals[place]}</span>` +
+            `<span class="who" style="color:${CSS_COLOR[r.key]}">${ALGS[r.key].name}</span>` +
+            `<span class="tm">${fmtMs(r.ms)}${spoil ? " · " + r.ops.toLocaleString() + " additions" : ""}</span></div>`).join("");
+        return `<div class="pod-col">${who}<div class="pod-block" style="height:${heights[place]}px">${place}</div></div>`;
+    }).join("");
+}
+
+/* -------------------------------------------------------------- running - */
+function finish(r, ms, snap, ops) {
+    r.done = true; r.on = false; r.ms = ms; r.ops = ops;
+    r.snap = { sum: snap.sum, i: snap.i, j: snap.j, lo: 0, hi: race.n, ops };
+    race.finished.push(r);
+    // medals go by measured time, not by the order the scheduler happened to
+    // hand out slices — in worker mode the two coincide anyway
+    race.finished.slice().sort((a, b) => a.ms - b.ms)
+        .forEach((x, q) => { x.place = Math.min(4, q + 1); });
+    if (race.runners.every(x => x.done || !x.enabled)) endRace();
+}
+
+function startRace() {
+    if (!race) newRace();
+    if (race.running) return;
+    if (race.runners.every(r => r.done || !r.enabled)) newRace();
+    const field = race.runners.filter(r => r.enabled && !r.done);
+    if (!field.length) return;
+    race.mode = document.getElementById("modeSel").value;
+    race.running = true;
+    document.getElementById("raceBtn").disabled = true;
+    document.getElementById("stopBtn").disabled = false;
+    if (race.mode === "workers") startWorkers(field); else startSliced(field);
+    if (!raceRAF) raceRAF = requestAnimationFrame(raceLoop);
+}
+
+function startWorkers(field) {
+    if (!workerURL) workerURL = URL.createObjectURL(new Blob([WORKER_SRC], { type: "text/javascript" }));
+    let ready = 0;
+    let failed = false;
+    for (const r of field) {
+        try {
+            r.worker = new Worker(workerURL);
+        } catch (e) { failed = true; break; }
+        r.worker.onmessage = (ev) => {
+            const d = ev.data;
+            if (d.type === "ready") {
+                ready++;
+                if (ready === field.length) {
+                    race.goTime = performance.now();
+                    for (const q of field) { q.on = true; q.worker.postMessage({ type: "go" }); }
+                }
+            } else if (d.type === "p") {
+                r.snap = { sum: d.sum, i: d.i, j: d.j, lo: d.lo, hi: d.hi, ops: d.ops };
+            } else if (d.type === "done") {
+                finish(r, d.ms, d, d.ops);
+                r.worker.terminate(); r.worker = null;
+            }
+        };
+        r.worker.onerror = () => { fallbackToSliced(); };
+        r.worker.postMessage({ type: "init", alg: r.key, seed: race.seed, n: race.n });
+    }
+    if (failed) fallbackToSliced();
+}
+
+function fallbackToSliced() {
+    for (const r of race.runners) { if (r.worker) { r.worker.terminate(); r.worker = null; } }
+    document.getElementById("modeSel").value = "sliced";
+    race.mode = "sliced";
+    document.getElementById("raceNote").innerHTML =
+        "<b>Worker threads are not available here</b> — that happens when the file is opened directly from disk " +
+        "rather than served over http. Falling back to the time-sliced mode.";
+    startSliced(race.runners.filter(r => r.enabled && !r.done));
+}
+
+function startSliced(field) {
+    const M = algoModule();
+    for (const r of field) {
+        M.warmUp(r.key);
+        r.gen = M.makeGen(r.key, race.A, M.pubFor(r.key, race.n));
+        r.on = true; r.ms = 0;
+    }
+    race.goTime = performance.now();
+}
+
+function raceLoop() {
+    raceRAF = null;
+    if (race.mode === "sliced" && race.running) {
+        const budget = 6;                       // ms of real work per contender per frame
+        race.turn = ((race.turn || 0) + 1) % race.runners.length;   // rotate, so nobody
+        const order = race.runners.slice(race.turn).concat(race.runners.slice(0, race.turn));
+        for (const r of order) {                                    // is always served first
+            if (!r.on || r.done) continue;
+            const t0 = performance.now();
+            let res;
+            while (performance.now() - t0 < budget) {
+                res = r.gen.next();
+                if (res.done) break;
+                r.snap = res.value;
+            }
+            r.ms += performance.now() - t0;
+            if (res && res.done) finish(r, r.ms, res.value, res.value.ops);
+        }
+    }
+    drawRace();
+    if (race.running) raceRAF = requestAnimationFrame(raceLoop);
+}
+
+function endRace() {
+    race.running = false;
+    document.getElementById("raceBtn").disabled = false;
+    document.getElementById("stopBtn").disabled = true;
+}
+
+function stopRace() {
+    if (raceRAF) cancelAnimationFrame(raceRAF);
+    raceRAF = null;
+    if (race) {
+        for (const r of race.runners) {
+            if (r.worker) { r.worker.terminate(); r.worker = null; }
+            if (!r.done) { r.on = false; r.gen = null; }
+        }
+        race.running = false;
+        drawRace();
+    }
+    const b = document.getElementById("raceBtn"), st = document.getElementById("stopBtn");
+    if (b) b.disabled = false;
+    if (st) st.disabled = true;
+}
+
+/* ======================================================================
+   boot
+   ====================================================================== */
+function setMode(m) {
+    stopPlay(); stopRace();
+    for (const k of ["step", "measure", "race"]) {
+        document.getElementById("panel-" + k).classList.toggle("hidden", k !== m);
+        document.getElementById("tab-" + k).classList.toggle("on", k === m);
+    }
+    if (m === "measure") drawPlots();
+    if (m === "race") {
+        if (!document.getElementById("nPresets").children.length) buildNPresets();
+        if (!race) newRace(); else { buildStrip(); buildLanes(); drawRace(); }
+    }
+}
+
+function boot() {
+    const algSel = document.getElementById("algSel"), mAlgSel = document.getElementById("mAlgSel");
+    for (const k of ALG_KEYS) {
+        const o = document.createElement("option");
+        o.value = k; o.innerHTML = ALGS[k].name + " — " + ALGS[k].sub;
+        algSel.appendChild(o);
+        mAlgSel.appendChild(o.cloneNode(true));
+    }
+    const ps = document.getElementById("presetSel");
+    for (const name in PRESETS) {
+        const o = document.createElement("option");
+        o.value = PRESETS[name]; o.textContent = name;
+        ps.appendChild(o);
+    }
+    document.getElementById("inputText").value = PRESETS["Mixed signs (10)"];
+    loadFromText();
+    window.addEventListener("resize", () => {
+        drawPlots();
+        if (race && !document.getElementById("panel-race").classList.contains("hidden")) { buildStrip(); buildLanes(); drawRace(); }
+    });
+    document.addEventListener("keydown", e => {
+        if (document.getElementById("panel-step").classList.contains("hidden")) return;
+        if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+        if (e.key === "ArrowRight") { stepFwd(); e.preventDefault(); }
+        if (e.key === "ArrowLeft")  { stepBack(); e.preventDefault(); }
+        if (e.key === " ")          { togglePlay(); e.preventDefault(); }
+    });
+}
+boot();
+</script>
+</body>
+</html>

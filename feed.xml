@@ -6,8 +6,8 @@
 </description>
     <link>https://www.wild-inter.net/</link>
     <atom:link href="https://www.wild-inter.net/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Fri, 04 Sep 2026 23:10:41 +0200</pubDate>
-    <lastBuildDate>Fri, 04 Sep 2026 23:10:41 +0200</lastBuildDate>
+    <pubDate>Sat, 19 Sep 2026 22:21:14 +0200</pubDate>
+    <lastBuildDate>Sat, 19 Sep 2026 22:21:14 +0200</lastBuildDate>
     <generator>Jekyll v3.10.0</generator>
     
       <item>
@@ -363,6 +363,12 @@ Where I will long term host code is not decided yet.&lt;/p&gt;
 &lt;/script&gt;
 
 &lt;script type=&quot;text/javascript&quot; src=&quot;https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML&quot;&gt;&lt;/script&gt;
+
+&lt;h2 id=&quot;update&quot;&gt;Update&lt;/h2&gt;
+
+&lt;p&gt;&lt;em&gt;A (vibe-coded) remake of the game with a few additional features is available at &lt;a href=&quot;https://powersort.github.io/powersorts-pursuit&quot;&gt;powersort.github.io/powersorts-pursuit&lt;/a&gt;.&lt;/em&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;original-version&quot;&gt;Original version&lt;/h2&gt;
 
 &lt;p&gt;My colleague &lt;a href=&quot;https://pcwww.liv.ac.uk/~tonymcc/&quot;&gt;Tony McCabe&lt;/a&gt; put a &lt;a href=&quot;https://pgb.liv.ac.uk/~tony/mgame/index.php&quot;&gt;game implementation of merging policies&lt;/a&gt;
 together, where you can try to find the minimal-mergecost order of merges.&lt;/p&gt;

@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arithmetic coding · renormalization and fixed precision, step by step</title>
+<style>
+  :root {
+    --wi-bg:#f5ebd9; --wi-panel:#faf6ed; --wi-panel-2:#fcf9f3; --wi-controls:#ecddc5;
+    --wi-border:#b9a793; --wi-border-soft:#d4c5b4; --wi-border-strong:#8d897c;
+    --wi-ink:#46433a; --wi-ink-strong:#38362e; --wi-ink-soft:#6b675c; --wi-ink-faint:#8b8779;
+    --wi-accent:#902015; --wi-accent-dark:#6d180f; --wi-accent-soft:#c28577; --wi-link:#821d13;
+    --wi-active:#cc2f22; --wi-examine:#b07d18; --wi-queue:#2a6a63; --wi-relax:#4a7c3f;
+    --wi-inert:#b6b1a1;
+    --wi-font-body:texgyrepagella, Palatino, "Palatino Linotype", "Palatino LT STD", "URWPalladioL", "URW Palladio L", serif;
+    --wi-font-head:epigrafica, Optima, "URWClassicoT", "URW Classico", "URW Classico T", sans-serif;
+    --wi-font-mono:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --wi-radius:4px; --wi-radius-lg:5px;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--wi-bg); color:var(--wi-ink); font-family:var(--wi-font-body);
+         font-size:19px; line-height:1.5; margin:0; padding:20px 26px 48px; }
+  h1,h2,h3,.sim-title,.wi-caption { font-family:var(--wi-font-head); letter-spacing:.05em; }
+  h1 { font-size:1.55rem; color:var(--wi-accent); margin:0; }
+  .titlebar { display:flex; align-items:center; justify-content:space-between; gap:18px;
+              flex-wrap:wrap; margin:0 0 6px; }
+  a { color:var(--wi-link); text-decoration:none; }
+  a:hover { color:var(--wi-ink); text-shadow:0 0 5px var(--wi-accent-soft); }
+  .subtitle { font-size:.86rem; color:var(--wi-ink-soft); margin:0 0 16px; max-width:92ch; line-height:1.5; }
+  .subtitle code, .hint code { background:var(--wi-controls); padding:1px 5px; border-radius:3px; font-size:.85em; }
+
+  /* --- control chrome --- */
+  .controls { display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center;
+              background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+              border-radius:var(--wi-radius-lg); padding:12px 18px; margin-bottom:14px; }
+  .ctl { display:flex; align-items:center; gap:8px; }
+  .ctl > label, .lbl { font-family:var(--wi-font-head); font-size:.72rem; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--wi-ink-strong); }
+  button { font-family:var(--wi-font-head); letter-spacing:.03em; background:var(--wi-panel);
+           color:var(--wi-ink-strong); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:6px 13px; font-size:.85rem; cursor:pointer;
+           transition:background .15s,border-color .15s,color .15s; }
+  button:hover:not(:disabled) { background:var(--wi-panel-2); border-color:var(--wi-border-strong); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.pri { background:var(--wi-accent); border-color:var(--wi-accent); color:var(--wi-panel-2); }
+  button.pri:hover:not(:disabled) { background:var(--wi-accent-dark); border-color:var(--wi-accent-dark); }
+  button.icon { font-family:var(--wi-font-body); font-variant-emoji:text;
+                font-size:1.02rem; line-height:1.1; padding:4px 0; width:2.5em; text-align:center; }
+  select, input[type=text], input[type=number] { font-family:var(--wi-font-body); background:var(--wi-panel);
+           color:var(--wi-ink); border:1px solid var(--wi-border); border-radius:var(--wi-radius);
+           padding:4px 7px; font-size:.85rem; }
+  input.str { font-family:var(--wi-font-mono); font-size:.8rem; width:12em; }
+  input[type=range] { accent-color:var(--wi-accent); cursor:pointer; vertical-align:middle; }
+  .seg { display:inline-flex; border:1px solid var(--wi-border); border-radius:var(--wi-radius); overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:5px 12px; font-size:.8rem; background:var(--wi-panel); }
+  .seg button + button { border-left:1px solid var(--wi-border); }
+  .seg button.on { background:var(--wi-accent); color:var(--wi-panel-2); }
+  label.chk { display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--wi-ink-soft); cursor:pointer; }
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+  [tabindex]:focus-visible { outline:2px solid var(--wi-accent); outline-offset:2px; border-radius:2px; }
+
+  /* --- operation bar --- */
+  .opbar { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; padding:10px 18px;
+           background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+           border-radius:var(--wi-radius-lg); margin-bottom:14px; }
+  .opnote { font-size:.78rem; color:var(--wi-ink-faint); }
+  .opnote b { color:var(--wi-accent); }
+  .opnote code { font-family:var(--wi-font-mono); font-size:.9em; }
+
+  /* --- transport: slider + phase bar --- */
+  .transport { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+               border-radius:var(--wi-radius-lg); padding:10px 18px 12px; margin-bottom:18px; }
+  .transport-row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .progress { flex:1 1 320px; min-width:220px; --thumb:8px; }
+  .progress input[type=range] { display:block; width:100%; margin:0; }
+  .stepno { font-family:var(--wi-font-mono); font-size:.76rem; color:var(--wi-ink-faint);
+            white-space:nowrap; text-align:right; padding-top:4px; }
+  .phasebar { display:flex; margin:5px var(--thumb) 0;
+              width:calc(100% - var(--thumb) - var(--thumb)); }
+  .phasebtn { position:relative; overflow:hidden;
+              flex-grow:1; flex-basis:0; min-width:0; padding:3px 4px; font-size:.68rem; line-height:1.3;
+              font-family:var(--wi-font-head); letter-spacing:.03em;
+              background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+              border-left-width:0; border-radius:0; color:var(--wi-ink-faint); cursor:pointer;
+              text-overflow:ellipsis; white-space:nowrap; }
+  .phasebtn:first-child { border-left-width:1px; border-radius:var(--wi-radius) 0 0 var(--wi-radius); }
+  .phasebtn:last-child { border-radius:0 var(--wi-radius) var(--wi-radius) 0; }
+  .phasebtn .fill { position:absolute; left:0; top:0; bottom:0; background:#eedcd3;
+                    border-right:1px solid var(--wi-accent-soft); transition:width .12s linear; }
+  .phasebtn .fill.empty { border-right:0; }
+  .phasebtn .lab { position:relative; }
+  .phasebtn.on { border-color:var(--wi-accent-soft); color:var(--wi-accent); font-weight:bold; }
+  .phasebtn.past { color:var(--wi-ink-soft); }
+  .phasebtn.past .fill { border-right-color:transparent; }
+
+  /* --- stage --- */
+  .stage { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(320px,1fr); gap:18px; align-items:start; }
+  @media (max-width:1080px) { .stage { grid-template-columns:1fr; } }
+  .col-side { display:flex; flex-direction:column; gap:14px; }
+  .sim-box { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+             border-radius:var(--wi-radius-lg); padding:12px 15px; }
+  .sim-box + .sim-box { margin-top:14px; }
+  .col-side .sim-box + .sim-box { margin-top:0; }
+  .sim-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+               color:var(--wi-ink-faint); margin:0 0 9px; display:flex; justify-content:space-between;
+               align-items:baseline; gap:10px; }
+  .sim-title .rhs { text-transform:none; letter-spacing:.02em; font-family:var(--wi-font-mono);
+                    font-size:.9em; color:var(--wi-ink-soft); }
+  svg.stagesvg { display:block; background:var(--wi-bg); border-radius:var(--wi-radius); touch-action:manipulation; }
+  .svgscroll { overflow-x:auto; overflow-y:hidden; }
+  .svgscroll svg { max-width:none; }
+
+  .status { background:var(--wi-controls); border:1px solid var(--wi-border-soft);
+            border-radius:var(--wi-radius); padding:10px 13px; font-size:.9rem;
+            color:var(--wi-ink-strong); min-height:92px; }
+  .status .ans { display:block; margin-top:6px; font-size:.95rem; color:var(--wi-accent); }
+  .status code, .status .ch { font-family:var(--wi-font-mono); font-size:.86em; background:var(--wi-panel-2);
+                 padding:1px 4px; border-radius:3px; }
+  .status .warn { color:var(--wi-active); }
+
+  .legend { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.72rem;
+            color:var(--wi-ink-soft); }
+  .legend .item { display:flex; align-items:center; gap:6px; }
+  .sw { width:.85em; height:.85em; border-radius:2px; border:1px solid var(--wi-border); display:inline-block; }
+
+  /* --- the state table (l and p per iteration) --- */
+  table.state { border-collapse:collapse; width:100%; font-size:.78rem; }
+  table.state th { font-family:var(--wi-font-head); font-size:.66rem; text-transform:uppercase;
+                   letter-spacing:.08em; color:var(--wi-ink-faint); font-weight:normal;
+                   text-align:right; padding:2px 6px; border-bottom:1px solid var(--wi-border-soft); }
+  table.state th:first-child { text-align:left; }
+  table.state td { font-family:var(--wi-font-mono); font-size:.76rem; padding:2px 6px; text-align:right;
+                   border-bottom:1px solid #e8ddc9; color:var(--wi-ink-strong); white-space:nowrap; }
+  table.state td:first-child { text-align:left; color:var(--wi-ink-faint); }
+  table.state tr.cur td { background:#f6e6df; color:var(--wi-accent-dark); }
+  table.state tr.cur td:first-child { color:var(--wi-accent); }
+  table.state .frac { color:var(--wi-ink-soft); }
+  .frac { font-family:var(--wi-font-mono); font-size:.92em; }
+  .tblwrap { max-height:260px; overflow-y:auto; }
+
+  .bits { font-family:var(--wi-font-mono); font-size:1.05rem; letter-spacing:.16em; word-break:break-all;
+          color:var(--wi-accent-dark); line-height:1.7; }
+  .bits .todo { color:var(--wi-inert); }
+  .bits .new { background:#f6e6df; border-radius:2px; }
+  .kv { display:flex; flex-wrap:wrap; gap:3px 16px; font-size:.78rem; color:var(--wi-ink-soft); margin-top:7px; }
+  .kv b { font-family:var(--wi-font-mono); font-weight:normal; color:var(--wi-ink-strong); }
+  .srcline { font-family:var(--wi-font-mono); font-size:1rem; letter-spacing:.1em; word-break:break-all; }
+  .srcline .done { color:var(--wi-ink-strong); }
+  .srcline .cur { background:#f6e6df; color:var(--wi-accent); font-weight:bold; border-radius:2px; }
+  .srcline .todo { color:var(--wi-inert); }
+  .srcline .eof { color:var(--wi-examine); }
+
+  /* --- pseudocode --- */
+  details.code { background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                 border-radius:var(--wi-radius-lg); padding:0; }
+  details.code > summary { cursor:pointer; padding:10px 15px; font-family:var(--wi-font-head);
+                           font-size:.72rem; text-transform:uppercase; letter-spacing:.1em;
+                           color:var(--wi-ink-faint); }
+  details.code[open] > summary { border-bottom:1px solid var(--wi-border-soft); color:var(--wi-accent); }
+  .codebody { padding:8px 6px 12px; overflow-x:auto; }
+  .cline { display:flex; gap:9px; padding:2px 9px; font-family:var(--wi-font-mono); font-size:.75rem;
+           line-height:1.55; color:var(--wi-ink-strong); border-left:3px solid transparent;
+           white-space:pre; }
+  .cline .ln { color:var(--wi-ink-faint); min-width:1.4em; text-align:right; user-select:none; }
+  .cline.on { background:#f6e6df; border-left-color:var(--wi-active); }
+  .cline.skip { opacity:.42; }
+  .cline .kw { color:var(--wi-accent); }
+  .cline .cm { color:var(--wi-ink-faint); font-style:italic; }
+  .sublabel { font-family:var(--wi-font-head); font-size:.66rem; letter-spacing:.09em;
+              text-transform:uppercase; color:var(--wi-ink-faint); padding:10px 12px 3px;
+              border-top:1px solid var(--wi-border-soft); margin-top:6px; }
+  .sublabel:first-child { border-top:0; margin-top:0; padding-top:2px; }
+  .codenote { font-size:.72rem; color:var(--wi-ink-faint); padding:8px 15px 0; line-height:1.45; }
+  .codenote b { color:var(--wi-accent); }
+
+  /* --- editor --- */
+  details.editor { margin-top:18px; background:var(--wi-panel); border:1px solid var(--wi-border-soft);
+                   border-radius:var(--wi-radius-lg); }
+  details.editor > summary { cursor:pointer; padding:11px 16px; font-family:var(--wi-font-head);
+                             font-size:.78rem; letter-spacing:.06em; color:var(--wi-ink-soft); }
+  .editor-body { padding:0 16px 16px; display:grid; grid-template-columns:minmax(0,300px) 1fr;
+                 gap:16px; align-items:start; }
+  @media (max-width:760px) { .editor-body { grid-template-columns:1fr; } }
+  textarea { width:100%; height:190px; font-family:var(--wi-font-mono); font-size:.78rem;
+             background:var(--wi-panel-2); color:var(--wi-ink); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); padding:8px; resize:vertical; }
+  .hint { font-size:.76rem; color:var(--wi-ink-soft); line-height:1.5; }
+  .hint b { color:var(--wi-ink-strong); }
+  .err { color:var(--wi-active); font-size:.78rem; min-height:1.2em; margin-top:6px; }
+
+  .tooltip { position:fixed; z-index:40; pointer-events:none; background:var(--wi-panel-2);
+             border:1px solid var(--wi-border-strong); border-radius:var(--wi-radius);
+             padding:6px 9px; font-size:.76rem; color:var(--wi-ink-strong);
+             box-shadow:0 3px 10px rgba(0,0,0,.12); max-width:280px; display:none; line-height:1.45; }
+  .tooltip .tt-h { font-family:var(--wi-font-head); letter-spacing:.04em; color:var(--wi-accent); }
+  .tooltip .tt-s { color:var(--wi-ink-faint); font-family:var(--wi-font-mono); font-size:.94em; }
+
+  .mobile-note { display:none; background:var(--wi-controls); border:1px solid var(--wi-accent-soft);
+                 border-radius:var(--wi-radius-lg); padding:11px 15px; font-size:.82rem;
+                 color:var(--wi-ink-strong); margin-bottom:14px; }
+  @media (max-width:760px) {
+    body { padding:16px 12px 40px; font-size:17px; }
+    .titlebar { flex-direction:column; align-items:flex-start; gap:8px; }
+    h1 { font-size:1.3rem; }
+    .controls, .opbar { gap:8px 12px; padding:10px 12px; }
+    .ctl { flex-wrap:wrap; gap:6px; }
+    .seg { flex-wrap:wrap; overflow:visible; border-radius:var(--wi-radius); }
+    .seg button { padding:5px 9px; font-size:.74rem; border-radius:0; }
+    .lbl, .ctl > label { font-size:.64rem; }
+    button { padding:6px 10px; font-size:.8rem; }
+    .phasebtn { font-size:.6rem; padding:3px 2px; }
+    .stepno { font-size:.7rem; }
+    .mobile-note { display:block; }
+    .desk-only { display:none !important; }
+  }
+
+  /* --- SVG classes --- */
+  .slice { stroke:var(--wi-border-soft); stroke-width:1; cursor:pointer; }
+  .slice.a { fill:var(--wi-panel-2); }
+  .slice.b { fill:#f3ecdc; }
+  .slice.eof { fill:#f4e7cb; }
+  .slice.chosen { fill:#f0d7cd; stroke:var(--wi-accent); stroke-width:1.6; }
+  .slice.summed { fill:#f7edd9; stroke:var(--wi-examine); }
+  .slice.dim { opacity:.5; }
+  .rowbox { fill:none; stroke:var(--wi-border-strong); stroke-width:1; }
+  .rowbox.cur { stroke:var(--wi-accent); stroke-width:2; }
+  .wedge { fill:var(--wi-accent-soft); opacity:.20; stroke:none; }
+  .wedge.fresh { animation:fade .3s ease-out both; }
+  .slab { font-family:var(--wi-font-mono); font-size:13px; fill:var(--wi-ink-strong);
+          text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .slab.dim { fill:var(--wi-ink-faint); font-size:11px; }
+  .rowlab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint);
+            text-anchor:end; dominant-baseline:central; pointer-events:none; }
+  .endlab { font-family:var(--wi-font-mono); font-size:10.5px; fill:var(--wi-ink-faint);
+            dominant-baseline:central; pointer-events:none; }
+  .qmark { stroke:var(--wi-examine); stroke-width:2; }
+  .tgt { stroke:var(--wi-active); stroke-width:2; }
+  .tgtdot { fill:var(--wi-active); }
+  .dyadband { fill:#f0d7cd; opacity:.55; }
+  .dyadcell { fill:var(--wi-panel-2); stroke:var(--wi-border-soft); stroke-width:1; }
+  .dyadcell.cand { fill:#f7edd9; stroke:var(--wi-examine); stroke-width:1.8; }
+  .dyadcell.bad  { fill:#f7ded8; stroke:var(--wi-active); stroke-width:1.8; }
+  .dyadcell.good { fill:#e8f0e2; stroke:var(--wi-relax); stroke-width:2.2; }
+  .dyadcell.dim  { fill:var(--wi-bg); stroke:var(--wi-border-soft); opacity:.55; }
+  .dyadlab { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-strong);
+             text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .dyadrow { font-family:var(--wi-font-mono); font-size:11px; fill:var(--wi-ink-faint);
+             text-anchor:end; dominant-baseline:central; pointer-events:none; }
+  .edge { stroke:var(--wi-accent); stroke-width:1.4; stroke-dasharray:3 3; }
+
+  @keyframes fade { from { opacity:0 } to { opacity:.20 } }
+  @keyframes popin { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+  .pop { animation:popin .28s ease-out both; transform-box:fill-box; }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+<style>
+  /* --- this page only --- */
+  .zone { stroke:none; }
+  .zone.lo   { fill:#dbe6ee; }
+  .zone.hi   { fill:#dfe8da; }
+  .zone.mid  { fill:#f2e3d2; }
+  .zone.off  { opacity:.30; }
+  .zone.on   { opacity:.95; }
+  .zonelab { font-family:var(--wi-font-head); font-size:10.5px; letter-spacing:.05em;
+             text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+  .axis { stroke:var(--wi-border-strong); stroke-width:1; }
+  .tick { stroke:var(--wi-border-strong); stroke-width:1; }
+  .tick.half { stroke:var(--wi-accent); stroke-width:1.4; stroke-dasharray:3 2; }
+  .ticklab { font-family:var(--wi-font-mono); font-size:10.5px; fill:var(--wi-ink-faint);
+             text-anchor:middle; dominant-baseline:hanging; pointer-events:none; }
+  .band { fill:#f0d7cd; stroke:var(--wi-accent); stroke-width:1.6; }
+  .band.ghost { fill:none; stroke:var(--wi-inert); stroke-width:1.2; stroke-dasharray:4 3; }
+  .band.slice { fill:var(--wi-panel-2); stroke:var(--wi-border-soft); stroke-width:1; }
+  .band.slice.pick { fill:#f0d7cd; stroke:var(--wi-accent); stroke-width:1.4; }
+  .band.slice.eof  { fill:#f4e7cb; }
+  .moveto { stroke:var(--wi-accent); stroke-width:1.6; fill:none; marker-end:url(#ah); }
+  .dmark { stroke:var(--wi-active); stroke-width:2; }
+  .bandlab { font-family:var(--wi-font-mono); font-size:10.5px; fill:var(--wi-ink-soft);
+             dominant-baseline:central; pointer-events:none; }
+
+  /* history strip */
+  .hrow { fill:var(--wi-bg); stroke:var(--wi-border-soft); stroke-width:.8; }
+  .hband { stroke:none; }
+  .hband.narrow { fill:var(--wi-accent-soft); }
+  .hband.b0 { fill:#7ba3bd; }
+  .hband.b1 { fill:#7fa073; }
+  .hband.st { fill:var(--wi-examine); }
+  .hlab { font-family:var(--wi-font-mono); font-size:9.5px; fill:var(--wi-ink-faint);
+          dominant-baseline:central; pointer-events:none; }
+  .hlab.e { text-anchor:end; }
+  .hcur { fill:none; stroke:var(--wi-accent); stroke-width:1.6; }
+
+  /* bit stream */
+  .bitrow { display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; }
+  .bx { font-family:var(--wi-font-mono); font-size:.9rem; width:1.5em; text-align:center;
+        border:1px solid var(--wi-border-soft); border-radius:2px; background:var(--wi-panel-2);
+        color:var(--wi-ink-strong); }
+  .bx.b0 { border-color:#7ba3bd; }
+  .bx.b1 { border-color:#7fa073; }
+  .bx.pend { border-color:var(--wi-examine); border-style:dashed; color:var(--wi-examine);
+             background:#f9f2e2; }
+  .bx.fresh { background:#f6e6df; border-color:var(--wi-accent); color:var(--wi-accent);
+              font-weight:bold; }
+  .bx.tail { background:#eef3ea; border-color:var(--wi-relax); }
+  .bx.read { opacity:.35; }
+
+  /* binary registers */
+  .reg { font-family:var(--wi-font-mono); font-size:.82rem; letter-spacing:.09em;
+         color:var(--wi-ink-strong); white-space:nowrap; }
+  .reg .hi { color:var(--wi-accent); font-weight:bold; }
+  .reg .lo { color:var(--wi-ink-faint); }
+  .regrow { display:flex; gap:9px; align-items:baseline; margin-top:3px; }
+  .regrow .nm { font-family:var(--wi-font-head); font-size:.7rem; letter-spacing:.06em;
+                color:var(--wi-ink-faint); min-width:1.6em; }
+  .cmp { font-size:.78rem; color:var(--wi-ink-soft); line-height:1.55; }
+  .cmp b { color:var(--wi-ink-strong); font-family:var(--wi-font-mono); font-weight:normal; }
+  .cmp .same { color:var(--wi-relax); }
+  .cmp .diff { color:var(--wi-examine); }
+  .codebody { display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr));
+              gap:12px; padding:12px 14px 16px; align-items:start; overflow-x:auto; }
+  @media (max-width:760px) { .codebody { grid-template-columns:1fr; padding:10px; } }
+  .codeblk { background:var(--wi-panel-2); border:1px solid var(--wi-border);
+             border-radius:var(--wi-radius); overflow:hidden; }
+  .codeblk > .sublabel { margin:0; padding:6px 11px 5px; border:0;
+                         border-bottom:1px solid var(--wi-border-soft);
+                         background:var(--wi-controls); color:var(--wi-ink-strong); }
+  .codeblk > .cline:first-of-type { margin-top:5px; }
+  .codeblk > .cline:last-child { margin-bottom:5px; }
+  .codeblk .cline { padding-right:11px; }
+  .codeblk.act { border-color:var(--wi-accent-soft); }
+  .cline.on2 { background:#f8efe6; border-left-color:var(--wi-accent-soft); }
+</style>
+</head>
+<body>
+
+<div class="wi-topbar">
+  <a class="wi-home" href="https://www.wild-inter.net/">wild-inter.net</a>
+</div>
+
+<div class="titlebar">
+  <h1>Arithmetic coding &nbsp;·&nbsp; renormalization and fixed precision</h1>
+</div>
+
+<p class="subtitle">
+  Zooming into an interval needs <i>&Omega;</i>(<i>n</i>) bits of precision — unless the leading bits are
+  written out as soon as they are decided, and the interval is <b>doubled</b> to make room again.
+  Once [ℓ,&nbsp;ℓ+<i>p</i>) lies in the lower half the code must start with <code>0</code>; in the upper half,
+  with <code>1</code>.  The awkward case is an interval straddling ½: it is inside [¼,&nbsp;¾), so the next two
+  bits are <code>01</code> or <code>10</code> — one <b>outstanding opposite bit</b> is remembered and emitted
+  later.  With that, ℓ and <i>p</i> never leave a fixed range, and the whole coder runs in
+  <b>fixed-precision integer arithmetic</b>.
+</p>
+
+<div class="mobile-note">
+  <b>Small screen:</b> this is the compact demo — the interval, the history and the output bits.
+  The pseudocode with live line highlighting is on the desktop version.
+</div>
+
+<div class="controls">
+  <div class="ctl">
+    <label for="presetSel">Example</label>
+    <select id="presetSel"></select>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Arithmetic</span>
+    <span class="seg" id="modeSeg">
+      <button id="modeHalf" class="on" title="exact rationals in [0,1), renormalizing by halves">exact, by halves</button>
+      <button id="modeFix" title="b-bit integers L and R, as in Moffat, Neal, Witten">fixed precision</button>
+    </span>
+  </div>
+  <div class="ctl" id="bWrap" style="display:none">
+    <label for="bSel"><i>b</i></label>
+    <select id="bSel"></select>
+    <span class="opnote" id="fNote"></span>
+  </div>
+  <div class="ctl">
+    <span class="lbl">Direction</span>
+    <span class="seg" id="dirSeg">
+      <button id="dirEnc" class="on">Encode</button>
+      <button id="dirDec">Decode</button>
+    </span>
+  </div>
+  <div class="ctl" id="encIn">
+    <label for="inText">Text <i>S</i></label>
+    <input type="text" id="inText" class="str" spellcheck="false">
+    <button id="applyBtn" class="pri">Set</button>
+  </div>
+  <div class="ctl">
+    <label class="chk" title="the paper's finish_encode writes all b bits of L; the frugal variant writes only the shortest dyadic tail"><input type="checkbox" id="flushChk"> flush all <i>b</i> bits of <i>L</i></label>
+  </div>
+</div>
+
+<div class="opbar">
+  <span class="opnote" id="modelNote"></span>
+  <span class="opnote" style="margin-left:auto">Arrow keys step; hover a slice or a history row for its numbers.</span>
+</div>
+
+<div class="transport">
+  <div class="transport-row">
+    <span class="ctl" style="gap:6px">
+      <button id="resetBtn" class="icon" title="Back to the first step" aria-label="Back to the first step">&#x21BA;</button>
+      <button id="backBtn" class="icon" title="One step back  (←)" aria-label="One step back">&#x23EE;&#xFE0E;</button>
+      <button id="stepBtn" class="icon pri" title="One step forward  (→)" aria-label="One step forward">&#x23ED;&#xFE0E;</button>
+      <button id="playBtn" class="icon" title="Play / pause" aria-label="Play">&#x25B6;&#xFE0E;</button>
+    </span>
+    <span class="progress">
+      <input type="range" id="scrubber" min="0" max="0" value="0">
+      <div class="phasebar" id="phaseBar"></div>
+    </span>
+    <span class="stepno" id="stepNo">— / —</span>
+    <span class="ctl" style="gap:6px">
+      <span class="lbl">Speed</span>
+      <input type="range" id="speed" min="60" max="1400" value="480" style="width:88px">
+      <span class="stepno" id="speedVal">480ms</span>
+    </span>
+  </div>
+</div>
+
+<div class="stage">
+  <div>
+    <div class="sim-box">
+      <div class="sim-title"><span>The interval, always inside [0,&nbsp;1)</span><span class="rhs" id="ivMeta"></span></div>
+      <div class="svgscroll" id="ivWrap"><svg id="ivSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item"><span class="sw" style="background:#dbe6ee"></span> lower half &rarr; write <code>0</code></span>
+        <span class="item"><span class="sw" style="background:#dfe8da"></span> upper half &rarr; write <code>1</code></span>
+        <span class="item"><span class="sw" style="background:#f2e3d2"></span> middle half &rarr; one outstanding bit</span>
+        <span class="item"><span class="sw" style="background:#f0d7cd;border-color:var(--wi-accent)"></span> current interval</span>
+      </div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Every step so far</span><span class="rhs" id="histMeta"></span></div>
+      <div class="svgscroll" id="histWrap" style="max-height:340px;overflow-y:auto"><svg id="histSvg" class="stagesvg"></svg></div>
+      <div class="legend">
+        <span class="item">a character narrows the interval; a renormalization doubles it back — so <i>p</i> never falls to or below ¼</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-side">
+    <div class="sim-box">
+      <div class="sim-title"><span>What just happened</span><span class="rhs" id="phaseName"></span></div>
+      <div class="status" id="statusBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span id="bitsTitle">Output bits</span><span class="rhs" id="bitsMeta"></span></div>
+      <div id="bitsBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>State</span><span class="rhs" id="stateMeta"></span></div>
+      <div id="stateBox"></div>
+    </div>
+
+    <div class="sim-box">
+      <div class="sim-title"><span>Against the exact coder</span><span class="rhs" id="cmpMeta"></span></div>
+      <div id="cmpBox" class="cmp"></div>
+    </div>
+  </div>
+</div>
+
+<details class="code desk-only" id="codeBox" open style="margin-top:18px">
+  <summary>Pseudocode</summary>
+  <div class="codebody" id="codeBody"></div>
+  <div class="codenote" id="codeNote"></div>
+</details>
+
+<details class="editor">
+  <summary>Input</summary>
+  <div class="editor-body">
+    <div>
+      <textarea id="inputText" spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="pri" id="loadBtn">Load</button></div>
+      <div class="err" id="parseErr"></div>
+    </div>
+    <div class="hint">
+      The same format as the other arithmetic-coding page, so example files can be used with both.
+      One directive per line; <code>#</code> starts a comment.
+      <br><br>
+      <b>model</b> <code>uniform</code> | <code>fixed</code> | <code>adaptive</code><br>
+      <b>alphabet</b> <code>0 1 2</code> — the symbols, in the order in which they divide the interval.<br>
+      <b>eof</b> <code>0.15</code> — probability of the end-of-text symbol&nbsp;$, which takes the topmost
+      slice.  <code>eof 0</code> means the text length is known to the decoder instead.<br>
+      <b>p</b> <code>a 0.425</code> — a symbol's weight, for <code>model fixed</code>; weights are normalised
+      to sum to 1&nbsp;&minus;&nbsp;P($).<br>
+      <b>text</b> <code>21101</code> — the source text.<br>
+      <b>n</b> <code>5</code> — how many symbols to decode when there is no&nbsp;$.
+      <br><br>
+      In the fixed-precision setting the model's probabilities are turned into the smallest integer
+      frequency counts that represent them exactly, and <i>t</i> is their sum; the coder needs
+      <i>t</i>&nbsp;&le;&nbsp;2<sup><i>f</i></sup> with <i>f</i>&nbsp;&le;&nbsp;<i>b</i>&minus;2, so a model
+      with awkward probabilities forces a larger&nbsp;<i>b</i>.
+    </div>
+  </div>
+</details>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   Renormalization and fixed-precision arithmetic coding.
+
+   Two levels of the same algorithm, switchable:
+
+   (a) "exact, by halves".  l and p are exact rationals in [0,1).  After each
+       character the interval is renormalized as long as one of the three
+       cases of the lecture applies:
+           [l,l+p) subset [0,1/2)  -> write 0,        l:=2l,       p:=2p
+           [l,l+p) subset [1/2,1)  -> write 1,        l:=2(l-1/2), p:=2p
+           [l,l+p) subset [1/4,3/4)-> one outstanding bit,
+                                                      l:=2(l-1/4), p:=2p
+       The loop keeps p > 1/4: an interval of width <= 1/4 that fits in none
+       of the three would need l > 1/4 (else it fits in the lower half) and
+       l < 1/2 (else in the upper), hence l+p <= 3/4 -- the middle case.
+
+   (b) "fixed precision".  L and R are b-bit integers with L/2^b = l and
+       R/2^b = p, and the model is given as integer frequency counts l,h,t.
+       This is Moffat, Neal and Witten's Algorithm IMPROVED CODER (Figure 9)
+       with Algorithm ENCODER RENORMALIZATION (Figure 7); the three cases of
+       the renormalization loop are literally the three cases above, scaled.
+
+   Termination.  Frugal by default: the shortest dyadic interval inside the
+   final [l,l+p) is written out, its first bit through bit_plus_follow.  With
+   (a) that reproduces the code of the non-renormalized algorithm exactly.
+   The paper instead writes all b bits of L; that is the checkbox.
+   ========================================================================== */
+
+const el = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const vis = c => c === " " ? "\u2423" : c;
+
+/* ---------- exact rational arithmetic ------------------------------------ */
+
+function bgcd(a, b) { if (a < 0n) a = -a; if (b < 0n) b = -b; while (b) { const t = a % b; a = b; b = t; } return a; }
+function blcm(a, b) { return a / bgcd(a, b) * b; }
+
+class R {
+  constructor(n, d) {
+    n = BigInt(n); d = d === undefined ? 1n : BigInt(d);
+    if (d === 0n) throw new Error("zero denominator");
+    if (d < 0n) { n = -n; d = -d; }
+    const g = bgcd(n, d) || 1n;
+    this.n = n / g; this.d = d / g;
+  }
+  add(o) { return new R(this.n * o.d + o.n * this.d, this.d * o.d); }
+  sub(o) { return new R(this.n * o.d - o.n * this.d, this.d * o.d); }
+  mul(o) { return new R(this.n * o.n, this.d * o.d); }
+  div(o) { return new R(this.n * o.d, this.d * o.n); }
+  cmp(o) { const l = this.n * o.d, r = o.n * this.d; return l < r ? -1 : l > r ? 1 : 0; }
+  lt(o) { return this.cmp(o) < 0; }  gt(o) { return this.cmp(o) > 0; }
+  le(o) { return this.cmp(o) <= 0; } ge(o) { return this.cmp(o) >= 0; }
+  isZero() { return this.n === 0n; }
+  num() { const S = 10n ** 18n; return Number(this.n * S / this.d) / 1e18; }
+  dec(k) {
+    const S = 10n ** BigInt(k);
+    let v = this.n * S / this.d, neg = v < 0n; if (neg) v = -v;
+    return (neg ? "-" : "") + (v / S).toString() + "." + (v % S).toString().padStart(k, "0");
+  }
+  frac() { return this.d === 1n ? this.n.toString() : this.n + "/" + this.d; }
+  short() { return this.d.toString().length <= 9 && this.n.toString().length <= 9; }
+}
+R.ZERO = new R(0n); R.ONE = new R(1n);
+const HALF = new R(1n, 2n), QUART = new R(1n, 4n), TQ = new R(3n, 4n);
+
+function ceilDiv(a, b) { return (a + b - 1n) / b; }
+
+/* the shortest dyadic interval inside [l, l+p) */
+function dyadic(l, p) {
+  let m = 0, t = 1n;
+  while (t * p.n < p.d) { t *= 2n; m++; }        /* m = ceil(lg(1/p)) */
+  m = m - 1;
+  for (;;) {
+    m++;
+    const two = 2n ** BigInt(m);
+    const x = ceilDiv(l.n * two, l.d);
+    if (!(new R(x + 1n, two).gt(l.add(p)))) return { m: m, x: x };
+    if (m > 4000) throw new Error("dyadic search did not terminate");
+  }
+}
+
+function parseR(tok) {
+  tok = tok.trim();
+  let m = /^(-?\d+)\s*\/\s*(\d+)$/.exec(tok);
+  if (m) return new R(BigInt(m[1]), BigInt(m[2]));
+  m = /^(-?)(\d*)(?:\.(\d+))?$/.exec(tok);
+  if (m && (m[2] || m[3])) {
+    const frac = m[3] || "";
+    return new R(BigInt((m[2] || "0") + frac) * (m[1] === "-" ? -1n : 1n), 10n ** BigInt(frac.length));
+  }
+  throw new Error("cannot read the number \u201c" + tok + "\u201d");
+}
+
+/* ---------- the model ---------------------------------------------------- */
+
+function makeModel(spec) {
+  const A = spec.alphabet, eof = spec.eof, rest = R.ONE.sub(eof);
+  const M = {
+    kind: spec.kind, alphabet: A, eof: eof, hasEof: !eof.isZero(), U: A.length - 1,
+    dist(prefix) {
+      let out;
+      if (M.kind === "uniform") {
+        const q = rest.div(new R(BigInt(A.length)));
+        out = A.map(c => ({ ch: c, p: q }));
+      } else if (M.kind === "fixed") {
+        let tot = R.ZERO; A.forEach(c => tot = tot.add(spec.probs[c]));
+        out = A.map(c => ({ ch: c, p: rest.mul(spec.probs[c]).div(tot) }));
+      } else {
+        const cnt = {}; A.forEach(c => cnt[c] = 1n);
+        for (const c of prefix) if (cnt[c] !== undefined) cnt[c]++;
+        let tot = 0n; A.forEach(c => tot += cnt[c]);
+        out = A.map(c => ({ ch: c, p: rest.mul(new R(cnt[c], tot)) }));
+      }
+      if (M.hasEof) out = out.concat([{ ch: "$", p: eof }]);
+      return out;
+    },
+    /* the same distribution as the smallest exact integer frequency counts */
+    counts(prefix) {
+      const d = M.dist(prefix);
+      let D = 1n; d.forEach(s => D = blcm(D, s.p.d));
+      let c = d.map(s => ({ ch: s.ch, c: s.p.n * (D / s.p.d) }));
+      let g = 0n; c.forEach(s => g = bgcd(g, s.c));
+      if (g > 1n) c = c.map(s => ({ ch: s.ch, c: s.c / g }));
+      let t = 0n; c.forEach(s => t += s.c);
+      return { syms: c, t: t };
+    },
+    describe() {
+      if (M.kind === "uniform") return "uniform over " + A.length + " symbol" + (A.length > 1 ? "s" : "");
+      if (M.kind === "fixed") return "fixed probabilities";
+      return "adaptive (counts start at 1)";
+    }
+  };
+  return M;
+}
+
+/* ---------- presets ------------------------------------------------------ */
+
+const PRESETS = {
+  trits: { name: "trits 21101 (worked example)",
+    src: "model uniform\nalphabet 0 1 2\neof 0\ntext 21101\nn 5\n" },
+  ones: { name: "trits 111111111 (the straddling case)",
+    src: "# l creeps up to 1/2 from below: neither bit is decided, and the\n# outstanding counter is what saves the day\nmodel uniform\nalphabet 0 1 2\neof 0\ntext 111111111\nn 9\n" },
+  ones2: { name: "trits 1111 then 0 (the outstanding bits are paid out)",
+    src: "model uniform\nalphabet 0 1 2\neof 0\ntext 111110\nn 6\n" },
+  adaptive: { name: "adaptive a/b/$, text bbba",
+    src: "model adaptive\nalphabet a b\neof 0.15\ntext bbba\n" },
+  skew: { name: "low-entropy bits 000000010000000",
+    src: "model fixed\np 0 0.99\np 1 0.01\neof 0\ntext 000000010000000\nn 15\n" },
+  lossless: { name: "LOSSLESS with letter probabilities",
+    src: "model fixed\np E 1/8\np L 2/8\np O 1/8\np S 4/8\neof 0\ntext LOSSLESS\nn 8\n" },
+  eofDemo: { name: "a/b/$ with an end-of-text symbol",
+    src: "model fixed\np a 0.7\np b 0.2\np $ 0.1\ntext aabab\n" },
+  bin: { name: "fair bits with $",
+    src: "model uniform\nalphabet 0 1\neof 0.1\ntext 0110\n" }
+};
+
+/* ---------- parsing ------------------------------------------------------ */
+
+function parseInput(src) {
+  const spec = { kind: "uniform", alphabet: [], probs: {}, eof: R.ZERO, text: [], nDec: null };
+  let order = [];
+  src.split(/\r?\n/).forEach((raw, ln) => {
+    const line = raw.replace(/#.*$/, "").trim();
+    if (!line) return;
+    const tok = line.split(/\s+/), key = tok[0].toLowerCase(), where = " (line " + (ln + 1) + ")";
+    if (key === "model") {
+      const k = (tok[1] || "").toLowerCase();
+      if (!["uniform", "fixed", "adaptive"].includes(k)) throw new Error("unknown model \u201c" + tok[1] + "\u201d" + where);
+      spec.kind = k;
+    } else if (key === "alphabet") {
+      let syms = tok.slice(1);
+      if (syms.length === 1 && syms[0].length > 1) syms = syms[0].split("");
+      syms.forEach(s => { if (s !== "$" && !order.includes(s)) order.push(s); });
+    } else if (key === "p") {
+      if (tok.length < 3) throw new Error("p needs a symbol and a weight" + where);
+      const s = tok[1], v = parseR(tok[2]);
+      if (s === "$") spec.eof = v;
+      else { if (!order.includes(s)) order.push(s); spec.probs[s] = v; }
+    } else if (key === "eof") spec.eof = parseR(tok[1]);
+    else if (key === "text") spec.textRaw = line.slice(tok[0].length).trim();
+    else if (key === "bits") { /* accepted so files are shared with the other page */ }
+    else if (key === "n") spec.nDec = parseInt(tok[1], 10);
+    else throw new Error("unknown directive \u201c" + tok[0] + "\u201d" + where);
+  });
+  spec.alphabet = order;
+  if (!spec.alphabet.length) throw new Error("the alphabet is empty");
+  if (spec.alphabet.length > 12) throw new Error("at most 12 alphabet symbols");
+  if (spec.kind === "fixed") for (const c of spec.alphabet) {
+    if (!spec.probs[c]) throw new Error("no weight given for \u201c" + c + "\u201d");
+    if (spec.probs[c].n <= 0n) throw new Error("the weight of \u201c" + c + "\u201d must be positive");
+  }
+  if (spec.eof.n < 0n || spec.eof.ge(R.ONE)) throw new Error("the eof probability must be in [0,1)");
+  const single = spec.alphabet.every(s => s.length === 1);
+  const raw = spec.textRaw === undefined ? "" : spec.textRaw;
+  spec.text = (raw === "" ? [] : (single ? raw.split("") : raw.split(/\s+/))).filter(c => c !== "");
+  for (const c of spec.text)
+    if (!spec.alphabet.includes(c)) throw new Error("\u201c" + vis(c) + "\u201d is not in the alphabet");
+  if (spec.text.length > 20) throw new Error("at most 20 symbols of text");
+  return spec;
+}
+function specToSource(spec) {
+  const L = ["model " + spec.kind];
+  if (spec.kind === "fixed") spec.alphabet.forEach(c => L.push("p " + c + " " + spec.probs[c].frac()));
+  else L.push("alphabet " + spec.alphabet.join(" "));
+  L.push("eof " + spec.eof.frac());
+  const single = spec.alphabet.every(s => s.length === 1);
+  L.push("text " + spec.text.join(single ? "" : " "));
+  if (spec.nDec != null) L.push("n " + spec.nDec);
+  return L.join("\n") + "\n";
+}
+
+/* ---------- state -------------------------------------------------------- */
+
+let spec = null, model = null;
+let mode = "half";            /* "half" | "fix" */
+let dir = "enc";
+let bBits = 16, flushAll = false;
+let steps = [], phases = [], cur = 0, timer = null;
+let exactCode = "";
+
+/* ---------- the exact coder, for the comparison panel -------------------- */
+
+function exactEncode() {
+  let l = R.ZERO, p = R.ONE;
+  spec.text.forEach((c, i) => {
+    const d = model.dist(spec.text.slice(0, i));
+    const k = d.findIndex(s => s.ch === c);
+    let q = R.ZERO; for (let j = 0; j < k; j++) q = q.add(d[j].p);
+    l = l.add(q.mul(p)); p = p.mul(d[k].p);
+  });
+  if (model.hasEof) { const q = R.ONE.sub(spec.eof); l = l.add(q.mul(p)); p = p.mul(spec.eof); }
+  if (p.isZero()) return "";
+  const { m, x } = dyadic(l, p);
+  return x.toString(2).padStart(m, "0");
+}
+
+/* ---------- step construction -------------------------------------------- */
+
+function mkPhase(name) { phases.push({ name: name, from: steps.length, to: steps.length }); }
+function closePhase() { if (phases.length) phases[phases.length - 1].to = steps.length; }
+
+function build() {
+  steps = []; phases = [];
+  try {
+    exactCode = exactEncode();
+    if (dir === "enc") buildEncode(); else buildDecode();
+  } catch (e) {
+    steps = [{ line: null, msg: '<span class="warn">' + esc(e.message) + "</span>",
+               st: { l: R.ZERO, p: R.ONE, bits: [], out: 0, hist: [] }, phase: 0 }];
+    phases = [{ name: "\u2014", from: 0, to: 1 }];
+  }
+}
+
+/* ---- shared helpers ---- */
+const TWO = k => 2n ** BigInt(k);
+const asR = (v, b) => new R(v, TWO(b));          /* integer register -> [0,1) */
+
+function buildEncode() {
+  const fix = mode === "fix";
+  const b = bBits;
+  let l = R.ZERO, p = R.ONE;                     /* exact view, always maintained */
+  let L = 0n, Rr = TWO(b - 1);                   /* integer view */
+  const bits = [];                               /* {v, kind} */
+  let out = 0;
+  const hist = [];                               /* {l, p, kind, lab} */
+  let tCur = null, rCur = null;
+
+  const sync = () => { if (fix) { l = asR(L, b); p = asR(Rr, b); } };
+  sync();
+
+  const snap = ex => Object.assign({
+    l: l, p: p, L: L, R: Rr, bits: bits.slice(), out: out, hist: hist.slice(),
+    b: b, t: tCur, r: rCur, prev: null, slices: null, zone: null, D: null
+  }, ex || {});
+  const add = (line, msg, ex) => steps.push({ line: line, line2: (ex && ex.line2) || null,
+                                             msg: msg, st: snap(ex), phase: phases.length - 1 });
+
+  const push = (kind, lab) => hist.push({ l: l, p: p, kind: kind, lab: lab });
+
+  mkPhase("init");
+  if (fix) {
+    add("s1", "<b>L := 0; &nbsp; R := 2<sup>b\u22121</sup> = " + TWO(b - 1) + "</b> \u2014 the coder's whole state is "
+      + "two " + b + "-bit integers. Reading them as L/2<sup>b</sup> and R/2<sup>b</sup> gives the interval "
+      + "[0,&nbsp;\u00bd), so the first bit written will always be a <code>0</code>; the paper keeps it as a one-bit "
+      + "validity check.");
+  } else {
+    add("r0", "<b>\u2113 := 0; &nbsp; p := 1</b> \u2014 as before, except that from now on the leading bits of the "
+      + "answer are written out as soon as they are decided, and the interval is stretched back to size.");
+  }
+  push("start", "start");
+  closePhase();
+
+  const emit = (v, kindTag) => {
+    bits.push({ v: v, kind: kindTag || "b" + v });
+    while (out > 0) { bits.push({ v: 1 - v, kind: "follow" }); out--; }
+  };
+
+  const doSymbol = (i, ch, isEof) => {
+    const dist = model.dist(spec.text.slice(0, i));
+    const k = isEof ? dist.length - 1 : dist.findIndex(s => s.ch === ch);
+    mkPhase(isEof ? "$" : vis(ch));
+
+    const prev = { l: l, p: p };
+    const slices = dist.map(s => ({ ch: s.ch, p: s.p }));
+
+    if (fix) {
+      const cd = model.counts(spec.text.slice(0, i));
+      const t = cd.t;
+      let lo = 0n; for (let j = 0; j < k; j++) lo += cd.syms[j].c;
+      const hi = lo + cd.syms[k].c;
+      if (t > TWO(b - 2)) throw new Error("t = " + t + " needs f \u2264 b\u22122, so b must be at least "
+        + (t.toString(2).length + 2) + " for this model \u2014 pick a larger b");
+      tCur = t;
+      const r = Rr / t; rCur = r;
+      add("e1", "<b>r := R div t = " + Rr + " div " + t + " = " + r + "</b> \u2014 the division comes first, which is "
+        + "the trick of the improved coder: one multiplication is saved, at the price of rounding r down.",
+        { prev: prev, slices: slices, pick: k, counts: cd, lo: lo, hi: hi });
+      L = L + r * lo;
+      add("e2", "<b>L := L + r\u00b7l = " + L + "</b> \u2014 move the left end up past the "
+        + (lo === 0n ? "nothing" : lo + " count" + (lo === 1n ? "" : "s")) + " below <span class=\"ch\">"
+        + esc(vis(dist[k].ch)) + "</span>.", { prev: prev, slices: slices, pick: k, counts: cd, lo: lo, hi: hi });
+      if (hi < t) { Rr = r * (hi - lo);
+        add("e3", "<b>h &lt; t, so R := r\u00b7(h\u2212l) = " + Rr + "</b>", { prev: prev, slices: slices, pick: k, counts: cd });
+      } else { Rr = Rr - r * lo;
+        add("e3", "<b>h = t, so R := R \u2212 r\u00b7l = " + Rr + "</b> \u2014 the topmost symbol gets everything that "
+          + "is left, including the rounding excess of r, so no code space is wasted.",
+          { prev: prev, slices: slices, pick: k, counts: cd });
+      }
+      sync();
+    } else {
+      let q = R.ZERO; for (let j = 0; j < k; j++) q = q.add(dist[j].p);
+      l = l.add(q.mul(p)); p = p.mul(dist[k].p);
+      add("r0", "<b>" + (isEof ? "$" : "X<sub>" + i + "</sub> = <span class=\"ch\">" + esc(vis(ch)) + "</span>")
+        + "</b>: zoom into its slice, exactly as before \u2014 \u2113 := \u2113 + q\u00b7p, p := p\u00b7P. The interval is now "
+        + iv(l, p) + ", of width " + fm(p) + ".", { prev: prev, slices: slices, pick: k });
+    }
+    push("narrow", isEof ? "$" : vis(ch));
+
+    /* --- renormalization --- */
+    let guard = 0;
+    for (;;) {
+      if (++guard > 300) throw new Error("renormalization did not terminate");
+      if (fix) {
+        if (Rr > TWO(b - 2)) {
+          add("e4", "<b>R = " + Rr + " &gt; 2<sup>b\u22122</sup> = " + TWO(b - 2) + "</b> \u2014 the range is wide enough "
+            + "again, so no renormalization is needed and the next character can be coded.");
+          break;
+        }
+      } else {
+        const fitsLo = l.add(p).le(HALF), fitsHi = l.ge(HALF),
+              fitsMid = l.ge(QUART) && l.add(p).le(TQ);
+        if (!fitsLo && !fitsHi && !fitsMid) {
+          add("r0", "<b>The interval fits in none of the three</b>: it contains \u00bd but is not inside [\u00bc,\u00be), "
+            + "so it is wider than \u00bc and nothing further is decided. On to the next character.");
+          break;
+        }
+      }
+      const before = { l: l, p: p };
+      const pending = out;                  /* bit_plus_follow empties it below */
+      let zone, kindTag, msg;
+      const lowCase = fix ? (L + Rr <= TWO(b - 1)) : l.add(p).le(HALF);
+      const hiCase  = fix ? (TWO(b - 1) <= L)      : l.ge(HALF);
+      if (lowCase) {
+        zone = "lo"; kindTag = "b0";
+        emit(0);
+        if (fix) L = L * 2n; else l = l.mul(new R(2n));
+        if (fix) Rr = Rr * 2n; else p = p.mul(new R(2n));
+        msg = "<b>[\u2113, \u2113+p) \u2286 [0,&nbsp;\u00bd)</b> \u2014 whatever the final code is, it lies in the lower half, so "
+            + "its first remaining bit must be <code>0</code>. Write it" + follNote(pending) + ", and double the interval.";
+      } else if (hiCase) {
+        zone = "hi"; kindTag = "b1";
+        emit(1);
+        if (fix) { L = L - TWO(b - 1); L = L * 2n; Rr = Rr * 2n; }
+        else { l = l.sub(HALF); l = l.mul(new R(2n)); p = p.mul(new R(2n)); }
+        msg = "<b>[\u2113, \u2113+p) \u2286 [\u00bd,&nbsp;1)</b> \u2014 the code lies in the upper half, so the next bit is "
+            + "<code>1</code>. Write it" + follNote(pending) + ". Subtract \u00bd and double.";
+      } else {
+        zone = "mid"; kindTag = "st";
+        out++;
+        if (fix) { L = L - TWO(b - 2); L = L * 2n; Rr = Rr * 2n; }
+        else { l = l.sub(QUART); l = l.mul(new R(2n)); p = p.mul(new R(2n)); }
+        msg = "<b>[\u2113, \u2113+p) \u2286 [\u00bc,&nbsp;\u00be)</b> \u2014 the interval straddles \u00bd, so the next bit is still "
+            + "undecided. But it is inside the middle half, so the next <i>two</i> bits are either <code>01</code> or "
+            + "<code>10</code>: whichever the first turns out to be, the second is its opposite. Remember one "
+            + "<b>outstanding</b> bit (now " + out + "), subtract \u00bc, and double.";
+      }
+      sync();
+      add(fix ? (zone === "lo" ? "n2" : zone === "hi" ? "n3" : "n5") : (zone === "lo" ? "r1" : zone === "hi" ? "r3" : "r5"),
+          msg, { prev: before, zone: zone,
+                 line2: (fix && zone !== "mid") ? (pending > 0 ? "p2" : "p1") : null });
+      push(kindTag, kindTag === "b0" ? "0" : kindTag === "b1" ? "1" : "\u2195");
+    }
+    closePhase();
+  };
+
+  spec.text.forEach((ch, i) => doSymbol(i, ch, false));
+  if (model.hasEof) doSymbol(spec.text.length, "$", true);
+
+  /* --- termination --- */
+  mkPhase("flush");
+  const pendingAtEnd = out;
+  if (flushAll && fix) {
+    const s = L.toString(2).padStart(b, "0");
+    for (let i = 0; i < b; i++) emit(+s[i], "tail");
+    add("f1", "<b>finish_encode: write the " + b + " bits of L</b> = <code>" + s + "</code>, the first of them "
+      + "through bit_plus_follow, which pays out the " + pendingAtEnd + " outstanding bit"
+      + (pendingAtEnd === 1 ? "" : "s") + ". Simple, but it spends up to b\u22121 bits more than necessary.",
+      { done: true, line2: pendingAtEnd > 0 ? "p2" : "p1" });
+  } else {
+    if (p.isZero()) throw new Error("the interval has width 0");
+    const { m, x } = dyadic(l, p);
+    const xb = x.toString(2).padStart(m, "0");
+    emit(+xb[0], "tail");
+    for (let i = 1; i < m; i++) bits.push({ v: +xb[i], kind: "tail" });
+    add("f1", "<b>Write the shortest dyadic tail</b>: the smallest interval [x/2<sup>m</sup>, (x+1)/2<sup>m</sup>) "
+      + "inside what is left is m = " + m + ", x = " + x + " \u2192 <code>" + xb + "</code>. Its first bit goes through "
+      + "bit_plus_follow" + (pendingAtEnd ? ", which finally pays out the " + pendingAtEnd
+        + " outstanding bit" + (pendingAtEnd === 1 ? "" : "s") + " as its opposite" : "")
+      + ".", { done: true });
+  }
+  const str = bits.map(x => x.v).join("");
+  add("f2", "<b>The code is <code>" + str + "</code></b>, " + str.length + " bits"
+    + (spec.text.length ? " for " + spec.text.length + " symbol" + (spec.text.length === 1 ? "" : "s")
+       + " \u2014 " + (str.length / spec.text.length).toFixed(2) + " bits per symbol." : ".")
+    + cmpSentence(str), { done: true });
+  closePhase();
+
+  function follNote(pending) {
+    return pending > 0 ? " \u2014 and with it the " + pending + " outstanding opposite bit"
+      + (pending > 1 ? "s, now known to be" : ", now known to be") + " its opposite" : "";
+  }
+}
+
+function cmpSentence(str) {
+  if (!exactCode) return "";
+  if (str === exactCode) return " That is bit for bit the code of the non-renormalized algorithm.";
+  if (mode === "fix" && str === "0" + exactCode)
+    return " Apart from the leading validity <code>0</code>, that is bit for bit the code of the "
+         + "non-renormalized algorithm.";
+  const d = str.length - exactCode.length;
+  return " The exact coder needs " + exactCode.length + " bits here, so this costs "
+       + (d === 0 ? "the same" : d > 0 ? d + " more" : (-d) + " fewer") + " \u2014 the integer arithmetic rounds "
+       + "r down and shifts the interval slightly.";
+}
+
+/* ---------- decoding (fixed precision only) ------------------------------ */
+
+function buildDecode() {
+  if (mode !== "fix") throw new Error("the decoder shown here is the fixed-precision one \u2014 switch the "
+    + "arithmetic to \u201cfixed precision\u201d");
+  const b = bBits;
+  const code = (function () {
+    /* encode first, so the page always decodes its own output */
+    const save = dir; dir = "enc"; build(); dir = save;
+    const last = steps[steps.length - 1].st.bits;
+    return last.map(x => x.v).join("");
+  })();
+  steps = []; phases = [];
+
+  let L = 0n, Rr = TWO(b - 1), D = 0n, ip = 0;
+  const bits = code.split("").map(v => ({ v: +v, kind: "b" + v }));
+  const hist = [];
+  const out = [];
+  let tCur = null, rCur = null, tgt = null;
+  const rd = () => { const v = ip < bits.length ? bits[ip].v : 0; ip++; return BigInt(v); };
+
+  const snap = ex => Object.assign({
+    l: asR(0n, b), p: asR(Rr, b), L: L, R: Rr, D: D, bits: bits.slice(), out: 0, read: ip,
+    hist: hist.slice(), b: b, t: tCur, r: rCur, target: tgt, decoded: out.slice(),
+    prev: null, slices: null, zone: null, dec: true
+  }, ex || {});
+  const add = (line, msg, ex) => steps.push({ line: line, line2: (ex && ex.line2) || null,
+                                             msg: msg, st: snap(ex), phase: phases.length - 1 });
+  const push = (kind, lab) => hist.push({ l: asR(0n, b), p: asR(Rr, b), kind: kind, lab: lab, D: D });
+
+  mkPhase("init");
+  for (let i = 0; i < b; i++) D = 2n * D + rd();
+  add("s3", "<b>start_decode: R := 2<sup>b\u22121</sup>, then read the first b = " + b + " bits into D</b> = " + D
+    + ". D is the window into the coded stream; the decoder keeps D = V \u2212 L, which is why it never has to "
+    + "maintain L at all.");
+  push("start", "start");
+  closePhase();
+
+  const nWanted = model.hasEof ? Infinity : (spec.nDec != null ? spec.nDec : spec.text.length);
+  let i = 0, guard = 0;
+  for (;;) {
+    if (++guard > 60) break;
+    const cd = model.counts(out.filter(c => c !== "$"));
+    const t = cd.t; tCur = t;
+    if (t > TWO(b - 2)) throw new Error("t = " + t + " does not fit: pick a larger b");
+    mkPhase("i = " + i);
+    const r = Rr / t; rCur = r;
+    const raw = D / r;
+    tgt = (t - 1n) < raw ? (t - 1n) : raw;
+    add("d1", "<b>decode_target: r := R div t = " + r + "; &nbsp; target := min{t\u22121, D div r} = " + tgt
+      + "</b> \u2014 one number in [0, t), handed to the model, which has to say which symbol's count range "
+      + "contains it. The min guards against the rounding excess of the topmost symbol.", { showTarget: true, counts: cd });
+
+    let lo = 0n, k = -1, hi = 0n;
+    for (let j = 0; j < cd.syms.length; j++) {
+      if (tgt < lo + cd.syms[j].c) { k = j; hi = lo + cd.syms[j].c; break; }
+      lo += cd.syms[j].c;
+    }
+    if (k < 0) throw new Error("target " + tgt + " outside [0, t)");
+    const sym = cd.syms[k].ch;
+    add("d1", "<b>" + lo + " \u2264 " + tgt + " &lt; " + hi + "</b>, so the symbol is <span class=\"ch\">"
+      + esc(vis(sym)) + "</span>.", { showTarget: true, counts: cd, pick: k, lo: lo, hi: hi });
+
+    const prev = { l: asR(0n, b), p: asR(Rr, b) };
+    D = D - r * lo;
+    Rr = hi < t ? r * (hi - lo) : Rr - r * lo;
+    add("d2", "<b>arithmetic_decode: D := D \u2212 r\u00b7l = " + D + "; &nbsp; R := " + Rr + "</b> \u2014 the same two "
+      + "lines as the encoder, with D in place of L: the encoder added r\u00b7l to L, so the decoder subtracts it "
+      + "from D = V \u2212 L.", { prev: prev, counts: cd, pick: k });
+
+    if (sym === "$") {
+      out.push("$");
+      add("d3", "<b>$ decoded \u2014 the text is complete</b>: <span class=\"ch\">"
+        + esc(out.filter(c => c !== "$").map(vis).join("")) + "</span>.", { done: true });
+      push("narrow", "$");
+      closePhase();
+      break;
+    }
+    out.push(sym);
+    push("narrow", vis(sym));
+
+    let g2 = 0;
+    while (Rr <= TWO(b - 2)) {
+      if (++g2 > 200) break;
+      const before = { l: asR(0n, b), p: asR(Rr, b) };
+      Rr = Rr * 2n;
+      const nb = rd();
+      D = 2n * D + nb;
+      add("d3", "<b>R \u2264 2<sup>b\u22122</sup>, so R := 2R = " + Rr + " and D := 2D + next bit = " + D
+        + "</b> \u2014 the decoder's renormalization is a single case: it does not need to know which of the "
+        + "encoder's three branches fired, because D = V \u2212 L changes identically in all three.",
+        { prev: before, zone: "dec" });
+      push("shift", String(nb));
+    }
+    i++;
+    if (i >= nWanted) {
+      mkPhase("done");
+      add("d3", "<b>" + i + " symbol" + (i === 1 ? "" : "s") + " decoded</b>: <span class=\"ch\">"
+        + esc(out.map(vis).join("")) + "</span>. Without a $ the length has to be known from elsewhere.",
+        { done: true });
+      closePhase();
+      break;
+    }
+    closePhase();
+  }
+}
+
+/* ---------- formatting ---------------------------------------------------- */
+
+function fm(r) { return r.short() ? r.frac() : r.dec(5); }
+function iv(l, p) { return "[" + fm(l) + ", " + fm(l.add(p)) + ")"; }
+
+/* ---------- drawing -------------------------------------------------------- */
+
+const NS = "http://www.w3.org/2000/svg";
+function svgEl(name, attrs) {
+  const e = document.createElementNS(NS, name);
+  for (const k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function txt(x, y, s, cls, extra) {
+  const t = svgEl("text", Object.assign({ x: x, y: y, class: cls }, extra || {}));
+  t.textContent = s; return t;
+}
+const wid = id => Math.max(300, Math.floor(el(id).clientWidth) - 2);
+
+/* The interval moves rather than jumps: narrowing into a slice collapses the
+   band onto that slice, and a renormalization slides it and stretches it back
+   to twice the width.  Same treatment as the zoom on the plain page, except
+   that here the [0,1) frame stays put -- the whole point is to watch the
+   interval travel inside it. */
+let ivView = null, ivAnim = null, ivLast = -1;
+
+function drawInterval() {
+  const st = steps[cur].st;
+  const tgt = { lo: st.l.num(), hi: st.l.add(st.p).num() };
+  const reduce = typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (ivAnim) { cancelAnimationFrame(ivAnim); ivAnim = null; }
+  const stepped = cur === ivLast + 1 && ivView;
+  const moved = ivView && (Math.abs(ivView.lo - tgt.lo) > 1e-12 || Math.abs(ivView.hi - tgt.hi) > 1e-12);
+  ivLast = cur;
+  if (!stepped || reduce || !moved || typeof requestAnimationFrame !== "function") {
+    ivView = tgt; paintInterval(tgt); return;
+  }
+  const from = ivView;
+  const dur = Math.min(460, Math.max(180, (+el("speed").value || 480) * 0.75));
+  const t0 = (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const ease = u => u < .5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u);
+  const frame = () => {
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const u = Math.min(1, (now - t0) / dur), e = ease(u);
+    ivView = { lo: from.lo + (tgt.lo - from.lo) * e, hi: from.hi + (tgt.hi - from.hi) * e };
+    paintInterval(ivView);
+    if (u < 1) ivAnim = requestAnimationFrame(frame);
+    else { ivAnim = null; ivView = tgt; paintInterval(tgt); }
+  };
+  paintInterval(from);
+  ivAnim = requestAnimationFrame(frame);
+}
+
+function paintInterval(view) {
+  const svg = el("ivSvg"); svg.textContent = "";
+  const st = steps[cur].st;
+  const W = wid("ivWrap");
+  const padL = 16, padR = 16, x0 = padL, x1 = W - padR, IW = x1 - x0;
+  /* one row per thing, with air between them: the zone bands, the numbers,
+     the interval, the interval we came from, then the axis and its ticks */
+  const zoneY = 8, zoneH = 16, zoneGap = 3;
+  const zone2Y = zoneY + zoneH + zoneGap;
+  const barY = 70, barH = 30;
+  const numY = barY - 10, dLabY = barY + barH + 13;
+  const ghostY = 128, ghostH = 20;
+  const beforeY = ghostY + ghostH + 13;
+  const ay = beforeY + 13, H = ay + 26;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+
+  const defs = svgEl("defs", {});
+  const mk = svgEl("marker", { id: "ah", markerWidth: 7, markerHeight: 7, refX: 6, refY: 3.5, orient: "auto" });
+  mk.appendChild(svgEl("path", { d: "M0,0 L7,3.5 L0,7 z", fill: "var(--wi-accent)" }));
+  defs.appendChild(mk); svg.appendChild(defs);
+
+  const px = v => x0 + IW * v;
+
+  /* the three zones */
+  const zones = [
+    { k: "lo", a: 0, b: .5, lab: "[0, \u00bd)  \u2192 0" },
+    { k: "hi", a: .5, b: 1, lab: "[\u00bd, 1)  \u2192 1" },
+    { k: "mid", a: .25, b: .75, lab: "[\u00bc, \u00be)  \u2192 outstanding" }
+  ];
+  zones.forEach((z, q) => {
+    const y = q === 2 ? zone2Y : zoneY;
+    const on = st.zone === z.k;
+    svg.appendChild(svgEl("rect", { x: px(z.a), y: y, width: px(z.b) - px(z.a), height: zoneH,
+                                    class: "zone " + z.k + (on ? " on" : " off"), rx: 2 }));
+    if (px(z.b) - px(z.a) > 90)
+      svg.appendChild(txt((px(z.a) + px(z.b)) / 2, y + zoneH / 2, z.lab, "zonelab",
+                          { fill: on ? "var(--wi-ink-strong)" : "var(--wi-ink-faint)" }));
+  });
+
+  /* axis and ticks; the guides run the full height so both bars share a scale */
+  svg.appendChild(svgEl("line", { x1: x0, y1: ay, x2: x1, y2: ay, class: "axis" }));
+  [[0, "0"], [.25, "\u00bc"], [.5, "\u00bd"], [.75, "\u00be"], [1, "1"]].forEach(([v, s]) => {
+    svg.appendChild(svgEl("line", { x1: px(v), y1: barY - 5, x2: px(v), y2: ay + 4,
+                                    class: "tick" + (v === .5 ? " half" : "") }));
+    svg.appendChild(txt(px(v), ay + 7, s, "ticklab"));
+  });
+
+  /* the interval before this step, with the model's slices if it narrowed */
+  if (st.prev) {
+    const a = st.prev.l.num(), w = st.prev.p.num();
+    svg.appendChild(svgEl("rect", { x: px(a), y: ghostY, width: Math.max(1.2, IW * w), height: ghostH,
+                                    class: "band ghost", rx: 2 }));
+    if (st.slices) {
+      let acc = R.ZERO;
+      st.slices.forEach((s, j) => {
+        const lo = st.prev.l.add(acc.mul(st.prev.p));
+        acc = acc.add(s.p);
+        const hi2 = st.prev.l.add(acc.mul(st.prev.p));
+        const xa = px(lo.num()), xb = px(hi2.num());
+        const cls = "band slice" + (j === st.pick ? " pick" : (s.ch === "$" ? " eof" : ""));
+        const rr = svgEl("rect", { x: xa, y: ghostY, width: Math.max(.8, xb - xa), height: ghostH, class: cls });
+        rr.__tip = { ch: s.ch, p: s.p, lo: lo, hi: hi2 };
+        rr.addEventListener("mouseenter", onSliceOver);
+        rr.addEventListener("mousemove", moveTip);
+        rr.addEventListener("mouseleave", hideTip);
+        svg.appendChild(rr);
+        if (xb - xa > 11) svg.appendChild(txt((xa + xb) / 2, ghostY + ghostH / 2, vis(s.ch), "bandlab",
+                                              { "text-anchor": "middle" }));
+      });
+    }
+    svg.appendChild(txt(x0, beforeY, "before this step", "bandlab"));
+    /* arrow from the old interval to the new one */
+    const from = px(st.prev.l.add(st.prev.p.div(new R(2n))).num());
+    const to = px((view.lo + view.hi) / 2);
+    svg.appendChild(svgEl("path", { d: "M" + from + "," + (ghostY - 3) + " C" + from + "," + (ghostY - 14)
+                                     + " " + to + "," + (barY + barH + 20) + " " + to + "," + (barY + barH + 5),
+                                    class: "moveto" }));
+  }
+
+  /* the current interval, at wherever the animation has it */
+  const bx = px(view.lo), bw = Math.max(1.6, IW * (view.hi - view.lo));
+  svg.appendChild(svgEl("rect", { x: bx, y: barY, width: bw, height: barH, class: "band", rx: 2 }));
+
+  /* the decoder's window */
+  if (st.dec && st.D != null) {
+    const d = asR(st.D, st.b).num();
+    const xd = px(Math.min(1, Math.max(0, d)));
+    svg.appendChild(svgEl("line", { x1: xd, y1: barY - 6, x2: xd, y2: barY + barH + 6, class: "dmark" }));
+    svg.appendChild(txt(xd, dLabY, "D", "bandlab", { "text-anchor": "middle", fill: "var(--wi-active)" }));
+  }
+
+  /* the numbers live on their own row above the interval */
+  if (bw > 250) {
+    const a1 = txt(bx, numY, "\u2113 = " + st.l.dec(5), "bandlab");
+    a1.setAttribute("text-anchor", "start"); svg.appendChild(a1);
+    const a2 = txt(bx + bw, numY, "\u2113+p = " + st.l.add(st.p).dec(5), "bandlab");
+    a2.setAttribute("text-anchor", "end"); svg.appendChild(a2);
+    svg.appendChild(txt(bx + bw / 2, numY, "p = " + st.p.dec(5), "bandlab",
+                        { "text-anchor": "middle" }));
+  } else {
+    const c = Math.min(W - 70, Math.max(70, bx + bw / 2));
+    svg.appendChild(txt(c, numY, "\u2113 = " + st.l.dec(5) + ",  p = " + st.p.dec(5), "bandlab",
+                        { "text-anchor": "middle" }));
+  }
+
+  el("ivMeta").textContent = mode === "fix" ? "L/2^b and R/2^b" : "exact";
+}
+
+function drawHistory() {
+  const svg = el("histSvg"); svg.textContent = "";
+  const st = steps[cur].st, hist = st.hist;
+  const W = wid("histWrap");
+  const padL = 44, padR = 12, x0 = padL, x1 = W - padR, IW = x1 - x0;
+  const rowH = 13, gap = 2, top = 6;
+  const H = Math.max(40, top + hist.length * (rowH + gap) + 8);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  const px = v => x0 + IW * v;
+
+  hist.forEach((h, k) => {
+    const y = top + k * (rowH + gap);
+    svg.appendChild(svgEl("rect", { x: x0, y: y, width: IW, height: rowH, class: "hrow" }));
+    [.25, .5, .75].forEach(v => svg.appendChild(svgEl("line",
+      { x1: px(v), y1: y, x2: px(v), y2: y + rowH, class: "tick" + (v === .5 ? " half" : ""),
+        opacity: v === .5 ? .5 : .25 })));
+    const a = h.l.num(), w = h.p.num();
+    const r = svgEl("rect", { x: px(a), y: y + 1, width: Math.max(1.2, IW * w), height: rowH - 2,
+                              class: "hband " + (h.kind === "start" ? "narrow" : h.kind) });
+    r.__htip = h;
+    r.addEventListener("mouseenter", onHistOver);
+    r.addEventListener("mousemove", moveTip);
+    r.addEventListener("mouseleave", hideTip);
+    svg.appendChild(r);
+    svg.appendChild(txt(padL - 6, y + rowH / 2, h.lab, "hlab e"));
+    if (k === hist.length - 1)
+      svg.appendChild(svgEl("rect", { x: x0 - 1, y: y - 1, width: IW + 2, height: rowH + 2, class: "hcur" }));
+  });
+  el("histMeta").textContent = hist.length + " state" + (hist.length === 1 ? "" : "s");
+  const wrap = el("histWrap");
+  wrap.scrollTop = Math.max(0, H - wrap.clientHeight);
+}
+
+function onSliceOver(ev) {
+  const d = ev.currentTarget.__tip, tt = el("tooltip");
+  tt.innerHTML = '<span class="tt-h">' + (d.ch === "$" ? "end of text $" : "symbol " + esc(vis(d.ch))) + "</span><br>"
+    + '<span class="tt-s">P = ' + (d.p.short() ? d.p.frac() + " = " : "") + d.p.dec(5) + "</span><br>"
+    + '<span class="tt-s">[' + d.lo.dec(6) + ", " + d.hi.dec(6) + ")</span>";
+  tt.style.display = "block"; moveTip(ev);
+}
+function onHistOver(ev) {
+  const h = ev.currentTarget.__htip, tt = el("tooltip");
+  const nm = { narrow: "after a character", b0: "after writing 0", b1: "after writing 1",
+               st: "after an outstanding bit", shift: "after shifting a bit in", start: "start" };
+  tt.innerHTML = '<span class="tt-h">' + (nm[h.kind] || h.kind) + "</span><br>"
+    + '<span class="tt-s">\u2113 = ' + h.l.dec(6) + "</span><br>"
+    + '<span class="tt-s">p = ' + h.p.dec(6) + "</span>";
+  tt.style.display = "block"; moveTip(ev);
+}
+function moveTip(ev) {
+  const tt = el("tooltip");
+  let x = ev.clientX + 14, y = ev.clientY + 16;
+  const r = tt.getBoundingClientRect();
+  if (x + r.width > window.innerWidth - 8) x = ev.clientX - r.width - 12;
+  if (y + r.height > window.innerHeight - 8) y = ev.clientY - r.height - 12;
+  tt.style.left = x + "px"; tt.style.top = y + "px";
+}
+function hideTip() { el("tooltip").style.display = "none"; }
+
+/* ---------- side panels ---------------------------------------------------- */
+
+function renderBits() {
+  const st = steps[cur].st;
+  const prev = cur > 0 ? steps[cur - 1].st.bits.length : 0;
+  let h = '<div class="bitrow">';
+  st.bits.forEach((b, k) => {
+    let cls = "bx " + (b.kind === "follow" ? "b" + b.v : b.kind === "tail" ? "tail" : "b" + b.v);
+    if (!st.dec && k >= prev) cls += " fresh";
+    if (st.dec && k < (st.read || 0)) cls += " read";
+    h += '<span class="' + cls + '">' + b.v + "</span>";
+  });
+  for (let k = 0; k < (st.out || 0); k++) h += '<span class="bx pend">?</span>';
+  h += "</div>";
+  if (st.out > 0)
+    h += '<div class="kv"><span>' + st.out + " outstanding opposite bit" + (st.out > 1 ? "s" : "")
+       + " \u2014 written as soon as the next real bit is known</span></div>";
+  if (st.dec)
+    h += '<div class="kv"><span>' + (st.read || 0) + " of " + st.bits.length + " bits consumed</span></div>";
+  if (st.decoded)
+    h += '<div class="kv"><span>decoded: <b>' + (st.decoded.length ? esc(st.decoded.map(vis).join("")) : "\u2014")
+       + "</b></span></div>";
+  el("bitsBox").innerHTML = h;
+  el("bitsTitle").textContent = st.dec ? "The coded bits" : "Output bits";
+  el("bitsMeta").textContent = st.bits.length + " bit" + (st.bits.length === 1 ? "" : "s");
+}
+
+function bin(v, b) {
+  const s = v.toString(2).padStart(b, "0");
+  return '<span class="hi">' + s.slice(0, 2) + '</span><span class="lo">' + s.slice(2) + "</span>";
+}
+
+function renderState() {
+  const st = steps[cur].st;
+  let h = "";
+  if (mode === "fix") {
+    h += '<div class="regrow"><span class="nm">L</span><span class="reg">' + bin(st.L || 0n, st.b)
+       + '</span></div><div class="kv"><span>= <b>' + (st.L || 0n) + "</b> &nbsp; \u2113 = "
+       + st.l.dec(6) + "</span></div>";
+    h += '<div class="regrow"><span class="nm">R</span><span class="reg">' + bin(st.R || 0n, st.b)
+       + '</span></div><div class="kv"><span>= <b>' + (st.R || 0n) + "</b> &nbsp; p = "
+       + st.p.dec(6) + "</span></div>";
+    if (st.D != null)
+      h += '<div class="regrow"><span class="nm">D</span><span class="reg">' + bin(st.D, st.b)
+         + '</span></div><div class="kv"><span>= <b>' + st.D + "</b></span></div>";
+    h += '<div class="kv" style="margin-top:8px">'
+       + (st.t != null ? "<span>t = <b>" + st.t + "</b></span>" : "")
+       + (st.r != null ? "<span>r = <b>" + st.r + "</b></span>" : "")
+       + (st.target != null ? "<span>target = <b>" + st.target + "</b></span>" : "")
+       + "<span>2<sup>b\u22122</sup> = <b>" + TWO(st.b - 2) + "</b></span></div>";
+    h += '<div class="kv"><span>invariant: 2<sup>b\u22122</sup> &lt; R \u2264 2<sup>b\u22121</sup>'
+       + (st.R > TWO(st.b - 2) && st.R <= TWO(st.b - 1) ? " <span class=\"good\">holds</span>"
+          : " <span class=\"warn\">temporarily broken \u2014 renormalizing</span>") + "</span></div>";
+  } else {
+    h += '<div class="kv"><span>\u2113 = <b>' + fm(st.l) + "</b></span></div>";
+    h += '<div class="kv"><span>p = <b>' + fm(st.p) + "</b></span></div>";
+    h += '<div class="kv"><span>\u2113 + p = <b>' + fm(st.l.add(st.p)) + "</b></span></div>";
+    h += '<div class="kv" style="margin-top:6px"><span>p &gt; \u00bc: <b>'
+       + (st.p.gt(QUART) ? "yes" : "not yet") + "</b> \u2014 the renormalization loop restores it</span></div>";
+  }
+  el("stateBox").innerHTML = h;
+  el("stateMeta").textContent = mode === "fix" ? "b = " + st.b : "exact rationals";
+}
+
+function renderCmp() {
+  const st = steps[cur].st;
+  const got = st.done ? st.bits.map(x => x.v).join("") : null;
+  let h = "<span>the non-renormalized algorithm on the same input: <b>" + (exactCode || "\u2014") + "</b> ("
+        + exactCode.length + " bits)</span><br>";
+  if (got) {
+    h += "<span>this coder: <b>" + got + "</b> (" + got.length + " bits)</span><br>";
+    if (got === exactCode) h += '<span class="same">identical</span>';
+    else if (got === "0" + exactCode) h += '<span class="same">identical after the leading validity 0</span>';
+    else h += '<span class="diff">' + (got.length - exactCode.length >= 0 ? "+" : "")
+            + (got.length - exactCode.length) + " bits</span>";
+  } else h += "<span>this coder: still running\u2026</span>";
+  el("cmpBox").innerHTML = h;
+  el("cmpMeta").textContent = mode === "fix" ? "rounding costs bits" : "should agree exactly";
+}
+
+/* ---------- pseudocode ----------------------------------------------------- */
+
+const CODE_HALF = [["Renormalization after each character", [
+  ["r0", "  after each character, while one of the three applies:"],
+  ["r1", "    if [\u2113, \u2113+p) \u2286 [0, \u00bd)                // the code starts with 0"],
+  ["r2", "        output 0;   \u2113 := 2\u2113;  p := 2p"],
+  ["r3", "    if [\u2113, \u2113+p) \u2286 [\u00bd, 1)"],
+  ["r4", "        output 1;   \u2113 := \u2113 \u2212 \u00bd;  \u2113 := 2\u2113;  p := 2p"],
+  ["r5", "    if [\u2113, \u2113+p) \u2286 [\u00bc, \u00be)                // next two bits are 01 or 10"],
+  ["r6", "        remember an outstanding opposite bit"],
+  ["r7", "        \u2113 := \u2113 \u2212 \u00bc;  \u2113 := 2\u2113;  p := 2p"],
+  ["f1", "  at the end: write the shortest dyadic tail"]
+]]];
+
+const CODE_FIX_ENC = [
+["arithmetic_encode(l, h, t)", [
+  ["e1", "(1) Set r \u2190 R div t"],
+  ["e2", "(2) Set L \u2190 L + r times l"],
+  ["e3", "(3) If h < t then"],
+  ["e3", "        set R \u2190 r times (h \u2212 l)"],
+  ["e3", "    else"],
+  ["e3", "        set R \u2190 R \u2212 r times l"],
+  ["e4", "(4) While R \u2264 2^(b\u22122) do"],
+  ["e4", "        Use ENCODER RENORMALIZATION to renormalize R,"],
+  ["e4", "            adjust L, and output one bit"]
+]],
+["Algorithm ENCODER RENORMALIZATION", [
+  ["n1", "(4) While R \u2264 2^(b\u22122) do"],
+  ["n2", "        If L + R \u2264 2^(b\u22121) then"],
+  ["n2", "            bit_plus_follow(0)"],
+  ["n3", "        else if 2^(b\u22121) \u2264 L then"],
+  ["n3", "            bit_plus_follow(1)"],
+  ["n3", "            Set L \u2190 L \u2212 2^(b\u22121)"],
+  ["n4", "        else"],
+  ["n5", "            Set bits_outstanding \u2190 bits_outstanding + 1"],
+  ["n5", "                and L \u2190 L \u2212 2^(b\u22122)"],
+  ["n6", "        Set L \u2190 2L and R \u2190 2R"]
+]],
+["bit_plus_follow(x)", [
+  ["p1", "(1) write_one_bit(x)"],
+  ["p2", "(2) While bits_outstanding > 0 do"],
+  ["p2", "        write_one_bit(1 \u2212 x)"],
+  ["p2", "        Set bits_outstanding \u2190 bits_outstanding \u2212 1"]
+]],
+["start_encode()", [
+  ["s1", "(1) Set L \u2190 0, R \u2190 2^(b\u22121), and bits_outstanding \u2190 0"]
+]],
+["finish_encode()", [
+  ["f1", "(1) Use bit_plus_follow() to transmit the b bits of L"]
+]]];
+
+const CODE_FIX_DEC = [
+["decode_target(t)", [
+  ["d1", "(1) Set r \u2190 R div t"],
+  ["d1", "(2) Return (min{t \u2212 1, D div r})"]
+]],
+["arithmetic_decode(l, h, t)", [
+  ["d2", "(1) Set D \u2190 D \u2212 r times l"],
+  ["d2", "(2) If h < t then"],
+  ["d2", "        set R \u2190 r times (h \u2212 l)"],
+  ["d2", "    else"],
+  ["d2", "        set R \u2190 R \u2212 r times l"],
+  ["d3", "(3) While R \u2264 2^(b\u22122) do"],
+  ["d3", "        Set R \u2190 2R and D \u2190 2D + read_one_bit()"]
+]],
+["start_decode()", [
+  ["s3", "(1) Set R \u2190 2^(b\u22121) and D \u2190 0"],
+  ["s3", "(2) For i \u2190 1 to b do"],
+  ["s3", "        Set D \u2190 2D + read_one_bit()"]
+]],
+["finish_decode()", [
+  ["s4", "(1) Push any unconsumed bits back to the input bit stream."]
+]]];
+
+function renderCode() {
+  const on = steps[cur].line, on2 = steps[cur].line2;
+  const blocks = mode === "half" ? CODE_HALF : (dir === "enc" ? CODE_FIX_ENC : CODE_FIX_DEC);
+  let h = "";
+  blocks.forEach(([title, lines]) => {
+    const act = lines.some(([id]) => id === on || id === on2);
+    h += '<div class="codeblk' + (act ? " act" : "") + '"><div class="sublabel">' + esc(title) + "</div>";
+    lines.forEach(([id, s]) => {
+      const body = esc(s).replace(/(\/\/.*)$/, '<span class="cm">$1</span>')
+                         .replace(/\b(While|If|then|else|do|Set|Return|Use|for|if|output|while|remember|after|at)\b/g,
+                                  '<span class="kw">$1</span>');
+      h += '<div class="cline' + (id === on ? " on" : id === on2 ? " on2" : "") + '"><span class="ln"></span><span>'
+         + (s === "" ? "&nbsp;" : body) + "</span></div>";
+    });
+    h += "</div>";
+  });
+  el("codeBody").innerHTML = h;
+  el("codeBody").className = "codebody";
+  el("codeNote").innerHTML = mode === "half"
+    ? "The three rules of the lecture. The loop keeps <b>p &gt; \u00bc</b>: an interval of width at most \u00bc that "
+      + "escaped the first two cases has \u2113 &gt; \u00bc and \u2113 &lt; \u00bd, hence \u2113+p \u2264 \u00be \u2014 the third case. "
+      + "With the frugal tail, the bits produced here are <b>exactly</b> those of the non-renormalized algorithm; "
+      + "they just come out as the text is read instead of all at the end."
+    : "Moffat, Neal and Witten, <i>Arithmetic Coding Revisited</i>, ACM TOIS 1998 \u2014 Algorithm IMPROVED CODER "
+      + "(Figure 9), ENCODER RENORMALIZATION (Figure 7) and the support routines (Figure 10). Their L is our \u2113 and "
+      + "their R is our p, scaled by 2<sup>b</sup>: the three branches of the renormalization loop are the three "
+      + "cases above. <b>l, h, t are integer frequency counts</b>, not probabilities, and the coder needs "
+      + "t \u2264 2<sup>f</sup> with f \u2264 b\u22122.";
+}
+
+/* ---------- transport ------------------------------------------------------ */
+
+function renderPhases() {
+  const bar = el("phaseBar"); bar.textContent = "";
+  phases.forEach(ph => {
+    const len = Math.max(1, ph.to - ph.from);
+    const b = document.createElement("button");
+    b.className = "phasebtn"; b.style.flexGrow = len;
+    const done = cur >= ph.to, on = cur >= ph.from && cur < ph.to;
+    if (on) b.className += " on"; else if (done) b.className += " past";
+    const f = document.createElement("span");
+    f.className = "fill" + (cur <= ph.from ? " empty" : "");
+    f.style.width = (done ? 100 : on ? Math.round(100 * (cur - ph.from) / len) : 0) + "%";
+    b.appendChild(f);
+    const lb = document.createElement("span"); lb.className = "lab"; lb.textContent = ph.name;
+    b.appendChild(lb);
+    b.title = ph.name + " \u2014 steps " + ph.from + "\u2013" + (ph.to - 1);
+    b.addEventListener("click", () => goto(ph.from));
+    bar.appendChild(b);
+  });
+  el("stepNo").textContent = (cur + 1) + " / " + steps.length;
+}
+
+function render() {
+  const s = steps[cur];
+  el("statusBox").innerHTML = s.msg;
+  el("phaseName").textContent = phases[s.phase] ? phases[s.phase].name : "";
+  drawInterval(); drawHistory();
+  renderBits(); renderState(); renderCmp(); renderCode(); renderPhases();
+  el("scrubber").max = steps.length - 1;
+  el("scrubber").value = cur;
+  el("backBtn").disabled = cur === 0;
+  el("stepBtn").disabled = cur >= steps.length - 1;
+}
+
+function goto(k) { cur = Math.max(0, Math.min(steps.length - 1, k)); render(); }
+function stepBy(d) { stop(); goto(cur + d); }
+function stop() { if (timer) { clearInterval(timer); timer = null; el("playBtn").innerHTML = "&#x25B6;&#xFE0E;"; } }
+function play() {
+  if (timer) { stop(); return; }
+  if (cur >= steps.length - 1) cur = 0;
+  el("playBtn").innerHTML = "&#x23F8;&#xFE0E;";
+  timer = setInterval(() => { if (cur >= steps.length - 1) { stop(); return; } goto(cur + 1); }, +el("speed").value);
+}
+
+/* ---------- wiring ---------------------------------------------------------- */
+
+function refresh() {
+  stop();
+  ivView = null; ivLast = -1;
+  model = makeModel(spec);
+  build();
+  cur = 0;
+  syncInputs();
+  render();
+}
+function syncInputs() {
+  const single = spec.alphabet.every(s => s.length === 1);
+  el("inText").value = spec.text.join(single ? "" : " ");
+  el("inputText").value = specToSource(spec);
+  el("bWrap").style.display = mode === "fix" ? "" : "none";
+  el("modeHalf").classList.toggle("on", mode === "half");
+  el("modeFix").classList.toggle("on", mode === "fix");
+  el("dirEnc").classList.toggle("on", dir === "enc");
+  el("dirDec").classList.toggle("on", dir === "dec");
+  el("flushChk").parentElement.style.display = mode === "fix" && dir === "enc" ? "" : "none";
+  let fTxt = "";
+  try {
+    const cd = model.counts([]);
+    fTxt = "t = " + cd.t + ", so f \u2265 " + cd.t.toString(2).length;
+  } catch (e) { fTxt = ""; }
+  el("fNote").textContent = fTxt;
+  el("modelNote").innerHTML = "Model: <b>" + esc(model.describe()) + "</b> over {"
+    + spec.alphabet.map(c => esc(vis(c))).join(", ") + "}"
+    + (model.hasEof ? " and $ with P = " + (spec.eof.short() ? spec.eof.frac() : spec.eof.dec(4)) : ", no $");
+}
+function loadSource(src) {
+  try {
+    spec = parseInput(src); el("parseErr").textContent = "";
+    refresh(); return true;
+  } catch (e) { el("parseErr").textContent = e.message; return false; }
+}
+
+function init() {
+  const sel = el("presetSel");
+  Object.keys(PRESETS).forEach(k => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = PRESETS[k].name; sel.appendChild(o);
+  });
+  sel.addEventListener("change", () => loadSource(PRESETS[sel.value].src));
+  const bs = el("bSel");
+  [8, 10, 12, 16, 20, 24, 32].forEach(v => {
+    const o = document.createElement("option");
+    o.value = v; o.textContent = v + " bits"; if (v === 16) o.selected = true;
+    bs.appendChild(o);
+  });
+  bs.addEventListener("change", () => { bBits = +bs.value; refresh(); });
+
+  el("modeHalf").addEventListener("click", () => { mode = "half"; if (dir === "dec") dir = "enc"; refresh(); });
+  el("modeFix").addEventListener("click", () => { mode = "fix"; refresh(); });
+  el("dirEnc").addEventListener("click", () => { dir = "enc"; refresh(); });
+  el("dirDec").addEventListener("click", () => { dir = "dec"; mode = "fix"; refresh(); });
+  el("flushChk").addEventListener("change", () => { flushAll = el("flushChk").checked; refresh(); });
+  el("applyBtn").addEventListener("click", () => {
+    const single = spec.alphabet.every(s => s.length === 1);
+    const t = el("inText").value;
+    const arr = (single ? t.split("") : t.split(/\s+/)).filter(c => c !== "");
+    const bad = arr.find(c => !spec.alphabet.includes(c));
+    if (bad !== undefined) { el("parseErr").textContent = "\u201c" + bad + "\u201d is not in the alphabet"; return; }
+    if (arr.length > 20) { el("parseErr").textContent = "at most 20 symbols"; return; }
+    el("parseErr").textContent = "";
+    spec.text = arr; if (spec.nDec != null) spec.nDec = arr.length;
+    refresh();
+  });
+  el("inText").addEventListener("keydown", ev => { if (ev.key === "Enter") el("applyBtn").click(); });
+  el("loadBtn").addEventListener("click", () => loadSource(el("inputText").value));
+
+  el("resetBtn").addEventListener("click", () => { stop(); goto(0); });
+  el("backBtn").addEventListener("click", () => stepBy(-1));
+  el("stepBtn").addEventListener("click", () => stepBy(1));
+  el("playBtn").addEventListener("click", play);
+  el("scrubber").addEventListener("input", ev => { stop(); goto(+ev.target.value); });
+  el("speed").addEventListener("input", ev => {
+    el("speedVal").textContent = ev.target.value + "ms";
+    if (timer) { stop(); play(); }
+  });
+  document.addEventListener("keydown", ev => {
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+    if (ev.key === "ArrowRight") { stepBy(1); ev.preventDefault(); }
+    else if (ev.key === "ArrowLeft") { stepBy(-1); ev.preventDefault(); }
+    else if (ev.key === " ") { play(); ev.preventDefault(); }
+    else if (ev.key === "Home") { stop(); goto(0); ev.preventDefault(); }
+    else if (ev.key === "End") { stop(); goto(steps.length - 1); ev.preventDefault(); }
+  });
+  let rt = null;
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { ivView = null; ivLast = -1; drawInterval(); drawHistory(); }, 120); });
+
+  loadSource(PRESETS.trits.src);
+  if (location.hash === "#selftest") runSelfTest(true);
+}
+
+/* ---------- self test -------------------------------------------------------- */
+
+function finalBits() { return steps[steps.length - 1].st.bits.map(x => x.v).join(""); }
+
+function runOnce(src, m, b, flush, direction) {
+  spec = parseInput(src); model = makeModel(spec);
+  const om = mode, ob = bBits, of = flushAll, od = dir;
+  mode = m; bBits = b; flushAll = !!flush; dir = direction || "enc";
+  build();
+  const last = steps[steps.length - 1];
+  const res = { bits: finalBits(), st: last.st, msg: last.msg };
+  mode = om; bBits = ob; flushAll = of; dir = od;
+  return res;
+}
+
+function runSelfTest(show) {
+  const res = [];
+  const ok = (name, got, want) => res.push({ name: name, got: String(got), want: String(want),
+                                             ok: String(got) === String(want) });
+
+  /* (a) renormalizing by halves reproduces the non-renormalized code exactly */
+  ok("halves, trits 21101", runOnce(PRESETS.trits.src, "half", 16).bits, "110100100");
+  ok("halves, trits 111111111", runOnce(PRESETS.ones.src, "half", 16).bits, "0111111111111111");
+  let same = 0, tot = 0;
+  ["21101", "111111111", "012201120", "2", "000", "210210210"].forEach(t => {
+    const src = "model uniform\nalphabet 0 1 2\neof 0\ntext " + t + "\n";
+    const a = runOnce(src, "half", 16).bits;
+    spec = parseInput(src); model = makeModel(spec);
+    tot++; if (a === exactEncode()) same++;
+  });
+  ok("halves = exact coder on 6 texts", same + "/" + tot, tot + "/" + tot);
+
+  /* (b) the invariant p > 1/4 after every renormalization loop */
+  spec = parseInput(PRESETS.ones.src); model = makeModel(spec);
+  const om = mode; mode = "half"; build(); mode = om;
+  let bad = 0;
+  steps.forEach(s => { if (s.st.hist.length) {
+    const h = s.st.hist[s.st.hist.length - 1];
+    if (h.kind === "narrow" && h.p.gt(QUART) === false) { /* mid-loop, allowed */ }
+  }});
+  const fin = steps[steps.length - 1].st;
+  ok("p stays above 1/4 outside the loop", fin.hist.filter(h =>
+      h.kind !== "narrow" && h.kind !== "start" && !h.p.gt(QUART)).length, 0);
+
+  /* (c) the outstanding counter really does fire on the straddling text */
+  spec = parseInput(PRESETS.ones.src); model = makeModel(spec);
+  const om2 = mode; mode = "half"; build(); mode = om2;
+  ok("111111111 uses outstanding bits", steps.some(s => s.st.out > 0), true);
+  ok("and they are all paid out by the end", steps[steps.length - 1].st.out, 0);
+
+  /* (d) fixed precision: leading validity 0, then the same code */
+  const f16 = runOnce(PRESETS.trits.src, "fix", 16);
+  ok("fixed precision b=16, trits 21101", f16.bits, "0110100100");
+  ok("its first bit is the validity 0", f16.bits[0], "0");
+
+  /* (e) fixed precision round-trips for every b */
+  [8, 10, 12, 16, 20, 24, 32].forEach(b => {
+    const d = runOnce(PRESETS.trits.src, "fix", b, false, "dec");
+    ok("b = " + b + " round trip", (d.st.decoded || []).join(""), "21101");
+  });
+
+  /* (f) round trip with an end-of-text symbol and an adaptive model */
+  const da = runOnce(PRESETS.adaptive.src, "fix", 20, false, "dec");
+  ok("adaptive bbba$ round trip", (da.st.decoded || []).filter(c => c !== "$").join(""), "bbba");
+  const de = runOnce(PRESETS.eofDemo.src, "fix", 20, false, "dec");
+  ok("a/b/$ aabab round trip", (de.st.decoded || []).filter(c => c !== "$").join(""), "aabab");
+
+  /* (g) the paper's flush costs bits but still decodes */
+  const fl = runOnce(PRESETS.trits.src, "fix", 16, true);
+  ok("flushing b bits of L is longer", fl.bits.length > f16.bits.length, true);
+
+  /* (h) integer counts represent the model exactly */
+  spec = parseInput(PRESETS.adaptive.src); model = makeModel(spec);
+  const cd = model.counts([]);
+  let s2 = R.ZERO;
+  cd.syms.forEach(x => s2 = s2.add(new R(x.c, cd.t)));
+  ok("counts sum to 1", s2.frac(), "1");
+  const d0 = model.dist([]);
+  ok("counts match the probabilities", cd.syms.map((x, j) =>
+      new R(x.c, cd.t).cmp(d0[j].p)).every(v => v === 0), true);
+
+  loadSource(PRESETS.trits.src);
+  if (show) {
+    const box = document.createElement("div");
+    box.className = "sim-box"; box.style.marginTop = "18px";
+    box.innerHTML = '<div class="sim-title"><span>Self test</span><span class="rhs">'
+      + res.filter(r => r.ok).length + " / " + res.length + " passed</span></div>"
+      + "<table class=\"state\">" + res.map(r =>
+        '<tr><td style="text-align:left">' + esc(r.name) + "</td><td>" + esc(r.got) + "</td><td>"
+        + (r.ok ? "\u2713" : "expected " + esc(r.want)) + "</td></tr>").join("") + "</table>";
+    document.body.appendChild(box);
+  }
+  return res;
+}
+window.runSelfTest = runSelfTest;
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

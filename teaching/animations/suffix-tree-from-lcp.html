@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/fonts/pagella/stylesheet.css">
+<link rel="stylesheet" href="/fonts/epigrafica/stylesheet.css">
+<link rel="stylesheet" href="/css/animations.css">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suffix Tree from Suffix Array + LCP Array — Animated</title>
+<style>
+    :root{
+        --bg:#f5ebd9; --panel:#faf6ed; --panel-border:#d4c5b4;
+        --controls-bg:#ecddc5; --controls-border:#d4c5b4;
+        --ink:#6b675c; --ink-strong:#46433a; --title-muted:#8b8779;
+        --btn:#faf6ed; --btn-border:#b9a793; --btn-border-hover:#9c866d;
+        --heading:#6d180f; --heading-deep:#902015;
+        --hi-fill:#e3c4b9;
+        --tree:#5a4c3f; --spine:#6d180f; --leaf:#1d5c80; --newnode:#3f6b1e;
+        --moved:#cc2f22; --grey:#b6a98d;
+    }
+    *{box-sizing:border-box}
+    body{background:var(--bg);color:var(--ink);
+        font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;
+        margin:0;padding:22px 26px 46px;min-height:100vh}
+    h1{font-size:1.6rem;font-weight:600;margin:0 0 4px;letter-spacing:.3px;color:var(--ink-strong)}
+    .subtitle{font-size:.92rem;color:var(--title-muted);margin:0 0 18px;max-width:64em;line-height:1.5}
+    .subtitle code{background:#ecddc5;padding:1px 6px;border-radius:3px}
+
+    .controls{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:center;background:var(--controls-bg);
+        padding:12px 18px;border-radius:6px;border:1px solid var(--controls-border);margin-bottom:16px}
+    .ctl-group{display:flex;align-items:center;gap:8px}
+    .ctl-group>label{font-size:.76rem;color:var(--ink-strong);font-weight:600;
+        text-transform:uppercase;letter-spacing:.6px}
+    button,select{background:var(--btn);color:var(--ink-strong);border:1px solid var(--btn-border);
+        padding:7px 13px;font-size:.87rem;border-radius:4px;cursor:pointer;font-weight:500;
+        font-family:inherit;transition:background .15s,border-color .15s}
+    button:hover:not(:disabled),select:hover{background:#fcf9f3;border-color:var(--btn-border-hover)}
+    button:disabled{opacity:.38;cursor:not-allowed}
+    button.primary{background:#f0d9cd;border-color:#c28577}
+    .seg{display:flex;border:1px solid var(--btn-border);border-radius:4px;overflow:hidden}
+    .seg button{border:none;border-radius:0;padding:7px 12px}
+    .seg button+button{border-left:1px solid var(--btn-border)}
+    .seg button.on{background:#e3c4b9;font-weight:600}
+    input[type=range]{accent-color:#cc2f22;cursor:pointer}
+    .slider-wrap{display:flex;align-items:center;gap:10px;flex:1 1 300px;min-width:240px}
+    .slider-wrap input[type=range]{flex:1}
+    .stepcount{font-size:.8rem;color:var(--title-muted);min-width:90px;text-align:right;
+        font-variant-numeric:tabular-nums}
+
+    .stage{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(320px,.95fr);gap:18px;align-items:start}
+    @media (max-width:1040px){.stage{grid-template-columns:1fr}}
+    .stage>div{min-width:0}
+    .sim-box{background:var(--panel);border:1px solid var(--panel-border);border-radius:6px;
+        padding:13px 16px;box-shadow:0 2px 8px rgba(0,0,0,.04);max-width:100%}
+    .sim-title{font-size:.76rem;text-transform:uppercase;letter-spacing:1px;color:var(--title-muted);
+        margin:0 0 10px;font-weight:700}
+    .side{display:flex;flex-direction:column;gap:15px}
+    .status{background:#ecddc5;border:1px solid var(--panel-border);border-radius:5px;padding:10px 13px;
+        font-size:.9rem;color:var(--ink-strong);min-height:54px;line-height:1.5}
+    .status b{color:var(--heading)}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    #treeWrap{overflow:auto;max-width:100%;max-height:74vh}
+    svg text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+    svg .hd{font-family:var(--wi-font-body)"Segoe UI",Roboto,sans-serif;font-size:10px;
+        fill:var(--title-muted);letter-spacing:.6px}
+    svg .num{fill:var(--title-muted);font-size:11.5px}
+    svg .lcpv{fill:var(--heading);font-weight:700}
+    svg .suf{fill:var(--ink-strong)}
+    svg .suf .pre{fill:var(--grey)}
+    svg .edge{stroke:var(--tree);stroke-width:1.4;fill:none}
+    svg .edge.moved{stroke:var(--moved);stroke-width:2.6}
+    svg .bar{stroke:var(--tree);stroke-width:1.6}
+    svg .bar.spine{stroke:var(--spine);stroke-width:2.6}
+    svg .bar.fresh{stroke:var(--newnode);stroke-width:3}
+    svg .dot{fill:var(--leaf)}
+    svg .nlab{fill:var(--tree);font-size:11px}
+    svg .nlab.spine{fill:var(--spine);font-weight:700}
+    svg .rowhl{fill:var(--hi-fill);opacity:.55}
+    svg .sentinel{stroke:var(--grey);stroke-dasharray:3 3}
+    svg .guide{stroke:#e0d0b4;stroke-width:1}
+
+    table.stk,table.kids{width:100%;border-collapse:collapse;font-size:.8rem;
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    table.stk td,table.stk th,table.kids td,table.kids th{padding:3px 6px;border-bottom:1px dashed #ecddc5;
+        text-align:left}
+    table.stk th,table.kids th{font-size:.68rem;color:var(--title-muted);text-transform:uppercase;
+        letter-spacing:.5px;font-family:inherit;font-weight:700}
+    table.stk tr.top td{background:#f3e7d2;font-weight:700;color:var(--ink-strong)}
+    table.kids tr.fresh td{background:#e6f0dc}
+    .kidchip{display:inline-block;border:1px solid #c3b295;border-radius:3px;background:#fefdf7;
+        padding:0 4px;margin:1px 2px 1px 0;font-size:.75rem}
+    .kidchip .c{color:var(--heading);font-weight:700}
+    .kidchip.leaf{border-color:var(--leaf);background:#e4eef4}
+    .empty-note{color:var(--title-muted);font-style:italic;font-size:.85rem}
+
+    .code-section{border:1px solid #d4c5b4;border-radius:6px;overflow:hidden;background:#fbf8f0}
+    pre.code{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.715rem;
+        line-height:1.62;color:#46433a;overflow-x:auto}
+    pre.code .ln{display:block;padding:0 9px;white-space:pre;border-left:3px solid transparent}
+    pre.code .ln.hot{background:#f6dfd8;border-left-color:var(--heading)}
+    pre.code .ln.added{background:#eef5e7}
+    pre.code .ln.added.hot{background:#f6dfd8}
+    pre.code .cm{color:#a1937c}
+    .code-note{font-size:.73rem;color:var(--title-muted);margin-top:8px;line-height:1.5}
+    .code-note code{background:#ecddc5;padding:0 4px;border-radius:3px}
+    .cost{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:.84rem}
+    .cost .v{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-strong)}
+    .cost .sub{padding-left:12px;font-size:.79rem;color:var(--title-muted)}
+    .cost hr{grid-column:1/-1;border:none;border-top:1px dashed #deceb2;margin:4px 0}
+
+    details.editor{margin-top:22px}
+    details.editor summary{cursor:pointer;font-size:.82rem;color:var(--title-muted);font-weight:600;
+        text-transform:uppercase;letter-spacing:.6px}
+    .editor-body{margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+    textarea{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem;
+        background:var(--panel);color:var(--ink-strong);border:1px solid var(--panel-border);
+        border-radius:5px;padding:10px;width:360px;height:120px;resize:vertical}
+    .editor-help{font-size:.82rem;color:var(--ink);max-width:520px;line-height:1.55}
+    .editor-help code{background:#ecddc5;padding:1px 5px;border-radius:3px}
+    .err{color:#6d180f;font-weight:600;font-size:.82rem;min-height:18px}
+</style>
+<style>
+/* wild-inter.net: re-assert the site type stack over the page's own styles */
+h1, h2, h3, h4, h5, h6, .sim-title, .wi-caption {
+  font-family: var(--wi-font-head);
+  letter-spacing: .05em;
+}
+h1, h2, h3 { color: var(--wi-accent); }
+body { font-family: var(--wi-font-body); }
+</style>
+</head>
+<body>
+
+<h1>Suffix Tree from Suffix Array and LCP Array</h1>
+<p class="subtitle">
+    The leaf array <code>L[0..n]</code> gives the leaves of the suffix tree from left to right, and
+    <code>LCP[r]</code> is the string depth of the lowest common ancestor of leaves <code>r&minus;1</code>
+    and <code>r</code>. One left-to-right sweep with a stack &mdash; the right spine of the tree built so far
+    &mdash; therefore rebuilds the whole tree. Nodes sit at their string depth, so the picture is the
+    LCP-interval picture.
+</p>
+
+<div class="controls">
+    <div class="ctl-group">
+        <label for="preset">Input</label>
+        <select id="preset"></select>
+    </div>
+    <div class="ctl-group">
+        <label>Labels</label>
+        <div class="seg" id="labSeg">
+            <button data-lab="path" class="on">path labels</button>
+            <button data-lab="depth">depths only</button>
+        </div>
+    </div>
+    <div class="ctl-group">
+        <button id="btnFirst">|&lt;</button>
+        <button id="btnPrev">&lt;</button>
+        <button id="btnPlay" class="primary">Play</button>
+        <button id="btnNext">&gt;</button>
+        <button id="btnLast">&gt;|</button>
+    </div>
+    <div class="slider-wrap">
+        <input type="range" id="slider" min="0" max="0" value="0">
+        <span class="stepcount" id="stepCount">0 / 0</span>
+    </div>
+    <div class="ctl-group">
+        <label for="speed">Speed</label>
+        <input type="range" id="speed" min="1" max="10" value="6" style="width:80px">
+    </div>
+</div>
+
+<div class="stage">
+    <div>
+        <div class="sim-box">
+            <p class="sim-title" id="stageTitle">Suffix tree</p>
+            <div id="treeWrap"></div>
+        </div>
+    </div>
+    <div class="side">
+        <div class="status" id="status"></div>
+        <div class="sim-box">
+            <p class="sim-title">Stack S &nbsp;<span style="text-transform:none;font-weight:400">(right spine)</span></p>
+            <div id="stack"></div>
+        </div>
+        <div class="sim-box">
+            <p class="sim-title">Child links</p>
+            <div id="kids"></div>
+        </div>
+        <div class="sim-box">
+            <p class="sim-title">Code</p>
+            <div class="code-section"><pre class="code" id="code"></pre></div>
+            <div class="code-note" id="codeNote"></div>
+        </div>
+        <div class="sim-box">
+            <p class="sim-title">Cost</p>
+            <div class="cost" id="cost"></div>
+        </div>
+    </div>
+</div>
+
+<details class="editor" id="editor">
+    <summary>Input editor</summary>
+    <div class="editor-body">
+        <div>
+            <textarea id="ta" spellcheck="false"></textarea>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+                <button id="btnLoad" class="primary">Load</button>
+                <span class="err" id="err"></span>
+            </div>
+        </div>
+        <div class="editor-help">
+            <p style="margin-top:0"><b>Format.</b> Either a text, in which case suffix array and LCP array are
+            computed for you:</p>
+            <p class="mono" style="margin:4px 0">text: bananaban$</p>
+            <p style="margin:6px 0">or the two arrays directly, to run the sweep on any Cartesian-tree input:</p>
+            <p class="mono" style="margin:4px 0">text: bananaban$<br>L: 9 5 7 3 1 6 0 8 4 2<br>LCP: 0 1 2 3 0 3 0 1 2</p>
+            <p style="margin:6px 0">
+            <code>LCP</code> lists <code>LCP[1..n]</code> (n values, no entry for rank 0). Use <code>_</code>
+            for a blank in the text. The text is only used for the labels; the sweep reads
+            <code>L</code> and <code>LCP</code>.</p>
+        </div>
+    </div>
+</details>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   ENGINE START
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* corrected version of the sweep; the two lines marked ADDED repair the
+   published pseudocode, which creates a fresh node even when the top of the
+   stack already sits at string depth d (repeated LCP values). */
+const CODE = [
+    ["procedure suffixTreeFrom(LCP[1..n], L[0..n])", 0],
+    ["    v0 := new Node(stringDepth: -1)      // sentinel above the root", 0],
+    ["    v0.addChild(Leaf(L[0]))", 0],
+    ["    S := new Stack;  S.push(v0)          // S = right spine of T", 0],
+    ["    for j := 1, ..., n", 0],
+    ["        d := LCP[j]", 0],
+    ["        while S.top().stringDepth > d do S.pop() end while", 0],
+    ["        if S.top().stringDepth = d then  // node is already there", 1],
+    ["            S.top().addChild(Leaf(L[j]))", 1],
+    ["        else", 1],
+    ["            p := S.top()", 0],
+    ["            u := new Node(stringDepth: d)", 0],
+    ["            u.addChild(p.removeRightmostChild())", 0],
+    ["            u.addChild(Leaf(L[j]))", 0],
+    ["            p.addChild(u)", 0],
+    ["            S.push(u)", 0],
+    ["    return v0.rightmostChild()", 0]
+];
+
+/* ---- suffix array and LCP array, computed naively (n is small here) ----- */
+function suffixArray(T) {
+    const n = T.length - 1;                       // T = text + '$', ranks 0..n
+    const L = [...Array(n + 1).keys()];
+    L.sort((a, b) => { const x = T.slice(a), y = T.slice(b); return x < y ? -1 : x > y ? 1 : 0; });
+    const LCP = [null];
+    for (let r = 1; r <= n; r++) {
+        let k = 0;
+        while (L[r - 1] + k < T.length && L[r] + k < T.length && T[L[r - 1] + k] === T[L[r] + k]) k++;
+        LCP.push(k);
+    }
+    return { L, LCP };
+}
+
+/* ---- the sweep ---------------------------------------------------------- */
+function buildTrace(T, L, LCP) {
+    const n = L.length - 1;
+    const nodes = [];                             // node objects, id = index
+    const newNode = (depth) => { nodes.push({ id: nodes.length, depth, kids: [], leaf: false }); return nodes.length - 1; };
+    const newLeaf = (sa, rank) => { nodes.push({ id: nodes.length, depth: T.length - sa, kids: [], leaf: true, sa, rank }); return nodes.length - 1; };
+    const steps = [];
+    const stack = [];
+    const cnt = { push: 0, pop: 0, nodes: 0, reuse: 0 };
+
+    const snap = (o) => {
+        steps.push({
+            nodes: nodes.map(v => ({ ...v, kids: v.kids.slice() })),
+            stack: stack.slice(), j: o.j === undefined ? -1 : o.j,
+            d: o.d === undefined ? null : o.d,
+            hot: o.hot || [], moved: o.moved || null, fresh: o.fresh === undefined ? -1 : o.fresh,
+            code: o.code || [], msg: o.msg, counts: { ...cnt }
+        });
+    };
+
+    const v0 = newNode(-1);
+    const l0 = newLeaf(L[0], 0);
+    nodes[v0].kids.push(l0);
+    stack.push(v0); cnt.push++;
+    snap({ code: [0, 1, 2, 3], j: 0,
+        msg: `Start with the sentinel <span class="mono">v<sub>0</sub></span> of string depth ` +
+             `<span class="mono">&minus;1</span> and hang the first leaf ` +
+             `<span class="mono">L[0] = ${L[0]}</span> under it. The stack holds the right spine.` });
+
+    for (let j = 1; j <= n; j++) {
+        const d = LCP[j];
+        snap({ code: [4, 5], j, d, hot: [stack[stack.length - 1]],
+            msg: `<b>j = ${j}</b>: <span class="mono">d = LCP[${j}] = ${d}</span>. The new leaf ` +
+                 `<span class="mono">L[${j}] = ${L[j]}</span> hangs under the node of string depth ` +
+                 `<span class="mono">${d}</span> on the right spine.` });
+        while (nodes[stack[stack.length - 1]].depth > d) {
+            const popped = stack.pop(); cnt.pop++;
+            snap({ code: [6], j, d, hot: [popped],
+                msg: `<span class="mono">stringDepth(${nm(popped)}) = ${nodes[popped].depth} &gt; ${d}</span> ` +
+                     `&mdash; that node can never receive another child, <b>pop</b> it.` });
+        }
+        const p = stack[stack.length - 1];
+        if (nodes[p].depth === d) {
+            const lf = newLeaf(L[j], j);
+            nodes[p].kids.push(lf);
+            cnt.reuse++;
+            snap({ code: [7, 8], j, d, hot: [p], fresh: lf, moved: [p, lf],
+                msg: `The top of the stack already has string depth <span class="mono">${d}</span> &mdash; ` +
+                     `<b>reuse it</b> and append the leaf <span class="mono">${L[j]}</span> as its new ` +
+                     `rightmost child. <em>(This is the case the published code is missing.)</em>` });
+        } else {
+            const u = newNode(d); cnt.nodes++;
+            const c = nodes[p].kids.pop();
+            nodes[u].kids.push(c);
+            nodes[p].kids.push(u);
+            snap({ code: [10, 11, 12, 14], j, d, hot: [p, u], fresh: u, moved: [u, c],
+                msg: `The top of the stack has string depth ` +
+                     `<span class="mono">${nodes[p].depth} &lt; ${d}</span>, so a <b>new node</b> ` +
+                     `<span class="mono">${nm(u)}</span> of string depth <span class="mono">${d}</span> is ` +
+                     `spliced in: it takes over the rightmost child of <span class="mono">${nm(p)}</span>.` });
+            const lf = newLeaf(L[j], j);
+            nodes[u].kids.push(lf);
+            stack.push(u); cnt.push++;
+            snap({ code: [13, 15], j, d, hot: [u], fresh: lf, moved: [u, lf],
+                msg: `Append the leaf <span class="mono">${L[j]}</span> to ` +
+                     `<span class="mono">${nm(u)}</span> and push ` +
+                     `<span class="mono">${nm(u)}</span> &mdash; it is the new end of the right spine.` });
+        }
+    }
+    snap({ code: [16], j: n + 1,
+        msg: `<b>Done.</b> The root of the suffix tree is the only child of the sentinel. Every node was ` +
+             `pushed and popped at most once, so the sweep is <span class="mono">&Theta;(n)</span>.` });
+
+    function nm(id) { return nodes[id].leaf ? "leaf " + nodes[id].sa : "v" + id; }
+    return { steps, nodes };
+}
+
+/* ---- input parsing ------------------------------------------------------ */
+function parseInput(raw) {
+    const lines = raw.split("\n").map(x => x.trim()).filter(x => x.length);
+    let text = null, L = null, LCP = null;
+    for (const ln of lines) {
+        const m = /^([A-Za-z]+)\s*:\s*(.*)$/.exec(ln);
+        if (!m) continue;
+        const k = m[1].toLowerCase(), v = m[2];
+        if (k === "text") text = v.replace(/\s+/g, "").replace(/_/g, "\u2423");
+        else if (k === "l") L = v.split(/[\s,]+/).filter(x => x.length).map(Number);
+        else if (k === "lcp") LCP = [null].concat(v.split(/[\s,]+/).filter(x => x.length && x !== "-").map(Number));
+    }
+    if (text === null) throw new Error("give a line  text: ...");
+    text = text.replace(/\$+$/, "") + "$";
+    if (text.length > 42) throw new Error("please use at most 40 characters");
+    if (L === null || LCP === null) { const r = suffixArray(text); L = r.L; LCP = r.LCP; }
+    if (L.length !== text.length) throw new Error(`L must have ${text.length} entries`);
+    if (LCP.length !== L.length) throw new Error(`LCP must have ${L.length - 1} entries`);
+    if (L.some(x => !(x >= 0 && x < text.length))) throw new Error("L has an out-of-range entry");
+    if (LCP.slice(1).some(x => !(x >= 0))) throw new Error("LCP has a negative entry");
+    return { text, L, LCP };
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   ENGINE END
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const PRESETS = [
+    { n: "bananaban$", t: "text: bananaban$" },
+    { n: "hannahbansbananasman$", t: "text: hannahbansbananasman$" },
+    { n: "mississippi$", t: "text: mississippi$" },
+    { n: "abracadabra$", t: "text: abracadabra$" },
+    { n: "alf_eats_alfalfa$", t: "text: alf_eats_alfalfa$" },
+    { n: "aaaaaaa$  (a path)", t: "text: aaaaaaa$" },
+    { n: "abababab$", t: "text: abababab$" },
+    { n: "superiorcalifornialives$", t: "text: superiorcalifornialives$" }
+];
+
+let ST = { text: "", L: [], LCP: [], steps: [], nodes: [], idx: 0, timer: null, lab: "path" };
+const $ = id => document.getElementById(id);
+const ROW = 22, COLW = 26, X0 = 96, PADT = 44;
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function sub(t) { return String(t).split("").map(c => "₀₁₂₃₄₅₆₇₈₉"[+c]).join(""); }
+
+/* ---------------------------------------------------------------- code */
+function renderCode() {
+    $("code").innerHTML = CODE.map(([l, added], i) => {
+        const c = l.indexOf("//");
+        const h = c >= 0 ? esc(l.slice(0, c)) + `<span class="cm">${esc(l.slice(c))}</span>` : esc(l);
+        return `<span class="ln${added ? " added" : ""}" data-l="${i}">${h}</span>`;
+    }).join("");
+    $("codeNote").innerHTML =
+        `The three <span style="background:#eef5e7">shaded</span> lines are the repair of the published ` +
+        `pseudocode: without them a repeated LCP value creates a second node of the same string depth, ` +
+        `and the root degenerates into a chain. The sweep computes the <em>shape</em>; ` +
+        `path labels come from a second traversal.`;
+}
+function hilite(lines) {
+    $("code").querySelectorAll(".ln").forEach(e => e.classList.remove("hot"));
+    (lines || []).forEach(i => { const e = $("code").querySelector(`.ln[data-l="${i}"]`); if (e) e.classList.add("hot"); });
+}
+
+/* ---------------------------------------------------------------- drawing */
+function firstLeaf(nodes, id) {
+    let v = nodes[id];
+    while (!v.leaf) { if (!v.kids.length) return null; v = nodes[v.kids[0]]; }
+    return v;
+}
+function anchorOf(nodes, id, memo) {
+    if (memo[id] !== undefined) return memo[id];
+    const v = nodes[id];
+    let a;
+    if (v.leaf) a = yOf(v.rank);
+    else if (!v.kids.length) a = yOf(0);
+    else a = (anchorOf(nodes, v.kids[0], memo) + anchorOf(nodes, v.kids[v.kids.length - 1], memo)) / 2;
+    return (memo[id] = a);
+}
+function yOf(rank) { return PADT + rank * ROW + ROW / 2; }
+function xOf(d) { return X0 + (d + 1) * COLW; }
+
+function renderTree(s) {
+    const nodes = s.nodes, T = ST.text, n = ST.L.length - 1;
+    const maxD = Math.max(0, ...ST.LCP.slice(1));
+    const leafX = xOf(maxD) + 34;
+    const memo = {};
+    const H = PADT + (n + 1) * ROW + 14;
+    /* width: leaf column plus the longest suffix drawn */
+    const maxSufLen = Math.max(...ST.L.map(i => T.length - i));
+    const W = leafX + 16 + maxSufLen * 8 + 30;
+    const parts = [];
+    const esc2 = esc;
+
+    /* header row */
+    parts.push(`<text class="hd" x="4" y="32">RANK</text>`);
+    parts.push(`<text class="hd" x="34" y="32">LCP</text>`);
+    parts.push(`<text class="hd" x="64" y="32">L</text>`);
+    parts.push(`<text class="hd" x="${leafX + 16}" y="32">SUFFIX</text>`);
+    /* depth ruler */
+    for (let d = 0; d <= maxD; d++) {
+        parts.push(`<line class="guide" x1="${xOf(d)}" y1="${PADT - 6}" x2="${xOf(d)}" y2="${H - 8}"/>`);
+        parts.push(`<text class="hd" x="${xOf(d)}" y="${PADT - 12}" text-anchor="middle">${d}</text>`);
+    }
+    parts.push(`<text class="hd" x="${xOf(0)}" y="14" text-anchor="start">STRING DEPTH</text>`);
+
+    /* rows */
+    for (let r = 0; r <= n; r++) {
+        const y = PADT + r * ROW;
+        if (s.j === r) parts.push(`<rect class="rowhl" x="0" y="${y}" width="${W}" height="${ROW}"/>`);
+        parts.push(`<text class="num" x="24" y="${y + 15}" text-anchor="end">${r}</text>`);
+        if (r >= 1) parts.push(`<text class="num lcpv" x="56" y="${y + 15}" text-anchor="end">${ST.LCP[r]}</text>`);
+        parts.push(`<text class="num" x="84" y="${y + 15}" text-anchor="end">${ST.L[r]}</text>`);
+    }
+
+    /* edges and nodes */
+    const drawn = new Set();
+    const draw = (id) => {
+        const v = nodes[id];
+        if (v.leaf) return;
+        const x = xOf(v.depth);
+        v.kids.forEach(k => draw(k));
+        if (v.kids.length) {
+            const a0 = anchorOf(nodes, v.kids[0], memo), a1 = anchorOf(nodes, v.kids[v.kids.length - 1], memo);
+            const cls = "bar" + (s.stack.includes(id) ? " spine" : "") + (s.fresh === id ? " fresh" : "") +
+                        (v.depth < 0 ? " sentinel" : "");
+            parts.push(`<line class="${cls}" x1="${x}" y1="${a0}" x2="${x}" y2="${a1}"/>`);
+        }
+        v.kids.forEach(k => {
+            const c = nodes[k];
+            const ax = c.leaf ? leafX : xOf(c.depth);
+            const ay = anchorOf(nodes, k, memo);
+            const mv = s.moved && s.moved[0] === id && s.moved[1] === k;
+            parts.push(`<line class="edge${mv ? " moved" : ""}" x1="${x}" y1="${ay}" x2="${ax}" y2="${ay}"/>`);
+        });
+        /* node label */
+        if (v.depth >= 0 && v.kids.length) {
+            const a0 = anchorOf(nodes, v.kids[0], memo);
+            const lf = firstLeaf(nodes, id);
+            let lbl = "d=" + v.depth;
+            if (ST.lab === "path" && lf) lbl = v.depth === 0 ? "\u03b5" : T.slice(lf.sa, lf.sa + v.depth);
+            parts.push(`<text class="nlab${s.stack.includes(id) ? " spine" : ""}" x="${x + 3}" ` +
+                       `y="${a0 - 5}">${esc2(lbl)}</text>`);
+        }
+    };
+    draw(0);
+
+    /* leaves */
+    for (const v of nodes) {
+        if (!v.leaf) continue;
+        const y = anchorOf(nodes, v.id, memo);
+        parts.push(`<circle class="dot" cx="${leafX}" cy="${y}" r="3.4"/>`);
+        const d = s.nodes.find(q => !q.leaf && q.kids.includes(v.id));
+        const pd = d ? Math.max(0, d.depth) : 0;
+        const suf = T.slice(v.sa);
+        parts.push(`<text class="suf" x="${leafX + 10}" y="${y + 4.5}">` +
+                   `<tspan class="pre" fill="#b6a98d">${esc2(suf.slice(0, pd))}</tspan>` +
+                   `${esc2(suf.slice(pd))}</text>`);
+    }
+
+    $("treeWrap").innerHTML =
+        `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+}
+
+/* ---------------------------------------------------------------- panels */
+function nodeName(nodes, id) { return nodes[id].leaf ? `&#9633;${nodes[id].sa}` : (id === 0 ? "v&#8320;" : "v" + id); }
+function renderStack(s) {
+    const nodes = s.nodes;
+    let h = `<table class="stk"><tr><th>node</th><th>stringDepth</th><th>path label</th></tr>`;
+    for (let k = s.stack.length - 1; k >= 0; k--) {
+        const id = s.stack[k], v = nodes[id];
+        const lf = firstLeaf(nodes, id);
+        const lbl = v.depth < 0 ? "&mdash;" : (v.depth === 0 ? "\u03b5" : esc(ST.text.slice(lf.sa, lf.sa + v.depth)));
+        h += `<tr class="${k === s.stack.length - 1 ? "top" : ""}"><td>${nodeName(nodes, id)}</td>` +
+             `<td>${v.depth}</td><td>${lbl}</td></tr>`;
+    }
+    $("stack").innerHTML = h + `</table>` +
+        `<div class="empty-note" style="margin-top:6px">top of the stack first</div>`;
+}
+function renderKids(s) {
+    const nodes = s.nodes;
+    let h = `<table class="kids"><tr><th>node</th><th>d</th><th>children (first character of the edge)</th></tr>`;
+    for (const v of nodes) {
+        if (v.leaf) continue;
+        const kids = v.kids.map(k => {
+            const c = nodes[k];
+            const lf = firstLeaf(nodes, k) || c;
+            const ch = Math.max(0, v.depth) < ST.text.length ? ST.text[lf.sa + Math.max(0, v.depth)] : "";
+            return `<span class="kidchip ${c.leaf ? "leaf" : ""}"><span class="c">${esc(ch || "?")}</span> ` +
+                   `${nodeName(nodes, k)}</span>`;
+        }).join("");
+        h += `<tr class="${s.fresh === v.id ? "fresh" : ""}"><td>${nodeName(nodes, v.id)}</td>` +
+             `<td>${v.depth}</td><td>${kids || "&mdash;"}</td></tr>`;
+    }
+    $("kids").innerHTML = h + `</table>` +
+        `<div class="empty-note" style="margin-top:6px">&#9633;i = leaf storing the start index i</div>`;
+}
+function renderCost(s) {
+    const c = s.counts, n = ST.L.length - 1;
+    $("cost").innerHTML =
+        `<div class="k">leaves</div><div class="v">${n + 1}</div>` +
+        `<div class="k">internal nodes created</div><div class="v">${c.nodes}</div>` +
+        `<div class="k sub">reused (repeated LCP value)</div><div class="v">${c.reuse}</div>` +
+        `<hr><div class="k">pushes</div><div class="v">${c.push}</div>` +
+        `<div class="k">pops</div><div class="v">${c.pop}</div>` +
+        `<div class="k sub">every node is pushed and popped once</div><div class="v"></div>`;
+}
+
+/* ---------------------------------------------------------------- driver */
+function render() {
+    const s = ST.steps[ST.idx]; if (!s) return;
+    renderTree(s);
+    $("status").innerHTML = s.msg;
+    hilite(s.code);
+    renderStack(s); renderKids(s); renderCost(s);
+    $("stageTitle").innerHTML = s.j >= 0 && s.j <= ST.L.length - 1
+        ? `<span style="color:var(--heading);font-weight:700">j = ${s.j}</span>` +
+          (s.d !== null ? ` &nbsp;&nbsp;d = LCP[${s.j}] = ${s.d}` : ``)
+        : `Suffix tree`;
+}
+function setIdx(i) {
+    ST.idx = Math.max(0, Math.min(i, ST.steps.length - 1));
+    $("slider").max = ST.steps.length - 1;
+    $("slider").value = ST.idx;
+    $("stepCount").textContent = `${ST.idx} / ${ST.steps.length - 1}`;
+    render();
+    $("btnPrev").disabled = $("btnFirst").disabled = ST.idx === 0;
+    $("btnNext").disabled = $("btnLast").disabled = ST.idx === ST.steps.length - 1;
+}
+function play() {
+    if (ST.timer) { stop(); return; }
+    if (ST.idx >= ST.steps.length - 1) setIdx(0);
+    $("btnPlay").textContent = "Pause";
+    const delay = () => 1250 - 110 * (+$("speed").value);
+    const tick = () => { if (ST.idx >= ST.steps.length - 1) { stop(); return; }
+        setIdx(ST.idx + 1); ST.timer = setTimeout(tick, delay()); };
+    ST.timer = setTimeout(tick, delay());
+}
+function stop() { if (ST.timer) clearTimeout(ST.timer); ST.timer = null; $("btnPlay").textContent = "Play"; }
+
+function load(raw) {
+    let p;
+    try { p = parseInput(raw); } catch (e) { $("err").textContent = e.message; return; }
+    $("err").textContent = "";
+    ST.text = p.text; ST.L = p.L; ST.LCP = p.LCP;
+    const t = buildTrace(p.text, p.L, p.LCP);
+    ST.steps = t.steps; ST.nodes = t.nodes;
+    setIdx(0);
+}
+
+(function init() {
+    const sel = $("preset");
+    PRESETS.forEach((p, i) => { const o = document.createElement("option"); o.value = i; o.textContent = p.n; sel.appendChild(o); });
+    sel.onchange = () => { stop(); $("ta").value = PRESETS[+sel.value].t; load($("ta").value); };
+    $("btnLoad").onclick = () => { stop(); load($("ta").value); };
+    $("labSeg").onclick = e => {
+        const b = e.target.closest("button"); if (!b) return;
+        [...$("labSeg").children].forEach(x => x.classList.toggle("on", x === b));
+        ST.lab = b.dataset.lab; render();
+    };
+    $("slider").oninput = () => { stop(); setIdx(+$("slider").value); };
+    $("btnNext").onclick = () => { stop(); setIdx(ST.idx + 1); };
+    $("btnPrev").onclick = () => { stop(); setIdx(ST.idx - 1); };
+    $("btnFirst").onclick = () => { stop(); setIdx(0); };
+    $("btnLast").onclick = () => { stop(); setIdx(ST.steps.length - 1); };
+    $("btnPlay").onclick = play;
+    document.addEventListener("keydown", e => {
+        if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+        if (e.key === "ArrowRight") { stop(); setIdx(ST.idx + 1); }
+        else if (e.key === "ArrowLeft") { stop(); setIdx(ST.idx - 1); }
+        else if (e.key === " ") {
+            if (document.activeElement && document.activeElement.tagName === "BUTTON") return;
+            e.preventDefault(); play();
+        }
+    });
+    renderCode();
+    $("ta").value = PRESETS[0].t;
+    load($("ta").value);
+})();
+</script>
+</body>
+</html>
